@@ -1,0 +1,18 @@
+[package]
+name = "khronos_cli"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+mlua = { git = "https://github.com/mlua-rs/mlua", branch = "dev", features = ["luau", "async"] }
+mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+tokio = { version = "1", features = ["rt"] }
+clap = { version = "4.5.20", features = ["derive", "string"] }
+env_logger = "0.11"
+khronos_runtime = { path = "../runtime" }
+
+[features]
+default = []
+ncg = ["mlua/luau-jit"]
+multithread = ["mlua_scheduler/send", "mlua_scheduler_ext/multithread"]

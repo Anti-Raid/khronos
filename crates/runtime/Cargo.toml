@@ -1,0 +1,73 @@
+[package]
+name = "khronos_runtime"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua = { git = "https://github.com/mlua-rs/mlua", branch = "dev", features = ["async", "luau", "serialize", "macros"] }
+captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
+env_logger = "0.11"
+
+# @lune/datetime
+chrono = { version = "0.4", features = ["serde"]}
+chrono-tz = "0.10"
+chrono_lc = "0.1"
+thiserror = "1.0"
+self_cell = "1"
+
+# @lune/regex
+regex = "1"
+
+# @lune/serde
+async-compression = { version = "0.4", features = [
+    "tokio",
+    "brotli",
+    "deflate",
+    "gzip",
+    "zlib",
+] }
+bstr = "1.9"
+lz4 = "1.26"
+serde_yaml = "0.9"
+toml = { version = "0.8", features = ["preserve_order"] }
+digest = "0.10.7"
+hmac = "0.12.1"
+md-5 = "0.10.6"
+sha1 = "0.10.6"
+sha2 = "0.10.8"
+sha3 = "0.10.8"
+# This feature MIGHT break due to the unstable nature of the digest crate.
+# Check before updating it.
+blake3 = { version = "=1.5.0", features = ["traits-preview"] }
+
+# Lune Roblox
+glam = "0.27"
+rand = "0.8"
+rbx_binary = "0.7.7"
+rbx_dom_weak = "2.9.0"
+rbx_reflection = "4.7.0"
+rbx_reflection_database = "0.2.12"
+rbx_xml = "0.13.5"
+
+async-trait = "0.1.80"
+
+[dependencies.serenity]
+git = "https://github.com/Anti-Raid/serenity"
+branch = "next"
+features = ["model", "http", "cache", "rustls_backend", "unstable"]
+
+[dependencies.kittycat]
+git = "https://github.com/infinitybotlist/kittycat"
+branch = "main"
+
+
+[dependencies.tokio]
+version = "1"
+features = ["sync", "macros", "rt-multi-thread", "io-util"]
+
+[features]
+default = []
