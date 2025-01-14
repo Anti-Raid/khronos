@@ -71,4 +71,54 @@ pub trait DiscordProvider: 'static + Clone {
         delete_message_seconds: u32,
         reason: Option<&str>,
     ) -> Result<()>;
+
+    /// Kicks a member from the guild
+    async fn kick_member(&self, user_id: serenity::all::UserId, reason: Option<&str>)
+        -> Result<()>;
+
+    /// Edits a member on the guild
+    async fn edit_member(
+        &self,
+        user_id: serenity::all::UserId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<()>;
+
+    /// Sends a message
+    async fn send_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        files: Vec<serenity::all::CreateAttachment<'_>>,
+        data: impl serde::Serialize,
+    ) -> Result<serenity::model::channel::Message>;
+
+    /// Creates an interaction response
+    async fn create_interaction_response(
+        &self,
+        interaction_id: serenity::all::InteractionId,
+        interaction_token: &str,
+        response: impl serde::Serialize,
+        files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<()>;
+
+    /// Gets the original interaction response
+    async fn get_original_interaction_response(
+        &self,
+        interaction_token: &str,
+    ) -> Result<serenity::model::channel::Message>;
+
+    /// Returns the guilds commands
+    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>>;
+
+    /// Returns a guild command by id
+    async fn get_guild_command(
+        &self,
+        command_id: serenity::all::CommandId,
+    ) -> Result<serenity::all::Command>;
+
+    /// Creates a guild command
+    async fn create_guild_command(
+        &self,
+        map: impl serde::Serialize,
+    ) -> Result<serenity::all::Command>;
 }

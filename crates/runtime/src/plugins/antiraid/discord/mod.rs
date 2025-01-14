@@ -693,8 +693,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .edit_member(
                         data.user_id,
                         serenity::all::EditMember::new()
-                            .audit_log_reason(data.reason.as_str())
                             .disable_communication_until(communication_disabled_until.into()),
+                        Some(data.reason.as_str())
                     )
                     .await
                     .map_err(LuaError::external)?;
@@ -766,8 +766,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let files = data.data.take_files().map_err(|e| LuaError::external(e.to_string()))?;
 
-                this.serenity_context
-                    .http
+                this.discord_provider
                     .create_interaction_response(data.interaction_id, &data.interaction_token, &data.data, files)
                     .await
                     .map_err(LuaError::external)?;
@@ -794,6 +793,23 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 )
             },
         );
+
+        methods.add_method("get_guild_command", |_, this, cmd_id: String| {
+            Ok(lua_promise!(this, cmd_id, |_lua, this, cmd_id|, {
+                let command_id: serenity::all::CommandId = cmd_id.parse().map_err(|e| {
+                    LuaError::external(format!("Invalid command id: {}", e))
+                })?;
+                this.check_action("get_guild_command".to_string())
+                    .map_err(LuaError::external)?;
+
+                let resp = this.discord_provider
+                    .get_guild_command(command_id)
+                    .await
+                    .map_err(LuaError::external)?;
+
+                Ok(Lazy::new(resp))
+            }))
+        });
 
         methods.add_method("get_guild_commands", |_, this, _g: ()| {
             Ok(lua_promise!(this, _g, |_lua, this, _g|, {

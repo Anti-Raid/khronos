@@ -152,4 +152,65 @@ impl DiscordProvider for SampleDiscordProvider {
     ) -> serenity::Result<()> {
         todo!()
     }
+
+    async fn kick_member(
+        &self,
+        _user_id: serenity::all::UserId,
+        _reason: Option<&str>,
+    ) -> serenity::Result<()> {
+        todo!()
+    }
+
+    async fn edit_member(
+        &self,
+        _user_id: serenity::all::UserId,
+        _map: impl serde::Serialize,
+        _audit_log_reason: Option<&str>,
+    ) -> serenity::Result<()> {
+        todo!()
+    }
+
+    async fn send_message(
+        &self,
+        _channel_id: serenity::all::ChannelId,
+        _files: Vec<serenity::all::CreateAttachment<'_>>,
+        _data: impl serde::Serialize,
+    ) -> serenity::Result<serenity::model::channel::Message> {
+        todo!()
+    }
+
+    async fn create_interaction_response(
+        &self,
+        _interaction_id: serenity::all::InteractionId,
+        _interaction_token: &str,
+        _response: impl serde::Serialize,
+        _files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> serenity::Result<()> {
+        todo!()
+    }
+
+    async fn get_original_interaction_response(
+        &self,
+        _interaction_token: &str,
+    ) -> serenity::Result<serenity::model::channel::Message> {
+        todo!()
+    }
+
+    async fn get_guild_commands(&self) -> serenity::Result<Vec<serenity::all::Command>> {
+        todo!()
+    }
+
+    async fn get_guild_command(
+        &self,
+        _command_id: serenity::all::CommandId,
+    ) -> serenity::Result<serenity::all::Command> {
+        todo!()
+    }
+
+    async fn create_guild_command(
+        &self,
+        _map: impl serde::Serialize,
+    ) -> serenity::Result<serenity::all::Command> {
+        todo!()
+    }
 }
