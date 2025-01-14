@@ -82,7 +82,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         KvRecord {
                             key: k.key,
                             value: k.value,
-                            exists: k.exists,
+                            exists: true,
                             created_at: k.created_at,
                             last_updated_at: k.last_updated_at,
                         }

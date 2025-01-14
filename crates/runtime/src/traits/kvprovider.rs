@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct KvRecord {
     pub key: String,
     pub value: serde_json::Value,
-    pub exists: bool,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
