@@ -212,7 +212,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .discord_provider
                     .get_automod_rule(rule_id)
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(rule))
             }))
@@ -481,7 +481,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .discord_provider
                     .edit_channel(data.channel_id, &data.data, Some(data.reason.as_str()))
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(channel))
             }))
@@ -541,7 +541,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .discord_provider
                     .delete_channel(data.channel_id, Some(data.reason.as_str()))
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(channel))
             }))
@@ -602,7 +602,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                         Some(data.reason.as_str()),
                     )
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(())
             }))
@@ -644,7 +644,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this.discord_provider
                     .kick_member(data.user_id, Some(data.reason.as_str()))
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(())
             }))
@@ -701,7 +701,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                         Some(data.reason.as_str())
                     )
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(member))
             }))
@@ -754,7 +754,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let msg = this.discord_provider
                     .send_message(guild_channel.id, files, &data.data)
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(msg))
             }))
@@ -773,7 +773,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this.discord_provider
                     .create_interaction_response(data.interaction_id, &data.interaction_token, &data.data, files)
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(())
             }))
@@ -790,7 +790,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                         let resp = this.discord_provider
                             .get_original_interaction_response(&interaction_token)
                             .await
-                            .map_err(LuaError::external)?;
+                            .map_err(|e| LuaError::external(e.to_string()))?;
 
                         Ok(Lazy::new(resp))
                     }),
@@ -809,7 +809,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let resp = this.discord_provider
                     .get_guild_command(command_id)
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(resp))
             }))
@@ -823,7 +823,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let resp = this.discord_provider
                     .get_guild_commands()
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(resp))
             }))
@@ -839,7 +839,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let resp = this.discord_provider
                     .create_guild_command(&data.data)
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(resp))
             }))

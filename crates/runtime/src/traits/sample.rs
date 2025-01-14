@@ -137,14 +137,14 @@ impl DiscordProvider for SampleDiscordProvider {
 
     async fn get_automod_rules(
         &self,
-    ) -> serenity::Result<Vec<serenity::model::guild::automod::Rule>> {
+    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error> {
         todo!()
     }
 
     async fn get_automod_rule(
         &self,
         _rule_id: serenity::all::RuleId,
-    ) -> serenity::Result<serenity::model::guild::automod::Rule> {
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
         todo!()
     }
 
@@ -153,7 +153,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _channel_id: serenity::all::ChannelId,
         _map: impl serde::Serialize,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<serenity::model::channel::GuildChannel> {
+    ) -> Result<serenity::model::channel::GuildChannel, crate::Error> {
         todo!()
     }
 
@@ -161,7 +161,7 @@ impl DiscordProvider for SampleDiscordProvider {
         &self,
         _channel_id: serenity::all::ChannelId,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<serenity::model::channel::Channel> {
+    ) -> Result<serenity::model::channel::Channel, crate::Error> {
         todo!()
     }
 
@@ -170,7 +170,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _user_id: serenity::all::UserId,
         _delete_message_seconds: u32,
         _reason: Option<&str>,
-    ) -> serenity::Result<()> {
+    ) -> Result<(), crate::Error> {
         todo!()
     }
 
@@ -178,7 +178,7 @@ impl DiscordProvider for SampleDiscordProvider {
         &self,
         _user_id: serenity::all::UserId,
         _reason: Option<&str>,
-    ) -> serenity::Result<()> {
+    ) -> Result<(), crate::Error> {
         todo!()
     }
 
@@ -187,7 +187,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _user_id: serenity::all::UserId,
         _map: impl serde::Serialize,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<serenity::all::Member> {
+    ) -> Result<serenity::all::Member, crate::Error> {
         todo!()
     }
 
@@ -196,7 +196,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _channel_id: serenity::all::ChannelId,
         _files: Vec<serenity::all::CreateAttachment<'_>>,
         _data: impl serde::Serialize,
-    ) -> serenity::Result<serenity::model::channel::Message> {
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
         todo!()
     }
 
@@ -206,32 +206,32 @@ impl DiscordProvider for SampleDiscordProvider {
         _interaction_token: &str,
         _response: impl serde::Serialize,
         _files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> serenity::Result<()> {
+    ) -> Result<(), crate::Error> {
         todo!()
     }
 
     async fn get_original_interaction_response(
         &self,
         _interaction_token: &str,
-    ) -> serenity::Result<serenity::model::channel::Message> {
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
         todo!()
     }
 
-    async fn get_guild_commands(&self) -> serenity::Result<Vec<serenity::all::Command>> {
+    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error> {
         todo!()
     }
 
     async fn get_guild_command(
         &self,
         _command_id: serenity::all::CommandId,
-    ) -> serenity::Result<serenity::all::Command> {
+    ) -> Result<serenity::all::Command, crate::Error> {
         todo!()
     }
 
     async fn create_guild_command(
         &self,
         _map: impl serde::Serialize,
-    ) -> serenity::Result<serenity::all::Command> {
+    ) -> Result<serenity::all::Command, crate::Error> {
         todo!()
     }
 }

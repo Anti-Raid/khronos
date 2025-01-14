@@ -1,5 +1,4 @@
-use nonmax::NonMaxU8;
-use serenity::all::*;
+use serenity::nonmax::NonMaxU8;
 
 /// A discord provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -12,7 +11,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// Fetches the target guild.
     ///
     /// This should return an error if the guild does not exist
-    async fn guild(&self) -> Result<PartialGuild, crate::Error>;
+    async fn guild(&self) -> Result<serenity::all::PartialGuild, crate::Error>;
 
     /// Returns a member from the guild.
     ///
@@ -35,19 +34,21 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_audit_logs(
         &self,
         action_type: Option<serenity::all::audit_log::Action>,
-        user_id: Option<UserId>,
-        before: Option<AuditLogEntryId>,
+        user_id: Option<serenity::all::UserId>,
+        before: Option<serenity::all::AuditLogEntryId>,
         limit: Option<NonMaxU8>,
-    ) -> Result<AuditLogs, crate::Error>;
+    ) -> Result<serenity::all::AuditLogs, crate::Error>;
 
     /// Retrieves all auto moderation rules in a guild.
-    async fn get_automod_rules(&self) -> Result<Vec<serenity::model::guild::automod::Rule>>;
+    async fn get_automod_rules(
+        &self,
+    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error>;
 
     /// Retrieves an auto moderation rule in a guild.
     async fn get_automod_rule(
         &self,
         rule_id: serenity::all::RuleId,
-    ) -> Result<serenity::model::guild::automod::Rule>;
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
 
     /// Edits a discord channel
     async fn edit_channel(
@@ -55,14 +56,14 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::GuildChannel>;
+    ) -> Result<serenity::model::channel::GuildChannel, crate::Error>;
 
     /// Deletes a discord channel
     async fn delete_channel(
         &self,
         channel_id: serenity::all::ChannelId,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel>;
+    ) -> Result<serenity::model::channel::Channel, crate::Error>;
 
     /// Creates a ban for a user
     async fn create_member_ban(
@@ -70,11 +71,14 @@ pub trait DiscordProvider: 'static + Clone {
         user_id: serenity::all::UserId,
         delete_message_seconds: u32,
         reason: Option<&str>,
-    ) -> Result<()>;
+    ) -> Result<(), crate::Error>;
 
     /// Kicks a member from the guild
-    async fn kick_member(&self, user_id: serenity::all::UserId, reason: Option<&str>)
-        -> Result<()>;
+    async fn kick_member(
+        &self,
+        user_id: serenity::all::UserId,
+        reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
 
     /// Edits a member on the guild
     async fn edit_member(
@@ -82,7 +86,7 @@ pub trait DiscordProvider: 'static + Clone {
         user_id: serenity::all::UserId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Member>;
+    ) -> Result<serenity::all::Member, crate::Error>;
 
     /// Sends a message
     async fn send_message(
@@ -90,7 +94,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serenity::model::channel::Message>;
+    ) -> Result<serenity::model::channel::Message, crate::Error>;
 
     /// Creates an interaction response
     async fn create_interaction_response(
@@ -99,26 +103,26 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_token: &str,
         response: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<()>;
+    ) -> Result<(), crate::Error>;
 
     /// Gets the original interaction response
     async fn get_original_interaction_response(
         &self,
         interaction_token: &str,
-    ) -> Result<serenity::model::channel::Message>;
+    ) -> Result<serenity::model::channel::Message, crate::Error>;
 
     /// Returns the guilds commands
-    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>>;
+    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error>;
 
     /// Returns a guild command by id
     async fn get_guild_command(
         &self,
         command_id: serenity::all::CommandId,
-    ) -> Result<serenity::all::Command>;
+    ) -> Result<serenity::all::Command, crate::Error>;
 
     /// Creates a guild command
     async fn create_guild_command(
         &self,
         map: impl serde::Serialize,
-    ) -> Result<serenity::all::Command>;
+    ) -> Result<serenity::all::Command, crate::Error>;
 }
