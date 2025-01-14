@@ -153,7 +153,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _channel_id: serenity::all::ChannelId,
         _map: impl serde::Serialize,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<serenity::model::channel::Channel> {
+    ) -> serenity::Result<serenity::model::channel::GuildChannel> {
         todo!()
     }
 

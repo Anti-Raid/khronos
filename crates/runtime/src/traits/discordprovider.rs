@@ -55,7 +55,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel>;
+    ) -> Result<serenity::model::channel::GuildChannel>;
 
     /// Deletes a discord channel
     async fn delete_channel(
