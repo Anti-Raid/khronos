@@ -68,6 +68,18 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(v)
         });
 
+        fields.add_field_method_get("owner_guild_id", |lua, this| {
+            let v = lua.to_value(&this.context.owner_guild_id())?;
+
+            Ok(v)
+        });
+
+        fields.add_field_method_get("allowed_caps", |lua, this| {
+            let v = lua.to_value(this.context.allowed_caps())?;
+
+            Ok(v)
+        });
+
         fields.add_field_method_get("current_user", |lua, this| {
             // Check for cached serialized data
             let mut cached_data = this
@@ -84,6 +96,12 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             *cached_data = Some(v.clone());
 
             Ok(v)
+        });
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("has_cap", |_, this, cap: String| {
+            Ok(this.context.has_cap(&cap))
         });
     }
 }

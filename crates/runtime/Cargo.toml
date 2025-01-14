@@ -6,11 +6,16 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+governor = "0.6"
+log = "0.4"
+extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
+indexmap = { version = "2", features = ["serde"] }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua = { git = "https://github.com/mlua-rs/mlua", branch = "dev", features = ["async", "luau", "serialize", "macros"] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 env_logger = "0.11"
+arrayvec = "0.7"
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}
@@ -52,8 +57,6 @@ rbx_dom_weak = "2.9.0"
 rbx_reflection = "4.7.0"
 rbx_reflection_database = "0.2.12"
 rbx_xml = "0.13.5"
-
-async-trait = "0.1.80"
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"

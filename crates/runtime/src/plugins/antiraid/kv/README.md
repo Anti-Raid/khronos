@@ -35,13 +35,6 @@ KvRecord represents a key-value record with metadata.
 
 KvExecutor allows templates to get, store and find persistent data within a scope.
 
-#### Fields
-
-- `guild_id` ([string](#type.string)): The guild ID the executor will perform key-value operations on.
-- `origin_guild_id` ([string](#type.string)): The originating guild ID (the guild ID of the template itself).
-- `scope` ([string](#type.string)): The scope of the executor. Either ``this_guild`` for the originating guild, or ``owner_guild`` for the guild that owns the template (the template that owns the template on the shop if a shop template or the guild that owns the template otherwise).
-
-
 #### Methods
 
 ##### KvExecutor:find
@@ -166,3 +159,12 @@ function new(token: TemplateContext, scope: string?): KvExecutor
 #### Returns
 
 - `executor` ([KvExecutor](#type.KvExecutor)): A key-value executor.
+
+
+TO MOVE TO PRIMITIVES DOCS
+
+- `guild_id` ([string](#type.string)): The guild ID the executor will perform key-value operations on.
+- `origin_guild_id` ([string](#type.string)): The originating guild ID (the guild ID of the template itself).
+- `allowed_caps` ([{string}](#type.{string})): The allowed capabilities in the current context.
+- `has_cap` ([function](#type.function)): A function that returns `true` if the current context has the capability specified.
+- `scope` ([string](#type.string)): The scope of the executor. Either ``this_guild`` for the originating guild, or ``owner_guild`` for the guild that owns the template (the template that owns the template on the shop if a shop template or the guild that owns the template otherwise).

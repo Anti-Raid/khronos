@@ -10,15 +10,9 @@ use crate::utils::executorscope::ExecutorScope;
 /// An kv executor is used to execute key-value ops from Lua
 /// templates
 #[derive(Clone)]
-pub struct KvExecutor<T: KVProvider> {
-    /// The guild ID to execute the operation on
-    ///
-    /// This can be either ThisGuild or OwnerGuild
-    guild_id: Option<serenity::all::GuildId>,
-    /// The origin guild id
-    origin_guild_id: Option<serenity::all::GuildId>,
-    scope: ExecutorScope,
-    kv_provider: T,
+pub struct KvExecutor<T: KhronosContext> {
+    context: T,
+    kv_provider: T::KVProvider,
 }
 
 /// Represents a full record complete with metadata
@@ -43,22 +37,44 @@ impl KvRecord {
     }
 }
 
-impl<T: KVProvider> LuaUserData for KvExecutor<T> {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("guild_id", |lua, this| {
-            let value = lua.to_value(&this.guild_id)?;
-            Ok(value)
-        });
-        fields.add_field_method_get("origin_guild_id", |lua, this| {
-            let value = lua.to_value(&this.origin_guild_id)?;
-            Ok(value)
-        });
-        fields.add_field_method_get("scope", |_, this| Ok(this.scope.to_string()));
-    }
+impl<T: KhronosContext> KvExecutor<T> {
+    pub fn check(&self, action: String, key: String) -> Result<(), crate::Error> {
+        if !self
+        .context
+        .has_cap("kv:*") // KV:* means all KV operations are allowed
+        && !self
+        .context
+        .has_cap(&format!("kv:{}:*", action)) // kv:{action}:* means that the action can be performed on any key
+        && !self
+        .context
+        .has_cap(&format!("kv:{}:{}", action, key)) // kv:{action}:{key} means that the action can only be performed on said key
+        && !self
+        .context
+        .has_cap(&format!("kv:*:{}", key))
+        // kv:*:{key} means that any action can be performed on said key
+        {
+            return Err(format!(
+                "KV operation `{}` not allowed in this template context for key '{}'",
+                action, key
+            )
+            .into());
+        }
 
+        self.kv_provider.attempt_action(&action)?; // Check rate limits
+
+        Ok(())
+    }
+}
+
+impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("KvExecutor"));
+
         methods.add_method("find", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
+                this.check("find".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 let records = this.kv_provider.find(key).await
                     .map_err(|e| LuaError::external(e.to_string()))?
                     .into_iter()
@@ -81,6 +97,9 @@ impl<T: KVProvider> LuaUserData for KvExecutor<T> {
 
         methods.add_method("exists", |_, this, key: String| {
             Ok(lua_promise!(this, key, |_lua, this, key|, {
+                this.check("exists".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 let exists = this.kv_provider.exists(key).await
                 .map_err(|e| LuaError::external(e.to_string()))?;
                 Ok(exists)
@@ -89,6 +108,9 @@ impl<T: KVProvider> LuaUserData for KvExecutor<T> {
 
         methods.add_method("get", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
+                this.check("get".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 let record = this.kv_provider.get(key).await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -106,6 +128,9 @@ impl<T: KVProvider> LuaUserData for KvExecutor<T> {
 
         methods.add_method("getrecord", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
+                this.check("get".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 let record = this.kv_provider.get(key).await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -127,6 +152,9 @@ impl<T: KVProvider> LuaUserData for KvExecutor<T> {
 
         methods.add_method("set", |_, this, (key, value): (String, LuaValue)| {
             Ok(lua_promise!(this, key, value, |lua, this, key, value|, {
+                this.check("set".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 this.kv_provider.set(key, lua.from_value(value)?).await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
                 Ok(())
@@ -135,6 +163,9 @@ impl<T: KVProvider> LuaUserData for KvExecutor<T> {
 
         methods.add_method("delete", |_lua, this, key: String| {
             Ok(lua_promise!(this, key, |_lua, this, key|, {
+                this.check("delete".to_string(), key.clone())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 this.kv_provider.delete(key).await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -152,13 +183,13 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(
             |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
                 let scope = ExecutorScope::scope_str(scope)?;
-                let Some((guild_id, kv_provider)) = token.context.kv_executor(scope) else {
-                    return Err(LuaError::external("KV provider not found"));
+                let Some(kv_provider) = token.context.kv_provider(scope) else {
+                    return Err(LuaError::external(
+                        "The key-value plugin is not supported in this context",
+                    ));
                 };
                 let executor = KvExecutor {
-                    origin_guild_id: token.context.guild_id(),
-                    guild_id,
-                    scope,
+                    context: token.context.clone(),
                     kv_provider,
                 };
 

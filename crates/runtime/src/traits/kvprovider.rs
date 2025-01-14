@@ -13,6 +13,11 @@ pub struct KvRecord {
 /// A key-value provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
 pub trait KVProvider: 'static + Clone {
+    /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
+    ///
+    /// This should return an error if ratelimited
+    fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
+
     /// Finds all records with the specified query. % means wildcard before/after query. E.g. %abc% will match any occurrence of abc
     async fn find(&self, query: String) -> Result<Vec<KvRecord>, crate::Error>;
 
