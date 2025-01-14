@@ -7,5 +7,6 @@ pub mod lazy;
 pub mod lockdowns;
 pub mod permissions;
 pub mod promise;
+pub mod stings;
 pub mod typesext;
 pub mod userinfo;

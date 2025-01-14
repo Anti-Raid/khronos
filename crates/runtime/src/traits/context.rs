@@ -1,6 +1,6 @@
 use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
-    userinfoprovider::UserInfoProvider,
+    stingprovider::StingProvider, userinfoprovider::UserInfoProvider,
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -10,6 +10,7 @@ pub trait KhronosContext: 'static + Clone {
     type DiscordProvider: DiscordProvider;
     type LockdownProvider: LockdownProvider;
     type UserInfoProvider: UserInfoProvider;
+    type StingProvider: StingProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -48,4 +49,7 @@ pub trait KhronosContext: 'static + Clone {
 
     /// Returns a UserInfo provider with the given scope
     fn userinfo_provider(&self, scope: ExecutorScope) -> Option<Self::UserInfoProvider>;
+
+    /// Returns a Sting provider with the given scope
+    fn sting_provider(&self, scope: ExecutorScope) -> Option<Self::StingProvider>;
 }

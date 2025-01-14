@@ -6,6 +6,7 @@ use super::context::KhronosContext;
 use super::discordprovider::DiscordProvider;
 use super::kvprovider::{self, KVProvider};
 use super::lockdownprovider::LockdownProvider;
+use super::stingprovider::StingProvider;
 use super::userinfoprovider::UserInfoProvider;
 
 #[derive(Clone)]
@@ -19,6 +20,7 @@ impl KhronosContext for SampleKhronosContext {
     type DiscordProvider = SampleDiscordProvider;
     type LockdownProvider = SampleLockdownProvider;
     type UserInfoProvider = SampleUserInfoProvider;
+    type StingProvider = SampleStingProvider;
 
     fn data(&self) -> Self::Data {
         todo!()
@@ -54,6 +56,10 @@ impl KhronosContext for SampleKhronosContext {
 
     fn userinfo_provider(&self, _scope: ExecutorScope) -> Option<Self::UserInfoProvider> {
         Some(SampleUserInfoProvider {})
+    }
+
+    fn sting_provider(&self, _scope: ExecutorScope) -> Option<Self::StingProvider> {
+        Some(SampleStingProvider {})
     }
 }
 
@@ -279,6 +285,41 @@ impl UserInfoProvider for SampleUserInfoProvider {
     }
 
     async fn get(&self, _user_id: serenity::all::UserId) -> Result<UserInfo, crate::Error> {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct SampleStingProvider {}
+
+impl StingProvider for SampleStingProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn list(&self, _page: usize) -> Result<Vec<antiraid_types::stings::Sting>, crate::Error> {
+        todo!()
+    }
+
+    async fn get(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<Option<antiraid_types::stings::Sting>, crate::Error> {
+        todo!()
+    }
+
+    async fn create(
+        &self,
+        _sting: antiraid_types::stings::StingCreate,
+    ) -> Result<uuid::Uuid, crate::Error> {
+        todo!()
+    }
+
+    async fn update(&self, _sting: antiraid_types::stings::Sting) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn delete(&self, _id: uuid::Uuid) -> Result<(), crate::Error> {
         todo!()
     }
 }
