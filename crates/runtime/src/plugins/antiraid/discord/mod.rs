@@ -708,6 +708,58 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
+        methods.add_method("get_messages", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetMessagesOptions>(data)?;
+
+                this.check_action("get_messages".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let guild_channel = this.discord_provider.guild_channel(data.channel_id).await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                    .map_err(|e| LuaError::external(e.to_string()))?
+                else {
+                    return Err(LuaError::runtime("Bot user not found in guild"));
+                };
+
+                let guild = this.discord_provider.guild().await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                // Check if the bot has permissions to send messages in the given channel
+                if !guild
+                    .user_permissions_in(&guild_channel, &bot_member)
+                    .view_channel()
+                {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to send messages in the given channel",
+                    ));
+                }
+
+                if guild_channel.kind == serenity::all::ChannelType::Voice && !guild
+                .user_permissions_in(&guild_channel, &bot_member)
+                .connect() {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to connect to the given voice channel",
+                    ));
+                }
+
+                let msg = this.discord_provider
+                    .get_messages(data.channel_id, data.target.map(|x| x.to_serenity()), data.limit)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        // Should be documented
         methods.add_method("create_message", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data = lua.from_value::<structs::CreateMessageOptions>(data)?;
@@ -752,7 +804,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 };
 
                 let msg = this.discord_provider
-                    .send_message(guild_channel.id, files, &data.data)
+                    .create_message(guild_channel.id, files, &data.data)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 

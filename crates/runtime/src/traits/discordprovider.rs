@@ -88,8 +88,23 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::Member, crate::Error>;
 
-    /// Sends a message
-    async fn send_message(
+    /// Gets messages from a channel based on target+limit
+    async fn get_messages(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        target: Option<serenity::all::MessagePagination>,
+        limit: Option<NonMaxU8>,
+    ) -> Result<Vec<serenity::all::Message>, crate::Error>;
+
+    /// Gets a message from a channel
+    async fn get_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error>;
+
+    /// Creates a discord message
+    async fn create_message(
         &self,
         channel_id: serenity::all::ChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,

@@ -37,6 +37,19 @@ pub struct DeleteChannelOptions {
     pub reason: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetMessagesOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub target: Option<MessagePagination>,
+    pub limit: Option<serenity::nonmax::NonMaxU8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetMessageOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub message_id: serenity::all::MessageId,
+}
+
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateMessageOptions {
     pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
@@ -53,4 +66,23 @@ pub struct CreateInteractionResponseOptions {
     pub interaction_id: serenity::all::InteractionId,
     pub interaction_token: String,
     pub data: CreateInteractionResponse,
+}
+
+/// In Luau { type: "After" | "Around" | "Before", id: MessageId }
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug)]
+#[serde(tag = "type")]
+pub enum MessagePagination {
+    After { id: serenity::all::MessageId },
+    Around { id: serenity::all::MessageId },
+    Before { id: serenity::all::MessageId },
+}
+
+impl MessagePagination {
+    pub fn to_serenity(self) -> serenity::all::MessagePagination {
+        match self {
+            Self::After { id } => serenity::all::MessagePagination::After(id),
+            Self::Around { id } => serenity::all::MessagePagination::Around(id),
+            Self::Before { id } => serenity::all::MessagePagination::Before(id),
+        }
+    }
 }

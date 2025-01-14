@@ -191,7 +191,7 @@ impl DiscordProvider for SampleDiscordProvider {
         todo!()
     }
 
-    async fn send_message(
+    async fn create_message(
         &self,
         _channel_id: serenity::all::ChannelId,
         _files: Vec<serenity::all::CreateAttachment<'_>>,
@@ -232,6 +232,23 @@ impl DiscordProvider for SampleDiscordProvider {
         &self,
         _map: impl serde::Serialize,
     ) -> Result<serenity::all::Command, crate::Error> {
+        todo!()
+    }
+
+    async fn get_messages(
+        &self,
+        _channel_id: serenity::all::ChannelId,
+        _target: Option<serenity::all::MessagePagination>,
+        _limit: Option<serenity::nonmax::NonMaxU8>,
+    ) -> Result<Vec<serenity::all::Message>, crate::Error> {
+        todo!()
+    }
+
+    async fn get_message(
+        &self,
+        _channel_id: serenity::all::ChannelId,
+        _message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error> {
         todo!()
     }
 }
