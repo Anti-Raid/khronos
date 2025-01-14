@@ -9,9 +9,10 @@ use super::lockdownprovider::LockdownProvider;
 use super::stingprovider::StingProvider;
 use super::userinfoprovider::UserInfoProvider;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct SampleKhronosContext {
     v: Vec<String>,
+    _d: Option<serenity::all::Context>,
 }
 
 impl KhronosContext for SampleKhronosContext {
