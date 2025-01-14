@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use antiraid_types::userinfo::UserInfo;
 
 use crate::utils::executorscope::ExecutorScope;
@@ -13,6 +15,7 @@ use super::userinfoprovider::UserInfoProvider;
 pub struct SampleKhronosContext {
     v: Vec<String>,
     _d: Option<serenity::all::Context>,
+    _rc: Rc<String>,
 }
 
 impl KhronosContext for SampleKhronosContext {

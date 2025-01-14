@@ -9,28 +9,26 @@ use crate::{
 ///
 /// This can be used to make plugin loading easier but is not strictly required
 /// to use Khronos.
-pub struct PluginSet<T: KhronosContext> {
+pub struct PluginSet {
     pub plugins: indexmap::IndexMap<String, fn(&Lua) -> LuaResult<LuaTable>>,
-    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: KhronosContext> Default for PluginSet<T> {
+impl Default for PluginSet {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: KhronosContext> PluginSet<T> {
+impl PluginSet {
     /// Creates a new plugin set.
     pub fn new() -> Self {
         Self {
             plugins: indexmap::IndexMap::new(),
-            _phantom: std::marker::PhantomData,
         }
     }
 
     /// Adds the default Khronos plugins to the plugin set.
-    pub fn add_default_plugins(&mut self) {
+    pub fn add_default_plugins<T: KhronosContext>(&mut self) {
         // Antiraid plugins
 
         self.add_plugin("@antiraid/discord", antiraid::discord::init_plugin::<T>);
@@ -79,8 +77,14 @@ impl<T: KhronosContext> PluginSet<T> {
 mod test {
     #[test]
     pub fn test_plugin_set() {
-        let mut my_plugin_set =
-            super::PluginSet::<crate::traits::sample::SampleKhronosContext>::new();
+        pub static _KHRONOS_PLUGINSET: std::sync::LazyLock<super::PluginSet> =
+            std::sync::LazyLock::new(|| {
+                let mut plugins = super::PluginSet::new();
+                plugins.add_default_plugins::<crate::traits::sample::SampleKhronosContext>();
+                plugins
+            });
+
+        let mut my_plugin_set = super::PluginSet::new();
         my_plugin_set.add_plugin(
             "@antiraid/kv".to_string(),
             crate::plugins::antiraid::kv::init_plugin::<crate::traits::sample::SampleKhronosContext>,
@@ -91,6 +95,6 @@ mod test {
             crate::plugins::antiraid::kv::init_plugin::<crate::traits::sample::SampleKhronosContext>,
         );
 
-        my_plugin_set.add_default_plugins();
+        my_plugin_set.add_default_plugins::<crate::traits::sample::SampleKhronosContext>();
     }
 }
