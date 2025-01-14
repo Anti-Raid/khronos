@@ -62,7 +62,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::ChannelId,
         audit_log_reason: Option<&str>,
-    ) -> Result<()>;
+    ) -> Result<serenity::model::channel::Channel>;
 
     /// Creates a ban for a user
     async fn create_member_ban(
@@ -82,7 +82,7 @@ pub trait DiscordProvider: 'static + Clone {
         user_id: serenity::all::UserId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<()>;
+    ) -> Result<serenity::all::Member>;
 
     /// Sends a message
     async fn send_message(

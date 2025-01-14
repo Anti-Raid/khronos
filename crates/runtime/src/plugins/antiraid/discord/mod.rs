@@ -130,6 +130,10 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
 
 impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| {
+            Ok("DiscordActionExecutor")
+        });
+
         // Audit Log
 
         // Should be documented

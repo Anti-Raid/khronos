@@ -1,10 +1,15 @@
-use super::{discordprovider::DiscordProvider, kvprovider::KVProvider};
+use super::{
+    discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
+    userinfoprovider::UserInfoProvider,
+};
 use crate::utils::executorscope::ExecutorScope;
 
 pub trait KhronosContext: 'static + Clone {
     type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
+    type LockdownProvider: LockdownProvider;
+    type UserInfoProvider: UserInfoProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -37,4 +42,10 @@ pub trait KhronosContext: 'static + Clone {
     /// Returns a Discord provider with the given scope
     /// This is used to interact with Discord API
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider>;
+
+    /// Returns a Lockdown provider with the given scope
+    fn lockdown_provider(&self, scope: ExecutorScope) -> Option<Self::LockdownProvider>;
+
+    /// Returns a UserInfo provider with the given scope
+    fn userinfo_provider(&self, scope: ExecutorScope) -> Option<Self::UserInfoProvider>;
 }

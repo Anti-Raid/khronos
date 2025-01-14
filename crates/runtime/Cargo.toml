@@ -14,6 +14,7 @@ mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua = { git = "https://github.com/mlua-rs/mlua", branch = "dev", features = ["async", "luau", "serialize", "macros"] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
+antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 env_logger = "0.11"
 arrayvec = "0.7"
 
@@ -67,10 +68,13 @@ features = ["model", "http", "cache", "rustls_backend", "unstable"]
 git = "https://github.com/infinitybotlist/kittycat"
 branch = "main"
 
-
 [dependencies.tokio]
 version = "1"
 features = ["sync", "macros", "rt-multi-thread", "io-util"]
+
+[dependencies.uuid]
+version = "1"
+features = ["v4", "fast-rng", "serde"]
 
 [features]
 default = []

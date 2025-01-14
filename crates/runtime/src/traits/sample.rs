@@ -1,8 +1,12 @@
+use antiraid_types::userinfo::UserInfo;
+
 use crate::utils::executorscope::ExecutorScope;
 
 use super::context::KhronosContext;
 use super::discordprovider::DiscordProvider;
 use super::kvprovider::{self, KVProvider};
+use super::lockdownprovider::LockdownProvider;
+use super::userinfoprovider::UserInfoProvider;
 
 #[derive(Clone)]
 pub struct SampleKhronosContext {
@@ -13,6 +17,8 @@ impl KhronosContext for SampleKhronosContext {
     type Data = ();
     type KVProvider = SampleKVProvider;
     type DiscordProvider = SampleDiscordProvider;
+    type LockdownProvider = SampleLockdownProvider;
+    type UserInfoProvider = SampleUserInfoProvider;
 
     fn data(&self) -> Self::Data {
         todo!()
@@ -40,6 +46,14 @@ impl KhronosContext for SampleKhronosContext {
 
     fn discord_provider(&self, _scope: ExecutorScope) -> Option<Self::DiscordProvider> {
         Some(SampleDiscordProvider {})
+    }
+
+    fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
+        Some(SampleLockdownProvider {})
+    }
+
+    fn userinfo_provider(&self, _scope: ExecutorScope) -> Option<Self::UserInfoProvider> {
+        Some(SampleUserInfoProvider {})
     }
 }
 
@@ -140,7 +154,7 @@ impl DiscordProvider for SampleDiscordProvider {
         &self,
         _channel_id: serenity::all::ChannelId,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<()> {
+    ) -> serenity::Result<serenity::model::channel::Channel> {
         todo!()
     }
 
@@ -166,7 +180,7 @@ impl DiscordProvider for SampleDiscordProvider {
         _user_id: serenity::all::UserId,
         _map: impl serde::Serialize,
         _audit_log_reason: Option<&str>,
-    ) -> serenity::Result<()> {
+    ) -> serenity::Result<serenity::all::Member> {
         todo!()
     }
 
@@ -211,6 +225,60 @@ impl DiscordProvider for SampleDiscordProvider {
         &self,
         _map: impl serde::Serialize,
     ) -> serenity::Result<serenity::all::Command> {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct SampleLockdownProvider {}
+
+impl LockdownProvider for SampleLockdownProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn list(&self) -> Result<Vec<super::lockdownprovider::Lockdown>, crate::Error> {
+        todo!()
+    }
+
+    async fn qsl(&self, _reason: String) -> Result<uuid::Uuid, crate::Error> {
+        todo!()
+    }
+
+    async fn tsl(&self, _reason: String) -> Result<uuid::Uuid, crate::Error> {
+        todo!()
+    }
+
+    async fn scl(
+        &self,
+        _channel_id: serenity::all::ChannelId,
+        _reason: String,
+    ) -> Result<uuid::Uuid, crate::Error> {
+        todo!()
+    }
+
+    async fn role(
+        &self,
+        _role_id: serenity::all::RoleId,
+        _reason: String,
+    ) -> Result<uuid::Uuid, crate::Error> {
+        todo!()
+    }
+
+    async fn remove(&self, _id: uuid::Uuid) -> Result<(), crate::Error> {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct SampleUserInfoProvider {}
+
+impl UserInfoProvider for SampleUserInfoProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn get(&self, _user_id: serenity::all::UserId) -> Result<UserInfo, crate::Error> {
         todo!()
     }
 }

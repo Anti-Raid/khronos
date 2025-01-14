@@ -4,6 +4,8 @@ pub mod img_captcha;
 pub mod interop;
 pub mod kv;
 pub mod lazy;
+pub mod lockdowns;
 pub mod permissions;
 pub mod promise;
 pub mod typesext;
+pub mod userinfo;
