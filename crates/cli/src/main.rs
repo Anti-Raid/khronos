@@ -95,19 +95,12 @@ fn main() {
                 thread_tracker,
                 TaskPrintError {},
             )),
+            Duration::from_millis(1),
         );
 
         let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
 
         scheduler.attach();
-
-        let task_mgr_ref = task_mgr.clone();
-        local.spawn_local(async move {
-            task_mgr_ref
-                .run(Duration::from_millis(1))
-                .await
-                .expect("Failed to run task manager");
-        });
 
         lua.globals()
             .set("_OS", OS.to_lowercase())

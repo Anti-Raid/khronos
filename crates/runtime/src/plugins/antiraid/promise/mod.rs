@@ -120,6 +120,8 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -167,19 +169,12 @@ mod tests {
                     thread_tracker,
                     TaskPrintError {},
                 )),
+                Duration::from_millis(1),
             );
 
             let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
 
             scheduler.attach();
-
-            let task_mgr_ref = task_mgr.clone();
-            local.spawn_local(async move {
-                task_mgr_ref
-                    .run(std::time::Duration::from_millis(1))
-                    .await
-                    .expect("Failed to run task manager");
-            });
 
             let a = 3;
             let test_promise = lua_promise!(a, |_lua, a|, {
