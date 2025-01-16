@@ -112,7 +112,10 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 log::info!("Starting get operation");
 
                 this.check("get".to_string(), key.clone())
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
+                .map_err(|e| {
+                    println!("Error: {}", e);
+                    LuaError::runtime(e.to_string())
+                })?;
 
                 log::info!("Getting key: {}", key);
 
