@@ -69,6 +69,7 @@ impl<T: KhronosContext> KvExecutor<T> {
 impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("KvExecutor"));
+        methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));
 
         methods.add_method("find", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
@@ -108,8 +109,12 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_method("get", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
+                log::info!("Starting get operation");
+
                 this.check("get".to_string(), key.clone())
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                log::info!("Getting key: {}", key);
 
                 let record = this.kv_provider.get(key).await
                     .map_err(|e| LuaError::external(e.to_string()))?;

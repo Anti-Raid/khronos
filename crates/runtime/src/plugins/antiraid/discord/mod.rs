@@ -133,6 +133,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| {
             Ok("DiscordActionExecutor")
         });
+        methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| {
+            Ok("DiscordActionExecutor")
+        });
 
         // Audit Log
 
