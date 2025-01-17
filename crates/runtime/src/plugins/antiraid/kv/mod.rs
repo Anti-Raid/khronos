@@ -113,7 +113,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 this.check("get".to_string(), key.clone())
                 .map_err(|e| {
-                    println!("Error: {}", e);
                     LuaError::runtime(e.to_string())
                 })?;
 

@@ -25,9 +25,10 @@ pub struct DiscordActionExecutor<T: KhronosContext> {
 impl<T: KhronosContext> DiscordActionExecutor<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
         if !self.context.has_cap(&format!("discord:{}", action)) {
-            return Err(LuaError::runtime(
-                "Discord action not allowed in this template context",
-            ));
+            return Err(LuaError::runtime(format!(
+                "Discord action `{}` not allowed in this template context",
+                action
+            )));
         }
 
         self.discord_provider
