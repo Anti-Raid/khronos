@@ -28,8 +28,15 @@ impl<T: KhronosContext> Chunk<T> {
     }
 
     pub fn setup_chunk(&self, lua: &Lua) -> LuaResult<LuaChunk<'_>> {
-        let mut chunk = lua.load(&self.code);
-        chunk = chunk.set_mode(mlua::ChunkMode::Text); // Ensure we only load text chunks
+        let mut compiler = mlua::Compiler::new();
+        if let Some(level) = self.optimization_level {
+            compiler = compiler.set_optimization_level(level);
+        }
+
+        let bytecode = compiler.compile(&self.code)?;
+
+        let mut chunk = lua.load(bytecode);
+        chunk = chunk.set_mode(mlua::ChunkMode::Binary); // We've compiled it anyways so
 
         if let Some(name) = &self.chunk_name {
             chunk = chunk.set_name(name);
@@ -37,11 +44,6 @@ impl<T: KhronosContext> Chunk<T> {
 
         if let Some(env) = &self.environment {
             chunk = chunk.set_environment(env.clone());
-        }
-
-        let mut compiler = mlua::Compiler::new();
-        if let Some(level) = self.optimization_level {
-            compiler = compiler.set_optimization_level(level);
         }
 
         chunk = chunk.set_compiler(compiler);
@@ -73,7 +75,7 @@ impl<T: KhronosContext> LuaUserData for Chunk<T> {
         });
         fields.add_field_method_get("code", |_, this| Ok(this.code.clone()));
         fields.add_field_method_set("code", |_, this, code: String| {
-            this.check_action("eval.set_code".to_string())?;
+            this.check_action("eval.modify_set_code".to_string())?;
             this.code = code;
             Ok(())
         });
