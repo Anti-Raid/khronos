@@ -5,6 +5,7 @@ pub mod interop;
 pub mod kv;
 pub mod lazy;
 pub mod lockdowns;
+pub mod luau;
 pub mod permissions;
 pub mod promise;
 pub mod stings;
