@@ -67,6 +67,10 @@ impl<T: KhronosContext> KvExecutor<T> {
 }
 
 impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "KvExecutor");
+    }
+
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("KvExecutor"));
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));

@@ -29,9 +29,11 @@ impl<T: KhronosContext> StingExecutor<T> {
 }
 
 impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| Ok("StingExecutor"));
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "StingExecutor");
+    }
 
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("list", |_, this, page: usize| {
             Ok(lua_promise!(this, page, |lua, this, page|, {
                 this.check_action("list".to_string())

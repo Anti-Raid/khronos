@@ -33,9 +33,11 @@ impl<T: KhronosContext> LockdownExecutor<T> {
 }
 
 impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| Ok("LockdownExecutor"));
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "LockdownExecutor");
+    }
 
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("list", |_, this, _g: ()| {
             Ok(lua_promise!(this, _g, |lua, this, _g|, {
                 this.check_action("list".to_string())?;

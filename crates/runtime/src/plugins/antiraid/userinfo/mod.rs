@@ -33,9 +33,11 @@ impl<T: KhronosContext> UserInfoExecutor<T> {
 }
 
 impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| Ok("UserInfoExecutor"));
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "UserInfoExecutor");
+    }
 
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("get", |_, this, (user,): (String,)| {
             let user: serenity::all::UserId = user
                 .parse()

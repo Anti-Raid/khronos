@@ -130,10 +130,11 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
 }
 
 impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "DiscordActionExecutor");
+    }
+
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, (): ()| {
-            Ok("DiscordActionExecutor")
-        });
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| {
             Ok("DiscordActionExecutor")
         });

@@ -47,10 +47,6 @@ impl LuaUserData for TimeDelta {
             |_, this, other: LuaUserDataRef<TimeDelta>| Ok(this.timedelta < other.timedelta),
         );
 
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, _: ()| {
-            Ok("TimeDelta".to_string())
-        });
-
         methods.add_method("offset_string", |_, this, ()| {
             Ok(format!(
                 "{}{:02}:{:02}",
@@ -66,6 +62,7 @@ impl LuaUserData for TimeDelta {
     }
 
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "TimeDelta".to_string());
         fields.add_field_method_get("nanos", |_, this| Ok(this.timedelta.num_nanoseconds()));
         fields.add_field_method_get("micros", |_, this| Ok(this.timedelta.num_microseconds()));
         fields.add_field_method_get("millis", |_, this| Ok(this.timedelta.num_milliseconds()));
@@ -128,11 +125,6 @@ where
         methods.add_meta_method(
             LuaMetaMethod::Lt,
             |_, this, other: LuaUserDataRef<DateTime<Tz>>| Ok(this.dt < other.dt),
-        );
-
-        methods.add_meta_method(
-            LuaMetaMethod::Type,
-            |_, _, _: ()| Ok("DateTime".to_string()),
         );
 
         methods.add_method("with_timezone", |_, this, tz: LuaUserDataRef<Timezone>| {
