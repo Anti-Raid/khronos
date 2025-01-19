@@ -888,6 +888,29 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
+        methods.add_method("create_followup_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::CreateFollowupMessageOptions>(data)?;
+
+                this.check_action("create_followup_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                let files = if let Some(ref attachments) = data.data.attachments {
+                    attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+                } else {
+                    Vec::new()
+                };
+
+
+                this.discord_provider
+                    .create_followup_message(&data.interaction_token, &data.data, files)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
+            }))
+        });
+
         methods.add_method(
             "get_original_interaction_response",
             |_, this, interaction_token: String| {

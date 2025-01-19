@@ -120,6 +120,14 @@ pub trait DiscordProvider: 'static + Clone {
         files: Vec<serenity::all::CreateAttachment<'_>>,
     ) -> Result<(), crate::Error>;
 
+    /// Creates a followup response
+    async fn create_followup_message(
+        &self,
+        interaction_token: &str,
+        response: impl serde::Serialize,
+        files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<serenity::all::Message, crate::Error>;
+
     /// Gets the original interaction response
     async fn get_original_interaction_response(
         &self,

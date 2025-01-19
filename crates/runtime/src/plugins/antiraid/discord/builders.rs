@@ -405,6 +405,28 @@ pub struct CreateModal {
     title: String,
 }
 
+/// [Discord docs](https://discord.com/developers/docs/interactions/receiving-and-responding#create-followup-message)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[must_use]
+pub struct CreateInteractionResponseFollowup {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // [Omitting username: not supported in interaction followups]
+    // [Omitting avatar_url: not supported in interaction followups]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tts: Option<bool>,
+    pub embeds: Option<Vec<CreateEmbed>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_mentions: Option<CreateAllowedMentions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<Vec<ActionRow>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<MessageFlags>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll: Option<CreatePoll>,
+    pub attachments: Option<CreateMessageAttachment>,
+}
+
 /// A builder to create an embed in a message
 ///
 /// [Discord docs](https://discord.com/developers/docs/resources/channel#embed-object)

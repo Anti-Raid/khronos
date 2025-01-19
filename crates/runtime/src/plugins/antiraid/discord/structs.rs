@@ -1,4 +1,7 @@
-use super::builders::{CreateCommand, CreateInteractionResponse, CreateMessage, EditChannel};
+use super::builders::{
+    CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup, CreateMessage,
+    EditChannel,
+};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLogOptions {
@@ -66,6 +69,12 @@ pub struct CreateInteractionResponseOptions {
     pub interaction_id: serenity::all::InteractionId,
     pub interaction_token: String,
     pub data: CreateInteractionResponse,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct CreateFollowupMessageOptions {
+    pub interaction_token: String,
+    pub data: CreateInteractionResponseFollowup,
 }
 
 /// In Luau { type: "After" | "Around" | "Before", id: MessageId }

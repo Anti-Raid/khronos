@@ -213,6 +213,15 @@ impl DiscordProvider for SampleDiscordProvider {
         todo!()
     }
 
+    async fn create_followup_message(
+        &self,
+        _interaction_token: &str,
+        _response: impl serde::Serialize,
+        _files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        todo!()
+    }
+
     async fn get_original_interaction_response(
         &self,
         _interaction_token: &str,
