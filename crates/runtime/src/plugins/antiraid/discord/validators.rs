@@ -2,10 +2,7 @@ use rustrict::{Censor, Type};
 
 /// Checks if a string contains any disallowed words
 pub fn validate_string(input: &str) -> Result<(), crate::Error> {
-    let analysis = Censor::from_str(input)
-        .with_ignore_false_positives(false)
-        .with_ignore_self_censoring(false)
-        .analyze();
+    let analysis = Censor::from_str(input).analyze();
 
     if analysis.is((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE) {
         Err(format!("Input contains disallowed words: {:?}", analysis).into())
@@ -238,7 +235,7 @@ pub fn validate_message(message: &super::builders::CreateMessage) -> Result<(), 
             return Err("Message content cannot be empty".into());
         }
 
-        validate_string(content)?;
+        //validate_string(content)?;
 
         if content.len() > MESSAGE_CONTENT_LIMIT {
             return Err(format!(
