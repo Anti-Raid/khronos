@@ -3,13 +3,11 @@ use rustrict::{Censor, Type};
 /// Checks if a string contains any disallowed words
 pub fn validate_string(input: &str) -> Result<(), crate::Error> {
     let analysis = Censor::from_str(input)
-        .with_censor_threshold(Type::INAPPROPRIATE)
-        .with_censor_first_character_threshold((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE)
         .with_ignore_false_positives(false)
         .with_ignore_self_censoring(false)
         .analyze();
 
-    if analysis == Type::NONE {
+    if analysis.is((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE) {
         Ok(())
     } else {
         Err(format!("Input contains disallowed words: {:?}", analysis).into())
