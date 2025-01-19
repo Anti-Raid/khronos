@@ -8,9 +8,9 @@ pub fn validate_string(input: &str) -> Result<(), crate::Error> {
         .analyze();
 
     if analysis.is((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE) {
-        Ok(())
-    } else {
         Err(format!("Input contains disallowed words: {:?}", analysis).into())
+    } else {
+        Ok(())
     }
 }
 
