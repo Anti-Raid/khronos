@@ -9,7 +9,7 @@ pub fn validate_string(input: &str) -> Result<(), crate::Error> {
         .with_ignore_self_censoring(false)
         .analyze();
 
-    if analysis.is(Type::NONE) {
+    if analysis == Type::NONE {
         Ok(())
     } else {
         Err(format!("Input contains disallowed words: {:?}", analysis).into())
