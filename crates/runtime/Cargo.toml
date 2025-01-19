@@ -17,6 +17,7 @@ captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 env_logger = "0.11"
 arrayvec = "0.7"
+rustrict = "0.7"
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}

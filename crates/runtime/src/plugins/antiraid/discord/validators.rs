@@ -1,3 +1,21 @@
+use rustrict::{Censor, Type};
+
+/// Checks if a string contains any disallowed words
+pub fn validate_string(input: &str) -> Result<(), crate::Error> {
+    let analysis = Censor::from_str(input)
+        .with_censor_threshold(Type::INAPPROPRIATE)
+        .with_censor_first_character_threshold((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE)
+        .with_ignore_false_positives(false)
+        .with_ignore_self_censoring(false)
+        .analyze();
+
+    if analysis.is(Type::NONE) {
+        Ok(())
+    } else {
+        Err(format!("Input contains disallowed words: {:?}", analysis).into())
+    }
+}
+
 /// Validates a set of components
 pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crate::Error> {
     const MAX_BUTTONS_PER_ACTION_ROW: usize = 5;
@@ -19,7 +37,11 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
 
         for component in row.components.iter() {
             match component {
-                serenity::all::ActionRowComponent::Button(_) => {
+                serenity::all::ActionRowComponent::Button(b) => {
+                    if let Some(label) = b.label.as_ref() {
+                        validate_string(label.as_str())?;
+                    }
+
                     if num_buttons >= MAX_BUTTONS_PER_ACTION_ROW {
                         return Err(format!(
                             "Too many buttons in action row, limit is {}",
@@ -32,7 +54,15 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
                     }
                     num_buttons += 1;
                 }
-                serenity::all::ActionRowComponent::SelectMenu(_) => {
+                serenity::all::ActionRowComponent::SelectMenu(sm) => {
+                    if let Some(placeholder) = sm.placeholder.as_ref() {
+                        validate_string(placeholder.as_str())?;
+                    }
+
+                    for option in sm.options.iter() {
+                        validate_string(option.label.as_str())?;
+                    }
+
                     if num_selects >= MAX_SELECTS_PER_ACTION_ROW {
                         return Err(format!(
                             "Too many select menus in action row, limit is {}",
@@ -72,6 +102,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
             return Err("Embed title cannot be empty".into());
         }
 
+        //validate_string(title)?;
+
         if title.len() > EMBED_TITLE_LIMIT {
             return Err(format!("Embed title is too long, limit is {}", EMBED_TITLE_LIMIT).into());
         }
@@ -84,6 +116,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
         if description.is_empty() {
             return Err("Embed description cannot be empty".into());
         }
+
+        //validate_string(description)?;
 
         if description.len() > EMBED_DESCRIPTION_LIMIT {
             return Err(format!(
@@ -102,6 +136,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
             return Err("Embed footer text cannot be empty".into());
         }
 
+        //validate_string(&footer.text)?;
+
         if footer.text.len() > EMBED_FOOTER_TEXT_LIMIT {
             return Err(format!(
                 "Embed footer text is too long, limit is {}",
@@ -118,6 +154,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
         if author.name.is_empty() {
             return Err("Embed author name cannot be empty".into());
         }
+
+        //validate_string(&author.name)?;
 
         if author.name.len() > EMBED_AUTHOR_NAME_LIMIT {
             return Err(format!(
@@ -136,6 +174,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
             return Err("Embed field name cannot be empty".into());
         }
 
+        //validate_string(&field.name)?;
+
         if field.name.len() > EMBED_FIELD_NAME_LIMIT {
             return Err(format!(
                 "Embed field name is too long, limit is {}",
@@ -149,6 +189,8 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
         if field.value.is_empty() {
             return Err("Embed field value cannot be empty".into());
         }
+
+        //validate_string(&field.value)?;
 
         if field.value.len() > EMBED_FIELD_VALUE_LIMIT {
             return Err(format!(
@@ -198,6 +240,8 @@ pub fn validate_message(message: &super::builders::CreateMessage) -> Result<(), 
             return Err("Message content cannot be empty".into());
         }
 
+        validate_string(content)?;
+
         if content.len() > MESSAGE_CONTENT_LIMIT {
             return Err(format!(
                 "Message content is too long, limit is {}",
@@ -225,6 +269,65 @@ pub fn validate_message(message: &super::builders::CreateMessage) -> Result<(), 
     // Validate components
     if let Some(components) = message.components.as_ref() {
         validate_components(components)?
+    }
+
+    Ok(())
+}
+
+fn validate_option(option: &super::builders::CreateCommandOption) -> Result<(), crate::Error> {
+    validate_string(&option.name)?;
+
+    if let Some(name_localizations) = option.name_localizations.as_ref() {
+        for (lang, name) in name_localizations.iter() {
+            validate_string(lang)?;
+            validate_string(name)?;
+        }
+    }
+
+    validate_string(&option.description)?;
+
+    if let Some(description_localizations) = option.description_localizations.as_ref() {
+        for (lang, desc) in description_localizations.iter() {
+            validate_string(lang)?;
+            validate_string(desc)?;
+        }
+    }
+
+    for option in option.options.iter() {
+        validate_option(option)?;
+    }
+
+    for choice in option.choices.iter() {
+        validate_string(&choice.name)?;
+        if let serde_json::Value::String(ref s) = &choice.value {
+            validate_string(s)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_command(command: &super::builders::CreateCommand) -> Result<(), crate::Error> {
+    if let Some(name) = command.fields.name.as_ref() {
+        validate_string(name)?;
+    }
+
+    for (lang, name) in command.fields.name_localizations.iter() {
+        validate_string(lang)?;
+        validate_string(name)?;
+    }
+
+    if let Some(description) = command.fields.description.as_ref() {
+        validate_string(description)?;
+    }
+
+    for (lang, desc) in command.fields.description_localizations.iter() {
+        validate_string(lang)?;
+        validate_string(desc)?;
+    }
+
+    for option in command.fields.options.iter() {
+        validate_option(option)?;
     }
 
     Ok(())

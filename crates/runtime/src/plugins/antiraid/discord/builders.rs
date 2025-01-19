@@ -653,12 +653,12 @@ pub struct CreateForumTag {
 pub struct CreateCommand {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "type")]
-    kind: Option<CommandType>,
+    pub kind: Option<CommandType>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    handler: Option<EntryPointHandlerType>,
+    pub handler: Option<EntryPointHandlerType>,
 
     #[serde(flatten)]
-    fields: EditCommand,
+    pub fields: EditCommand,
 }
 
 impl Default for CreateCommand {
@@ -681,21 +681,21 @@ impl Default for CreateCommand {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[must_use]
 pub struct EditCommand {
-    name: Option<String>,
-    name_localizations: HashMap<String, String>,
+    pub name: Option<String>,
+    pub name_localizations: HashMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    description_localizations: HashMap<String, String>,
-    options: Vec<CreateCommandOption>,
+    pub description: Option<String>,
+    pub description_localizations: HashMap<String, String>,
+    pub options: Vec<CreateCommandOption>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    default_member_permissions: Option<Permissions>,
+    pub default_member_permissions: Option<Permissions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    dm_permission: Option<bool>,
+    pub dm_permission: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    integration_types: Option<Vec<InstallationContext>>,
+    pub integration_types: Option<Vec<InstallationContext>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    contexts: Option<Vec<InteractionContext>>,
-    nsfw: bool,
+    pub contexts: Option<Vec<InteractionContext>>,
+    pub nsfw: bool,
 }
 
 impl Default for EditCommand {
@@ -726,35 +726,35 @@ impl Default for EditCommand {
 #[must_use]
 pub struct CreateCommandOption {
     #[serde(rename = "type")]
-    kind: CommandOptionType,
-    name: String,
+    pub kind: CommandOptionType,
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    name_localizations: Option<HashMap<String, String>>,
-    description: String,
+    pub name_localizations: Option<HashMap<String, String>>,
+    pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description_localizations: Option<HashMap<String, String>>,
+    pub description_localizations: Option<HashMap<String, String>>,
     #[serde(default)]
-    required: bool,
+    pub required: bool,
     #[serde(default)]
-    choices: Vec<CreateCommandOptionChoice>,
+    pub choices: Vec<CreateCommandOptionChoice>,
     #[serde(default)]
-    options: Vec<CreateCommandOption>,
+    pub options: Vec<CreateCommandOption>,
     #[serde(default)]
-    channel_types: Vec<ChannelType>,
+    pub channel_types: Vec<ChannelType>,
     #[serde(default)]
-    min_value: Option<serde_json::Number>,
+    pub min_value: Option<serde_json::Number>,
     #[serde(default)]
-    max_value: Option<serde_json::Number>,
+    pub max_value: Option<serde_json::Number>,
     #[serde(default)]
-    min_length: Option<u16>,
+    pub min_length: Option<u16>,
     #[serde(default)]
-    max_length: Option<u16>,
+    pub max_length: Option<u16>,
     #[serde(default)]
-    autocomplete: bool,
+    pub autocomplete: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct CreateCommandOptionChoice {
+pub struct CreateCommandOptionChoice {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name_localizations: Option<HashMap<String, String>>,

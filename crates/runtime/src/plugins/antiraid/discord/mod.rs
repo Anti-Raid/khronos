@@ -968,6 +968,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let data = lua.from_value::<structs::CreateCommandOptions>(data)?;
 
+                validators::validate_command(&data.data)
+                    .map_err(|x| LuaError::external(x.to_string()))?;
+
                 let resp = this.discord_provider
                     .create_guild_command(&data.data)
                     .await
