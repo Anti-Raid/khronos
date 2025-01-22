@@ -8,6 +8,7 @@ use super::context::KhronosContext;
 use super::discordprovider::DiscordProvider;
 use super::kvprovider::{self, KVProvider};
 use super::lockdownprovider::LockdownProvider;
+use super::pageprovider::PageProvider;
 use super::stingprovider::StingProvider;
 use super::userinfoprovider::UserInfoProvider;
 
@@ -25,6 +26,8 @@ impl KhronosContext for SampleKhronosContext {
     type LockdownProvider = SampleLockdownProvider;
     type UserInfoProvider = SampleUserInfoProvider;
     type StingProvider = SampleStingProvider;
+    type PageProviderData = DummyPageInnerData;
+    type PageProvider = DummyPageProvider;
 
     fn data(&self) -> Self::Data {
         todo!()
@@ -46,6 +49,11 @@ impl KhronosContext for SampleKhronosContext {
         None::<serenity::all::CurrentUser>
     }
 
+    /// Returns the global table to use
+    fn global_table(&self) -> mlua::Table {
+        todo!()
+    }
+
     fn kv_provider(&self, _scope: ExecutorScope) -> Option<Self::KVProvider> {
         Some(SampleKVProvider {})
     }
@@ -64,6 +72,10 @@ impl KhronosContext for SampleKhronosContext {
 
     fn sting_provider(&self, _scope: ExecutorScope) -> Option<Self::StingProvider> {
         Some(SampleStingProvider {})
+    }
+
+    fn page_provider(&self, _scope: ExecutorScope) -> Option<Self::PageProvider> {
+        Some(DummyPageProvider {})
     }
 }
 
@@ -350,6 +362,35 @@ impl StingProvider for SampleStingProvider {
     }
 
     async fn delete(&self, _id: uuid::Uuid) -> Result<(), crate::Error> {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct DummyPageInnerData {}
+
+#[derive(Clone)]
+pub struct DummyPageProvider {}
+
+impl PageProvider<DummyPageInnerData> for DummyPageProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn get_page(
+        &self,
+    ) -> Result<super::pageprovider::PageProviderPage<DummyPageInnerData>, crate::Error> {
+        todo!()
+    }
+
+    async fn set_page(
+        &self,
+        _page: super::pageprovider::PageProviderPage<DummyPageInnerData>,
+    ) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn delete_page(&self) -> Result<(), crate::Error> {
         todo!()
     }
 }

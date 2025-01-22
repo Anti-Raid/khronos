@@ -1,6 +1,6 @@
 use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
-    stingprovider::StingProvider, userinfoprovider::UserInfoProvider,
+    pageprovider::PageProvider, stingprovider::StingProvider, userinfoprovider::UserInfoProvider,
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -11,6 +11,8 @@ pub trait KhronosContext: 'static + Clone {
     type LockdownProvider: LockdownProvider;
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
+    type PageProviderData: Clone + Send + Sync;
+    type PageProvider: PageProvider<Self::PageProviderData>;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -37,6 +39,9 @@ pub trait KhronosContext: 'static + Clone {
     /// Returns the current Discord user, if any
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
+    /// Returns the global table to use
+    fn global_table(&self) -> mlua::Table;
+
     /// Returns a key-value provider with the given scope
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider>;
 
@@ -52,4 +57,7 @@ pub trait KhronosContext: 'static + Clone {
 
     /// Returns a Sting provider with the given scope
     fn sting_provider(&self, scope: ExecutorScope) -> Option<Self::StingProvider>;
+
+    /// Returns a Page provider with the given scope
+    fn page_provider(&self, scope: ExecutorScope) -> Option<Self::PageProvider>;
 }
