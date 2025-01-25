@@ -1,9 +1,12 @@
+mod types;
+
 use crate::lua_promise;
 use crate::traits::context::KhronosContext;
 use crate::traits::lockdownprovider::LockdownProvider;
 use crate::utils::executorscope::ExecutorScope;
 use crate::TemplateContextRef;
 use mlua::prelude::*;
+
 
 #[derive(Clone)]
 /// An lockdown executor is used to manage AntiRaid lockdowns from Lua
@@ -45,7 +48,10 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
                 // Get the current lockdown set
                 let lockdowns = this.lockdown_provider.list().await.map_err(|e| {
                     LuaError::external(format!("Error while fetching lockdowns: {}", e))
-                })?;
+                })?
+                    .into_iter()
+                    .map(|e| e.into())
+                    .collect::<Vec<types::Lockdown>>();
 
                 let value = lua.to_value(&lockdowns)?;
 

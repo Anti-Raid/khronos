@@ -55,12 +55,14 @@ Calls the chunk asynchronously with the provided arguments. Requires ``luau:eval
 
 - `result` ([...](#type.any)): The result of evaluating the chunk.
 
+---
+
 ## Methods
 
 ### load
 
 ```lua
-function load(code: string): Chunk
+function load(token: TemplateContext, code: string): Chunk
 ```
 
 Loads a luau code chunk. Note that setting other properties on the chunk must be done after loading and requires their respective capabilities. Loading a chunk does *not* parse or validate the code, it is only stored for later use.

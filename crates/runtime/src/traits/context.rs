@@ -11,8 +11,7 @@ pub trait KhronosContext: 'static + Clone {
     type LockdownProvider: LockdownProvider;
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
-    type PageProviderData: Clone + Send + Sync;
-    type PageProvider: PageProvider<Self::PageProviderData>;
+    type PageProvider: PageProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;

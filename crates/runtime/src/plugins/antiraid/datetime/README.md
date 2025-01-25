@@ -105,6 +105,62 @@ Translates the current timestamp to a datetime in the said specific timezone.
 - `date` ([DateTime](#type.DateTime)): The translated datetime.
 
 
+##### Timezone:fromTime
+
+Given a unix time, returns a DateTime object with this timezone
+
+```lua
+function Timezone:fromTime(time: number): DateTime
+```
+
+###### Parameters
+
+- `time` ([number](#type.number)): The unix time (in seconds) to convert.
+
+###### Returns
+
+- `dt` ([DateTime](#type.DateTime)): The DateTime object with the specified timezone converted from the time.
+
+##### Timezone:fromTimeMillis
+
+Given a unix time in milliseconds, returns a DateTime object with this timezone
+
+```lua
+function Timezone:fromTimeMillis(time: i64): DateTime
+```
+
+###### Parameters
+- `time` ([i64](#type.i64)): The unix time (in milliseconds) to convert.
+
+###### Returns
+- `dt` ([DateTime](#type.DateTime)): The DateTime object with the specified timezone converted from the time.
+
+##### Timezone:fromTimeMicros
+Given a unix time in microseconds, returns a DateTime object with this timezone
+
+```lua
+function Timezone:fromTimeMicros(time: i64): DateTime
+```
+
+###### Parameters
+- `time` ([i64](#type.i64)): The unix time (in microseconds) to convert.
+
+###### Returns
+- `dt` ([DateTime](#type.DateTime)): The DateTime object with the specified timezone converted from the time.
+
+##### Timezone:fromTimeNanos
+Given a unix time in nanoseconds, returns a DateTime object with this timezone
+
+```lua
+function Timezone:fromTimeNanos(time: i64): DateTime
+```
+
+###### Parameters
+- `time` ([i64](#type.i64)): The unix time (in nanoseconds) to convert.
+
+###### Returns
+- `dt` ([DateTime](#type.DateTime)): The DateTime object with the specified timezone converted from the time.
+
 <div id="type.TimeDelta" />
 
 ### TimeDelta

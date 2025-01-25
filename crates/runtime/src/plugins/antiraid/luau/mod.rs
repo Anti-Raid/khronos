@@ -13,9 +13,6 @@ pub struct Chunk<T: KhronosContext> {
     optimization_level: Option<u8>,
 }
 
-// @userdata LockdownExecutor
-//
-// Executes actions on discord
 impl<T: KhronosContext> Chunk<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
         if !self.context.has_cap(&format!("luau:{}", action)) {

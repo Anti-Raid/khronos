@@ -1,3 +1,5 @@
+mod types;
+
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
 use crate::TemplateContextRef;

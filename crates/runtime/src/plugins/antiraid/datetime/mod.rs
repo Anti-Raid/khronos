@@ -321,6 +321,46 @@ impl LuaUserData for Timezone {
             let now = now.with_timezone(&this.tz);
             Ok(DateTime { dt: now })
         });
+
+        // Given a unix time, returns a DateTime object with this timezone
+        methods.add_method("fromTime", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp(time, 0) else {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid time (might exceed bounds?)".to_string(),
+                ));
+            };
+            let dt = dt.with_timezone(&this.tz);
+            Ok(DateTime { dt })
+        });
+
+        // Given a unix time in milliseconds, returns a DateTime object with this timezone
+        methods.add_method("fromTimeMillis", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp_millis(time) else {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid time (might exceed bounds?)".to_string(),
+                ));
+            };
+            let dt = dt.with_timezone(&this.tz);
+            Ok(DateTime { dt })
+        });
+
+        // Given a unix time in microseconds, returns a DateTime object with this timezone
+        methods.add_method("fromTimeMicros", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp_micros(time) else {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid time (might exceed bounds?)".to_string(),
+                ));
+            };
+            let dt = dt.with_timezone(&this.tz);
+            Ok(DateTime { dt })
+        });
+
+        // Given a unix time in nanoseconds, returns a DateTime object with this timezone
+        methods.add_method("fromTimeNanos", |_, this, epoch: i64| {
+            let dt = chrono::DateTime::from_timestamp_nanos(epoch);
+            let dt = dt.with_timezone(&this.tz);
+            Ok(DateTime { dt })
+        });
     }
 }
 

@@ -1,13 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-/// Represents a full record complete with metadata
-#[derive(Serialize, Deserialize)]
-pub struct KvRecord {
-    pub key: String,
-    pub value: serde_json::Value,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
-}
+use super::ir::KvRecord;
 
 /// A key-value provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways

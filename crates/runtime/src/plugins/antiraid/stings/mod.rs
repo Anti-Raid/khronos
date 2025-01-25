@@ -1,10 +1,11 @@
+mod types;
 use crate::{
     traits::{context::KhronosContext, stingprovider::StingProvider},
     utils::executorscope::ExecutorScope,
     TemplateContextRef,
 };
-use antiraid_types::stings::{Sting, StingCreate};
 use mlua::prelude::*;
+use types::{Sting, StingAggregateSet, StingCreate};
 
 use crate::lua_promise;
 
@@ -41,7 +42,10 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
 
                 let stings = this.sting_provider.list(page).await.map_err(|e|
                     mlua::Error::external(format!("Failed to list stings: {}", e))
-                )?;
+                )?
+                .into_iter()
+                .map(types::Sting::from)
+                .collect::<Vec<_>>();
 
                 let v = lua.to_value(&stings)?;
 
@@ -62,7 +66,8 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
 
                 let sting = this.sting_provider.get(id).await.map_err(|e|
                     mlua::Error::external(format!("Failed to get sting: {}", e))
-                )?;
+                )?
+                .map(types::Sting::from);
 
                 let v = lua.to_value(&sting)?;
 
@@ -77,7 +82,7 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                 this.check_action("create".to_string())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let sting_id = this.sting_provider.create(sting).await.map_err(|e|
+                let sting_id = this.sting_provider.create(sting.into()).await.map_err(|e|
                     mlua::Error::external(format!("Failed to create sting: {}", e))
                 )?;
 
@@ -92,7 +97,7 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                 this.check_action("update".to_string())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                this.sting_provider.update(sting).await.map_err(|e|
+                this.sting_provider.update(sting.into()).await.map_err(|e|
                     mlua::Error::external(format!("Failed to update sting: {}", e))
                 )?;
 
@@ -118,6 +123,39 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                 )?;
 
                 Ok(())
+            }))
+        });
+
+        methods.add_method("guild_aggregate", |_, this, _g: ()| {
+            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
+                this.check_action("guild_aggregate".to_string())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let stings = this.sting_provider.guild_aggregate().await.map_err(|e|
+                    mlua::Error::external(format!("Failed to get guild aggregate for stings: {}", e))
+                )?;
+
+                Ok(StingAggregateSet {
+                    aggregates: stings.into_iter().map(types::StingAggregate::from).collect(),
+                })
+            }))
+        });
+
+        methods.add_method("guild_user_aggregate", |_, this, user_id: String| {
+            let user_id: serenity::all::UserId = user_id.parse().map_err(|e| {
+                LuaError::external(format!("Invalid user id: {}", e))
+            })?;
+            Ok(lua_promise!(this, user_id, |_lua, this, user_id|, {
+                this.check_action("guild_aggregate".to_string())
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let stings = this.sting_provider.guild_user_aggregate(user_id).await.map_err(|e|
+                    mlua::Error::external(format!("Failed to get guild user aggregate for stings: {}", e))
+                )?;
+
+                Ok(StingAggregateSet {
+                    aggregates: stings.into_iter().map(types::StingAggregate::from).collect(),
+                })
             }))
         });
     }

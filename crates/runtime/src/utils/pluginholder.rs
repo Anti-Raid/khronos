@@ -38,7 +38,7 @@ impl PluginSet {
         self.add_plugin("@antiraid/lazy", antiraid::lazy::init_plugin);
         self.add_plugin("@antiraid/lockdowns", antiraid::lockdowns::init_plugin::<T>);
         self.add_plugin("@antiraid/luau", antiraid::luau::init_plugin::<T>);
-        //self.add_plugin("@antiraid/page", antiraid::page::init_plugin); [will be implemented later on, once we know how templates are being used]
+        self.add_plugin("@antiraid/pages", antiraid::pages::init_plugin::<T>);
         self.add_plugin("@antiraid/permissions", antiraid::permissions::init_plugin);
         self.add_plugin("@antiraid/promise", antiraid::promise::init_plugin);
         self.add_plugin("@antiraid/stings", antiraid::stings::init_plugin::<T>);

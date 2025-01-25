@@ -6,11 +6,12 @@ use crate::utils::executorscope::ExecutorScope;
 
 use super::context::KhronosContext;
 use super::discordprovider::DiscordProvider;
-use super::kvprovider::{self, KVProvider};
+use super::kvprovider::KVProvider;
 use super::lockdownprovider::LockdownProvider;
 use super::pageprovider::PageProvider;
 use super::stingprovider::StingProvider;
 use super::userinfoprovider::UserInfoProvider;
+use antiraid_types::stings::{Sting, StingAggregate, StingCreate};
 
 #[derive(Clone, Default)]
 pub struct SampleKhronosContext {
@@ -26,7 +27,6 @@ impl KhronosContext for SampleKhronosContext {
     type LockdownProvider = SampleLockdownProvider;
     type UserInfoProvider = SampleUserInfoProvider;
     type StingProvider = SampleStingProvider;
-    type PageProviderData = DummyPageInnerData;
     type PageProvider = DummyPageProvider;
 
     fn data(&self) -> Self::Data {
@@ -83,7 +83,7 @@ impl KhronosContext for SampleKhronosContext {
 pub struct SampleKVProvider {}
 
 impl KVProvider for SampleKVProvider {
-    async fn get(&self, _key: String) -> Result<Option<kvprovider::KvRecord>, crate::Error> {
+    async fn get(&self, _key: String) -> Result<Option<crate::traits::ir::KvRecord>, crate::Error> {
         todo!()
     }
 
@@ -99,7 +99,7 @@ impl KVProvider for SampleKVProvider {
         todo!()
     }
 
-    async fn find(&self, _query: String) -> Result<Vec<super::kvprovider::KvRecord>, crate::Error> {
+    async fn find(&self, _query: String) -> Result<Vec<crate::traits::ir::KvRecord>, crate::Error> {
         todo!()
     }
 
@@ -285,7 +285,7 @@ impl LockdownProvider for SampleLockdownProvider {
         todo!()
     }
 
-    async fn list(&self) -> Result<Vec<super::lockdownprovider::Lockdown>, crate::Error> {
+    async fn list(&self) -> Result<Vec<super::ir::Lockdown>, crate::Error> {
         todo!()
     }
 
@@ -339,53 +339,55 @@ impl StingProvider for SampleStingProvider {
         todo!()
     }
 
-    async fn list(&self, _page: usize) -> Result<Vec<antiraid_types::stings::Sting>, crate::Error> {
+    async fn list(&self, _page: usize) -> Result<Vec<Sting>, crate::Error> {
         todo!()
     }
 
-    async fn get(
-        &self,
-        _id: uuid::Uuid,
-    ) -> Result<Option<antiraid_types::stings::Sting>, crate::Error> {
+    async fn get(&self, _id: uuid::Uuid) -> Result<Option<Sting>, crate::Error> {
         todo!()
     }
 
-    async fn create(
-        &self,
-        _sting: antiraid_types::stings::StingCreate,
-    ) -> Result<uuid::Uuid, crate::Error> {
+    async fn create(&self, _sting: StingCreate) -> Result<uuid::Uuid, crate::Error> {
         todo!()
     }
 
-    async fn update(&self, _sting: antiraid_types::stings::Sting) -> Result<(), crate::Error> {
+    async fn update(&self, _sting: Sting) -> Result<(), crate::Error> {
         todo!()
     }
 
     async fn delete(&self, _id: uuid::Uuid) -> Result<(), crate::Error> {
         todo!()
     }
-}
 
-#[derive(Clone)]
-pub struct DummyPageInnerData {}
+    /// Returns a StingAggregate set for a user in the guild
+    async fn guild_user_aggregate(
+        &self,
+        _target: serenity::all::UserId,
+    ) -> Result<Vec<StingAggregate>, crate::Error> {
+        todo!()
+    }
+
+    /// Returns a StingAggregate set for the guild
+    async fn guild_aggregate(&self) -> Result<Vec<StingAggregate>, crate::Error> {
+        todo!()
+    }
+}
 
 #[derive(Clone)]
 pub struct DummyPageProvider {}
 
-impl PageProvider<DummyPageInnerData> for DummyPageProvider {
+impl PageProvider for DummyPageProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
         todo!()
     }
 
-    async fn get_page(
-        &self,
-    ) -> Result<super::pageprovider::PageProviderPage<DummyPageInnerData>, crate::Error> {
+    async fn get_page(&self) -> Option<super::pageprovider::PageProviderPage> {
         todo!()
     }
 
     async fn set_page(
         &self,
-        _page: super::pageprovider::PageProviderPage<DummyPageInnerData>,
+        _page: super::pageprovider::PageProviderPage,
     ) -> Result<(), crate::Error> {
         todo!()
     }

@@ -1,4 +1,4 @@
-use antiraid_types::stings::{Sting, StingCreate};
+use antiraid_types::stings::{Sting, StingAggregate, StingCreate};
 
 /// A sting provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -29,4 +29,13 @@ pub trait StingProvider: 'static + Clone {
     ///
     /// Should error if the guild the sting is associated with mismatches the providers' expected guild id
     async fn delete(&self, id: uuid::Uuid) -> Result<(), crate::Error>;
+
+    /// Returns a StingAggregate set for a user in the guild
+    async fn guild_user_aggregate(
+        &self,
+        target: serenity::all::UserId,
+    ) -> Result<Vec<StingAggregate>, crate::Error>;
+
+    /// Returns a StingAggregate set for the guild
+    async fn guild_aggregate(&self) -> Result<Vec<StingAggregate>, crate::Error>;
 }
