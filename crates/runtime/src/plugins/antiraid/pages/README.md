@@ -379,7 +379,7 @@ An AntiRaid template page
 - `id` ([string](#type.string)): The ID of the page.
 - `name` ([string](#type.string)): The name of the page.
 - `description` ([string](#type.string)): The description of the page.
-- `settings` ([{Setting}](#type.Setting)): The settings of the page. This is cached upon setting
+- `settings` ([{Setting}](#type.Setting)): The settings of the page.
 
 ### PageExecutor
 
@@ -390,7 +390,7 @@ A page executor. This is used to manipulate the page.
 ##### PageExecutor:get
 
 ```luau
-function get(): Page?
+function get(): LuaPromise<Page?>
 ```
 
 Returns the page associated with the template, if any. Using the token from another template to create a PageExecutor and then calling get can be used to get that templates' page.
@@ -398,7 +398,7 @@ Returns the page associated with the template, if any. Using the token from anot
 ##### PageExecutor:set
 
 ```luau
-function set(page: Page)
+function set(page: Page): LuaPromise<void>
 ```
 
 Sets a page to be the templates page. This will overwrite any existing page if one exists.
@@ -406,7 +406,7 @@ Sets a page to be the templates page. This will overwrite any existing page if o
 ##### PageExecutor:delete
 
 ```luau
-function delete()
+function delete(): LuaPromise<void>
 ```
 
 Deletes the templates page. This will not delete the page itself, but will remove it from the server's list of custom pages.
