@@ -381,14 +381,11 @@ impl PageProvider for DummyPageProvider {
         todo!()
     }
 
-    async fn get_page(&self) -> Option<super::pageprovider::PageProviderPage> {
+    async fn get_page(&self) -> Option<super::ir::Page> {
         todo!()
     }
 
-    async fn set_page(
-        &self,
-        _page: super::pageprovider::PageProviderPage,
-    ) -> Result<(), crate::Error> {
+    async fn set_page(&self, _page: super::ir::Page) -> Result<(), crate::Error> {
         todo!()
     }
 

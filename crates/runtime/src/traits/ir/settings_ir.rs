@@ -184,3 +184,10 @@ pub struct SettingOperations {
     /// How to delete this setting
     pub delete: bool,
 }
+
+pub struct Page {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub settings: Vec<Setting>,
+}
