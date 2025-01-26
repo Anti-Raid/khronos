@@ -8,14 +8,12 @@ use crate::{lua_promise, TemplateContextRef};
 use mlua::prelude::*;
 use settings_ir::Setting;
 
-const MAX_ID_LENGTH: usize = 100;
 const MAX_TITLE_LENGTH: usize = 256;
 const MAX_DESCRIPTION_LENGTH: usize = 4096;
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 /// A intermediary representation of a template page
 pub struct Page {
-    id: String,
     title: String,
     description: String,
     settings: Vec<Setting>,
@@ -23,9 +21,6 @@ pub struct Page {
 
 impl Page {
     pub fn validate(&self) -> LuaResult<()> {
-        if self.id.len() > MAX_ID_LENGTH {
-            return Err(LuaError::external("ID is too long"));
-        }
         if self.title.len() > MAX_TITLE_LENGTH {
             return Err(LuaError::external("Title is too long"));
         }
@@ -69,7 +64,6 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
                 };
 
                 let page = Page {
-                    id: page.id,
                     title: page.title,
                     description: page.description,
                     settings: page.settings.into_iter().map(|e| e.into()).collect(),
@@ -91,7 +85,6 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
 
                 // Convert to khronos PageProviderPage raw struct IR
                 let page = crate::traits::ir::Page {
-                    id: page.id,
                     title: page.title,
                     description: page.description,
                     settings: page.settings.into_iter().map(|e| e.into()).collect(),

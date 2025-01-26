@@ -182,7 +182,6 @@ pub struct SettingOperations {
 }
 
 pub struct Page {
-    pub id: String,
     pub title: String,
     pub description: String,
     pub settings: Vec<Setting>,

@@ -45,7 +45,13 @@ A setting column
   "description": "The time the record was created.",
   "column_type": {
     "type": "Scalar",
-    "inner": "TimestampTz"
+    "inner": "String",
+    "min_length": 120,
+    "max_length": 120,
+    "allowed_values": [
+      "allowed_value"
+    ],
+    "kind": "timestamp"
   },
   "nullable": false,
   "suggestions": {
@@ -337,7 +343,13 @@ A setting
       "description": "The time the record was created.",
       "column_type": {
         "type": "Scalar",
-        "inner": "TimestampTz"
+        "inner": "String",
+        "min_length": 120,
+        "max_length": 120,
+        "allowed_values": [
+          "allowed_value"
+        ],
+        "kind": "timestamp"
       },
       "nullable": false,
       "suggestions": {
@@ -376,8 +388,7 @@ An AntiRaid template page
 
 #### Fields
 
-- `id` ([string](#type.string)): The ID of the page.
-- `name` ([string](#type.string)): The name of the page.
+- `title` ([string](#type.string)): The title of the page.
 - `description` ([string](#type.string)): The description of the page.
 - `settings` ([{Setting}](#type.Setting)): The settings of the page.
 
