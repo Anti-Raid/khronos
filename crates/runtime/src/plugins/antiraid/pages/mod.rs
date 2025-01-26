@@ -90,7 +90,7 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
                 page.validate()?;
 
                 // Convert to khronos PageProviderPage raw struct IR
-                let page = crate::traits::pageprovider::PageProviderPage {
+                let page = crate::traits::ir::Page {
                     id: page.id,
                     title: page.title,
                     description: page.description,
