@@ -38,16 +38,12 @@ impl ColumnType {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum InnerColumnType {
-    Uuid {},
     String {
         min_length: Option<usize>,
         max_length: Option<usize>,
         allowed_values: Vec<String>, // If empty, all values are allowed
-        kind: String,                // e.g. textarea, channel, user, role etc.
+        kind: String, // e.g. uuid, textarea, channel, user, role, interval, timestamp etc.
     },
-    Timestamp {},
-    TimestampTz {},
-    Interval {},
     Integer {},
     Float {},
     BitFlag {

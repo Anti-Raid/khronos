@@ -44,16 +44,12 @@ impl From<crate::traits::ir::ColumnType> for ColumnType {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "inner")]
 pub enum InnerColumnType {
-    Uuid {},
     String {
         min_length: Option<usize>,
         max_length: Option<usize>,
         allowed_values: Vec<String>, // If empty, all values are allowed
-        kind: String,                // e.g. textarea, channel, user, role etc.
+        kind: String, // e.g. uuid, textarea, channel, user, role, interval, timestamp etc.
     },
-    Timestamp {},
-    TimestampTz {},
-    Interval {},
     Integer {},
     Float {},
     BitFlag {
@@ -69,7 +65,6 @@ pub enum InnerColumnType {
 impl From<InnerColumnType> for crate::traits::ir::InnerColumnType {
     fn from(v: InnerColumnType) -> crate::traits::ir::InnerColumnType {
         match v {
-            InnerColumnType::Uuid {} => crate::traits::ir::InnerColumnType::Uuid {},
             InnerColumnType::String {
                 min_length,
                 max_length,
@@ -81,9 +76,6 @@ impl From<InnerColumnType> for crate::traits::ir::InnerColumnType {
                 allowed_values,
                 kind,
             },
-            InnerColumnType::Timestamp {} => crate::traits::ir::InnerColumnType::Timestamp {},
-            InnerColumnType::TimestampTz {} => crate::traits::ir::InnerColumnType::TimestampTz {},
-            InnerColumnType::Interval {} => crate::traits::ir::InnerColumnType::Interval {},
             InnerColumnType::Integer {} => crate::traits::ir::InnerColumnType::Integer {},
             InnerColumnType::Float {} => crate::traits::ir::InnerColumnType::Float {},
             InnerColumnType::BitFlag { values } => {
@@ -100,7 +92,6 @@ impl From<InnerColumnType> for crate::traits::ir::InnerColumnType {
 impl From<crate::traits::ir::InnerColumnType> for InnerColumnType {
     fn from(v: crate::traits::ir::InnerColumnType) -> InnerColumnType {
         match v {
-            crate::traits::ir::InnerColumnType::Uuid {} => InnerColumnType::Uuid {},
             crate::traits::ir::InnerColumnType::String {
                 min_length,
                 max_length,
@@ -112,9 +103,6 @@ impl From<crate::traits::ir::InnerColumnType> for InnerColumnType {
                 allowed_values,
                 kind,
             },
-            crate::traits::ir::InnerColumnType::Timestamp {} => InnerColumnType::Timestamp {},
-            crate::traits::ir::InnerColumnType::TimestampTz {} => InnerColumnType::TimestampTz {},
-            crate::traits::ir::InnerColumnType::Interval {} => InnerColumnType::Interval {},
             crate::traits::ir::InnerColumnType::Integer {} => InnerColumnType::Integer {},
             crate::traits::ir::InnerColumnType::Float {} => InnerColumnType::Float {},
             crate::traits::ir::InnerColumnType::BitFlag { values } => {
