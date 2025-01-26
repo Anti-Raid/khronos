@@ -363,7 +363,7 @@ A setting
 - `id` ([string](#type.string)): The ID of the setting.
 - `name` ([string](#type.string)): The name of the setting.
 - `description` ([string](#type.string)): The description of the setting.
-- `operations` ([{OperationType}](#type.OperationType)): The operations that can be performed on the setting. **Note that when using ``add_settings``, you must pass this as the second argument to settings and ignore this field.**
+- `operations` ([{OperationType}](#type.OperationType)): The operations that can be performed on the setting. 
 - `primary_key` ([string](#type.string)): The primary key of the setting that UNIQUELY identifies the row. When ``Delete`` is called, the value of this is what will be sent in the event. On ``Update``, this key MUST also exist (otherwise, the template MUST error out)
 - `title_template` ([string](#type.string)): The template for the title of each row for the setting. This is a string that can contain placeholders for columns. The placeholders are in the form of ``{column_id}``. For example, if you have a column with ID ``col1`` and another with ID ``col2``, you can have a title template of ``{col1} - {col2}`` etc..
 - `columns` ([{Setting.Column}](#type.Setting.Column)): The columns of the setting.
@@ -372,7 +372,7 @@ A setting
 
 ### Page
 
-An AntiRaid template page. Like all things in the AntiRaid runtime, pages can be freely shared within the VM etc. which may be useful.
+An AntiRaid template page
 
 #### Fields
 
@@ -390,10 +390,10 @@ A page executor. This is used to manipulate the page.
 ##### PageExecutor:get
 
 ```luau
-function get(): Page
+function get(): Page?
 ```
 
-Returns the page associated with the template. Note that pages can be passed around across the VM if desired and are not bound to the template. Using the token from another template to create a PageExecutor and then calling get can be used to get that templates' page.
+Returns the page associated with the template, if any. Using the token from another template to create a PageExecutor and then calling get can be used to get that templates' page.
 
 ##### PageExecutor:set
 

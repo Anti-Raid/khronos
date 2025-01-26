@@ -1,8 +1,6 @@
 // To avoid over-relying on Settings
 mod settings_ir;
 
-use std::cell::RefCell;
-
 use crate::traits::context::KhronosContext;
 use crate::traits::pageprovider::PageProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -14,84 +12,28 @@ const MAX_ID_LENGTH: usize = 100;
 const MAX_TITLE_LENGTH: usize = 256;
 const MAX_DESCRIPTION_LENGTH: usize = 4096;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 /// A intermediary representation of a template page
 pub struct Page {
     id: String,
     title: String,
     description: String,
     settings: Vec<Setting>,
-    _cached_settings: RefCell<Option<LuaValue>>,
 }
 
-impl LuaUserData for Page {
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::ToString, |_, this, _: ()| {
-            if this.id.is_empty() {
-                Ok("Page(NoID)".to_string())
-            } else {
-                Ok(format!("Page({})", this.id))
-            }
-        });
-    }
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_meta_field(LuaMetaMethod::Type, "Page");
+impl Page {
+    pub fn validate(&self) -> LuaResult<()> {
+        if self.id.len() > MAX_ID_LENGTH {
+            return Err(LuaError::external("ID is too long"));
+        }
+        if self.title.len() > MAX_TITLE_LENGTH {
+            return Err(LuaError::external("Title is too long"));
+        }
+        if self.description.len() > MAX_DESCRIPTION_LENGTH {
+            return Err(LuaError::external("Description is too long"));
+        }
 
-        fields.add_field_method_get("id", |_, this| Ok(this.id.clone()));
-        fields.add_field_method_set("id", |_, this, id: String| {
-            if id.len() > MAX_ID_LENGTH {
-                return Err(LuaError::external("ID is too long"));
-            }
-            this.id = id;
-            Ok(())
-        });
-        fields.add_field_method_get("title", |_, this| Ok(this.title.clone()));
-        fields.add_field_method_set("title", |_, this, title: String| {
-            if title.len() > MAX_TITLE_LENGTH {
-                return Err(LuaError::external("Title is too long"));
-            }
-            this.title = title;
-            Ok(())
-        });
-        fields.add_field_method_get("description", |_, this| Ok(this.description.clone()));
-        fields.add_field_method_set("description", |_, this, description: String| {
-            if description.len() > MAX_DESCRIPTION_LENGTH {
-                return Err(LuaError::external("Description is too long"));
-            }
-            this.description = description;
-            Ok(())
-        });
-        fields.add_field_method_get("settings", |lua, this| {
-            // Check for cached serialized data
-            let mut cached_data = this
-                ._cached_settings
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value(&this.settings)?;
-
-            *cached_data = Some(v.clone());
-
-            Ok(v)
-        });
-        fields.add_field_method_set("settings", |lua, this, settings: LuaValue| {
-            let settings = lua.from_value::<Vec<Setting>>(settings)?;
-            this.settings = settings;
-
-            // Clear _cached_settings
-            let mut cached_data = this
-                ._cached_settings
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            *cached_data = None;
-
-            Ok(())
-        });
+        Ok(())
     }
 }
 
@@ -115,36 +57,43 @@ impl<T: KhronosContext> PageExecutor<T> {
 
 impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("get", |_, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
+        methods.add_method("get", |_lua, this, _g: ()| {
+            Ok(lua_promise!(this, _g, |lua, this, _g|, {
                 this.check_action("get".to_string())?;
 
                 let page = match this.page_provider.get_page().await {
                     Some(page) => page,
                     None => {
-                        return Ok(Page::default());
+                        return Ok(LuaValue::Nil);
                     }
                 };
 
-                Ok(Page {
+                let page = Page {
                     id: page.id,
                     title: page.title,
                     description: page.description,
                     settings: page.settings.into_iter().map(|e| e.into()).collect(),
-                    ..Default::default()
-                })
+                };
+
+                let page = lua.to_value(&page)?;
+
+                Ok(page)
             }))
         });
 
-        methods.add_method("save", |_, this, page: LuaUserDataRef<Page>| {
-            Ok(lua_promise!(this, page, |_lua, this, page|, {
+        methods.add_method("save", |_lua, this, page: LuaValue| {
+            Ok(lua_promise!(this, page, |lua, this, page|, {
                 this.check_action("save".to_string())?;
+
+                let page: Page = lua.from_value(page)?;
+
+                page.validate()?;
 
                 // Convert to khronos PageProviderPage raw struct IR
                 let page = crate::traits::pageprovider::PageProviderPage {
-                    id: page.id.clone(),
-                    title: page.title.clone(),
-                    description: page.description.clone(),
+                    id: page.id,
+                    title: page.title,
+                    description: page.description,
                     settings: page.settings.into_iter().map(|e| e.into()).collect(),
                 };
 
