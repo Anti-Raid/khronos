@@ -17,7 +17,7 @@ indexmap = { version = "2", features = ["serde"] }
 # Antiraid
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau", "async"] }
+mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau"] }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }

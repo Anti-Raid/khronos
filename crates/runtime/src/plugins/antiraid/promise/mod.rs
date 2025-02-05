@@ -149,14 +149,13 @@ mod tests {
                     _label: &str,
                     _tm: &mlua_scheduler::TaskManager,
                     _th: &mlua::Thread,
-                    result: Option<mlua::Result<mlua::MultiValue>>,
+                    result: mlua::Result<mlua::MultiValue>,
                 ) {
                     match result {
-                        Some(Ok(_)) => {}
-                        Some(Err(e)) => {
+                        Ok(_) => {}
+                        Err(e) => {
                             eprintln!("Error: {:?}", e);
                         }
-                        None => {}
                     }
                 }
             }

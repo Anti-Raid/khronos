@@ -12,7 +12,7 @@ extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
 indexmap = { version = "2", features = ["serde"] }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["async", "luau", "serialize", "macros"] }
+mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau", "serialize", "macros"] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 env_logger = "0.11"

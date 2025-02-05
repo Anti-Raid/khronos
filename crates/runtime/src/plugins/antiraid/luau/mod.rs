@@ -100,10 +100,24 @@ impl<T: KhronosContext> LuaUserData for Chunk<T> {
             Ok(lua_promise!(this, args, |lua, this, args|, {
                 this.check_action("eval.call_async".to_string())?;
 
-                let chunk = this.setup_chunk(&lua)?;
-                let res = chunk.call_async::<LuaMultiValue>(args).await?;
+                let func = this.setup_chunk(&lua)?
+                .into_function()?;
 
-                Ok(res)
+
+                let th = lua.create_thread(func)?;
+                //println!("Spawning thread: {:?}", th.to_pointer());
+
+                let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
+                let output = scheduler
+                    .spawn_thread_and_wait("Eval", th, args)
+                    .await?;
+
+                match output {
+                    Some(result) => result,
+                    None => {
+                        Ok(LuaMultiValue::new())
+                    }
+                }
             }))
         });
     }

@@ -2,7 +2,6 @@ mod constants;
 mod dispatch;
 mod presets;
 mod provider;
-mod testfuncs;
 
 use antiraid_types::ar_event::AntiraidEvent;
 use clap::Parser;
@@ -11,9 +10,12 @@ use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
+use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler::XRc;
+use mlua_scheduler::XRefCell;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
+use std::env::consts::OS;
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 use tokio::fs;
@@ -208,7 +210,10 @@ fn main() {
             lua.clone(),
             XRc::new(mlua_scheduler_ext::feedbacks::ChainFeedback::new(
                 thread_tracker,
-                TaskPrintError {},
+                TaskPrintError {
+                    thread_limit: 100000000,
+                    threads: XRc::new(XRefCell::new(0)),
+                },
             )),
             Duration::from_millis(1),
         );
@@ -219,7 +224,20 @@ fn main() {
 
         // Test related functions, not available outside of script runner
         if cli.test_funcs {
-            testfuncs::attach_test_fns(&lua);
+            lua.globals()
+                .set("_OS", OS.to_lowercase())
+                .expect("Failed to set _OS global");
+
+            lua.globals()
+                .set(
+                    "_TEST_ASYNC_WORK",
+                    lua.create_scheduler_async_function(|lua, n: u64| async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(n)).await;
+                        lua.create_table()
+                    })
+                    .expect("Failed to create async function"),
+                )
+                .expect("Failed to set _OS global");
         }
 
         let scheduler_lib =
@@ -342,22 +360,40 @@ async fn entrypoint(
     }
 }
 
-pub struct TaskPrintError {}
+pub struct TaskPrintError {
+    pub thread_limit: usize,
+    pub threads: XRc<XRefCell<usize>>,
+}
 
 impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
+    fn on_thread_add(
+        &self,
+        _label: &str,
+        _creator: &mlua::Thread,
+        _thread: &mlua::Thread,
+    ) -> mlua::Result<()> {
+        let mut threads = self.threads.borrow_mut();
+        if *threads >= self.thread_limit {
+            return Err(mlua::Error::external("Thread limit reached"));
+        }
+
+        *threads += 1;
+
+        Ok(())
+    }
+
     fn on_response(
         &self,
         _label: &str,
         _tm: &mlua_scheduler::TaskManager,
         _th: &mlua::Thread,
-        result: Option<mlua::Result<mlua::MultiValue>>,
+        result: mlua::Result<mlua::MultiValue>,
     ) {
         match result {
-            Some(Ok(_)) => {}
-            Some(Err(e)) => {
-                eprintln!("Error: {:?}", e);
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Error: {}", e);
             }
-            None => {}
         }
     }
 }
