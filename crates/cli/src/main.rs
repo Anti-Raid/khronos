@@ -1,41 +1,120 @@
+mod constants;
+mod dispatch;
+mod presets;
+mod provider;
+
+use antiraid_types::ar_event::AntiraidEvent;
 use clap::Parser;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler::XRc;
+use presets::impls::CreateEventFromPresetType;
+use presets::types::AntiraidEventPresetType;
+use std::str::FromStr;
 use std::{env::consts::OS, path::PathBuf, time::Duration};
 use tokio::fs;
 
-fn get_default_log_path() -> PathBuf {
-    std::env::var("TFILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().unwrap().join("examples/bench.luau"))
-}
-
 #[derive(Debug, Parser)]
 struct Cli {
-    #[arg(default_value=get_default_log_path().into_os_string())]
-    path: Vec<PathBuf>,
+    #[arg(name = "path")]
+    /// The path to the script to run
+    script: Option<Vec<PathBuf>>,
+
+    /// What capbilities the script should have
+    ///
+    /// Can be useful for mocking etc.
+    #[clap(short, long)]
+    allowed_caps: Vec<String>,
+
+    /// Whether or not to be verbose
+    #[clap(short, long)]
+    verbose: bool,
+
+    /// What preset to use for creating the event
+    #[clap(short, long)]
+    preset: Option<String>,
+
+    /// The input data to use for creating the event
+    /// using a preset
+    ///
+    /// Must be JSON encoded
+    #[clap(short, long)]
+    preset_input: Option<String>,
+
+    /// The raw event data to use for creating the event
+    ///
+    /// Overrides `preset`/`preset_input` if set
+    #[clap(short, long)]
+    raw_event_data: Option<String>,
+
+    /// What guild_id to use for mocking
+    #[clap(short, long)]
+    guild_id: Option<serenity::all::GuildId>,
+
+    /// What owner_guild_id to use for mocking
+    #[clap(short, long)]
+    owner_guild_id: Option<serenity::all::GuildId>,
 }
 
-async fn spawn_script(lua: mlua::Lua, path: PathBuf, g: LuaTable) -> mlua::Result<()> {
-    let f = lua
-        .load(fs::read_to_string(&path).await?)
-        .set_name(fs::canonicalize(&path).await?.to_string_lossy())
-        .set_environment(g)
-        .into_function()?;
+impl Cli {
+    fn parse_event_args(&self) -> AntiraidEvent {
+        if let Some(ref raw_event_data) = self.raw_event_data {
+            serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
+        } else if let Some(ref preset) = self.preset {
+            let preset =
+                AntiraidEventPresetType::from_str(preset).expect("Failed to parse preset type");
 
-    let th = lua.create_thread(f)?;
-    //println!("Spawning thread: {:?}", th.to_pointer());
+            let input = if let Some(input) = &self.preset_input {
+                let input: serde_json::Value =
+                    serde_json::from_str(input).expect("Failed to parse preset input data");
+                input
+            } else {
+                serde_json::Value::Null
+            };
 
-    let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
-    let output = scheduler
-        .spawn_thread_and_wait("SpawnScript", th, mlua::MultiValue::new())
-        .await;
+            preset
+                .to_event(input)
+                .expect("Failed to create event from preset")
+        } else {
+            panic!("No event data provided")
+        }
+    }
 
-    println!("Output: {:?}", output);
+    fn create_khronos_context(&self, global_table: LuaTable) -> provider::CliKhronosContext {
+        provider::CliKhronosContext {
+            allowed_caps: self.allowed_caps.clone(),
+            guild_id: self.guild_id,
+            owner_guild_id: self.owner_guild_id,
+            global_table,
+        }
+    }
 
-    //println!("Spawned thread: {:?}", th.to_pointer());
-    Ok(())
+    async fn spawn_script(
+        &self,
+        lua: mlua::Lua,
+        name: impl Into<String>,
+        code: impl Into<String> + mlua::AsChunk<'_>,
+        global: LuaTable,
+    ) -> mlua::Result<()> {
+        let f = lua
+            .load(code)
+            .set_name(name)
+            .set_environment(global)
+            .into_function()?;
+
+        let th = lua.create_thread(f)?;
+        //println!("Spawning thread: {:?}", th.to_pointer());
+
+        let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
+        let output = scheduler
+            .spawn_thread_and_wait("SpawnScript", th, mlua::MultiValue::new())
+            .await;
+
+        println!("Output: {:?}", output);
+
+        //println!("Spawned thread: {:?}", th.to_pointer());
+        Ok(())
+    }
 }
 
 fn main() {
@@ -43,7 +122,7 @@ fn main() {
 
     let cli = Cli::parse();
 
-    println!("Running script: {:?}", cli.path);
+    let event = cli.parse_event_args();
 
     // Create tokio runtime and use spawn_local
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -58,34 +137,11 @@ fn main() {
         let lua = mlua::Lua::new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
             .expect("Failed to create Lua");
 
-        #[cfg(feature = "ncg")]
-        lua.enable_jit(true);
-
         let compiler = mlua::Compiler::new().set_optimization_level(2);
 
         lua.set_compiler(compiler);
 
         let thread_tracker = mlua_scheduler_ext::feedbacks::ThreadTracker::new();
-
-        pub struct TaskPrintError {}
-
-        impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
-            fn on_response(
-                &self,
-                _label: &str,
-                _tm: &mlua_scheduler::TaskManager,
-                _th: &mlua::Thread,
-                result: Option<mlua::Result<mlua::MultiValue>>,
-            ) {
-                match result {
-                    Some(Ok(_)) => {}
-                    Some(Err(e)) => {
-                        eprintln!("Error: {:?}", e);
-                    }
-                    None => {}
-                }
-            }
-        }
 
         lua.set_app_data(thread_tracker.clone());
 
@@ -102,6 +158,7 @@ fn main() {
 
         scheduler.attach();
 
+        // Test related functions, not available outside of script runner
         lua.globals()
             .set("_OS", OS.to_lowercase())
             .expect("Failed to set _OS global");
@@ -192,17 +249,57 @@ fn main() {
         // Set __index on global_tab to point to _G
         global_tab.set_metatable(Some(global_mt));
 
-        for path in cli.path {
-            spawn_script(lua.clone(), path, global_tab.clone())
-                .await
-                .expect("Failed to spawn script");
+        if let Some(ref script) = cli.script {
+            if cli.verbose {
+                println!("Running script: {:?}", script);
+            }
 
-            task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+            for path in script {
+                let name = match fs::canonicalize(path).await {
+                    Ok(p) => p.to_string_lossy().to_string(),
+                    Err(_) => path.to_string_lossy().to_string(),
+                };
+                let contents = match fs::read_to_string(&path).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("Failed to read script: {:?}", e);
+                        continue;
+                    }
+                };
+
+                cli.spawn_script(lua.clone(), name, contents, global_tab.clone())
+                    .await
+                    .expect("Failed to spawn script");
+
+                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+            }
         }
 
-        println!("Stopping task manager");
+        if cli.verbose {
+            println!("Stopping task manager");
+        }
 
         task_mgr.stop();
         //std::process::exit(0);
     });
+}
+
+pub struct TaskPrintError {}
+
+impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
+    fn on_response(
+        &self,
+        _label: &str,
+        _tm: &mlua_scheduler::TaskManager,
+        _th: &mlua::Thread,
+        result: Option<mlua::Result<mlua::MultiValue>>,
+    ) {
+        match result {
+            Some(Ok(_)) => {}
+            Some(Err(e)) => {
+                eprintln!("Error: {:?}", e);
+            }
+            None => {}
+        }
+    }
 }

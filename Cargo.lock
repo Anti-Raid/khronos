@@ -155,14 +155,16 @@ dependencies = [
 [[package]]
 name = "antiraid-types"
 version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/antiraid-types#e623c2c7f9468c5f0a218b0e049bdc90b30e1eff"
+source = "git+https://github.com/Anti-Raid/antiraid-types#827424e4eaf96966d684aa60d4971641c86a5305"
 dependencies = [
  "chrono",
  "extract_map",
+ "indexmap",
  "kittycat",
  "serde",
  "serde_json",
  "serenity",
+ "strum",
  "uuid",
 ]
 
@@ -1045,6 +1047,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gwevent"
+version = "0.0.1"
+source = "git+https://github.com/Anti-Raid/gwevent#87fcd5d9f6e14fa9b51365757907937c64f60575"
+dependencies = [
+ "log",
+ "serenity",
+ "strum",
+]
+
+[[package]]
 name = "half"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1522,13 +1534,24 @@ dependencies = [
 name = "khronos_cli"
 version = "1.0.0"
 dependencies = [
+ "antiraid-types",
+ "chrono",
  "clap",
  "env_logger",
+ "extract_map",
+ "gwevent",
+ "indexmap",
  "khronos_runtime",
+ "kittycat",
  "mlua",
  "mlua_scheduler",
  "mlua_scheduler_ext",
+ "serde",
+ "serde_json",
+ "serenity",
+ "strum",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
