@@ -2,16 +2,20 @@ mod constants;
 mod dispatch;
 mod presets;
 mod provider;
+mod testfuncs;
 
 use antiraid_types::ar_event::AntiraidEvent;
 use clap::Parser;
+use dispatch::parse_event;
+use khronos_runtime::primitives::event::CreateEvent;
+use khronos_runtime::primitives::event::Event;
+use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
-use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler::XRc;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
 use std::str::FromStr;
-use std::{env::consts::OS, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 use tokio::fs;
 
 #[derive(Debug, Parser)]
@@ -23,12 +27,48 @@ struct Cli {
     /// What capbilities the script should have
     ///
     /// Can be useful for mocking etc.
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "[]")]
     allowed_caps: Vec<String>,
 
     /// Whether or not to be verbose
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "false")]
     verbose: bool,
+
+    /// Whether or not internal test functions should be attached
+    /// or not
+    #[clap(short, long, default_value = "true")]
+    test_funcs: bool,
+
+    /// Whether or not _G should proxy or remain readonly
+    ///
+    /// AntiRaid uses the proxy method, however for testing,
+    /// you may want to check how dependent the script is on
+    /// globals etc.
+    ///
+    /// Keep enabled if you are unsure
+    #[clap(short, long, default_value = "true")]
+    proxy_globals: bool,
+
+    /// Whether or not the internal "scheduler" library
+    /// should be exposed to the script
+    ///
+    /// AntiRaid exposes this, however for testing, you may
+    /// want to disable this to ensure your code is portable
+    /// etc.
+    ///
+    /// Keep enabled if you are unsure
+    #[clap(short, long, default_value = "true")]
+    expose_scheduler_lib: bool,
+
+    /// Whether or not to expose the task library to the script
+    ///
+    /// AntiRaid exposes this and not exposing it will mean that
+    /// basic functionality provided by the task library such as
+    /// task.wait etc will not be available
+    ///
+    /// Keep enabled if you are unsure
+    #[clap(short, long, default_value = "true")]
+    expose_task_lib: bool,
 
     /// What preset to use for creating the event
     #[clap(short, long)]
@@ -76,7 +116,17 @@ impl Cli {
                 .to_event(input)
                 .expect("Failed to create event from preset")
         } else {
-            panic!("No event data provided")
+            let input = if let Some(input) = &self.preset_input {
+                let input: serde_json::Value =
+                    serde_json::from_str(input).expect("Failed to parse preset input data");
+                input
+            } else {
+                serde_json::Value::Null
+            };
+
+            AntiraidEventPresetType::OnStartup
+                .to_event(input)
+                .expect("Failed to create event from preset")
         }
     }
 
@@ -91,11 +141,20 @@ impl Cli {
 
     async fn spawn_script(
         &self,
+        event: &CreateEvent,
         lua: mlua::Lua,
         name: impl Into<String>,
         code: impl Into<String> + mlua::AsChunk<'_>,
         global: LuaTable,
     ) -> mlua::Result<()> {
+        let cli_context = self.create_khronos_context(global.clone());
+        let template_context = TemplateContext::new(cli_context);
+
+        let event = Event::from_create_event(event);
+        let args = (event, template_context)
+            .into_lua_multi(&lua)
+            .expect("Failed to convert");
+
         let f = lua
             .load(code)
             .set_name(name)
@@ -107,7 +166,7 @@ impl Cli {
 
         let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
         let output = scheduler
-            .spawn_thread_and_wait("SpawnScript", th, mlua::MultiValue::new())
+            .spawn_thread_and_wait("SpawnScript", th, args)
             .await;
 
         println!("Output: {:?}", output);
@@ -121,8 +180,8 @@ fn main() {
     env_logger::init();
 
     let cli = Cli::parse();
-
     let event = cli.parse_event_args();
+    let create_event = parse_event(&event).expect("Failed to parse event");
 
     // Create tokio runtime and use spawn_local
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -159,129 +218,128 @@ fn main() {
         scheduler.attach();
 
         // Test related functions, not available outside of script runner
-        lua.globals()
-            .set("_OS", OS.to_lowercase())
-            .expect("Failed to set _OS global");
-
-        lua.globals()
-            .set(
-                "_TEST_SYNC_WORK",
-                lua.create_async_function(|lua, n: u64| async move {
-                    //let task_mgr = taskmgr::get(&lua);
-                    //println!("Async work: {}", n);
-                    tokio::time::sleep(std::time::Duration::from_secs(n)).await;
-                    //println!("Async work done: {}", n);
-
-                    let created_table = lua.create_table()?;
-                    created_table.set("test", "test")?;
-
-                    Ok(created_table)
-                })
-                .expect("Failed to create async function"),
-            )
-            .expect("Failed to set _OS global");
-
-        lua.globals()
-            .set(
-                "_TEST_ASYNC_WORK",
-                lua.create_scheduler_async_function(|lua, n: u64| async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(n)).await;
-                    lua.create_table()
-                })
-                .expect("Failed to create async function"),
-            )
-            .expect("Failed to set _OS global");
+        if cli.test_funcs {
+            testfuncs::attach_test_fns(&lua);
+        }
 
         let scheduler_lib =
             mlua_scheduler::userdata::scheduler_lib(&lua).expect("Failed to create scheduler lib");
 
-        lua.globals()
-            .set("scheduler", scheduler_lib.clone())
-            .expect("Failed to set scheduler global");
+        if cli.expose_scheduler_lib {
+            lua.globals()
+                .set("scheduler", scheduler_lib.clone())
+                .expect("Failed to set scheduler global");
+        }
 
-        lua.globals()
-            .set(
-                "task",
-                mlua_scheduler::userdata::task_lib(&lua, scheduler_lib)
-                    .expect("Failed to create table"),
-            )
-            .expect("Failed to set task global");
+        if cli.expose_task_lib {
+            lua.globals()
+                .set(
+                    "task",
+                    mlua_scheduler::userdata::task_lib(&lua, scheduler_lib)
+                        .expect("Failed to create table"),
+                )
+                .expect("Failed to set task global");
+        }
 
         mlua_scheduler::userdata::patch_coroutine_lib(&lua).expect("Failed to patch coroutine lib");
 
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
-        // Setup the global table using a metatable
-        //
-        // SAFETY: This works because the global table will not change in the VM
-        let global_mt = lua.create_table().expect("Failed to create table");
-        let global_tab = lua.create_table().expect("Failed to create table");
+        // Proxy globals if enabled
+        let global_tab = if cli.proxy_globals {
+            // Setup the global table using a metatable
+            //
+            // SAFETY: This works because the global table will not change in the VM
+            let global_mt = lua.create_table().expect("Failed to create table");
+            let global_tab = lua.create_table().expect("Failed to create table");
 
-        // Proxy reads to globals if key is in globals, otherwise to the table
-        global_mt
-            .set("__index", lua.globals())
-            .expect("Failed to set __index");
-        global_tab
-            .set("_G", global_tab.clone())
-            .expect("Failed to set _G");
+            // Proxy reads to globals if key is in globals, otherwise to the table
+            global_mt
+                .set("__index", lua.globals())
+                .expect("Failed to set __index");
+            global_tab
+                .set("_G", global_tab.clone())
+                .expect("Failed to set _G");
 
-        // Provies writes
-        // Forward to _G if key is in globals, otherwise to the table
-        let globals_ref = lua.globals();
-        global_mt
-            .set(
-                "__newindex",
-                lua.create_function(
-                    move |_lua, (tab, key, value): (LuaTable, LuaValue, LuaValue)| {
-                        let v = globals_ref.get::<LuaValue>(key.clone())?;
+            // Provies writes
+            // Forward to _G if key is in globals, otherwise to the table
+            let globals_ref = lua.globals();
+            global_mt
+                .set(
+                    "__newindex",
+                    lua.create_function(
+                        move |_lua, (tab, key, value): (LuaTable, LuaValue, LuaValue)| {
+                            let v = globals_ref.get::<LuaValue>(key.clone())?;
 
-                        if !v.is_nil() {
-                            globals_ref.set(key, value)
-                        } else {
-                            tab.raw_set(key, value)
-                        }
-                    },
+                            if !v.is_nil() {
+                                globals_ref.set(key, value)
+                            } else {
+                                tab.raw_set(key, value)
+                            }
+                        },
+                    )
+                    .expect("Failed to create function"),
                 )
-                .expect("Failed to create function"),
-            )
-            .expect("Failed to set __newindex");
+                .expect("Failed to set __newindex");
 
-        // Set __index on global_tab to point to _G
-        global_tab.set_metatable(Some(global_mt));
+            // Set __index on global_tab to point to _G
+            global_tab.set_metatable(Some(global_mt));
 
-        if let Some(ref script) = cli.script {
-            if cli.verbose {
-                println!("Running script: {:?}", script);
-            }
+            global_tab
+        } else {
+            lua.globals()
+        };
 
-            for path in script {
-                let name = match fs::canonicalize(path).await {
-                    Ok(p) => p.to_string_lossy().to_string(),
-                    Err(_) => path.to_string_lossy().to_string(),
-                };
-                let contents = match fs::read_to_string(&path).await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("Failed to read script: {:?}", e);
-                        continue;
-                    }
-                };
-
-                cli.spawn_script(lua.clone(), name, contents, global_tab.clone())
-                    .await
-                    .expect("Failed to spawn script");
-
-                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
-            }
-        }
-
-        if cli.verbose {
-            println!("Stopping task manager");
-        }
+        entrypoint(cli, lua, create_event, global_tab, &task_mgr).await;
 
         task_mgr.stop();
         //std::process::exit(0);
     });
+}
+
+/// The core entrypoint for the CLI (after the init code has ran)
+async fn entrypoint(
+    cli: Cli,
+    lua: mlua::Lua,
+    create_event: CreateEvent,
+    global_tab: LuaTable,
+    task_mgr: &mlua_scheduler::taskmgr::TaskManager,
+) {
+    if let Some(ref script) = cli.script {
+        if cli.verbose {
+            println!("Running script: {:?}", script);
+        }
+
+        for path in script {
+            let name = match fs::canonicalize(path).await {
+                Ok(p) => p.to_string_lossy().to_string(),
+                Err(_) => path.to_string_lossy().to_string(),
+            };
+            let contents = match fs::read_to_string(&path).await {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Failed to read script: {:?}", e);
+                    continue;
+                }
+            };
+
+            cli.spawn_script(
+                &create_event,
+                lua.clone(),
+                name,
+                contents,
+                global_tab.clone(),
+            )
+            .await
+            .expect("Failed to spawn script");
+
+            task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+        }
+    }
+
+    if cli.verbose {
+        println!("Stopping task manager");
+    }
 }
 
 pub struct TaskPrintError {}
