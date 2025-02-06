@@ -15,6 +15,7 @@ use mlua_scheduler::XRc;
 use mlua_scheduler::XRefCell;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
+use rustyline::DefaultEditor;
 use std::env::consts::OS;
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
@@ -36,31 +37,33 @@ struct Cli {
     #[clap(short, long, default_value = "false")]
     verbose: bool,
 
-    /// Whether or not internal test functions should be attached
-    /// or not
-    #[clap(short, long, default_value = "true")]
-    test_funcs: bool,
+    /// Whether or not the default internal test functions
+    /// should be attached or not
+    #[clap(short, long, default_value = "false")]
+    disable_test_funcs: bool,
 
-    /// Whether or not _G should proxy or remain readonly
+    /// Whether or not _G default proxying behavior should
+    /// be disabled (hence making _G read only due to sandboxing)
     ///
-    /// AntiRaid uses the proxy method, however for testing,
+    /// AntiRaid uses the proxy method to allow _G to be read-write
+    /// while sandboxing lua globals, however for testing,
     /// you may want to check how dependent the script is on
     /// globals etc.
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "true")]
-    proxy_globals: bool,
+    #[clap(short, long, default_value = "false")]
+    disable_globals_proxying: bool,
 
     /// Whether or not the internal "scheduler" library
-    /// should be exposed to the script
+    /// should be exposed to the script or not
     ///
     /// AntiRaid exposes this, however for testing, you may
     /// want to disable this to ensure your code is portable
     /// etc.
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "true")]
-    expose_scheduler_lib: bool,
+    #[clap(short, long, default_value = "false")]
+    disable_scheduler_lib: bool,
 
     /// Whether or not to expose the task library to the script
     ///
@@ -69,8 +72,18 @@ struct Cli {
     /// task.wait etc will not be available
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "true")]
-    expose_task_lib: bool,
+    #[clap(short, long, default_value = "false")]
+    disable_task_lib: bool,
+
+    /// Whether or not the REPL should wait for all tasks to finish
+    /// before accepting new input. Not enabling this may cause
+    /// task.delay's etc to not work as expected
+    ///
+    /// Keep enabled if you are unsure
+    ///
+    /// Not applicable if a script is provided (not in REPL mode)
+    #[clap(short, long, default_value = "false")]
+    disable_repl_wait_for_tasks: bool,
 
     /// What preset to use for creating the event
     #[clap(short, long)]
@@ -144,18 +157,16 @@ impl Cli {
     async fn spawn_script(
         &self,
         event: &CreateEvent,
-        lua: mlua::Lua,
-        name: impl Into<String>,
-        code: impl Into<String> + mlua::AsChunk<'_>,
+        lua: &Lua,
+        name: &str,
+        code: &str,
         global: LuaTable,
-    ) -> mlua::Result<()> {
+    ) -> LuaResult<LuaMultiValue> {
         let cli_context = self.create_khronos_context(global.clone());
         let template_context = TemplateContext::new(cli_context);
 
         let event = Event::from_create_event(event);
-        let args = (event, template_context)
-            .into_lua_multi(&lua)
-            .expect("Failed to convert");
+        let args = (event, template_context).into_lua_multi(lua)?;
 
         let f = lua
             .load(code)
@@ -166,15 +177,15 @@ impl Cli {
         let th = lua.create_thread(f)?;
         //println!("Spawning thread: {:?}", th.to_pointer());
 
-        let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
+        let scheduler = mlua_scheduler_ext::Scheduler::get(lua);
         let output = scheduler
             .spawn_thread_and_wait("SpawnScript", th, args)
-            .await;
+            .await?;
 
-        println!("Output: {:?}", output);
-
-        //println!("Spawned thread: {:?}", th.to_pointer());
-        Ok(())
+        match output {
+            Some(result) => result,
+            None => Ok(LuaMultiValue::new()),
+        }
     }
 }
 
@@ -195,7 +206,7 @@ fn main() {
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&rt, async {
-        let lua = mlua::Lua::new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+        let lua = Lua::new_with(LuaStdLib::ALL_SAFE, LuaOptions::default())
             .expect("Failed to create Lua");
 
         let compiler = mlua::Compiler::new().set_optimization_level(2);
@@ -223,7 +234,7 @@ fn main() {
         scheduler.attach();
 
         // Test related functions, not available outside of script runner
-        if cli.test_funcs {
+        if !cli.disable_test_funcs {
             lua.globals()
                 .set("_OS", OS.to_lowercase())
                 .expect("Failed to set _OS global");
@@ -243,13 +254,13 @@ fn main() {
         let scheduler_lib =
             mlua_scheduler::userdata::scheduler_lib(&lua).expect("Failed to create scheduler lib");
 
-        if cli.expose_scheduler_lib {
+        if !cli.disable_scheduler_lib {
             lua.globals()
                 .set("scheduler", scheduler_lib.clone())
                 .expect("Failed to set scheduler global");
         }
 
-        if cli.expose_task_lib {
+        if !cli.disable_task_lib {
             lua.globals()
                 .set(
                     "task",
@@ -264,7 +275,7 @@ fn main() {
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
         // Proxy globals if enabled
-        let global_tab = if cli.proxy_globals {
+        let global_tab = if !cli.disable_globals_proxying {
             // Setup the global table using a metatable
             //
             // SAFETY: This works because the global table will not change in the VM
@@ -308,18 +319,21 @@ fn main() {
             lua.globals()
         };
 
-        entrypoint(cli, lua, create_event, global_tab, &task_mgr).await;
+        entrypoint(&cli, &create_event, lua, global_tab.clone(), &task_mgr).await;
+
+        if cli.verbose {
+            println!("Stopping task manager");
+        }
 
         task_mgr.stop();
         //std::process::exit(0);
     });
 }
 
-/// The core entrypoint for the CLI (after the init code has ran)
 async fn entrypoint(
-    cli: Cli,
-    lua: mlua::Lua,
-    create_event: CreateEvent,
+    cli: &Cli,
+    create_event: &CreateEvent,
+    lua: Lua,
     global_tab: LuaTable,
     task_mgr: &mlua_scheduler::taskmgr::TaskManager,
 ) {
@@ -341,23 +355,103 @@ async fn entrypoint(
                 }
             };
 
-            cli.spawn_script(
-                &create_event,
-                lua.clone(),
-                name,
-                contents,
-                global_tab.clone(),
-            )
-            .await
-            .expect("Failed to spawn script");
+            let output = cli
+                .spawn_script(create_event, &lua, &name, &contents, global_tab.clone())
+                .await
+                .expect("Failed to spawn script");
+
+            println!("Output: {:?}", output);
 
             task_mgr.wait_till_done(Duration::from_millis(1000)).await;
         }
+    } else {
+        if cli.verbose {
+            println!("Spawning REPL in separate thread");
+        }
+
+        // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
+        let mut editor = DefaultEditor::new().expect("Failed to create editor");
+
+        loop {
+            let mut prompt = "> ";
+            let mut line = String::new();
+
+            loop {
+                match editor.readline(prompt) {
+                    Ok(input) => line.push_str(&input),
+                    Err(_) => return,
+                }
+
+                match try_spawn_as(create_event, cli, &lua, "repl", &line, global_tab.clone()).await
+                {
+                    Ok(values) => {
+                        editor.add_history_entry(line).unwrap();
+
+                        if !values.is_empty() {
+                            println!(
+                                "{}",
+                                values
+                                    .iter()
+                                    .map(|value| format!("{:#?}", value))
+                                    .collect::<Vec<_>>()
+                                    .join("\t")
+                            );
+                        }
+
+                        if !cli.disable_repl_wait_for_tasks {
+                            if !task_mgr.is_empty() {
+                                println!("[waiting for all pending tasks to finish]");
+                            }
+
+                            task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+                        }
+
+                        break;
+                    }
+                    Err(LuaError::SyntaxError {
+                        incomplete_input: true,
+                        ..
+                    }) => {
+                        // continue reading input and append it to `line`
+                        #[allow(clippy::single_char_add_str)]
+                        line.push_str("\n"); // separate input lines
+                        prompt = ">> ";
+                    }
+                    Err(e) => {
+                        eprintln!("error: {}", e);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Try calling a line, first as an expression with an added "return " before it
+/// and then as a statement.
+async fn try_spawn_as(
+    create_event: &CreateEvent,
+    cli: &Cli,
+    lua: &Lua,
+    name: &str,
+    code: &str,
+    global_tab: LuaTable,
+) -> LuaResult<LuaMultiValue> {
+    if let Ok(result) = cli
+        .spawn_script(
+            create_event,
+            lua,
+            name,
+            &format!("return {}", code),
+            global_tab.clone(),
+        )
+        .await
+    {
+        return Ok(result);
     }
 
-    if cli.verbose {
-        println!("Stopping task manager");
-    }
+    cli.spawn_script(create_event, lua, name, code, global_tab)
+        .await
 }
 
 pub struct TaskPrintError {
@@ -369,12 +463,12 @@ impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
     fn on_thread_add(
         &self,
         _label: &str,
-        _creator: &mlua::Thread,
-        _thread: &mlua::Thread,
-    ) -> mlua::Result<()> {
+        _creator: &LuaThread,
+        _thread: &LuaThread,
+    ) -> LuaResult<()> {
         let mut threads = self.threads.borrow_mut();
         if *threads >= self.thread_limit {
-            return Err(mlua::Error::external("Thread limit reached"));
+            return Err(LuaError::external("Thread limit reached"));
         }
 
         *threads += 1;
@@ -386,8 +480,8 @@ impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
         &self,
         _label: &str,
         _tm: &mlua_scheduler::TaskManager,
-        _th: &mlua::Thread,
-        result: mlua::Result<mlua::MultiValue>,
+        _th: &LuaThread,
+        result: LuaResult<LuaMultiValue>,
     ) {
         match result {
             Ok(_) => {}

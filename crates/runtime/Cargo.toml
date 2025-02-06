@@ -10,14 +10,16 @@ governor = "0.6"
 log = "0.4"
 extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
 indexmap = { version = "2", features = ["serde"] }
-mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau", "serialize", "macros"] }
-captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
-antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
+tokio = { version = "1" }
 env_logger = "0.11"
 arrayvec = "0.7"
 rustrict = "0.7"
+
+mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau", "serialize"] }
+captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
+antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}
@@ -68,10 +70,6 @@ features = ["model", "http", "cache", "rustls_backend", "unstable"]
 [dependencies.kittycat]
 git = "https://github.com/infinitybotlist/kittycat"
 branch = "main"
-
-[dependencies.tokio]
-version = "1"
-features = ["sync", "macros", "rt-multi-thread", "io-util"]
 
 [dependencies.uuid]
 version = "1"
