@@ -97,10 +97,11 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
             Ok(v)
         });
+
+        fields.add_meta_field(LuaMetaMethod::Type, "TemplateContext".to_string());
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Type, |_, _, _: ()| Ok("TemplateContext"));
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _, _: ()| Ok("TemplateContext"));
 
         methods.add_method("has_cap", |_, this, cap: String| {

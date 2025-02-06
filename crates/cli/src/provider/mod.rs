@@ -1,8 +1,7 @@
-use antiraid_types::userinfo::UserInfo;
-
-use khronos_runtime::utils::executorscope::ExecutorScope;
+use std::rc::Rc;
 
 use antiraid_types::stings::{Sting, StingAggregate, StingCreate};
+use antiraid_types::userinfo::UserInfo;
 use khronos_runtime::traits::context::KhronosContext;
 use khronos_runtime::traits::discordprovider::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
@@ -10,6 +9,7 @@ use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
 use khronos_runtime::traits::stingprovider::StingProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
+use khronos_runtime::utils::executorscope::ExecutorScope;
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
@@ -17,6 +17,7 @@ pub struct CliKhronosContext {
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
     pub global_table: mlua::Table,
+    pub http: Option<Rc<serenity::all::Http>>,
 }
 
 impl KhronosContext for CliKhronosContext {

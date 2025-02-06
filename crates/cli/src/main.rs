@@ -2,9 +2,10 @@ mod constants;
 mod dispatch;
 mod presets;
 mod provider;
+mod repl_completer;
 
 use antiraid_types::ar_event::AntiraidEvent;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use dispatch::parse_event;
 use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::primitives::event::Event;
@@ -15,31 +16,52 @@ use mlua_scheduler::XRc;
 use mlua_scheduler::XRefCell;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
-use rustyline::DefaultEditor;
+use rustyline::history::DefaultHistory;
+use rustyline::Editor;
 use std::env::consts::OS;
+use std::env::var;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 use tokio::fs;
+
+#[derive(Debug, ValueEnum, Clone, Copy)]
+pub enum ReplTaskWaitMode {
+    /// No waiting. If you do a task.delay, you may need to explicitly do a task.wait to allow for the task to execute after delay
+    None,
+    /// Wait for all tasks to finish after each execution (if required)
+    WaitAfterExecution,
+    /// Tokio yield before prompting for the next line
+    YieldBeforePrompt,
+}
 
 #[derive(Debug, Parser)]
 struct Cli {
     #[arg(name = "path")]
     /// The path to the script to run
+    ///
+    /// Environment variable: `SCRIPT`
     script: Option<Vec<PathBuf>>,
 
     /// What capbilities the script should have
     ///
     /// Can be useful for mocking etc.
-    #[clap(short, long, default_value = "[]")]
+    ///
+    /// Environment variable: `ALLOWED_CAPS`
+    #[clap(long, default_value = "[]")]
     allowed_caps: Vec<String>,
 
     /// Whether or not to be verbose
-    #[clap(short, long, default_value = "false")]
+    ///
+    /// Environment variable: `VERBOSE`
+    #[clap(long, default_value = "false")]
     verbose: bool,
 
     /// Whether or not the default internal test functions
     /// should be attached or not
-    #[clap(short, long, default_value = "false")]
+    ///
+    /// Environment variable: `DISABLE_TEST_FUNCS`
+    #[clap(long, default_value = "false")]
     disable_test_funcs: bool,
 
     /// Whether or not _G default proxying behavior should
@@ -51,7 +73,9 @@ struct Cli {
     /// globals etc.
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "false")]
+    ///
+    /// Environment variable: `DISABLE_GLOBALS_PROXYING`
+    #[clap(long, default_value = "false")]
     disable_globals_proxying: bool,
 
     /// Whether or not the internal "scheduler" library
@@ -62,7 +86,9 @@ struct Cli {
     /// etc.
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "false")]
+    ///
+    /// Environment variable: `DISABLE_SCHEDULER_LIB`
+    #[clap(long, default_value = "false")]
     disable_scheduler_lib: bool,
 
     /// Whether or not to expose the task library to the script
@@ -72,46 +98,221 @@ struct Cli {
     /// task.wait etc will not be available
     ///
     /// Keep enabled if you are unsure
-    #[clap(short, long, default_value = "false")]
+    ///
+    /// Environment variable: `DISABLE_TASK_LIB`
+    #[clap(long, default_value = "false")]
     disable_task_lib: bool,
 
-    /// Whether or not the REPL should wait for all tasks to finish
-    /// before accepting new input. Not enabling this may cause
-    /// task.delay's etc to not work as expected
+    /// Sets the repl wait mode.
     ///
-    /// Keep enabled if you are unsure
-    ///
-    /// Not applicable if a script is provided (not in REPL mode)
-    #[clap(short, long, default_value = "false")]
-    disable_repl_wait_for_tasks: bool,
+    /// Environment variable: `REPL_WAIT_MODE`
+    #[clap(long, default_value = "wait-after-execution")]
+    repl_wait_mode: ReplTaskWaitMode,
 
     /// What preset to use for creating the event
-    #[clap(short, long)]
+    #[clap(long)]
     preset: Option<String>,
 
     /// The input data to use for creating the event
     /// using a preset
     ///
     /// Must be JSON encoded
-    #[clap(short, long)]
+    ///
+    /// Environment variable: `PRESET_INPUT`
+    #[clap(long)]
     preset_input: Option<String>,
 
     /// The raw event data to use for creating the event
     ///
     /// Overrides `preset`/`preset_input` if set
-    #[clap(short, long)]
+    ///
+    /// Environment variable: `RAW_EVENT_DATA`
+    #[clap(long)]
     raw_event_data: Option<String>,
 
     /// What guild_id to use for mocking
-    #[clap(short, long)]
+    ///
+    /// Environment variable: `GUILD_ID`
+    #[clap(long)]
     guild_id: Option<serenity::all::GuildId>,
 
     /// What owner_guild_id to use for mocking
-    #[clap(short, long)]
+    ///
+    /// Environment variable: `OWNER_GUILD_ID`
+    #[clap(long)]
     owner_guild_id: Option<serenity::all::GuildId>,
+
+    #[clap(long)]
+    /// The discord bot token to use for discord-related operations
+    ///
+    /// Optional, but required for discord-related operations
+    ///
+    /// Environment variable: `BOT_TOKEN``
+    bot_token: Option<String>,
+
+    /// The path to a config file containing e.g.
+    /// the bot token etc
+    ///
+    /// Config file must be in env variable format. If the config file refers to another
+    /// config file with `CONFIG_FILE`, it will be recursively loaded
+    ///
+    /// Environment variable: `CONFIG_FILE`
+    #[clap(long)]
+    config_file: Option<PathBuf>,
+
+    /// The http client to use for discord operations
+    #[clap(skip)]
+    http: Option<Rc<serenity::all::Http>>,
+
+    /// The cached khronos runtime arguments
+    #[clap(skip)]
+    cached_khronos_rt_args: Option<LuaMultiValue>,
+}
+
+/// Trait used in update_from_env_vars to get environment variables
+pub trait EnvSource {
+    fn var(&self, key: &str) -> Result<String, khronos_runtime::Error>;
+    fn keep_config_file(&self) -> bool; // Whether to set config file to null if not found in env source
+}
+
+pub struct EnvVarEnvSource {}
+
+impl EnvSource for EnvVarEnvSource {
+    fn var(&self, key: &str) -> Result<String, khronos_runtime::Error> {
+        var(key).map_err(|e| e.into())
+    }
+
+    fn keep_config_file(&self) -> bool {
+        true
+    }
+}
+
+pub struct DotEnvyEnvSource {
+    map: dotenvy::EnvMap,
+}
+
+impl EnvSource for DotEnvyEnvSource {
+    fn var(&self, key: &str) -> Result<String, khronos_runtime::Error> {
+        self.map.var(key).map_err(|e| e.into())
+    }
+
+    fn keep_config_file(&self) -> bool {
+        false // Ensure its set to null if not found in env
+    }
 }
 
 impl Cli {
+    /// Update from env var source
+    fn update_from_env_vars(&mut self, src: impl EnvSource) {
+        // First update from environment variables
+        if let Ok(script) = src.var("SCRIPT") {
+            self.script = serde_json::from_str(&script).expect("Failed to parse script");
+        }
+
+        if let Ok(allowed_caps) = src.var("ALLOWED_CAPS") {
+            self.allowed_caps =
+                serde_json::from_str(&allowed_caps).expect("Failed to parse allowed caps");
+        }
+
+        if let Ok(verbose) = src.var("VERBOSE") {
+            self.verbose = verbose.parse().expect("Failed to parse verbose");
+        }
+
+        if let Ok(disable_test_funcs) = src.var("DISABLE_TEST_FUNCS") {
+            self.disable_test_funcs = disable_test_funcs
+                .parse()
+                .expect("Failed to parse disable test funcs");
+        }
+
+        if let Ok(disable_globals_proxying) = src.var("DISABLE_GLOBALS_PROXYING") {
+            self.disable_globals_proxying = disable_globals_proxying
+                .parse()
+                .expect("Failed to parse DISABLE_GLOBALS_PROXYING");
+        }
+
+        if let Ok(disable_scheduler_lib) = src.var("DISABLE_SCHEDULER_LIB") {
+            self.disable_scheduler_lib = disable_scheduler_lib
+                .parse()
+                .expect("Failed to parse disable scheduler lib");
+        }
+
+        if let Ok(disable_task_lib) = src.var("DISABLE_TASK_LIB") {
+            self.disable_task_lib = disable_task_lib
+                .parse()
+                .expect("Failed to parse disable task lib");
+        }
+
+        if let Ok(repl_wait_mode) = src.var("REPL_WAIT_MODE") {
+            self.repl_wait_mode = <ReplTaskWaitMode as ValueEnum>::from_str(&repl_wait_mode, true)
+                .expect("Failed to parse repl wait mode");
+        }
+
+        if let Ok(preset) = src.var("PRESET") {
+            self.preset = Some(preset);
+        }
+
+        if let Ok(preset_input) = src.var("PRESET_INPUT") {
+            self.preset_input = Some(preset_input);
+        }
+
+        if let Ok(raw_event_data) = src.var("RAW_EVENT_DATA") {
+            self.raw_event_data = Some(raw_event_data);
+        }
+
+        if let Ok(guild_id) = src.var("GUILD_ID") {
+            self.guild_id = Some(serenity::all::GuildId::new(
+                guild_id.parse().expect("Failed to parse guild id"),
+            ));
+        }
+
+        if let Ok(owner_guild_id) = src.var("OWNER_GUILD_ID") {
+            self.owner_guild_id = Some(serenity::all::GuildId::new(
+                owner_guild_id
+                    .parse()
+                    .expect("Failed to parse owner guild id"),
+            ));
+        }
+
+        if let Ok(bot_token) = src.var("BOT_TOKEN") {
+            self.bot_token = Some(bot_token);
+        }
+
+        if let Ok(config_file) = src.var("CONFIG_FILE") {
+            self.config_file = Some(PathBuf::from(config_file));
+        } else if !src.keep_config_file() {
+            self.config_file = None;
+        }
+    }
+
+    /// Parses/updates the config from environment variables as well as config file
+    async fn finalize(&mut self) {
+        self.update_from_env_vars(EnvVarEnvSource {});
+
+        while let Some(ref config_file) = self.config_file {
+            let contents = fs::read_to_string(config_file)
+                .await
+                .expect("Failed to read config");
+
+            let map = dotenvy::EnvLoader::with_reader(contents.as_bytes())
+                .load()
+                .expect("Failed to load config");
+
+            let src = DotEnvyEnvSource { map };
+
+            self.update_from_env_vars(src);
+        }
+
+        // If bot token is specified, make a serenity http client
+        self.http = self
+            .bot_token
+            .as_ref()
+            .map(|token| Rc::new(serenity::all::Http::new(token)));
+
+        if self.verbose {
+            println!("Config: {:#?}", self);
+        }
+    }
+
     fn parse_event_args(&self) -> AntiraidEvent {
         if let Some(ref raw_event_data) = self.raw_event_data {
             serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
@@ -151,22 +352,28 @@ impl Cli {
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
             global_table,
+            http: self.http.clone(),
         }
     }
 
     async fn spawn_script(
-        &self,
+        &mut self,
         event: &CreateEvent,
         lua: &Lua,
         name: &str,
         code: &str,
         global: LuaTable,
     ) -> LuaResult<LuaMultiValue> {
-        let cli_context = self.create_khronos_context(global.clone());
-        let template_context = TemplateContext::new(cli_context);
-
-        let event = Event::from_create_event(event);
-        let args = (event, template_context).into_lua_multi(lua)?;
+        let args = if let Some(args) = self.cached_khronos_rt_args.clone() {
+            args
+        } else {
+            let cli_context = self.create_khronos_context(global.clone());
+            let template_context = TemplateContext::new(cli_context);
+            let event = Event::from_create_event(event);
+            let args = (event, template_context).into_lua_multi(lua)?;
+            self.cached_khronos_rt_args = Some(args.clone()); // Ensure we cache it
+            args
+        };
 
         let f = lua
             .load(code)
@@ -192,7 +399,7 @@ impl Cli {
 fn main() {
     env_logger::init();
 
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
     let event = cli.parse_event_args();
     let create_event = parse_event(&event).expect("Failed to parse event");
 
@@ -206,6 +413,8 @@ fn main() {
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&rt, async {
+        cli.finalize().await;
+
         let lua = Lua::new_with(LuaStdLib::ALL_SAFE, LuaOptions::default())
             .expect("Failed to create Lua");
 
@@ -319,7 +528,7 @@ fn main() {
             lua.globals()
         };
 
-        entrypoint(&cli, &create_event, lua, global_tab.clone(), &task_mgr).await;
+        entrypoint(&mut cli, &create_event, lua, global_tab, &task_mgr).await;
 
         if cli.verbose {
             println!("Stopping task manager");
@@ -331,13 +540,13 @@ fn main() {
 }
 
 async fn entrypoint(
-    cli: &Cli,
+    cli: &mut Cli,
     create_event: &CreateEvent,
     lua: Lua,
     global_tab: LuaTable,
     task_mgr: &mlua_scheduler::taskmgr::TaskManager,
 ) {
-    if let Some(ref script) = cli.script {
+    if let Some(ref script) = cli.script.clone() {
         if cli.verbose {
             println!("Running script: {:?}", script);
         }
@@ -370,13 +579,26 @@ async fn entrypoint(
         }
 
         // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
-        let mut editor = DefaultEditor::new().expect("Failed to create editor");
+        let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
+            Editor::new().expect("Failed to create editor");
+
+        editor.set_helper(Some(repl_completer::LuaStatementCompleter {
+            lua: lua.clone(),
+            global_tab: global_tab.clone(),
+        }));
 
         loop {
             let mut prompt = "> ";
             let mut line = String::new();
 
             loop {
+                match cli.repl_wait_mode {
+                    ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
+                    ReplTaskWaitMode::YieldBeforePrompt => {
+                        tokio::task::yield_now().await;
+                    }
+                };
+
                 match editor.readline(prompt) {
                     Ok(input) => line.push_str(&input),
                     Err(_) => return,
@@ -398,14 +620,16 @@ async fn entrypoint(
                             );
                         }
 
-                        if !cli.disable_repl_wait_for_tasks {
-                            if !task_mgr.is_empty() {
-                                println!("[waiting for all pending tasks to finish]");
+                        match cli.repl_wait_mode {
+                            ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
+                            ReplTaskWaitMode::WaitAfterExecution => {
+                                if !task_mgr.is_empty() {
+                                    println!("[waiting for all pending tasks to finish]");
+                                }
+
+                                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
                             }
-
-                            task_mgr.wait_till_done(Duration::from_millis(1000)).await;
                         }
-
                         break;
                     }
                     Err(LuaError::SyntaxError {
@@ -431,7 +655,7 @@ async fn entrypoint(
 /// and then as a statement.
 async fn try_spawn_as(
     create_event: &CreateEvent,
-    cli: &Cli,
+    cli: &mut Cli,
     lua: &Lua,
     name: &str,
     code: &str,

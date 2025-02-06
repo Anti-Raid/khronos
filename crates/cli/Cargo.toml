@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+serde_yaml = "0.9"
 strum = { version = "0.26", features = ["derive"] }
 tokio = { version = "1", features = ["rt"] }
 clap = { version = "4.5.20", features = ["derive", "string"] }
@@ -14,6 +15,7 @@ chrono = { version = "0.4", features = ["serde"]}
 extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
 indexmap = { version = "2", features = ["serde"] }
 rustyline = "15"
+dotenvy = { git = "https://github.com/allan2/dotenvy" }
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }
@@ -30,6 +32,10 @@ features = ["model", "http", "cache", "rustls_backend", "unstable"]
 
 [dependencies.kittycat]
 git = "https://github.com/infinitybotlist/kittycat"
+branch = "main"
+
+[dependencies.botox]
+git = "https://github.com/anti-raid/botox"
 branch = "main"
 
 [dependencies.uuid]
