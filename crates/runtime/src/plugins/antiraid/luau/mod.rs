@@ -1,3 +1,4 @@
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::{lua_promise, TemplateContextRef};
 use mlua::prelude::*;
@@ -105,7 +106,6 @@ impl<T: KhronosContext> LuaUserData for Chunk<T> {
 
 
                 let th = lua.create_thread(func)?;
-                //println!("Spawning thread: {:?}", th.to_pointer());
 
                 let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
                 let output = scheduler
@@ -119,6 +119,27 @@ impl<T: KhronosContext> LuaUserData for Chunk<T> {
                     }
                 }
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<Chunk<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "environment",
+                    "optimization_level",
+                    "code",
+                    "chunk_name",
+                    // Methods
+                    "call",
+                    "call_async",
+                ],
+            )
         });
     }
 }

@@ -1,6 +1,7 @@
 mod types;
 
 use crate::lua_promise;
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::lockdownprovider::LockdownProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -133,6 +134,26 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
                 
                 Ok(())
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<LockdownExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Methods
+                    "list",
+                    "qsl",
+                    "tsl",
+                    "scl",
+                    "role",
+                    "remove",
+                ],
+            )
         });
     }
 }

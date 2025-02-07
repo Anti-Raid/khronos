@@ -1,6 +1,7 @@
 use mlua::prelude::*;
 
 use crate::lua_promise;
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::userinfoprovider::UserInfoProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -53,6 +54,21 @@ impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
 
                 Ok(value)
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<UserInfoExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Methods
+                    "get",
+                ],
+            )
         });
     }
 }

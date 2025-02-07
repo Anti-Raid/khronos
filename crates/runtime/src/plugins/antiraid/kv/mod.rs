@@ -1,5 +1,6 @@
 mod types;
 
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
 use crate::TemplateContextRef;
@@ -184,6 +185,27 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 Ok(())
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<KvExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    // Methods
+                    "find",
+                    "exists",
+                    "get",
+                    "getrecord",
+                    "set",
+                    "delete",
+                ],
+            )
         });
     }
 }

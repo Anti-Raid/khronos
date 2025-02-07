@@ -3,6 +3,7 @@ mod structs;
 mod validators;
 
 use crate::lua_promise;
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -978,6 +979,41 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 Ok(Lazy::new(resp))
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<DiscordActionExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    // Methods
+                    "get_audit_logs",
+                    "list_auto_moderation_rules",
+                    "get_auto_moderation_rule",
+                    //"create_auto_moderation_rule", // Not yet stable
+                    //"edit_auto_moderation_rule", // Not yet stable
+                    "get_channel",
+                    "edit_channel",
+                    "delete_channel",
+                    "create_guild_ban",
+                    "kick",
+                    "timeout",
+                    "get_messages",
+                    "get_message",
+                    "create_message",
+                    "create_interaction_response",
+                    "create_followup_message",
+                    "get_original_interaction_response",
+                    "get_guild_command",
+                    "get_guild_commands",
+                    "create_guild_command",
+                ],
+            )
         });
     }
 }

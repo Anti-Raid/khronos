@@ -1,5 +1,6 @@
 mod types;
 use crate::{
+    primitives::create_userdata_iterator_with_fields,
     traits::{context::KhronosContext, stingprovider::StingProvider},
     utils::executorscope::ExecutorScope,
     TemplateContextRef,
@@ -157,6 +158,27 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                     aggregates: stings.into_iter().map(types::StingAggregate::from).collect(),
                 })
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<StingExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Methods
+                    "list",
+                    "get",
+                    "create",
+                    "update",
+                    "delete",
+                    "guild_aggregate",
+                    "guild_user_aggregate",
+                ],
+            )
         });
     }
 }

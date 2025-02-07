@@ -1,6 +1,7 @@
 // To avoid over-relying on Settings
 mod settings_ir;
 
+use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::pageprovider::PageProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -106,7 +107,22 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
 
                 Ok(())
             }))
-        })
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<PageExecutor<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Methods
+                    "get", "save", "delete",
+                ],
+            )
+        });
     }
 
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {

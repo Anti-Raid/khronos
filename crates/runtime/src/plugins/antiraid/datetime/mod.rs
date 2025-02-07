@@ -4,6 +4,8 @@ use chrono::{Datelike, TimeZone, Timelike};
 use chrono_tz::OffsetComponents;
 use mlua::prelude::*;
 
+use crate::primitives::create_userdata_iterator_with_fields;
+
 pub struct TimeDelta {
     pub timedelta: chrono::TimeDelta,
 }
@@ -58,6 +60,30 @@ impl LuaUserData for TimeDelta {
                 this.timedelta.num_hours(),
                 this.timedelta.num_minutes() % 60
             ))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<TimeDelta>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "nanos",
+                    "micros",
+                    "millis",
+                    "seconds",
+                    "minutes",
+                    "hours",
+                    "days",
+                    "weeks",
+                    // Methods
+                    "offset_string",
+                ],
+            )
         });
     }
 
@@ -145,6 +171,37 @@ where
                 })
             },
         );
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<DateTime<Tz>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "year",
+                    "month",
+                    "day",
+                    "hour",
+                    "minute",
+                    "second",
+                    "timestamp_seconds",
+                    "timestamp_millis",
+                    "timestamp_micros",
+                    "timestamp_nanos",
+                    "tz",
+                    "base_offset",
+                    "dst_offset",
+                    // Methods
+                    "with_timezone",
+                    "format",
+                    "duration_since",
+                ],
+            )
+        });
     }
 
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
@@ -360,6 +417,30 @@ impl LuaUserData for Timezone {
             let dt = chrono::DateTime::from_timestamp_nanos(epoch);
             let dt = dt.with_timezone(&this.tz);
             Ok(DateTime { dt })
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<Timezone>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    // Methods
+                    "utcToTz",
+                    "tzToUtc",
+                    "timeUtcToTz",
+                    "timeTzToUtc",
+                    "now",
+                    "fromTime",
+                    "fromTimeMillis",
+                    "fromTimeMicros",
+                    "fromTimeNanos",
+                ],
+            )
         });
     }
 }
