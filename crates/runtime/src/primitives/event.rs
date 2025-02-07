@@ -66,6 +66,24 @@ impl Event {
             cached_data: RefCell::new(None),
         }
     }
+
+    fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
+        // Check for cached serialized data
+        let mut cached_data = self
+            .cached_data
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        if let Some(v) = cached_data.as_ref() {
+            return Ok(v.clone());
+        }
+
+        let v = lua.to_value(&self.inner.data)?;
+
+        *cached_data = Some(v.clone());
+
+        Ok(v)
+    }
 }
 
 impl LuaUserData for Event {
@@ -79,21 +97,8 @@ impl LuaUserData for Event {
             Ok(name)
         });
         fields.add_field_method_get("data", |lua, this| {
-            // Check for cached serialized data
-            let mut cached_data = this
-                .cached_data
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value(&this.inner.data)?;
-
-            *cached_data = Some(v.clone());
-
-            Ok(v)
+            let data = this.get_cached_data(lua)?;
+            Ok(data)
         });
         fields.add_field_method_get("author", |lua, this| {
             let author = lua.to_value(&this.inner.author)?;
@@ -109,7 +114,7 @@ impl LuaUserData for Event {
                     lua.to_value(&this.inner.base_name)?,
                 ),
                 ("name".to_string(), lua.to_value(&this.inner.name)?),
-                ("data".to_string(), lua.to_value(&this.inner.data)?),
+                ("data".to_string(), this.get_cached_data(lua)?),
                 ("author".to_string(), lua.to_value(&this.inner.author)?),
             ];
 
