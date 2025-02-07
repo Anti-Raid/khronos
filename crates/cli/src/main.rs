@@ -13,7 +13,6 @@ use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler::XRc;
-use mlua_scheduler::XRefCell;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
 use rustyline::history::DefaultHistory;
@@ -710,13 +709,7 @@ fn main() {
 
         let task_mgr = mlua_scheduler::taskmgr::TaskManager::new(
             lua.clone(),
-            XRc::new(mlua_scheduler_ext::feedbacks::ChainFeedback::new(
-                thread_tracker,
-                TaskPrintError {
-                    thread_limit: 100000000,
-                    threads: XRc::new(XRefCell::new(0)),
-                },
-            )),
+            XRc::new(thread_tracker),
             Duration::from_millis(1),
         );
 
@@ -820,36 +813,4 @@ fn main() {
         task_mgr.stop();
         //std::process::exit(0);
     });
-}
-
-pub struct TaskPrintError {
-    pub thread_limit: usize,
-    pub threads: XRc<XRefCell<usize>>,
-}
-
-impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
-    fn on_thread_add(
-        &self,
-        _label: &str,
-        _creator: &LuaThread,
-        _thread: &LuaThread,
-    ) -> LuaResult<()> {
-        let mut threads = self.threads.borrow_mut();
-        if *threads >= self.thread_limit {
-            return Err(LuaError::external("Thread limit reached"));
-        }
-
-        *threads += 1;
-
-        Ok(())
-    }
-
-    fn on_response(
-        &self,
-        _label: &str,
-        _tm: &mlua_scheduler::TaskManager,
-        _th: &LuaThread,
-        _result: LuaResult<LuaMultiValue>,
-    ) {
-    }
 }
