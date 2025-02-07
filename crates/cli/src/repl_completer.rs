@@ -190,14 +190,27 @@ impl Completer for LuaStatementCompleter {
         pos: usize,
         _ctx: &rustyline::Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
-        let candidates = self.get_candidates(line).map_err(|e| {
+        // Look for a opening parenthesis from the position
+        // that is what we want to complete
+        let mut pos = pos;
+        let mut str = String::new();
+        while pos > 0 {
+            if line.chars().nth(pos - 1).unwrap() == '(' {
+                break;
+            }
+            str.push(line.chars().nth(pos - 1).unwrap());
+            pos -= 1;
+        }
+        str = str.chars().rev().collect(); // Reverse the string
+
+        let candidates = self.get_candidates(&str).map_err(|e| {
             rustyline::error::ReadlineError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 e.to_string(),
             ))
         })?;
 
-        println!("{:?}", self.get_candidates(line));
+        println!("{:?}", self.get_candidates(&str));
 
         Ok((pos, vec![]))
     }
