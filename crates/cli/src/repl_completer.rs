@@ -10,6 +10,24 @@ pub struct LuaStatementCompleter {
 }
 
 impl LuaStatementCompleter {
+    /// Remove all until opening parenthesis
+    fn prepare_str(line: &str, pos: usize) -> (usize, String) {
+        // Look for a opening parenthesis from the position
+        // that is what we want to complete
+        let mut pos = pos;
+        let mut str = String::new();
+        while pos > 0 {
+            if line.chars().nth(pos - 1).unwrap() == '(' {
+                break;
+            }
+            str.push(line.chars().nth(pos - 1).unwrap());
+            pos -= 1;
+        }
+        str = str.chars().rev().collect(); // Reverse the string
+
+        (pos, str)
+    }
+
     /// Returns the list of candidates for the given line
     pub fn get_candidates(&self, line: &str) -> LuaResult<Vec<String>> {
         let mut line = line;
@@ -29,8 +47,6 @@ impl LuaStatementCompleter {
                 Some(sep) => &line[..sep],
                 None => line,
             };
-
-            println!("Got prefix: {} in table: {:?}", prefix, current_table);
 
             /*
                if (sep == std::string_view::npos)
@@ -107,7 +123,6 @@ impl LuaStatementCompleter {
         prefix: &str,
         current_table: LuaTable,
     ) -> LuaResult<Vec<String>> {
-        println!("Completing partial matches with prefix: {}", prefix);
         let mut candidates = vec![];
 
         let mut tabs = vec![current_table.clone()];
@@ -173,7 +188,30 @@ impl Hinter for LuaStatementCompleter {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
-        let candidates = self.get_candidates(line).ok()?;
+        if pos != line.len() || pos == 0 {
+            return None;
+        }
+
+        let (_pos, mut str) = Self::prepare_str(line, pos);
+
+        let candidates = self.get_candidates(&str).ok()?;
+        // Return the first candidate
+        if let Some(first) = candidates.into_iter().next() {
+            // If there's a dot, find everything after the last dot
+            let last_dot = str.rfind('.');
+            if let Some(last_dot) = last_dot {
+                str = str[last_dot + 1..].to_string();
+            }
+
+            let first = first.replace(&str, "");
+
+            if first == "_G" {
+                return None; // _G while valid is not a good hint
+            }
+
+            return Some(first.clone());
+        }
+
         None
     }
 }
@@ -190,28 +228,26 @@ impl Completer for LuaStatementCompleter {
         pos: usize,
         _ctx: &rustyline::Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
-        // Look for a opening parenthesis from the position
-        // that is what we want to complete
-        let mut pos = pos;
-        let mut str = String::new();
-        while pos > 0 {
-            if line.chars().nth(pos - 1).unwrap() == '(' {
-                break;
-            }
-            str.push(line.chars().nth(pos - 1).unwrap());
-            pos -= 1;
-        }
-        str = str.chars().rev().collect(); // Reverse the string
+        let (pos, mut str) = Self::prepare_str(line, pos);
 
-        let candidates = self.get_candidates(&str).map_err(|e| {
+        let mut candidates = self.get_candidates(&str).map_err(|e| {
             rustyline::error::ReadlineError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 e.to_string(),
             ))
         })?;
 
-        println!("{:?}", self.get_candidates(&str));
+        // Remove everything from the string after the last '.'
+        let last_dot = str.rfind('.');
+        if let Some(last_dot) = last_dot {
+            str = str[..last_dot].to_string();
+            candidates = candidates
+                .into_iter()
+                .map(|c| format!("{}.{}", str, c))
+                .collect();
+        }
 
-        Ok((pos, vec![]))
+        // Then map candidate to the string
+        Ok((pos, candidates))
     }
 }
