@@ -1,3 +1,6 @@
+use std::iter;
+
+use indexmap::IndexMap;
 use mlua::prelude::*;
 use rustyline::{
     completion::Completer, highlight::Highlighter, hint::Hinter, validate::Validator, Helper,
@@ -35,7 +38,7 @@ impl LuaStatementCompleter {
         let mut complete_only_functions = false;
 
         // Set the global table to begin the search
-        let mut current_table = self.global_tab.clone();
+        let mut current_value = LuaValue::Table(self.global_tab.clone());
 
         loop {
             /*
@@ -60,12 +63,12 @@ impl LuaStatementCompleter {
                 return self.complete_partial_matches(
                     complete_only_functions,
                     prefix,
-                    current_table,
+                    current_value,
                 );
             }
 
             // Try finding the table
-            let next = current_table.get::<LuaValue>(prefix)?;
+            let next = Self::value_get(current_value, prefix)?;
 
             /*
             if (lua_istable(L, -1) || tryReplaceTopWithIndex(L))
@@ -81,13 +84,8 @@ impl LuaStatementCompleter {
              */
 
             // If the table is not found, return an empty list
-            let mt = self.tab_metamethod(next.clone(), "__index");
-            if next.is_table() || mt.is_some() {
-                current_table = if let Some(mt) = mt {
-                    mt
-                } else {
-                    next.as_table().unwrap().clone()
-                };
+            if next.is_table() || next.is_userdata() {
+                current_value = next;
                 complete_only_functions = line.chars().nth(sep.unwrap()).unwrap_or_default() == ':';
                 line = &line[sep.unwrap() + 1..];
             } else {
@@ -96,7 +94,7 @@ impl LuaStatementCompleter {
         }
     }
 
-    fn tab_metamethod(&self, value: LuaValue, metamethod: &str) -> Option<LuaTable> {
+    fn value_metamethod(value: &LuaValue, metamethod: &str) -> Option<LuaTable> {
         match value {
             LuaValue::Table(t) => match t.metatable() {
                 Some(mt) => match mt.get::<LuaValue>(metamethod) {
@@ -116,36 +114,98 @@ impl LuaStatementCompleter {
         }
     }
 
+    fn value_get(value: LuaValue, key: impl IntoLua) -> LuaResult<LuaValue> {
+        match value {
+            LuaValue::UserData(ud) => {
+                if let Ok(v) = ud.get::<LuaValue>(key) {
+                    return Ok(v);
+                }
+            }
+            LuaValue::Table(t) => {
+                if let Ok(v) = t.get::<LuaValue>(key) {
+                    return Ok(v);
+                }
+            }
+            _ => {}
+        }
+        Ok(LuaValue::Nil)
+    }
+
+    fn value_iter(value: LuaValue) -> LuaResult<IndexMap<String, LuaValue>> {
+        let mut map = IndexMap::new();
+        match value {
+            LuaValue::UserData(ud) => {
+                if let Ok(mt) = ud.metatable() {
+                    let Ok(iter) = mt.get::<LuaFunction>(LuaMetaMethod::Iter) else {
+                        return Ok(map);
+                    };
+
+                    let Ok(iter_func) = iter.call::<LuaFunction>(LuaValue::UserData(ud.clone()))
+                    else {
+                        return Ok(map);
+                    };
+
+                    loop {
+                        let Ok((k, v)) = iter_func.call::<(LuaValue, LuaValue)>(()) else {
+                            break;
+                        };
+                        if k.is_nil() {
+                            break;
+                        }
+                        map.insert(k.to_string()?, v);
+                    }
+                }
+            }
+            LuaValue::Table(t) => {
+                let inner_map = Self::iter_table_to_map(t)?;
+                for (k, v) in inner_map {
+                    map.insert(k, v);
+                }
+            }
+            _ => {}
+        }
+        Ok(map)
+    }
+
+    fn iter_table_to_map(
+        table: LuaTable,
+    ) -> LuaResult<std::collections::HashMap<String, LuaValue>> {
+        let mut map = std::collections::HashMap::new();
+        for entry in table.pairs::<LuaValue, LuaValue>() {
+            let (k, v) = entry?;
+            map.insert(k.to_string()?, v);
+        }
+        Ok(map)
+    }
+
     /// completePartialMatches finds keys that match the specified 'prefix'
     fn complete_partial_matches(
         &self,
         complete_only_functions: bool,
         prefix: &str,
-        current_table: LuaTable,
+        current_value: LuaValue,
     ) -> LuaResult<Vec<String>> {
         let mut candidates = vec![];
 
-        let mut tabs = vec![current_table.clone()];
+        let mut tabs = vec![current_value.clone()];
 
-        if let Some(mt) = self.tab_metamethod(LuaValue::Table(current_table.clone()), "__index") {
-            tabs.push(mt);
+        if let Some(mt) = Self::value_metamethod(&current_value, "__index") {
+            tabs.push(LuaValue::Table(mt));
         }
 
-        if current_table == self.global_tab {
+        if current_value == LuaValue::Table(self.global_tab.clone()) {
             // Add the real global table to the list of tables to search
-            tabs.push(self.lua.globals());
+            tabs.push(LuaValue::Table(self.lua.globals()));
 
-            if let Some(mt) = self.tab_metamethod(LuaValue::Table(self.lua.globals()), "__index") {
-                tabs.push(mt);
+            if let Some(mt) =
+                Self::value_metamethod(&LuaValue::Table(self.lua.globals()), "__index")
+            {
+                tabs.push(LuaValue::Table(mt));
             }
         }
 
         for current_table in tabs {
-            for entry in current_table.pairs::<LuaValue, LuaValue>() {
-                let (k, v) = entry?;
-
-                let key = k.to_string()?;
-
+            for (key, v) in Self::value_iter(current_table)? {
                 // If the last separator was a ':' (i.e. a method call) then only functions should be completed.
                 // bool requiredValueType = (!completeOnlyFunctions || valueType == LUA_TFUNCTION);
                 let required_value_type = !complete_only_functions || v.is_function();

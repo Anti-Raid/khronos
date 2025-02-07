@@ -16,7 +16,6 @@ use mlua_scheduler::XRc;
 use mlua_scheduler::XRefCell;
 use presets::impls::CreateEventFromPresetType;
 use presets::types::AntiraidEventPresetType;
-use rustyline::config::Configurer;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::env::consts::OS;
