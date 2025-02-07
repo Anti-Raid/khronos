@@ -1,6 +1,8 @@
 use mlua::prelude::*;
 use std::{cell::RefCell, sync::Arc};
 
+use super::create_userdata_iterator;
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct InnerEvent {
     /// The name of the base event
@@ -107,28 +109,19 @@ impl LuaUserData for Event {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Iter, |lua, this: &Event, _: ()| {
-            let pairs = [
-                (
-                    "base_name".to_string(),
-                    lua.to_value(&this.inner.base_name)?,
-                ),
-                ("name".to_string(), lua.to_value(&this.inner.name)?),
-                ("data".to_string(), this.get_cached_data(lua)?),
-                ("author".to_string(), lua.to_value(&this.inner.author)?),
-            ];
-
-            let i = RefCell::new(0);
-            lua.create_function(move |lua, _: ()| {
-                *i.borrow_mut() += 1;
-                let i_val = *i.borrow();
-                if i_val <= pairs.len() {
-                    let (k, v) = pairs[i_val - 1].clone();
-                    Ok((k, v).into_lua_multi(lua)?)
-                } else {
-                    Ok((LuaValue::Nil).into_lua_multi(lua)?)
-                }
-            })
+        methods.add_meta_method(LuaMetaMethod::Iter, |lua, this, _: ()| {
+            create_userdata_iterator(
+                lua,
+                [
+                    (
+                        "base_name".to_string(),
+                        lua.to_value(&this.inner.base_name)?,
+                    ),
+                    ("name".to_string(), lua.to_value(&this.inner.name)?),
+                    ("data".to_string(), this.get_cached_data(lua)?),
+                    ("author".to_string(), lua.to_value(&this.inner.author)?),
+                ],
+            )
         });
     }
 }

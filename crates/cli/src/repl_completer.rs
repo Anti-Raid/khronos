@@ -134,6 +134,11 @@ impl LuaStatementCompleter {
         match value {
             LuaValue::UserData(ud) => {
                 if let Ok(mt) = ud.metatable() {
+                    for pair in mt.pairs::<LuaValue>() {
+                        let (k, v) = pair?;
+                        println!("k: {:?}, v: {:?}", k, v);
+                    }
+
                     let Ok(iter) = mt.get::<LuaFunction>(LuaMetaMethod::Iter) else {
                         return Ok(map);
                     };

@@ -353,6 +353,7 @@ impl Cli {
             owner_guild_id: self.owner_guild_id,
             global_table,
             http: self.http.clone(),
+            cache: None, // Not yet implemented
         }
     }
 

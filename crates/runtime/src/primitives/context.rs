@@ -2,6 +2,8 @@ use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 use std::cell::RefCell;
 
+use super::create_userdata_iterator;
+
 pub struct TemplateContext<T: KhronosContext> {
     pub context: T,
 
@@ -19,6 +21,42 @@ impl<T: KhronosContext> TemplateContext<T> {
             cached_data: RefCell::default(),
             current_discord_user: RefCell::default(),
         }
+    }
+
+    fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
+        // Check for cached serialized data
+        let mut cached_data = self
+            .cached_data
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        if let Some(v) = cached_data.as_ref() {
+            return Ok(v.clone());
+        }
+
+        let v = lua.to_value(&self.context.data())?;
+
+        *cached_data = Some(v.clone());
+
+        Ok(v)
+    }
+
+    fn get_cached_current_user(&self, lua: &Lua) -> LuaResult<LuaValue> {
+        // Check for cached serialized data
+        let mut cached_data = self
+            .current_discord_user
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        if let Some(v) = cached_data.as_ref() {
+            return Ok(v.clone());
+        }
+
+        let v = lua.to_value(&self.context.data())?;
+
+        *cached_data = Some(v.clone());
+
+        Ok(v)
     }
 }
 
@@ -45,21 +83,8 @@ pub type TemplateContextRef<T> = LuaUserDataRef<TemplateContext<T>>;
 impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("data", |lua, this| {
-            // Check for cached serialized data
-            let mut cached_data = this
-                .cached_data
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value(&this.context.data())?;
-
-            *cached_data = Some(v.clone());
-
-            Ok(v)
+            let data = this.get_cached_data(lua)?;
+            Ok(data)
         });
 
         fields.add_field_method_get("guild_id", |lua, this| {
@@ -81,19 +106,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         });
 
         fields.add_field_method_get("current_user", |lua, this| {
-            // Check for cached serialized data
-            let mut cached_data = this
-                .current_discord_user
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value(&this.context.data())?;
-
-            *cached_data = Some(v.clone());
+            let v = this.get_cached_current_user(lua)?;
 
             Ok(v)
         });
@@ -106,6 +119,31 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         methods.add_method("has_cap", |_, this, cap: String| {
             Ok(this.context.has_cap(&cap))
+        });
+
+        methods.add_meta_method(LuaMetaMethod::Iter, |lua, this, _: ()| {
+            create_userdata_iterator(
+                lua,
+                [
+                    ("data".to_string(), this.get_cached_data(lua)?),
+                    (
+                        "guild_id".to_string(),
+                        lua.to_value(&this.context.guild_id())?,
+                    ),
+                    (
+                        "owner_guild_id".to_string(),
+                        lua.to_value(&this.context.owner_guild_id())?,
+                    ),
+                    (
+                        "allowed_caps".to_string(),
+                        lua.to_value(this.context.allowed_caps())?,
+                    ),
+                    (
+                        "current_user".to_string(),
+                        this.get_cached_current_user(lua)?,
+                    ),
+                ],
+            )
         });
     }
 }
