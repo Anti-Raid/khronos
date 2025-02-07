@@ -36,20 +36,20 @@ pub enum ReplTaskWaitMode {
 }
 
 #[derive(Debug, Parser)]
-struct Cli {
+struct CliArgs {
     #[arg(name = "path")]
     /// The path to the script to run
     ///
     /// Environment variable: `SCRIPT`
     script: Option<Vec<PathBuf>>,
 
-    /// What capbilities the script should have
+    /// What capbilities the script should have (comma separated)
     ///
     /// Can be useful for mocking etc.
     ///
     /// Environment variable: `ALLOWED_CAPS`
-    #[clap(long, default_value = "[]")]
-    allowed_caps: Vec<String>,
+    #[clap(long)]
+    allowed_caps: Option<String>,
 
     /// Whether or not to be verbose
     ///
@@ -130,6 +130,12 @@ struct Cli {
     #[clap(long)]
     raw_event_data: Option<String>,
 
+    /// What internal context data to use for mocking
+    ///
+    /// Environment variable: `CONTEXT_DATA`
+    #[clap(long)]
+    context_data: Option<String>,
+
     /// What guild_id to use for mocking
     ///
     /// Environment variable: `GUILD_ID`
@@ -159,14 +165,6 @@ struct Cli {
     /// Environment variable: `CONFIG_FILE`
     #[clap(long)]
     config_file: Option<PathBuf>,
-
-    /// The http client to use for discord operations
-    #[clap(skip)]
-    http: Option<Rc<serenity::all::Http>>,
-
-    /// The cached khronos runtime arguments
-    #[clap(skip)]
-    cached_khronos_rt_args: Option<LuaMultiValue>,
 }
 
 /// Trait used in update_from_env_vars to get environment variables
@@ -201,7 +199,7 @@ impl EnvSource for DotEnvyEnvSource {
     }
 }
 
-impl Cli {
+impl CliArgs {
     /// Update from env var source
     fn update_from_env_vars(&mut self, src: impl EnvSource) {
         // First update from environment variables
@@ -259,6 +257,10 @@ impl Cli {
             self.raw_event_data = Some(raw_event_data);
         }
 
+        if let Ok(context_data) = src.var("CONTEXT_DATA") {
+            self.context_data = Some(context_data);
+        }
+
         if let Ok(guild_id) = src.var("GUILD_ID") {
             self.guild_id = Some(serenity::all::GuildId::new(
                 guild_id.parse().expect("Failed to parse guild id"),
@@ -285,7 +287,7 @@ impl Cli {
     }
 
     /// Parses/updates the config from environment variables as well as config file
-    async fn finalize(&mut self) {
+    pub async fn finalize(mut self) -> Cli {
         self.update_from_env_vars(EnvVarEnvSource {});
 
         while let Some(ref config_file) = self.config_file {
@@ -302,17 +304,143 @@ impl Cli {
             self.update_from_env_vars(src);
         }
 
-        // If bot token is specified, make a serenity http client
-        self.http = self
-            .bot_token
-            .as_ref()
-            .map(|token| Rc::new(serenity::all::Http::new(token)));
-
         if self.verbose {
             println!("Config: {:#?}", self);
         }
-    }
 
+        Cli {
+            script: self.script,
+            allowed_caps: {
+                if let Some(allowed_caps) = self.allowed_caps {
+                    allowed_caps
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect()
+                } else {
+                    vec![]
+                }
+            },
+            verbose: self.verbose,
+            disable_test_funcs: self.disable_test_funcs,
+            disable_globals_proxying: self.disable_globals_proxying,
+            disable_scheduler_lib: self.disable_scheduler_lib,
+            disable_task_lib: self.disable_task_lib,
+            repl_wait_mode: self.repl_wait_mode,
+            preset: self.preset,
+            preset_input: self.preset_input,
+            raw_event_data: self.raw_event_data,
+            context_data: self.context_data,
+            guild_id: self.guild_id,
+            owner_guild_id: self.owner_guild_id,
+            bot_token: self.bot_token.clone(),
+            config_file: self.config_file,
+            http: self
+                .bot_token
+                .as_ref()
+                .map(|token| Rc::new(serenity::all::Http::new(token))),
+            cached_khronos_rt_args: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Cli {
+    /// The path to the script to run
+    script: Option<Vec<PathBuf>>,
+
+    /// What capbilities the script should have (comma separated)
+    ///
+    /// Can be useful for mocking etc.
+    allowed_caps: Vec<String>,
+
+    /// Whether or not to be verbose
+    ///
+    /// Environment variable: `VERBOSE`
+    verbose: bool,
+
+    /// Whether or not the default internal test functions
+    /// should be attached or not
+    ///
+    /// Environment variable: `DISABLE_TEST_FUNCS`
+    disable_test_funcs: bool,
+
+    /// Whether or not _G default proxying behavior should
+    /// be disabled (hence making _G read only due to sandboxing)
+    ///
+    /// AntiRaid uses the proxy method to allow _G to be read-write
+    /// while sandboxing lua globals, however for testing,
+    /// you may want to check how dependent the script is on
+    /// globals etc.
+    ///
+    /// Keep enabled if you are unsure
+    disable_globals_proxying: bool,
+
+    /// Whether or not the internal "scheduler" library
+    /// should be exposed to the script or not
+    ///
+    /// AntiRaid exposes this, however for testing, you may
+    /// want to disable this to ensure your code is portable
+    /// etc.
+    ///
+    /// Keep enabled if you are unsure
+    ///
+    /// Environment variable: `DISABLE_SCHEDULER_LIB`
+    disable_scheduler_lib: bool,
+
+    /// Whether or not to expose the task library to the script
+    ///
+    /// AntiRaid exposes this and not exposing it will mean that
+    /// basic functionality provided by the task library such as
+    /// task.wait etc will not be available
+    ///
+    /// Keep enabled if you are unsure
+    disable_task_lib: bool,
+
+    /// Sets the repl wait mode.
+    repl_wait_mode: ReplTaskWaitMode,
+
+    /// What preset to use for creating the event
+    preset: Option<String>,
+
+    /// The input data to use for creating the event
+    /// using a preset
+    ///
+    /// Must be JSON encoded
+    preset_input: Option<String>,
+
+    /// The raw event data to use for creating the event
+    ///
+    /// Overrides `preset`/`preset_input` if set
+    raw_event_data: Option<String>,
+
+    /// What internal context data to use for mocking
+    context_data: Option<String>,
+
+    /// What guild_id to use for mocking
+    guild_id: Option<serenity::all::GuildId>,
+
+    /// What owner_guild_id to use for mocking
+    owner_guild_id: Option<serenity::all::GuildId>,
+
+    #[allow(dead_code)]
+    /// The discord bot token to use for discord-related operations
+    ///
+    /// Optional, but required for discord-related operations
+    bot_token: Option<String>,
+
+    #[allow(dead_code)]
+    /// The path to a config file containing e.g.
+    /// the bot token etc
+    config_file: Option<PathBuf>,
+
+    /// The http client to use for discord operations
+    http: Option<Rc<serenity::all::Http>>,
+
+    /// The cached khronos runtime arguments
+    cached_khronos_rt_args: Option<LuaMultiValue>,
+}
+
+impl Cli {
     fn parse_event_args(&self) -> AntiraidEvent {
         if let Some(ref raw_event_data) = self.raw_event_data {
             serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
@@ -347,7 +475,14 @@ impl Cli {
     }
 
     fn create_khronos_context(&self, global_table: LuaTable) -> provider::CliKhronosContext {
+        let context_data = if let Some(ref context_data) = self.context_data {
+            serde_json::from_str(context_data).expect("Failed to parse context data")
+        } else {
+            serde_json::Value::Null
+        };
+
         provider::CliKhronosContext {
+            data: context_data,
             allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
@@ -357,7 +492,7 @@ impl Cli {
         }
     }
 
-    async fn spawn_script(
+    pub async fn spawn_script(
         &mut self,
         event: &CreateEvent,
         lua: &Lua,
@@ -395,14 +530,157 @@ impl Cli {
             None => Ok(LuaMultiValue::new()),
         }
     }
+
+    pub async fn entrypoint(
+        &mut self,
+        create_event: &CreateEvent,
+        lua: Lua,
+        global_tab: LuaTable,
+        task_mgr: &mlua_scheduler::taskmgr::TaskManager,
+    ) {
+        if let Some(ref script) = self.script.clone() {
+            if self.verbose {
+                println!("Running script: {:?}", script);
+            }
+
+            for path in script {
+                let name = match fs::canonicalize(path).await {
+                    Ok(p) => p.to_string_lossy().to_string(),
+                    Err(_) => path.to_string_lossy().to_string(),
+                };
+                let contents = match fs::read_to_string(&path).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("Failed to read script: {:?}", e);
+                        continue;
+                    }
+                };
+
+                let output = self
+                    .spawn_script(create_event, &lua, &name, &contents, global_tab.clone())
+                    .await
+                    .expect("Failed to spawn script");
+
+                println!("Output: {:?}", output);
+
+                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+            }
+        } else {
+            if self.verbose {
+                println!("Spawning REPL");
+            }
+
+            // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
+            let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
+                Editor::new().expect("Failed to create editor");
+
+            editor.set_helper(Some(repl_completer::LuaStatementCompleter {
+                lua: lua.clone(),
+                global_tab: global_tab.clone(),
+            }));
+
+            loop {
+                let mut prompt = "> ";
+                let mut line = String::new();
+
+                loop {
+                    match self.repl_wait_mode {
+                        ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
+                        ReplTaskWaitMode::YieldBeforePrompt => {
+                            tokio::task::yield_now().await;
+                        }
+                    };
+
+                    match editor.readline(prompt) {
+                        Ok(input) => line.push_str(&input),
+                        Err(_) => return,
+                    }
+
+                    match self
+                        .try_spawn_as(create_event, &lua, "repl", &line, global_tab.clone())
+                        .await
+                    {
+                        Ok(values) => {
+                            editor.add_history_entry(line).unwrap();
+
+                            if !values.is_empty() {
+                                println!(
+                                    "{}",
+                                    values
+                                        .iter()
+                                        .map(|value| format!("{:#?}", value))
+                                        .collect::<Vec<_>>()
+                                        .join("\t")
+                                );
+                            }
+
+                            match self.repl_wait_mode {
+                                ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
+                                ReplTaskWaitMode::WaitAfterExecution => {
+                                    if !task_mgr.is_empty() {
+                                        println!("[waiting for all pending tasks to finish]");
+                                    }
+
+                                    task_mgr.wait_till_done(Duration::from_millis(1000)).await;
+                                }
+                            }
+                            break;
+                        }
+                        Err(LuaError::SyntaxError {
+                            incomplete_input: true,
+                            ..
+                        }) => {
+                            // continue reading input and append it to `line`
+                            #[allow(clippy::single_char_add_str)]
+                            line.push_str("\n"); // separate input lines
+                            prompt = ">> ";
+                        }
+                        Err(e) => {
+                            editor.add_history_entry(line).unwrap();
+                            eprintln!("error: {}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Try calling a line, first as an expression with an added "return " before it
+    /// and then as a statement.
+    ///
+    /// Used internally for the REPL
+    async fn try_spawn_as(
+        &mut self,
+        create_event: &CreateEvent,
+        lua: &Lua,
+        name: &str,
+        code: &str,
+        global_tab: LuaTable,
+    ) -> LuaResult<LuaMultiValue> {
+        match self
+            .spawn_script(
+                create_event,
+                lua,
+                name,
+                &format!("return {}", code),
+                global_tab.clone(),
+            )
+            .await
+        {
+            Ok(result) => return Ok(result),
+            Err(LuaError::SyntaxError { .. }) => {}
+            Err(e) => return Err(e),
+        }
+        self.spawn_script(create_event, lua, name, code, global_tab)
+            .await
+    }
 }
 
 fn main() {
     env_logger::init();
 
-    let mut cli = Cli::parse();
-    let event = cli.parse_event_args();
-    let create_event = parse_event(&event).expect("Failed to parse event");
+    let cli_args = CliArgs::parse();
 
     // Create tokio runtime and use spawn_local
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -414,7 +692,10 @@ fn main() {
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&rt, async {
-        cli.finalize().await;
+        let mut cli = cli_args.finalize().await;
+
+        let event = cli.parse_event_args();
+        let create_event = parse_event(&event).expect("Failed to parse event");
 
         let lua = Lua::new_with(LuaStdLib::ALL_SAFE, LuaOptions::default())
             .expect("Failed to create Lua");
@@ -529,7 +810,8 @@ fn main() {
             lua.globals()
         };
 
-        entrypoint(&mut cli, &create_event, lua, global_tab, &task_mgr).await;
+        cli.entrypoint(&create_event, lua, global_tab, &task_mgr)
+            .await;
 
         if cli.verbose {
             println!("Stopping task manager");
@@ -538,146 +820,6 @@ fn main() {
         task_mgr.stop();
         //std::process::exit(0);
     });
-}
-
-async fn entrypoint(
-    cli: &mut Cli,
-    create_event: &CreateEvent,
-    lua: Lua,
-    global_tab: LuaTable,
-    task_mgr: &mlua_scheduler::taskmgr::TaskManager,
-) {
-    if let Some(ref script) = cli.script.clone() {
-        if cli.verbose {
-            println!("Running script: {:?}", script);
-        }
-
-        for path in script {
-            let name = match fs::canonicalize(path).await {
-                Ok(p) => p.to_string_lossy().to_string(),
-                Err(_) => path.to_string_lossy().to_string(),
-            };
-            let contents = match fs::read_to_string(&path).await {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("Failed to read script: {:?}", e);
-                    continue;
-                }
-            };
-
-            let output = cli
-                .spawn_script(create_event, &lua, &name, &contents, global_tab.clone())
-                .await
-                .expect("Failed to spawn script");
-
-            println!("Output: {:?}", output);
-
-            task_mgr.wait_till_done(Duration::from_millis(1000)).await;
-        }
-    } else {
-        if cli.verbose {
-            println!("Spawning REPL in separate thread");
-        }
-
-        // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
-        let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
-            Editor::new().expect("Failed to create editor");
-
-        editor.set_helper(Some(repl_completer::LuaStatementCompleter {
-            lua: lua.clone(),
-            global_tab: global_tab.clone(),
-        }));
-
-        loop {
-            let mut prompt = "> ";
-            let mut line = String::new();
-
-            loop {
-                match cli.repl_wait_mode {
-                    ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
-                    ReplTaskWaitMode::YieldBeforePrompt => {
-                        tokio::task::yield_now().await;
-                    }
-                };
-
-                match editor.readline(prompt) {
-                    Ok(input) => line.push_str(&input),
-                    Err(_) => return,
-                }
-
-                match try_spawn_as(create_event, cli, &lua, "repl", &line, global_tab.clone()).await
-                {
-                    Ok(values) => {
-                        editor.add_history_entry(line).unwrap();
-
-                        if !values.is_empty() {
-                            println!(
-                                "{}",
-                                values
-                                    .iter()
-                                    .map(|value| format!("{:#?}", value))
-                                    .collect::<Vec<_>>()
-                                    .join("\t")
-                            );
-                        }
-
-                        match cli.repl_wait_mode {
-                            ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
-                            ReplTaskWaitMode::WaitAfterExecution => {
-                                if !task_mgr.is_empty() {
-                                    println!("[waiting for all pending tasks to finish]");
-                                }
-
-                                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
-                            }
-                        }
-                        break;
-                    }
-                    Err(LuaError::SyntaxError {
-                        incomplete_input: true,
-                        ..
-                    }) => {
-                        // continue reading input and append it to `line`
-                        #[allow(clippy::single_char_add_str)]
-                        line.push_str("\n"); // separate input lines
-                        prompt = ">> ";
-                    }
-                    Err(e) => {
-                        editor.add_history_entry(line).unwrap();
-                        eprintln!("error: {}", e);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Try calling a line, first as an expression with an added "return " before it
-/// and then as a statement.
-async fn try_spawn_as(
-    create_event: &CreateEvent,
-    cli: &mut Cli,
-    lua: &Lua,
-    name: &str,
-    code: &str,
-    global_tab: LuaTable,
-) -> LuaResult<LuaMultiValue> {
-    if let Ok(result) = cli
-        .spawn_script(
-            create_event,
-            lua,
-            name,
-            &format!("return {}", code),
-            global_tab.clone(),
-        )
-        .await
-    {
-        return Ok(result);
-    }
-
-    cli.spawn_script(create_event, lua, name, code, global_tab)
-        .await
 }
 
 pub struct TaskPrintError {
@@ -707,13 +849,7 @@ impl mlua_scheduler::taskmgr::SchedulerFeedback for TaskPrintError {
         _label: &str,
         _tm: &mlua_scheduler::TaskManager,
         _th: &LuaThread,
-        result: LuaResult<LuaMultiValue>,
+        _result: LuaResult<LuaMultiValue>,
     ) {
-        match result {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("Error: {}", e);
-            }
-        }
     }
 }

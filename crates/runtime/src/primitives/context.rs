@@ -2,7 +2,7 @@ use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 use std::cell::RefCell;
 
-use super::create_userdata_iterator;
+use super::create_userdata_iterator_with_fields;
 
 pub struct TemplateContext<T: KhronosContext> {
     pub context: T,
@@ -121,27 +121,23 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(this.context.has_cap(&cap))
         });
 
-        methods.add_meta_method(LuaMetaMethod::Iter, |lua, this, _: ()| {
-            create_userdata_iterator(
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<TemplateContext<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
                 lua,
+                ud,
                 [
-                    ("data".to_string(), this.get_cached_data(lua)?),
-                    (
-                        "guild_id".to_string(),
-                        lua.to_value(&this.context.guild_id())?,
-                    ),
-                    (
-                        "owner_guild_id".to_string(),
-                        lua.to_value(&this.context.owner_guild_id())?,
-                    ),
-                    (
-                        "allowed_caps".to_string(),
-                        lua.to_value(this.context.allowed_caps())?,
-                    ),
-                    (
-                        "current_user".to_string(),
-                        this.get_cached_current_user(lua)?,
-                    ),
+                    // Fields
+                    "data",
+                    "guild_id",
+                    "owner_guild_id",
+                    "allowed_caps",
+                    "current_user",
+                    // Methods
+                    "has_cap",
                 ],
             )
         });

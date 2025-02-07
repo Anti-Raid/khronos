@@ -24,6 +24,7 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
+    pub data: serde_json::Value,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
@@ -33,7 +34,7 @@ pub struct CliKhronosContext {
 }
 
 impl KhronosContext for CliKhronosContext {
-    type Data = ();
+    type Data = serde_json::Value;
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
     type LockdownProvider = CliLockdownProvider;
@@ -42,7 +43,7 @@ impl KhronosContext for CliKhronosContext {
     type PageProvider = CliPageProvider;
 
     fn data(&self) -> Self::Data {
-        todo!()
+        self.data.clone()
     }
 
     fn allowed_caps(&self) -> &[String] {
@@ -58,7 +59,7 @@ impl KhronosContext for CliKhronosContext {
     }
 
     fn current_user(&self) -> Option<serenity::all::CurrentUser> {
-        None::<serenity::all::CurrentUser>
+        self.cache.as_ref().map(|c| c.current_user().clone())
     }
 
     /// Returns the global table to use
@@ -162,8 +163,7 @@ pub struct CliDiscordProvider {
 }
 
 impl DiscordProvider for CliDiscordProvider {
-    fn attempt_action(&self, bucket: &str) -> serenity::Result<(), khronos_runtime::Error> {
-        println!("CliDiscordProvider::attempt_action: {}", bucket);
+    fn attempt_action(&self, _bucket: &str) -> serenity::Result<(), khronos_runtime::Error> {
         Ok(())
     }
 

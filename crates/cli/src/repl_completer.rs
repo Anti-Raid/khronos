@@ -134,11 +134,6 @@ impl LuaStatementCompleter {
         match value {
             LuaValue::UserData(ud) => {
                 if let Ok(mt) = ud.metatable() {
-                    for pair in mt.pairs::<LuaValue>() {
-                        let (k, v) = pair?;
-                        println!("k: {:?}, v: {:?}", k, v);
-                    }
-
                     let Ok(iter) = mt.get::<LuaFunction>(LuaMetaMethod::Iter) else {
                         return Ok(map);
                     };
@@ -307,6 +302,16 @@ impl Completer for LuaStatementCompleter {
             candidates = candidates
                 .into_iter()
                 .map(|c| format!("{}.{}", str, c))
+                .collect();
+        }
+
+        // Do the same thing for ':'
+        let last_colon = str.rfind(':');
+        if let Some(last_colon) = last_colon {
+            str = str[..last_colon].to_string();
+            candidates = candidates
+                .into_iter()
+                .map(|c| format!("{}:{}", str, c))
                 .collect();
         }
 

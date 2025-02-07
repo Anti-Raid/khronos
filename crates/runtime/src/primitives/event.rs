@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 use std::{cell::RefCell, sync::Arc};
 
-use super::create_userdata_iterator;
+use super::create_userdata_iterator_with_fields;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct InnerEvent {
@@ -109,17 +109,20 @@ impl LuaUserData for Event {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::Iter, |lua, this, _: ()| {
-            create_userdata_iterator(
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<Event>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
                 lua,
+                ud,
                 [
-                    (
-                        "base_name".to_string(),
-                        lua.to_value(&this.inner.base_name)?,
-                    ),
-                    ("name".to_string(), lua.to_value(&this.inner.name)?),
-                    ("data".to_string(), this.get_cached_data(lua)?),
-                    ("author".to_string(), lua.to_value(&this.inner.author)?),
+                    // Fields
+                    "base_name",
+                    "name",
+                    "data",
+                    "author",
                 ],
             )
         });
