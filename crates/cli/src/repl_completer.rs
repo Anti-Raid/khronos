@@ -1,5 +1,3 @@
-use std::iter;
-
 use indexmap::IndexMap;
 use mlua::prelude::*;
 use rustyline::{
