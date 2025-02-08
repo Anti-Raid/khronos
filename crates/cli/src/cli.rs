@@ -2,9 +2,11 @@ use crate::dispatch::parse_event;
 use crate::presets::impls::CreateEventFromPresetType;
 use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
+use crate::provider::CliKhronosContext;
 use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::Event;
+use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
@@ -14,8 +16,15 @@ use rustyline::Editor;
 use std::env::consts::OS;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use std::{path::PathBuf, time::Duration};
 use tokio::fs;
+
+pub static PLUGIN_SET: LazyLock<PluginSet> = LazyLock::new(|| {
+    let mut plugins = PluginSet::new();
+    plugins.add_default_plugins::<CliKhronosContext>();
+    plugins
+});
 
 #[derive(Default, Debug, Clone, Copy)]
 pub enum ReplTaskWaitMode {
@@ -273,7 +282,14 @@ impl Cli {
 
         mlua_scheduler::userdata::patch_coroutine_lib(&lua).expect("Failed to patch coroutine lib");
 
-        lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
+        // Override require function for plugin support and increased security
+        lua.globals()
+            .set(
+                "require",
+                lua.create_function(|this, module: String| PLUGIN_SET.require(this, module))
+                    .expect("Failed to create require function"),
+            )
+            .expect("Failed to set require function");
 
         // Proxy globals if enabled
         let global_tab = if !aux_opts.disable_globals_proxying {
@@ -319,6 +335,8 @@ impl Cli {
         } else {
             lua.globals()
         };
+
+        lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
         LuaSetupResult {
             lua,
