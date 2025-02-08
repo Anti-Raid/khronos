@@ -7,6 +7,7 @@ use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::utils::pluginholder::PluginSet;
+use khronos_runtime::utils::proxyglobal::proxy_global;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
@@ -293,45 +294,7 @@ impl Cli {
 
         // Proxy globals if enabled
         let global_tab = if !aux_opts.disable_globals_proxying {
-            // Setup the global table using a metatable
-            //
-            // SAFETY: This works because the global table will not change in the VM
-            let global_mt = lua.create_table().expect("Failed to create table");
-            let global_tab = lua.create_table().expect("Failed to create table");
-
-            // Proxy reads to globals if key is in globals, otherwise to the table
-            global_mt
-                .set("__index", lua.globals())
-                .expect("Failed to set __index");
-            global_tab
-                .set("_G", global_tab.clone())
-                .expect("Failed to set _G");
-
-            // Provies writes
-            // Forward to _G if key is in globals, otherwise to the table
-            let globals_ref = lua.globals();
-            global_mt
-                .set(
-                    "__newindex",
-                    lua.create_function(
-                        move |_lua, (tab, key, value): (LuaTable, LuaValue, LuaValue)| {
-                            let v = globals_ref.get::<LuaValue>(key.clone())?;
-
-                            if !v.is_nil() {
-                                globals_ref.set(key, value)
-                            } else {
-                                tab.raw_set(key, value)
-                            }
-                        },
-                    )
-                    .expect("Failed to create function"),
-                )
-                .expect("Failed to set __newindex");
-
-            // Set __index on global_tab to point to _G
-            global_tab.set_metatable(Some(global_mt));
-
-            global_tab
+            proxy_global(&lua).expect("Failed to create proxy global table")
         } else {
             lua.globals()
         };
