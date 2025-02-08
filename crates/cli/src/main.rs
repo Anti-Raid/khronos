@@ -363,12 +363,5 @@ fn main() {
         let mut cli = cli_args.finalize().await;
 
         cli.entrypoint().await;
-
-        if cli.verbose {
-            println!("Stopping task manager");
-        }
-
-        cli.setup_data.task_mgr.stop();
-        //std::process::exit(0);
     });
 }

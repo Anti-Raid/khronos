@@ -437,6 +437,12 @@ impl Cli {
                 }
             }
         }
+
+        if self.verbose {
+            println!("Stopping task manager");
+        }
+
+        self.setup_data.task_mgr.stop();
     }
 
     /// Try calling a line, first as an expression with an added "return " before it
