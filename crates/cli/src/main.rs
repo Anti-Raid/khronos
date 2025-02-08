@@ -1,27 +1,15 @@
+mod cli;
 mod constants;
 mod dispatch;
 mod presets;
 mod provider;
 mod repl_completer;
 
-use antiraid_types::ar_event::AntiraidEvent;
 use clap::{Parser, ValueEnum};
-use dispatch::parse_event;
-use khronos_runtime::primitives::event::CreateEvent;
-use khronos_runtime::primitives::event::Event;
-use khronos_runtime::TemplateContext;
-use mlua::prelude::*;
-use mlua_scheduler::LuaSchedulerAsync;
-use mlua_scheduler::XRc;
-use presets::impls::CreateEventFromPresetType;
-use presets::types::AntiraidEventPresetType;
-use rustyline::history::DefaultHistory;
-use rustyline::Editor;
-use std::env::consts::OS;
+use cli::{Cli, CliAuxOpts};
 use std::env::var;
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
-use std::{path::PathBuf, time::Duration};
 use tokio::fs;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
@@ -32,6 +20,16 @@ pub enum ReplTaskWaitMode {
     WaitAfterExecution,
     /// Tokio yield before prompting for the next line
     YieldBeforePrompt,
+}
+
+impl From<ReplTaskWaitMode> for cli::ReplTaskWaitMode {
+    fn from(mode: ReplTaskWaitMode) -> Self {
+        match mode {
+            ReplTaskWaitMode::None => cli::ReplTaskWaitMode::None,
+            ReplTaskWaitMode::WaitAfterExecution => cli::ReplTaskWaitMode::WaitAfterExecution,
+            ReplTaskWaitMode::YieldBeforePrompt => cli::ReplTaskWaitMode::YieldBeforePrompt,
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -307,6 +305,13 @@ impl CliArgs {
             println!("Config: {:#?}", self);
         }
 
+        let aux_opts = CliAuxOpts {
+            disable_test_funcs: self.disable_test_funcs,
+            disable_globals_proxying: self.disable_globals_proxying,
+            disable_scheduler_lib: self.disable_scheduler_lib,
+            disable_task_lib: self.disable_task_lib,
+        };
+
         Cli {
             script: self.script,
             allowed_caps: {
@@ -320,11 +325,8 @@ impl CliArgs {
                 }
             },
             verbose: self.verbose,
-            disable_test_funcs: self.disable_test_funcs,
-            disable_globals_proxying: self.disable_globals_proxying,
-            disable_scheduler_lib: self.disable_scheduler_lib,
-            disable_task_lib: self.disable_task_lib,
-            repl_wait_mode: self.repl_wait_mode,
+            aux_opts,
+            repl_wait_mode: self.repl_wait_mode.into(),
             preset: self.preset,
             preset_input: self.preset_input,
             raw_event_data: self.raw_event_data,
@@ -338,341 +340,8 @@ impl CliArgs {
                 .as_ref()
                 .map(|token| Rc::new(serenity::all::Http::new(token))),
             cached_khronos_rt_args: None,
+            setup_data: Cli::setup_lua_vm(aux_opts).await,
         }
-    }
-}
-
-#[derive(Debug)]
-struct Cli {
-    /// The path to the script to run
-    script: Option<Vec<PathBuf>>,
-
-    /// What capbilities the script should have (comma separated)
-    ///
-    /// Can be useful for mocking etc.
-    allowed_caps: Vec<String>,
-
-    /// Whether or not to be verbose
-    ///
-    /// Environment variable: `VERBOSE`
-    verbose: bool,
-
-    /// Whether or not the default internal test functions
-    /// should be attached or not
-    ///
-    /// Environment variable: `DISABLE_TEST_FUNCS`
-    disable_test_funcs: bool,
-
-    /// Whether or not _G default proxying behavior should
-    /// be disabled (hence making _G read only due to sandboxing)
-    ///
-    /// AntiRaid uses the proxy method to allow _G to be read-write
-    /// while sandboxing lua globals, however for testing,
-    /// you may want to check how dependent the script is on
-    /// globals etc.
-    ///
-    /// Keep enabled if you are unsure
-    disable_globals_proxying: bool,
-
-    /// Whether or not the internal "scheduler" library
-    /// should be exposed to the script or not
-    ///
-    /// AntiRaid exposes this, however for testing, you may
-    /// want to disable this to ensure your code is portable
-    /// etc.
-    ///
-    /// Keep enabled if you are unsure
-    ///
-    /// Environment variable: `DISABLE_SCHEDULER_LIB`
-    disable_scheduler_lib: bool,
-
-    /// Whether or not to expose the task library to the script
-    ///
-    /// AntiRaid exposes this and not exposing it will mean that
-    /// basic functionality provided by the task library such as
-    /// task.wait etc will not be available
-    ///
-    /// Keep enabled if you are unsure
-    disable_task_lib: bool,
-
-    /// Sets the repl wait mode.
-    repl_wait_mode: ReplTaskWaitMode,
-
-    /// What preset to use for creating the event
-    preset: Option<String>,
-
-    /// The input data to use for creating the event
-    /// using a preset
-    ///
-    /// Must be JSON encoded
-    preset_input: Option<String>,
-
-    /// The raw event data to use for creating the event
-    ///
-    /// Overrides `preset`/`preset_input` if set
-    raw_event_data: Option<String>,
-
-    /// What internal context data to use for mocking
-    context_data: Option<String>,
-
-    /// What guild_id to use for mocking
-    guild_id: Option<serenity::all::GuildId>,
-
-    /// What owner_guild_id to use for mocking
-    owner_guild_id: Option<serenity::all::GuildId>,
-
-    #[allow(dead_code)]
-    /// The discord bot token to use for discord-related operations
-    ///
-    /// Optional, but required for discord-related operations
-    bot_token: Option<String>,
-
-    #[allow(dead_code)]
-    /// The path to a config file containing e.g.
-    /// the bot token etc
-    config_file: Option<PathBuf>,
-
-    /// The http client to use for discord operations
-    http: Option<Rc<serenity::all::Http>>,
-
-    /// The cached khronos runtime arguments
-    cached_khronos_rt_args: Option<LuaMultiValue>,
-}
-
-impl Cli {
-    fn parse_event_args(&self) -> AntiraidEvent {
-        if let Some(ref raw_event_data) = self.raw_event_data {
-            serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
-        } else if let Some(ref preset) = self.preset {
-            let preset =
-                AntiraidEventPresetType::from_str(preset).expect("Failed to parse preset type");
-
-            let input = if let Some(input) = &self.preset_input {
-                let input: serde_json::Value =
-                    serde_json::from_str(input).expect("Failed to parse preset input data");
-                input
-            } else {
-                serde_json::Value::Null
-            };
-
-            preset
-                .to_event(input)
-                .expect("Failed to create event from preset")
-        } else {
-            let input = if let Some(input) = &self.preset_input {
-                let input: serde_json::Value =
-                    serde_json::from_str(input).expect("Failed to parse preset input data");
-                input
-            } else {
-                serde_json::Value::Null
-            };
-
-            AntiraidEventPresetType::OnStartup
-                .to_event(input)
-                .expect("Failed to create event from preset")
-        }
-    }
-
-    fn create_khronos_context(&self, global_table: LuaTable) -> provider::CliKhronosContext {
-        let context_data = if let Some(ref context_data) = self.context_data {
-            serde_json::from_str(context_data).expect("Failed to parse context data")
-        } else {
-            serde_json::Value::Null
-        };
-
-        provider::CliKhronosContext {
-            data: context_data,
-            allowed_caps: self.allowed_caps.clone(),
-            guild_id: self.guild_id,
-            owner_guild_id: self.owner_guild_id,
-            global_table,
-            http: self.http.clone(),
-            cache: None, // Not yet implemented
-        }
-    }
-
-    pub async fn spawn_script(
-        &mut self,
-        event: &CreateEvent,
-        lua: &Lua,
-        name: &str,
-        code: &str,
-        global: LuaTable,
-    ) -> LuaResult<LuaMultiValue> {
-        let args = if let Some(args) = self.cached_khronos_rt_args.clone() {
-            args
-        } else {
-            let cli_context = self.create_khronos_context(global.clone());
-            let template_context = TemplateContext::new(cli_context);
-            let event = Event::from_create_event(event);
-            let args = (event, template_context).into_lua_multi(lua)?;
-            self.cached_khronos_rt_args = Some(args.clone()); // Ensure we cache it
-            args
-        };
-
-        let f = lua
-            .load(code)
-            .set_name(name)
-            .set_environment(global)
-            .into_function()?;
-
-        let th = lua.create_thread(f)?;
-        //println!("Spawning thread: {:?}", th.to_pointer());
-
-        let scheduler = mlua_scheduler_ext::Scheduler::get(lua);
-        let output = scheduler
-            .spawn_thread_and_wait("SpawnScript", th, args)
-            .await?;
-
-        match output {
-            Some(result) => result,
-            None => Ok(LuaMultiValue::new()),
-        }
-    }
-
-    pub async fn entrypoint(
-        &mut self,
-        create_event: &CreateEvent,
-        lua: Lua,
-        global_tab: LuaTable,
-        task_mgr: &mlua_scheduler::taskmgr::TaskManager,
-    ) {
-        if let Some(ref script) = self.script.clone() {
-            if self.verbose {
-                println!("Running script: {:?}", script);
-            }
-
-            for path in script {
-                let name = match fs::canonicalize(path).await {
-                    Ok(p) => p.to_string_lossy().to_string(),
-                    Err(_) => path.to_string_lossy().to_string(),
-                };
-                let contents = match fs::read_to_string(&path).await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("Failed to read script: {:?}", e);
-                        continue;
-                    }
-                };
-
-                let output = self
-                    .spawn_script(create_event, &lua, &name, &contents, global_tab.clone())
-                    .await
-                    .expect("Failed to spawn script");
-
-                println!("Output: {:?}", output);
-
-                task_mgr.wait_till_done(Duration::from_millis(1000)).await;
-            }
-        } else {
-            if self.verbose {
-                println!("Spawning REPL");
-            }
-
-            // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
-            let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
-                Editor::new().expect("Failed to create editor");
-
-            editor.set_helper(Some(repl_completer::LuaStatementCompleter {
-                lua: lua.clone(),
-                global_tab: global_tab.clone(),
-            }));
-
-            loop {
-                let mut prompt = "> ";
-                let mut line = String::new();
-
-                loop {
-                    match self.repl_wait_mode {
-                        ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
-                        ReplTaskWaitMode::YieldBeforePrompt => {
-                            tokio::task::yield_now().await;
-                        }
-                    };
-
-                    match editor.readline(prompt) {
-                        Ok(input) => line.push_str(&input),
-                        Err(_) => return,
-                    }
-
-                    match self
-                        .try_spawn_as(create_event, &lua, "repl", &line, global_tab.clone())
-                        .await
-                    {
-                        Ok(values) => {
-                            editor.add_history_entry(line).unwrap();
-
-                            if !values.is_empty() {
-                                println!(
-                                    "{}",
-                                    values
-                                        .iter()
-                                        .map(|value| format!("{:#?}", value))
-                                        .collect::<Vec<_>>()
-                                        .join("\t")
-                                );
-                            }
-
-                            match self.repl_wait_mode {
-                                ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
-                                ReplTaskWaitMode::WaitAfterExecution => {
-                                    if !task_mgr.is_empty() {
-                                        println!("[waiting for all pending tasks to finish]");
-                                    }
-
-                                    task_mgr.wait_till_done(Duration::from_millis(1000)).await;
-                                }
-                            }
-                            break;
-                        }
-                        Err(LuaError::SyntaxError {
-                            incomplete_input: true,
-                            ..
-                        }) => {
-                            // continue reading input and append it to `line`
-                            #[allow(clippy::single_char_add_str)]
-                            line.push_str("\n"); // separate input lines
-                            prompt = ">> ";
-                        }
-                        Err(e) => {
-                            editor.add_history_entry(line).unwrap();
-                            eprintln!("error: {}", e);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Try calling a line, first as an expression with an added "return " before it
-    /// and then as a statement.
-    ///
-    /// Used internally for the REPL
-    async fn try_spawn_as(
-        &mut self,
-        create_event: &CreateEvent,
-        lua: &Lua,
-        name: &str,
-        code: &str,
-        global_tab: LuaTable,
-    ) -> LuaResult<LuaMultiValue> {
-        match self
-            .spawn_script(
-                create_event,
-                lua,
-                name,
-                &format!("return {}", code),
-                global_tab.clone(),
-            )
-            .await
-        {
-            Ok(result) => return Ok(result),
-            Err(LuaError::SyntaxError { .. }) => {}
-            Err(e) => return Err(e),
-        }
-        self.spawn_script(create_event, lua, name, code, global_tab)
-            .await
     }
 }
 
@@ -693,124 +362,13 @@ fn main() {
     local.block_on(&rt, async {
         let mut cli = cli_args.finalize().await;
 
-        let event = cli.parse_event_args();
-        let create_event = parse_event(&event).expect("Failed to parse event");
-
-        let lua = Lua::new_with(LuaStdLib::ALL_SAFE, LuaOptions::default())
-            .expect("Failed to create Lua");
-
-        let compiler = mlua::Compiler::new().set_optimization_level(2);
-
-        lua.set_compiler(compiler);
-
-        let thread_tracker = mlua_scheduler_ext::feedbacks::ThreadTracker::new();
-
-        lua.set_app_data(thread_tracker.clone());
-
-        let task_mgr = mlua_scheduler::taskmgr::TaskManager::new(
-            lua.clone(),
-            XRc::new(thread_tracker),
-            Duration::from_millis(1),
-        );
-
-        let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
-
-        scheduler.attach();
-
-        // Test related functions, not available outside of script runner
-        if !cli.disable_test_funcs {
-            lua.globals()
-                .set("_OS", OS.to_lowercase())
-                .expect("Failed to set _OS global");
-
-            lua.globals()
-                .set(
-                    "_TEST_ASYNC_WORK",
-                    lua.create_scheduler_async_function(|lua, n: u64| async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(n)).await;
-                        lua.create_table()
-                    })
-                    .expect("Failed to create async function"),
-                )
-                .expect("Failed to set _OS global");
-        }
-
-        let scheduler_lib =
-            mlua_scheduler::userdata::scheduler_lib(&lua).expect("Failed to create scheduler lib");
-
-        if !cli.disable_scheduler_lib {
-            lua.globals()
-                .set("scheduler", scheduler_lib.clone())
-                .expect("Failed to set scheduler global");
-        }
-
-        if !cli.disable_task_lib {
-            lua.globals()
-                .set(
-                    "task",
-                    mlua_scheduler::userdata::task_lib(&lua, scheduler_lib)
-                        .expect("Failed to create table"),
-                )
-                .expect("Failed to set task global");
-        }
-
-        mlua_scheduler::userdata::patch_coroutine_lib(&lua).expect("Failed to patch coroutine lib");
-
-        lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
-
-        // Proxy globals if enabled
-        let global_tab = if !cli.disable_globals_proxying {
-            // Setup the global table using a metatable
-            //
-            // SAFETY: This works because the global table will not change in the VM
-            let global_mt = lua.create_table().expect("Failed to create table");
-            let global_tab = lua.create_table().expect("Failed to create table");
-
-            // Proxy reads to globals if key is in globals, otherwise to the table
-            global_mt
-                .set("__index", lua.globals())
-                .expect("Failed to set __index");
-            global_tab
-                .set("_G", global_tab.clone())
-                .expect("Failed to set _G");
-
-            // Provies writes
-            // Forward to _G if key is in globals, otherwise to the table
-            let globals_ref = lua.globals();
-            global_mt
-                .set(
-                    "__newindex",
-                    lua.create_function(
-                        move |_lua, (tab, key, value): (LuaTable, LuaValue, LuaValue)| {
-                            let v = globals_ref.get::<LuaValue>(key.clone())?;
-
-                            if !v.is_nil() {
-                                globals_ref.set(key, value)
-                            } else {
-                                tab.raw_set(key, value)
-                            }
-                        },
-                    )
-                    .expect("Failed to create function"),
-                )
-                .expect("Failed to set __newindex");
-
-            // Set __index on global_tab to point to _G
-            global_tab.set_metatable(Some(global_mt));
-
-            global_tab
-        } else {
-            lua.globals()
-        };
-
-        cli.entrypoint(&create_event, lua, global_tab, &task_mgr)
-            .await;
+        cli.entrypoint().await;
 
         if cli.verbose {
             println!("Stopping task manager");
         }
 
-        task_mgr.stop();
+        cli.setup_data.task_mgr.stop();
         //std::process::exit(0);
     });
 }

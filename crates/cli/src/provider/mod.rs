@@ -14,6 +14,8 @@ use khronos_runtime::traits::stingprovider::StingProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 
+use crate::cli::CliAuxOpts;
+
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
     LazyLock::new(|| {
@@ -25,6 +27,7 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
 #[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
+    pub aux_opts: CliAuxOpts,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
@@ -43,6 +46,12 @@ impl KhronosContext for CliKhronosContext {
     type PageProvider = CliPageProvider;
 
     fn data(&self) -> Self::Data {
+        if self.data == serde_json::Value::Null {
+            let val =
+                serde_json::to_value(self.aux_opts).expect("Failed to serialize aux_opts to JSON");
+
+            return val;
+        }
         self.data.clone()
     }
 
