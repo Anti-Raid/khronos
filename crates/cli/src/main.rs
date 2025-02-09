@@ -1,6 +1,7 @@
 mod cli;
 mod constants;
 mod dispatch;
+mod experiments;
 mod presets;
 mod provider;
 mod repl_completer;
@@ -153,6 +154,15 @@ struct CliArgs {
     /// Environment variable: `BOT_TOKEN``
     bot_token: Option<String>,
 
+    /// What experiments to load into the CLI, comma separated
+    ///
+    /// These experiments are for internal use only and may need additional
+    /// dependencies to be installed/available
+    ///
+    /// Environment variable: `EXPERIMENTS`
+    #[clap(long)]
+    experiments: Option<String>,
+
     /// The path to a config file containing e.g.
     /// the bot token etc
     ///
@@ -276,6 +286,10 @@ impl CliArgs {
             self.bot_token = Some(bot_token);
         }
 
+        if let Ok(experiments) = src.var("EXPERIMENTS") {
+            self.experiments = Some(experiments);
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -310,6 +324,16 @@ impl CliArgs {
             disable_globals_proxying: self.disable_globals_proxying,
             disable_scheduler_lib: self.disable_scheduler_lib,
             disable_task_lib: self.disable_task_lib,
+            experiments: {
+                if let Some(experiments) = self.experiments {
+                    experiments
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect()
+                } else {
+                    vec![]
+                }
+            },
         };
 
         Cli {
@@ -325,7 +349,7 @@ impl CliArgs {
                 }
             },
             verbose: self.verbose,
-            aux_opts,
+            aux_opts: aux_opts.clone(),
             repl_wait_mode: self.repl_wait_mode.into(),
             preset: self.preset,
             preset_input: self.preset_input,

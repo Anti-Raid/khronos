@@ -17,6 +17,7 @@ indexmap = { version = "2", features = ["serde"] }
 rustyline = "15"
 dotenvy = { git = "https://github.com/allan2/dotenvy" }
 moka = { version = "0.12", features = ["future", "futures-util", "sync"] }
+tch = { version = "0.19", features = ["download-libtorch"], optional = true }
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }
@@ -42,3 +43,11 @@ branch = "main"
 [dependencies.uuid]
 version = "1"
 features = ["v4", "fast-rng", "serde"]
+
+[features]
+default = []
+
+# Image classification experiments
+experiment_resnet34 = ["dep:tch"]
+experiment_resnet50 = ["dep:tch"]
+experiment_resnet101 = ["dep:tch"]

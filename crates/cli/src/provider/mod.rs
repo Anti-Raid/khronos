@@ -48,7 +48,7 @@ impl KhronosContext for CliKhronosContext {
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
             let val =
-                serde_json::to_value(self.aux_opts).expect("Failed to serialize aux_opts to JSON");
+                serde_json::to_value(&self.aux_opts).expect("Failed to serialize aux_opts to JSON");
 
             return val;
         }

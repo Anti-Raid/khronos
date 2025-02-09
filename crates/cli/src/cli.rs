@@ -1,4 +1,5 @@
 use crate::dispatch::parse_event;
+use crate::experiments::load_experiments;
 use crate::presets::impls::CreateEventFromPresetType;
 use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
@@ -54,13 +55,14 @@ impl std::fmt::Debug for LuaSetupResult {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 /// Auxillary options for the CLI
 pub struct CliAuxOpts {
     pub disable_test_funcs: bool,
     pub disable_globals_proxying: bool,
     pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
+    pub experiments: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -170,7 +172,7 @@ impl Cli {
 
         provider::CliKhronosContext {
             data: context_data,
-            aux_opts: self.aux_opts,
+            aux_opts: self.aux_opts.clone(),
             allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
@@ -298,6 +300,14 @@ impl Cli {
         } else {
             lua.globals()
         };
+
+        // Load experiments
+        let experiments_table =
+            load_experiments(&lua, &aux_opts.experiments).expect("Failed to load experiments");
+
+        lua.globals()
+            .set("exp", experiments_table)
+            .expect("Failed to set experiments global");
 
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
