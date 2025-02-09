@@ -48,6 +48,4 @@ features = ["v4", "fast-rng", "serde"]
 default = []
 
 # Image classification experiments
-experiment_resnet34 = ["dep:tch"]
-experiment_resnet50 = ["dep:tch"]
-experiment_resnet101 = ["dep:tch"]
+experiment_image_classification = ["dep:tch"]
