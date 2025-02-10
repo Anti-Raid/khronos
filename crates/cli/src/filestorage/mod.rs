@@ -47,15 +47,21 @@ pub struct LocalFileStorageProvider {
 }
 
 impl LocalFileStorageProvider {
-    pub fn new(base_path: PathBuf) -> Self {
-        Self {
+    pub async fn new(base_path: PathBuf) -> Result<Self, Error> {
+        let s = Self {
             base_path,
             lock: Rc::new(RwLock::new(())),
-        }
+        };
+
+        s.create_base_path_if_not_exists().await?;
+
+        Ok(s)
     }
 
-    fn create_base_path_if_not_exists(&self) -> Result<(), Error> {
-        std::fs::create_dir_all(&self.base_path).map_err(Error::from)
+    async fn create_base_path_if_not_exists(&self) -> Result<(), Error> {
+        tokio::fs::create_dir_all(&self.base_path)
+            .await
+            .map_err(Error::from)
     }
 }
 
@@ -63,24 +69,27 @@ impl LocalFileStorageProvider {
 impl FileStorageProvider for LocalFileStorageProvider {
     async fn create_file(&self, file_path: &[String]) -> Result<(), Error> {
         let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
+        // Create file
         tokio::fs::File::create(path).await?;
         Ok(())
     }
 
     async fn file_exists(&self, file_path: &[String]) -> Result<bool, Error> {
-        let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+        let _g = self.lock.read().await;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
         Ok(tokio::fs::try_exists(path).await?)
     }
 
     async fn list_files(&self, file_path: &[String]) -> Result<Vec<FileListEntry>, Error> {
-        let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+        let _g = self.lock.read().await;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
 
@@ -103,26 +112,29 @@ impl FileStorageProvider for LocalFileStorageProvider {
     }
 
     async fn get_file(&self, file_path: &[String]) -> Result<Vec<u8>, Error> {
-        let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+        let _g = self.lock.read().await;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
         tokio::fs::read(path).await.map_err(Error::from)
     }
 
     async fn save_file(&self, file_path: &[String], data: &[u8]) -> Result<(), Error> {
         let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
         tokio::fs::write(path, data).await.map_err(Error::from)
     }
 
     async fn delete_file(&self, file_path: &[String]) -> Result<(), Error> {
         let _g = self.lock.write().await;
-        self.create_base_path_if_not_exists()?;
+
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
         tokio::fs::remove_file(path).await.map_err(Error::from)
     }
 }
@@ -142,7 +154,9 @@ mod filestorage_test {
         let local = tokio::task::LocalSet::new();
 
         local.block_on(&rt, async {
-            let provider = LocalFileStorageProvider::new(PathBuf::from("test_files"));
+            let provider = LocalFileStorageProvider::new(PathBuf::from("test_files"))
+                .await
+                .unwrap();
             let file_path = vec!["test.txt".to_string()];
 
             assert!(!provider.file_exists(&file_path).await.unwrap());
@@ -156,12 +170,15 @@ mod filestorage_test {
             // Make 100 tasks all calling create_file at the same time on the same file
             let mut tasks = Vec::new();
 
-            for i in 0..100 {
+            for i in 0..10000_i64 {
                 let provider = provider.clone();
                 let file_path = vec!["test.txt".to_string()];
 
                 tasks.push(tokio::task::spawn_local(async move {
-                    provider.save_file(&file_path, &[i]).await.unwrap();
+                    provider
+                        .save_file(&file_path, &i.to_le_bytes())
+                        .await
+                        .unwrap();
                 }));
             }
 
@@ -170,7 +187,10 @@ mod filestorage_test {
             }
 
             // Ensure the file only contains the last write
-            assert_eq!(provider.get_file(&file_path).await.unwrap(), &[99]);
+            assert_eq!(
+                provider.get_file(&file_path).await.unwrap(),
+                9999i64.to_le_bytes()
+            );
 
             // Delete the base path
             tokio::fs::remove_dir_all("test_files").await.unwrap();

@@ -176,7 +176,7 @@ impl CliKVProvider {
         if file.starts_with("b64") {
             // Convert base64 to key
             data_encoding::BASE64URL_NOPAD
-                .decode(file.as_bytes())
+                .decode(file.trim_start_matches("b64").as_bytes())
                 .map_err(|e| e.into())
                 .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
         } else {

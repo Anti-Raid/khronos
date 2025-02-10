@@ -414,9 +414,11 @@ impl CliArgs {
                         base_path
                     });
 
-                    Some(Rc::new(filestorage::LocalFileStorageProvider::new(
-                        base_path,
-                    )))
+                    Some(Rc::new(
+                        filestorage::LocalFileStorageProvider::new(base_path)
+                            .await
+                            .expect("Failed to create file storage provider"),
+                    ))
                 }
             },
         }
