@@ -2,6 +2,7 @@ mod cli;
 mod constants;
 mod dispatch;
 mod experiments;
+mod filestorage;
 mod presets;
 mod provider;
 mod repl_completer;
@@ -136,6 +137,9 @@ struct CliArgs {
 
     /// What guild_id to use for mocking
     ///
+    /// If unset, all APIs will default to the default_global_guild_id
+    /// hardcoded in Khronos to be AntiRaids support server.
+    ///
     /// Environment variable: `GUILD_ID`
     #[clap(long)]
     guild_id: Option<serenity::all::GuildId>,
@@ -162,6 +166,20 @@ struct CliArgs {
     /// Environment variable: `EXPERIMENTS`
     #[clap(long)]
     experiments: Option<String>,
+
+    /// Whether or not file storage should be disabled entirely
+    ///
+    /// Environment variable: `DISABLE_FILE_STORAGE`
+    #[clap(long, default_value = "false")]
+    disable_file_storage: bool,
+
+    /// The base path to use for file storage
+    ///
+    /// If unset, See the rules from https://docs.rs/dirs/latest/dirs/fn.data_dir.html
+    ///
+    /// Environment variable: `FILE_STORAGE_BASE_PATH`
+    #[clap(long)]
+    file_storage_base_path: Option<PathBuf>,
 
     /// The path to a config file containing e.g.
     /// the bot token etc
@@ -290,6 +308,16 @@ impl CliArgs {
             self.experiments = Some(experiments);
         }
 
+        if let Ok(disable_file_storage) = src.var("DISABLE_FILE_STORAGE") {
+            self.disable_file_storage = disable_file_storage
+                .parse()
+                .expect("Failed to parse disable file storage");
+        }
+
+        if let Ok(file_storage_base_path) = src.var("FILE_STORAGE_BASE_PATH") {
+            self.file_storage_base_path = Some(PathBuf::from(file_storage_base_path));
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -365,6 +393,32 @@ impl CliArgs {
                 .map(|token| Rc::new(serenity::all::Http::new(token))),
             cached_khronos_rt_args: None,
             setup_data: Cli::setup_lua_vm(aux_opts).await,
+            file_storage_provider: {
+                if self.disable_file_storage {
+                    None
+                } else {
+                    let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
+                        let base_path = var("XDG_DATA_HOME")
+                            .map(|s| PathBuf::from(s).join("khronos-cli"))
+                            .unwrap_or_else(|_| {
+                                dirs::data_dir()
+                                    .expect("Failed to get data dir")
+                                    .join("khronos-cli")
+                            });
+
+                        if !base_path.exists() {
+                            std::fs::create_dir_all(&base_path)
+                                .expect("Failed to create base path");
+                        }
+
+                        base_path
+                    });
+
+                    Some(Rc::new(filestorage::LocalFileStorageProvider::new(
+                        base_path,
+                    )))
+                }
+            },
         }
     }
 }

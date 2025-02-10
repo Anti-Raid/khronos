@@ -1,5 +1,6 @@
 use crate::dispatch::parse_event;
 use crate::experiments::load_experiments;
+use crate::filestorage::FileStorageProvider;
 use crate::presets::impls::CreateEventFromPresetType;
 use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
@@ -113,6 +114,15 @@ pub struct Cli {
     /// Optional, but required for discord-related operations
     pub bot_token: Option<String>,
 
+    /// The file storage to use
+    ///
+    /// If unset, the following will be used:
+    ///
+    /// If $XDG_DATA_HOME is set, $XDG_DATA_HOME/khronos-cli will be used
+    /// Otherwise, $HOME/.local/share/khronos-cli will be used on Linux/MacOS
+    /// and %APPDATA%/khronos-cli will be used on Windows
+    pub file_storage_provider: Option<Rc<dyn FileStorageProvider>>,
+
     #[allow(dead_code)]
     /// The path to a config file containing e.g.
     /// the bot token etc
@@ -179,6 +189,7 @@ impl Cli {
             global_table,
             http: self.http.clone(),
             cache: None, // Not yet implemented
+            file_storage_provider: self.file_storage_provider.clone(),
         }
     }
 

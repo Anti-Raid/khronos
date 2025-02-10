@@ -2,3 +2,4 @@
 /experiments
 *.safetensors
 *.bin
+/test_files

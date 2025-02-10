@@ -15,6 +15,8 @@ use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 
 use crate::cli::CliAuxOpts;
+use crate::constants::default_global_guild_id;
+use crate::filestorage::FileStorageProvider;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -27,6 +29,7 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
 #[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
+    pub file_storage_provider: Option<Rc<dyn FileStorageProvider>>,
     pub aux_opts: CliAuxOpts,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
@@ -76,8 +79,28 @@ impl KhronosContext for CliKhronosContext {
         self.global_table.clone()
     }
 
-    fn kv_provider(&self, _scope: ExecutorScope) -> Option<Self::KVProvider> {
-        Some(CliKVProvider {})
+    fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
+        if let Some(file_storage_provider) = &self.file_storage_provider {
+            let guild_id = match scope {
+                ExecutorScope::ThisGuild => self.guild_id?,
+                ExecutorScope::OwnerGuild => {
+                    if let Some(owner_guild_id) = self.owner_guild_id {
+                        owner_guild_id
+                    } else if let Some(guild_id) = self.guild_id {
+                        guild_id
+                    } else {
+                        default_global_guild_id()
+                    }
+                }
+            };
+
+            Some(CliKVProvider {
+                guild_id,
+                file_storage_provider: file_storage_provider.clone(),
+            })
+        } else {
+            None
+        }
     }
 
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider> {
@@ -90,7 +113,7 @@ impl KhronosContext for CliKhronosContext {
                     } else if let Some(guild_id) = self.guild_id {
                         guild_id
                     } else {
-                        return None;
+                        default_global_guild_id()
                     }
                 }
             };
@@ -121,15 +144,45 @@ impl KhronosContext for CliKhronosContext {
     }
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+/// Represents a full record complete with metadata
+pub struct CliKvRecord {
+    pub key: String,
+    pub value: serde_json::Value,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 #[derive(Clone)]
-pub struct CliKVProvider {}
+pub struct CliKVProvider {
+    pub guild_id: serenity::all::GuildId,
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
+}
 
 impl KVProvider for CliKVProvider {
     async fn get(
         &self,
-        _key: String,
+        key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        todo!()
+        let file_contents = self
+            .file_storage_provider
+            .get_file(&["keys".to_string(), self.guild_id.to_string(), key])
+            .await
+            .map_err(|e| format!("Failed to get file: {}", e))?;
+
+        if file_contents.is_empty() {
+            Ok(None)
+        } else {
+            let record: CliKvRecord = serde_json::from_slice(&file_contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+            Ok(Some(khronos_runtime::traits::ir::KvRecord {
+                key: record.key,
+                value: record.value,
+                created_at: record.created_at,
+                last_updated_at: record.last_updated_at,
+            }))
+        }
     }
 
     async fn set(
@@ -152,7 +205,7 @@ impl KVProvider for CliKVProvider {
         &self,
         _query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        todo!()
+        Ok(vec![])
     }
 
     async fn exists(&self, _key: String) -> Result<bool, khronos_runtime::Error> {
@@ -578,5 +631,49 @@ impl PageProvider for CliPageProvider {
 
     async fn delete_page(&self) -> Result<(), khronos_runtime::Error> {
         todo!()
+    }
+}
+
+/// Returns true if the filename matches the pattern based on PostgreSQL ILIKE pattern matching rules
+fn does_file_match_pattern(filename: &str, pattern: &str) -> Result<bool, khronos_runtime::Error> {
+    // An underscore (_) in pattern stands for (matches) any single character; a percent sign (%) matches any sequence of zero or more characters.
+    let pattern = pattern.replace("_", ".").replace("%", ".*");
+    let regex = regex::Regex::new(&format!("(?i)^{}$", pattern))?;
+    Ok(regex.is_match(filename))
+}
+
+#[cfg(test)]
+mod file_pattern_matching_tests {
+    use super::does_file_match_pattern;
+
+    #[test]
+    fn test_does_file_match_pattern() {
+        assert!(
+            does_file_match_pattern("test", "test").unwrap(),
+            "test should match test"
+        );
+
+        // Postgres docs cases
+        assert!(
+            does_file_match_pattern("abc", "abc").unwrap(),
+            "abc should match abc"
+        );
+        assert!(
+            does_file_match_pattern("abc", "a%").unwrap(),
+            "abc should match a%"
+        );
+        assert!(
+            does_file_match_pattern("abc", "_b_").unwrap(),
+            "abc should match _b_"
+        );
+        assert!(
+            !does_file_match_pattern("abc", "c").unwrap(),
+            "abc should not match c"
+        );
+
+        assert!(
+            does_file_match_pattern("abc", "a_c").unwrap(),
+            "abc should match a_c"
+        );
     }
 }
