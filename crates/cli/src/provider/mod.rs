@@ -159,11 +159,38 @@ pub struct CliKVProvider {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
 }
 
+impl CliKVProvider {
+    fn parse_key_to_fs_file(&self, key: String) -> String {
+        if key.contains(['/', '\\', '.']) || key.starts_with("b64") {
+            // Convert key to base64
+            format!(
+                "b64{}",
+                data_encoding::BASE64URL_NOPAD.encode(key.as_bytes())
+            )
+        } else {
+            key
+        }
+    }
+
+    fn parse_fs_file_to_key(&self, file: String) -> Result<String, khronos_runtime::Error> {
+        if file.starts_with("b64") {
+            // Convert base64 to key
+            data_encoding::BASE64URL_NOPAD
+                .decode(file.as_bytes())
+                .map_err(|e| e.into())
+                .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+        } else {
+            Ok(file)
+        }
+    }
+}
+
 impl KVProvider for CliKVProvider {
     async fn get(
         &self,
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
+        let key = self.parse_key_to_fs_file(key);
         let file_contents = self
             .file_storage_provider
             .get_file(&["keys".to_string(), self.guild_id.to_string(), key])

@@ -1757,6 +1757,7 @@ dependencies = [
  "botox",
  "chrono",
  "clap",
+ "data-encoding",
  "dirs",
  "dotenvy",
  "env_logger",
