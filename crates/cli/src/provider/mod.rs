@@ -634,6 +634,7 @@ impl PageProvider for CliPageProvider {
     }
 }
 
+#[allow(dead_code)]
 /// Returns true if the filename matches the pattern based on PostgreSQL ILIKE pattern matching rules
 fn does_file_match_pattern(filename: &str, pattern: &str) -> Result<bool, khronos_runtime::Error> {
     // An underscore (_) in pattern stands for (matches) any single character; a percent sign (%) matches any sequence of zero or more characters.
@@ -661,6 +662,14 @@ mod file_pattern_matching_tests {
         assert!(
             does_file_match_pattern("abc", "a%").unwrap(),
             "abc should match a%"
+        );
+        assert!(
+            does_file_match_pattern("abc", "%a%").unwrap(),
+            "abc should match %a%"
+        );
+        assert!(
+            does_file_match_pattern("abcde", "%c%").unwrap(),
+            "abcde should match %c%"
         );
         assert!(
             does_file_match_pattern("abc", "_b_").unwrap(),
