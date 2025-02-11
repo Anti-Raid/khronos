@@ -360,6 +360,7 @@ impl SqliteFileStorageProvider {
     }
 }
 
+#[cfg(feature = "sqlite")]
 #[async_trait(?Send)]
 impl FileStorageProvider for SqliteFileStorageProvider {
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error> {
@@ -602,6 +603,7 @@ impl SqliteInMemoryProvider {
     }
 }
 
+#[cfg(feature = "sqlite")]
 #[async_trait(?Send)]
 impl FileStorageProvider for SqliteInMemoryProvider {
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error> {
