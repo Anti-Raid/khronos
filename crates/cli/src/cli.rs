@@ -42,8 +42,11 @@ pub enum ReplTaskWaitMode {
 
 #[derive(Debug, Clone, Copy)]
 pub enum FileStorageBackend {
+    #[cfg(feature = "sqlite")]
     SqliteInMemory,
+    #[cfg(feature = "sqlite")]
     SqliteFile,
+    #[cfg(feature = "sqlite")]
     SqliteFileNoSynchronize,
     LocalFs,
 }

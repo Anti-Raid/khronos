@@ -16,8 +16,11 @@ use tokio::fs;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
 pub enum FileStorageBackend {
+    #[cfg(feature = "sqlite")]
     SqliteInMemory,
+    #[cfg(feature = "sqlite")]
     SqliteFile,
+    #[cfg(feature = "sqlite")]
     SqliteFileNoSynchronize,
     LocalFs,
 }
@@ -402,8 +405,11 @@ impl CliArgs {
             cached_khronos_rt_args: None,
             setup_data: Cli::setup_lua_vm(aux_opts).await,
             file_storage_backend: match self.file_storage_backend {
+                #[cfg(feature = "sqlite")]
                 FileStorageBackend::SqliteInMemory => cli::FileStorageBackend::SqliteInMemory,
+                #[cfg(feature = "sqlite")]
                 FileStorageBackend::SqliteFile => cli::FileStorageBackend::SqliteFile,
+                #[cfg(feature = "sqlite")]
                 FileStorageBackend::SqliteFileNoSynchronize => {
                     cli::FileStorageBackend::SqliteFileNoSynchronize
                 }
@@ -435,6 +441,7 @@ impl CliArgs {
                                 .expect("Failed to create file storage provider"),
                         )
                     }
+                    #[cfg(feature = "sqlite")]
                     FileStorageBackend::SqliteFile => {
                         let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
                             let base_path = var("XDG_DATA_HOME")
@@ -463,6 +470,7 @@ impl CliArgs {
                             .expect("Failed to create file storage provider"),
                         )
                     }
+                    #[cfg(feature = "sqlite")]
                     FileStorageBackend::SqliteFileNoSynchronize => {
                         let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
                             let base_path = var("XDG_DATA_HOME")
@@ -491,6 +499,7 @@ impl CliArgs {
                             .expect("Failed to create file storage provider"),
                         )
                     }
+                    #[cfg(feature = "sqlite")]
                     FileStorageBackend::SqliteInMemory => Rc::new(
                         filestorage::SqliteInMemoryProvider::new(self.verbose)
                             .await
