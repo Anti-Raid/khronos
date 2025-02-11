@@ -8,7 +8,7 @@ mod provider;
 mod repl_completer;
 
 use clap::{Parser, ValueEnum};
-use cli::{Cli, CliAuxOpts};
+use cli::{Cli, CliAuxOpts, CliEntrypointAction};
 use std::env::var;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -52,6 +52,13 @@ struct CliArgs {
     ///
     /// Environment variable: `SCRIPT`
     script: Option<Vec<PathBuf>>,
+
+    /// What inline script to run
+    ///
+    /// Environment variable: `INLINE_SCRIPT`
+    /// Short form: `-c`
+    #[clap(short = 'c', long)]
+    inline_script: Option<String>,
 
     /// What capbilities the script should have (comma separated)
     ///
@@ -243,6 +250,10 @@ impl CliArgs {
             self.script = serde_json::from_str(&script).expect("Failed to parse script");
         }
 
+        if let Ok(inline_script) = src.var("INLINE_SCRIPT") {
+            self.inline_script = Some(inline_script);
+        }
+
         if let Ok(allowed_caps) = src.var("ALLOWED_CAPS") {
             self.allowed_caps =
                 serde_json::from_str(&allowed_caps).expect("Failed to parse allowed caps");
@@ -337,7 +348,7 @@ impl CliArgs {
     }
 
     /// Parses/updates the config from environment variables as well as config file
-    pub async fn finalize(mut self) -> Cli {
+    pub async fn finalize(mut self) -> (Cli, CliEntrypointAction) {
         self.update_from_env_vars(EnvVarEnvSource {});
 
         while let Some(ref config_file) = self.config_file {
@@ -375,139 +386,162 @@ impl CliArgs {
             },
         };
 
-        Cli {
-            script: self.script,
-            allowed_caps: {
-                if let Some(allowed_caps) = self.allowed_caps {
-                    allowed_caps
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .collect()
-                } else {
-                    vec![]
+        let entrypoint_action = {
+            if self.script.is_some() && self.inline_script.is_some() {
+                panic!("Cannot specify both script and inline script");
+            }
+
+            if let Some(script) = self.script {
+                CliEntrypointAction::RunScripts { scripts: script }
+            } else if let Some(inline_script) = self.inline_script {
+                CliEntrypointAction::InlineScript {
+                    script: inline_script,
+                    task_wait_mode: self.repl_wait_mode.into(),
                 }
-            },
-            verbose: self.verbose,
-            aux_opts: aux_opts.clone(),
-            repl_wait_mode: self.repl_wait_mode.into(),
-            preset: self.preset,
-            preset_input: self.preset_input,
-            raw_event_data: self.raw_event_data,
-            context_data: self.context_data,
-            guild_id: self.guild_id,
-            owner_guild_id: self.owner_guild_id,
-            bot_token: self.bot_token.clone(),
-            config_file: self.config_file,
-            http: self
-                .bot_token
-                .as_ref()
-                .map(|token| Rc::new(serenity::all::Http::new(token))),
-            cached_khronos_rt_args: None,
-            setup_data: Cli::setup_lua_vm(aux_opts).await,
-            file_storage_backend: match self.file_storage_backend {
-                #[cfg(feature = "sqlite")]
-                FileStorageBackend::SqliteInMemory => cli::FileStorageBackend::SqliteInMemory,
-                #[cfg(feature = "sqlite")]
-                FileStorageBackend::SqliteFile => cli::FileStorageBackend::SqliteFile,
-                #[cfg(feature = "sqlite")]
-                FileStorageBackend::SqliteFileNoSynchronize => {
-                    cli::FileStorageBackend::SqliteFileNoSynchronize
+            } else {
+                CliEntrypointAction::Repl {
+                    task_wait_mode: self.repl_wait_mode.into(),
                 }
-                FileStorageBackend::LocalFs => cli::FileStorageBackend::LocalFs,
-            },
-            file_storage_provider: {
-                match self.file_storage_backend {
-                    FileStorageBackend::LocalFs => {
-                        let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
-                            let base_path = var("XDG_DATA_HOME")
-                                .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                .unwrap_or_else(|_| {
-                                    dirs::data_dir()
-                                        .expect("Failed to get data dir")
-                                        .join("khronos-cli")
-                                });
+            }
+        };
 
-                            if !base_path.exists() {
-                                std::fs::create_dir_all(&base_path)
-                                    .expect("Failed to create base path");
-                            }
-
-                            base_path
-                        });
-
-                        Rc::new(
-                            filestorage::LocalFileStorageProvider::new(base_path, self.verbose)
-                                .await
-                                .expect("Failed to create file storage provider"),
-                        )
+        (
+            Cli {
+                allowed_caps: {
+                    if let Some(allowed_caps) = self.allowed_caps {
+                        allowed_caps
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .collect()
+                    } else {
+                        vec![]
                     }
+                },
+                verbose: self.verbose,
+                aux_opts: aux_opts.clone(),
+                preset: self.preset,
+                preset_input: self.preset_input,
+                raw_event_data: self.raw_event_data,
+                context_data: self.context_data,
+                guild_id: self.guild_id,
+                owner_guild_id: self.owner_guild_id,
+                bot_token: self.bot_token.clone(),
+                config_file: self.config_file,
+                http: self
+                    .bot_token
+                    .as_ref()
+                    .map(|token| Rc::new(serenity::all::Http::new(token))),
+                cached_khronos_rt_args: None,
+                setup_data: Cli::setup_lua_vm(aux_opts).await,
+                file_storage_backend: match self.file_storage_backend {
                     #[cfg(feature = "sqlite")]
-                    FileStorageBackend::SqliteFile => {
-                        let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
-                            let base_path = var("XDG_DATA_HOME")
-                                .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                .unwrap_or_else(|_| {
-                                    dirs::data_dir()
-                                        .expect("Failed to get data dir")
-                                        .join("khronos-cli")
-                                });
-
-                            if !base_path.exists() {
-                                std::fs::create_dir_all(&base_path)
-                                    .expect("Failed to create base path");
-                            }
-
-                            base_path
-                        });
-
-                        Rc::new(
-                            filestorage::SqliteFileStorageProvider::new(
-                                base_path,
-                                self.verbose,
-                                true,
-                            )
-                            .await
-                            .expect("Failed to create file storage provider"),
-                        )
-                    }
+                    FileStorageBackend::SqliteInMemory => cli::FileStorageBackend::SqliteInMemory,
+                    #[cfg(feature = "sqlite")]
+                    FileStorageBackend::SqliteFile => cli::FileStorageBackend::SqliteFile,
                     #[cfg(feature = "sqlite")]
                     FileStorageBackend::SqliteFileNoSynchronize => {
-                        let base_path = self.file_storage_base_path.clone().unwrap_or_else(|| {
-                            let base_path = var("XDG_DATA_HOME")
-                                .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                .unwrap_or_else(|_| {
-                                    dirs::data_dir()
-                                        .expect("Failed to get data dir")
-                                        .join("khronos-cli")
+                        cli::FileStorageBackend::SqliteFileNoSynchronize
+                    }
+                    FileStorageBackend::LocalFs => cli::FileStorageBackend::LocalFs,
+                },
+                file_storage_provider: {
+                    match self.file_storage_backend {
+                        FileStorageBackend::LocalFs => {
+                            let base_path =
+                                self.file_storage_base_path.clone().unwrap_or_else(|| {
+                                    let base_path = var("XDG_DATA_HOME")
+                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
+                                        .unwrap_or_else(|_| {
+                                            dirs::data_dir()
+                                                .expect("Failed to get data dir")
+                                                .join("khronos-cli")
+                                        });
+
+                                    if !base_path.exists() {
+                                        std::fs::create_dir_all(&base_path)
+                                            .expect("Failed to create base path");
+                                    }
+
+                                    base_path
                                 });
 
-                            if !base_path.exists() {
-                                std::fs::create_dir_all(&base_path)
-                                    .expect("Failed to create base path");
-                            }
-
-                            base_path
-                        });
-
-                        Rc::new(
-                            filestorage::SqliteFileStorageProvider::new(
-                                base_path,
-                                self.verbose,
-                                false,
+                            Rc::new(
+                                filestorage::LocalFileStorageProvider::new(base_path, self.verbose)
+                                    .await
+                                    .expect("Failed to create file storage provider"),
                             )
-                            .await
-                            .expect("Failed to create file storage provider"),
-                        )
+                        }
+                        #[cfg(feature = "sqlite")]
+                        FileStorageBackend::SqliteFile => {
+                            let base_path =
+                                self.file_storage_base_path.clone().unwrap_or_else(|| {
+                                    let base_path = var("XDG_DATA_HOME")
+                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
+                                        .unwrap_or_else(|_| {
+                                            dirs::data_dir()
+                                                .expect("Failed to get data dir")
+                                                .join("khronos-cli")
+                                        });
+
+                                    if !base_path.exists() {
+                                        std::fs::create_dir_all(&base_path)
+                                            .expect("Failed to create base path");
+                                    }
+
+                                    base_path
+                                });
+
+                            Rc::new(
+                                filestorage::SqliteFileStorageProvider::new(
+                                    base_path,
+                                    self.verbose,
+                                    true,
+                                )
+                                .await
+                                .expect("Failed to create file storage provider"),
+                            )
+                        }
+                        #[cfg(feature = "sqlite")]
+                        FileStorageBackend::SqliteFileNoSynchronize => {
+                            let base_path =
+                                self.file_storage_base_path.clone().unwrap_or_else(|| {
+                                    let base_path = var("XDG_DATA_HOME")
+                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
+                                        .unwrap_or_else(|_| {
+                                            dirs::data_dir()
+                                                .expect("Failed to get data dir")
+                                                .join("khronos-cli")
+                                        });
+
+                                    if !base_path.exists() {
+                                        std::fs::create_dir_all(&base_path)
+                                            .expect("Failed to create base path");
+                                    }
+
+                                    base_path
+                                });
+
+                            Rc::new(
+                                filestorage::SqliteFileStorageProvider::new(
+                                    base_path,
+                                    self.verbose,
+                                    false,
+                                )
+                                .await
+                                .expect("Failed to create file storage provider"),
+                            )
+                        }
+                        #[cfg(feature = "sqlite")]
+                        FileStorageBackend::SqliteInMemory => Rc::new(
+                            filestorage::SqliteInMemoryProvider::new(self.verbose)
+                                .await
+                                .expect("Failed to create file storage provider"),
+                        ),
                     }
-                    #[cfg(feature = "sqlite")]
-                    FileStorageBackend::SqliteInMemory => Rc::new(
-                        filestorage::SqliteInMemoryProvider::new(self.verbose)
-                            .await
-                            .expect("Failed to create file storage provider"),
-                    ),
-                }
+                },
             },
-        }
+            entrypoint_action,
+        )
     }
 }
 
@@ -526,8 +560,8 @@ fn main() {
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&rt, async {
-        let mut cli = cli_args.finalize().await;
+        let (mut cli, entrypoint_action) = cli_args.finalize().await;
 
-        cli.entrypoint().await;
+        cli.entrypoint(entrypoint_action).await;
     });
 }

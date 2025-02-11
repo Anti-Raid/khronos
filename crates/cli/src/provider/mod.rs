@@ -169,7 +169,7 @@ impl KVProvider for CliKVProvider {
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(file_contents) = self
             .file_storage_provider
-            .get_file(&["keys".to_string(), self.guild_id.to_string()], &key)
+            .get_file(&[self.guild_id.to_string(), "keys".to_string()], &key)
             .await
             .map_err(|e| format!("Failed to get file: {}", e))?
         else {
@@ -197,7 +197,7 @@ impl KVProvider for CliKVProvider {
 
         self.file_storage_provider
             .save_file(
-                &["keys".to_string(), self.guild_id.to_string()],
+                &[self.guild_id.to_string(), "keys".to_string()],
                 &key,
                 value.as_bytes(),
             )
@@ -206,7 +206,7 @@ impl KVProvider for CliKVProvider {
 
     async fn delete(&self, key: String) -> Result<(), khronos_runtime::Error> {
         self.file_storage_provider
-            .delete_file(&["keys".to_string(), self.guild_id.to_string()], &key)
+            .delete_file(&[self.guild_id.to_string(), "keys".to_string()], &key)
             .await
     }
 
@@ -221,7 +221,7 @@ impl KVProvider for CliKVProvider {
         let entries = self
             .file_storage_provider
             .list_files(
-                &["keys".to_string(), self.guild_id.to_string()],
+                &[self.guild_id.to_string(), "keys".to_string()],
                 Some(query),
                 None,
             )

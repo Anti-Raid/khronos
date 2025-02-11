@@ -29,6 +29,19 @@ pub static PLUGIN_SET: LazyLock<PluginSet> = LazyLock::new(|| {
     plugins
 });
 
+pub enum CliEntrypointAction {
+    Repl {
+        task_wait_mode: ReplTaskWaitMode,
+    },
+    RunScripts {
+        scripts: Vec<PathBuf>,
+    },
+    InlineScript {
+        script: String,
+        task_wait_mode: ReplTaskWaitMode,
+    },
+}
+
 #[derive(Default, Debug, Clone, Copy)]
 pub enum ReplTaskWaitMode {
     /// No waiting. If you do a task.delay, you may need to explicitly do a task.wait to allow for the task to execute after delay
@@ -37,6 +50,8 @@ pub enum ReplTaskWaitMode {
     /// Wait for all tasks to finish after each execution (if required)
     WaitAfterExecution,
     /// Tokio yield before prompting for the next line
+    ///
+    /// Does not apply to InlineScript
     YieldBeforePrompt,
 }
 
@@ -80,9 +95,6 @@ pub struct CliAuxOpts {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Cli {
-    /// The path to the script to run
-    pub script: Option<Vec<PathBuf>>,
-
     /// What capbilities the script should have (comma separated)
     ///
     /// Can be useful for mocking etc.
@@ -93,9 +105,6 @@ pub struct Cli {
 
     /// The auxiliary options for the CLI
     pub aux_opts: CliAuxOpts,
-
-    /// Sets the repl wait mode.
-    pub repl_wait_mode: ReplTaskWaitMode,
 
     /// What preset to use for creating the event
     pub preset: Option<String>,
@@ -344,115 +353,153 @@ impl Cli {
         }
     }
 
-    pub async fn entrypoint(&mut self) {
-        if let Some(ref script) = self.script.clone() {
-            if self.verbose {
-                println!("Running script: {:?}", script);
-            }
+    pub async fn entrypoint(&mut self, action: CliEntrypointAction) {
+        match action {
+            CliEntrypointAction::RunScripts { scripts } => {
+                if self.verbose {
+                    println!("Running script: {:?}", scripts);
+                }
 
-            for path in script {
-                let name = match fs::canonicalize(path).await {
-                    Ok(p) => p.to_string_lossy().to_string(),
-                    Err(_) => path.to_string_lossy().to_string(),
-                };
-                let contents = match fs::read_to_string(&path).await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("Failed to read script: {:?}", e);
-                        continue;
-                    }
-                };
-
-                let output = self
-                    .spawn_script(&name, &contents)
-                    .await
-                    .expect("Failed to spawn script");
-
-                println!("Output: {:?}", output);
-
-                self.setup_data
-                    .task_mgr
-                    .wait_till_done(Duration::from_millis(1000))
-                    .await;
-            }
-        } else {
-            if self.verbose {
-                println!("Spawning REPL");
-            }
-
-            // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
-            let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
-                Editor::new().expect("Failed to create editor");
-
-            editor.set_helper(Some(repl_completer::LuaStatementCompleter {
-                lua: self.setup_data.lua.clone(),
-                global_tab: self.setup_data.global_tab.clone(),
-            }));
-
-            loop {
-                let mut prompt = "> ";
-                let mut line = String::new();
-
-                loop {
-                    match self.repl_wait_mode {
-                        ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
-                        ReplTaskWaitMode::YieldBeforePrompt => {
-                            tokio::task::yield_now().await;
+                for path in &scripts {
+                    let name = match fs::canonicalize(path).await {
+                        Ok(p) => p.to_string_lossy().to_string(),
+                        Err(_) => path.to_string_lossy().to_string(),
+                    };
+                    let contents = match fs::read_to_string(&path).await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("Failed to read script: {:?}", e);
+                            continue;
                         }
                     };
 
-                    match editor.readline(prompt) {
-                        Ok(input) => line.push_str(&input),
-                        Err(_) => return,
-                    }
+                    let output = self
+                        .spawn_script(&name, &contents)
+                        .await
+                        .expect("Failed to spawn script");
 
-                    match self.try_spawn_as("repl", &line).await {
-                        Ok(values) => {
-                            editor.add_history_entry(line).unwrap();
+                    println!("Output: {:?}", output);
 
-                            if !values.is_empty() {
-                                println!(
-                                    "{}",
-                                    values
-                                        .iter()
-                                        .map(|value| format!("{:#?}", value))
-                                        .collect::<Vec<_>>()
-                                        .join("\t")
-                                );
+                    self.setup_data
+                        .task_mgr
+                        .wait_till_done(Duration::from_millis(1000))
+                        .await;
+                }
+            }
+            CliEntrypointAction::Repl { task_wait_mode } => {
+                if self.verbose {
+                    println!("Spawning REPL");
+                }
+
+                // Inspired from https://github.com/mlua-rs/mlua/blob/main/examples/repl.rs
+                let mut editor: Editor<repl_completer::LuaStatementCompleter, DefaultHistory> =
+                    Editor::new().expect("Failed to create editor");
+
+                editor.set_helper(Some(repl_completer::LuaStatementCompleter {
+                    lua: self.setup_data.lua.clone(),
+                    global_tab: self.setup_data.global_tab.clone(),
+                }));
+
+                loop {
+                    let mut prompt = "> ";
+                    let mut line = String::new();
+
+                    loop {
+                        match task_wait_mode {
+                            ReplTaskWaitMode::None | ReplTaskWaitMode::WaitAfterExecution => {}
+                            ReplTaskWaitMode::YieldBeforePrompt => {
+                                tokio::task::yield_now().await;
                             }
+                        };
 
-                            match self.repl_wait_mode {
-                                ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
-                                ReplTaskWaitMode::WaitAfterExecution => {
-                                    if !self.setup_data.task_mgr.is_empty() {
-                                        println!("[waiting for all pending tasks to finish]");
-                                    }
+                        match editor.readline(prompt) {
+                            Ok(input) => line.push_str(&input),
+                            Err(_) => return,
+                        }
 
-                                    self.setup_data
-                                        .task_mgr
-                                        .wait_till_done(Duration::from_millis(1000))
-                                        .await;
+                        match self.try_spawn_as("repl", &line).await {
+                            Ok(values) => {
+                                editor.add_history_entry(line).unwrap();
+
+                                if !values.is_empty() {
+                                    println!(
+                                        "{}",
+                                        values
+                                            .iter()
+                                            .map(|value| format!("{:#?}", value))
+                                            .collect::<Vec<_>>()
+                                            .join("\t")
+                                    );
                                 }
+
+                                match task_wait_mode {
+                                    ReplTaskWaitMode::None
+                                    | ReplTaskWaitMode::YieldBeforePrompt => {}
+                                    ReplTaskWaitMode::WaitAfterExecution => {
+                                        if !self.setup_data.task_mgr.is_empty() {
+                                            println!("[waiting for all pending tasks to finish]");
+                                        }
+
+                                        self.setup_data
+                                            .task_mgr
+                                            .wait_till_done(Duration::from_millis(1000))
+                                            .await;
+                                    }
+                                }
+                                break;
                             }
-                            break;
-                        }
-                        Err(LuaError::SyntaxError {
-                            incomplete_input: true,
-                            ..
-                        }) => {
-                            // continue reading input and append it to `line`
-                            #[allow(clippy::single_char_add_str)]
-                            line.push_str("\n"); // separate input lines
-                            prompt = ">> ";
-                        }
-                        Err(e) => {
-                            editor.add_history_entry(line).unwrap();
-                            eprintln!("error: {}", e);
-                            break;
+                            Err(LuaError::SyntaxError {
+                                incomplete_input: true,
+                                ..
+                            }) => {
+                                // continue reading input and append it to `line`
+                                #[allow(clippy::single_char_add_str)]
+                                line.push_str("\n"); // separate input lines
+                                prompt = ">> ";
+                            }
+                            Err(e) => {
+                                editor.add_history_entry(line).unwrap();
+                                eprintln!("error: {}", e);
+                                break;
+                            }
                         }
                     }
                 }
             }
+            CliEntrypointAction::InlineScript {
+                script,
+                task_wait_mode,
+            } => match self.try_spawn_as("repl", &script).await {
+                Ok(values) => {
+                    if !values.is_empty() {
+                        println!(
+                            "{}",
+                            values
+                                .iter()
+                                .map(|value| format!("{:#?}", value))
+                                .collect::<Vec<_>>()
+                                .join("\t")
+                        );
+                    }
+
+                    match task_wait_mode {
+                        ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
+                        ReplTaskWaitMode::WaitAfterExecution => {
+                            if !self.setup_data.task_mgr.is_empty() {
+                                println!("[waiting for all pending tasks to finish]");
+                            }
+
+                            self.setup_data
+                                .task_mgr
+                                .wait_till_done(Duration::from_millis(1000))
+                                .await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {}", e);
+                }
+            },
         }
 
         if self.verbose {
