@@ -49,7 +49,7 @@ version = "1"
 features = ["v4", "fast-rng", "serde"]
 
 [features]
-default = []
+default = ["sqlite"]
 
 # SQLite file storage backend
 sqlite = ["dep:rusqlite"]
