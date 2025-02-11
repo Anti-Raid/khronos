@@ -40,6 +40,14 @@ pub enum ReplTaskWaitMode {
     YieldBeforePrompt,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum FileStorageBackend {
+    SqliteInMemory,
+    SqliteFile,
+    SqliteFileNoSynchronize,
+    LocalFs,
+}
+
 pub struct LuaSetupResult {
     pub lua: Lua,
     pub global_tab: LuaTable,
@@ -66,6 +74,7 @@ pub struct CliAuxOpts {
     pub experiments: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Cli {
     /// The path to the script to run
@@ -114,6 +123,9 @@ pub struct Cli {
     /// Optional, but required for discord-related operations
     pub bot_token: Option<String>,
 
+    /// The file storage backend to use
+    pub file_storage_backend: FileStorageBackend,
+
     /// The file storage to use
     ///
     /// If unset, the following will be used:
@@ -121,7 +133,7 @@ pub struct Cli {
     /// If $XDG_DATA_HOME is set, $XDG_DATA_HOME/khronos-cli will be used
     /// Otherwise, $HOME/.local/share/khronos-cli will be used on Linux/MacOS
     /// and %APPDATA%/khronos-cli will be used on Windows
-    pub file_storage_provider: Option<Rc<dyn FileStorageProvider>>,
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
 
     #[allow(dead_code)]
     /// The path to a config file containing e.g.

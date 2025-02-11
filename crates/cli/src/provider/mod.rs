@@ -29,7 +29,7 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
 #[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
-    pub file_storage_provider: Option<Rc<dyn FileStorageProvider>>,
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
     pub aux_opts: CliAuxOpts,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
@@ -80,27 +80,23 @@ impl KhronosContext for CliKhronosContext {
     }
 
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
-        if let Some(file_storage_provider) = &self.file_storage_provider {
-            let guild_id = match scope {
-                ExecutorScope::ThisGuild => self.guild_id?,
-                ExecutorScope::OwnerGuild => {
-                    if let Some(owner_guild_id) = self.owner_guild_id {
-                        owner_guild_id
-                    } else if let Some(guild_id) = self.guild_id {
-                        guild_id
-                    } else {
-                        default_global_guild_id()
-                    }
+        let guild_id = match scope {
+            ExecutorScope::ThisGuild => self.guild_id?,
+            ExecutorScope::OwnerGuild => {
+                if let Some(owner_guild_id) = self.owner_guild_id {
+                    owner_guild_id
+                } else if let Some(guild_id) = self.guild_id {
+                    guild_id
+                } else {
+                    default_global_guild_id()
                 }
-            };
+            }
+        };
 
-            Some(CliKVProvider {
-                guild_id,
-                file_storage_provider: file_storage_provider.clone(),
-            })
-        } else {
-            None
-        }
+        Some(CliKVProvider {
+            guild_id,
+            file_storage_provider: self.file_storage_provider.clone(),
+        })
     }
 
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider> {
@@ -135,22 +131,29 @@ impl KhronosContext for CliKhronosContext {
         Some(CliUserInfoProvider {})
     }
 
-    fn sting_provider(&self, _scope: ExecutorScope) -> Option<Self::StingProvider> {
-        Some(CliStingProvider {})
+    fn sting_provider(&self, scope: ExecutorScope) -> Option<Self::StingProvider> {
+        let guild_id = match scope {
+            ExecutorScope::ThisGuild => self.guild_id?,
+            ExecutorScope::OwnerGuild => {
+                if let Some(owner_guild_id) = self.owner_guild_id {
+                    owner_guild_id
+                } else if let Some(guild_id) = self.guild_id {
+                    guild_id
+                } else {
+                    default_global_guild_id()
+                }
+            }
+        };
+
+        Some(CliStingProvider {
+            guild_id,
+            file_storage_provider: self.file_storage_provider.clone(),
+        })
     }
 
     fn page_provider(&self, _scope: ExecutorScope) -> Option<Self::PageProvider> {
         Some(CliPageProvider {})
     }
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-/// Represents a full record complete with metadata
-pub struct CliKvRecord {
-    pub key: String,
-    pub value: serde_json::Value,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 #[derive(Clone)]
@@ -159,88 +162,98 @@ pub struct CliKVProvider {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
 }
 
-impl CliKVProvider {
-    fn parse_key_to_fs_file(&self, key: String) -> String {
-        if key.contains(['/', '\\', '.']) || key.starts_with("b64") {
-            // Convert key to base64
-            format!(
-                "b64{}",
-                data_encoding::BASE64URL_NOPAD.encode(key.as_bytes())
-            )
-        } else {
-            key
-        }
-    }
-
-    fn parse_fs_file_to_key(&self, file: String) -> Result<String, khronos_runtime::Error> {
-        if file.starts_with("b64") {
-            // Convert base64 to key
-            data_encoding::BASE64URL_NOPAD
-                .decode(file.trim_start_matches("b64").as_bytes())
-                .map_err(|e| e.into())
-                .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-        } else {
-            Ok(file)
-        }
-    }
-}
-
 impl KVProvider for CliKVProvider {
     async fn get(
         &self,
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        let key = self.parse_key_to_fs_file(key);
-        let file_contents = self
+        let Some(file_contents) = self
             .file_storage_provider
-            .get_file(&["keys".to_string(), self.guild_id.to_string(), key])
+            .get_file(&["keys".to_string(), self.guild_id.to_string()], &key)
             .await
-            .map_err(|e| format!("Failed to get file: {}", e))?;
+            .map_err(|e| format!("Failed to get file: {}", e))?
+        else {
+            return Ok(None);
+        };
 
-        if file_contents.is_empty() {
-            Ok(None)
-        } else {
-            let record: CliKvRecord = serde_json::from_slice(&file_contents)
-                .map_err(|e| format!("Failed to parse record: {}", e))?;
+        let record: serde_json::Value = serde_json::from_slice(&file_contents.contents)
+            .map_err(|e| format!("Failed to parse record: {}", e))?;
 
-            Ok(Some(khronos_runtime::traits::ir::KvRecord {
-                key: record.key,
-                value: record.value,
-                created_at: record.created_at,
-                last_updated_at: record.last_updated_at,
-            }))
-        }
+        Ok(Some(khronos_runtime::traits::ir::KvRecord {
+            key: file_contents.name,
+            value: record,
+            created_at: Some(file_contents.created_at),
+            last_updated_at: Some(file_contents.last_updated_at),
+        }))
     }
 
     async fn set(
         &self,
-        _key: String,
-        _value: serde_json::Value,
+        key: String,
+        value: serde_json::Value,
     ) -> Result<(), khronos_runtime::Error> {
-        todo!()
+        let value = serde_json::to_string(&value)
+            .map_err(|e| format!("Failed to serialize value: {}", e))?;
+
+        self.file_storage_provider
+            .save_file(
+                &["keys".to_string(), self.guild_id.to_string()],
+                &key,
+                value.as_bytes(),
+            )
+            .await
     }
 
-    async fn delete(&self, _key: String) -> Result<(), khronos_runtime::Error> {
-        todo!()
+    async fn delete(&self, key: String) -> Result<(), khronos_runtime::Error> {
+        self.file_storage_provider
+            .delete_file(&["keys".to_string(), self.guild_id.to_string()], &key)
+            .await
     }
 
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
+        Ok(())
     }
 
     async fn find(
         &self,
-        _query: String,
+        query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        Ok(vec![])
+        let entries = self
+            .file_storage_provider
+            .list_files(
+                &["keys".to_string(), self.guild_id.to_string()],
+                Some(query),
+                None,
+            )
+            .await?;
+
+        let mut records = Vec::new();
+        for record in entries {
+            let value: serde_json::Value = serde_json::from_slice(&record.contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+            records.push(khronos_runtime::traits::ir::KvRecord {
+                key: record.name,
+                value,
+                created_at: Some(record.created_at),
+                last_updated_at: Some(record.last_updated_at),
+            });
+        }
+
+        Ok(records)
     }
 
-    async fn exists(&self, _key: String) -> Result<bool, khronos_runtime::Error> {
-        todo!()
+    async fn exists(&self, key: String) -> Result<bool, khronos_runtime::Error> {
+        self.file_storage_provider
+            .file_exists(&["keys".to_string(), self.guild_id.to_string()], &key)
+            .await
     }
 
     async fn keys(&self) -> Result<Vec<String>, khronos_runtime::Error> {
-        todo!()
+        self.file_storage_provider
+            .list_files(&["keys".to_string(), self.guild_id.to_string()], None, None)
+            .await
+            .map(|entries| entries.into_iter().map(|e| e.name).collect())
     }
 }
 
@@ -595,12 +608,16 @@ impl UserInfoProvider for CliUserInfoProvider {
     }
 }
 
+#[allow(dead_code)] // TODO: Implement
 #[derive(Clone)]
-pub struct CliStingProvider {}
+pub struct CliStingProvider {
+    pub guild_id: serenity::all::GuildId,
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
+}
 
 impl StingProvider for CliStingProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
+        Ok(())
     }
 
     async fn list(&self, _page: usize) -> Result<Vec<Sting>, khronos_runtime::Error> {
@@ -658,58 +675,5 @@ impl PageProvider for CliPageProvider {
 
     async fn delete_page(&self) -> Result<(), khronos_runtime::Error> {
         todo!()
-    }
-}
-
-#[allow(dead_code)]
-/// Returns true if the filename matches the pattern based on PostgreSQL ILIKE pattern matching rules
-fn does_file_match_pattern(filename: &str, pattern: &str) -> Result<bool, khronos_runtime::Error> {
-    // An underscore (_) in pattern stands for (matches) any single character; a percent sign (%) matches any sequence of zero or more characters.
-    let pattern = pattern.replace("_", ".").replace("%", ".*");
-    let regex = regex::Regex::new(&format!("(?i)^{}$", pattern))?;
-    Ok(regex.is_match(filename))
-}
-
-#[cfg(test)]
-mod file_pattern_matching_tests {
-    use super::does_file_match_pattern;
-
-    #[test]
-    fn test_does_file_match_pattern() {
-        assert!(
-            does_file_match_pattern("test", "test").unwrap(),
-            "test should match test"
-        );
-
-        // Postgres docs cases
-        assert!(
-            does_file_match_pattern("abc", "abc").unwrap(),
-            "abc should match abc"
-        );
-        assert!(
-            does_file_match_pattern("abc", "a%").unwrap(),
-            "abc should match a%"
-        );
-        assert!(
-            does_file_match_pattern("abc", "%a%").unwrap(),
-            "abc should match %a%"
-        );
-        assert!(
-            does_file_match_pattern("abcde", "%c%").unwrap(),
-            "abcde should match %c%"
-        );
-        assert!(
-            does_file_match_pattern("abc", "_b_").unwrap(),
-            "abc should match _b_"
-        );
-        assert!(
-            !does_file_match_pattern("abc", "c").unwrap(),
-            "abc should not match c"
-        );
-
-        assert!(
-            does_file_match_pattern("abc", "a_c").unwrap(),
-            "abc should match a_c"
-        );
     }
 }
