@@ -399,12 +399,12 @@ impl LuaUserData for Response {
     }
 }
 
-pub fn http_client_experiment(lua: &Lua) -> LuaResult<LuaTable> {
-    let http_client_exp = lua.create_table()?;
+pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
+    let http_client = lua.create_table()?;
 
     let client = reqwest::Client::new();
 
-    http_client_exp.set(
+    http_client.set(
         "new_request",
         lua.create_function(move |_lua, (method, url): (String, String)| {
             let url = reqwest::Url::parse(&url).map_err(mlua::Error::external)?;
@@ -416,5 +416,5 @@ pub fn http_client_experiment(lua: &Lua) -> LuaResult<LuaTable> {
         })?
     )?;
 
-    Ok(http_client_exp)
+    Ok(http_client)
 }

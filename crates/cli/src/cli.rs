@@ -16,6 +16,7 @@ use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler::XRc;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
+use std::cell::RefCell;
 use std::env::consts::OS;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -29,6 +30,7 @@ pub static PLUGIN_SET: LazyLock<PluginSet> = LazyLock::new(|| {
     plugins
 });
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum CliEntrypointAction {
     Repl {
         task_wait_mode: ReplTaskWaitMode,
@@ -42,7 +44,7 @@ pub enum CliEntrypointAction {
     },
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub enum ReplTaskWaitMode {
     /// No waiting. If you do a task.delay, you may need to explicitly do a task.wait to allow for the task to execute after delay
     None,
@@ -90,6 +92,18 @@ pub struct CliAuxOpts {
     pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
     pub experiments: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+/// Mutable cli extension state
+pub struct CliExtensionState {
+    pub requested_entrypoint: Option<CliEntrypointAction>,
+}
+
+impl CliExtensionState {
+    pub fn new() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::default()))
+    }
 }
 
 #[allow(dead_code)]
@@ -160,6 +174,9 @@ pub struct Cli {
 
     /// Setup data
     pub setup_data: LuaSetupResult,
+
+    /// CLI extension state
+    pub ext_state: Rc<RefCell<CliExtensionState>>,
 }
 
 impl Cli {
@@ -259,7 +276,10 @@ impl Cli {
         }
     }
 
-    pub async fn setup_lua_vm(aux_opts: CliAuxOpts) -> LuaSetupResult {
+    pub async fn setup_lua_vm(
+        aux_opts: CliAuxOpts,
+        ext_state: Rc<RefCell<CliExtensionState>>,
+    ) -> LuaSetupResult {
         let lua = Lua::new_with(LuaStdLib::ALL_SAFE, LuaOptions::default())
             .expect("Failed to create Lua");
 
@@ -337,7 +357,10 @@ impl Cli {
         };
 
         lua.globals()
-            .set("cli", Self::setup_cli_specific_table(&lua, &aux_opts))
+            .set(
+                "cli",
+                Self::setup_cli_specific_table(ext_state.clone(), &lua, &aux_opts),
+            )
             .expect("Failed to set cli global");
 
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
@@ -349,7 +372,11 @@ impl Cli {
         }
     }
 
-    fn setup_cli_specific_table(lua: &Lua, aux_opts: &CliAuxOpts) -> LuaTable {
+    fn setup_cli_specific_table(
+        ext_state: Rc<RefCell<CliExtensionState>>,
+        lua: &Lua,
+        aux_opts: &CliAuxOpts,
+    ) -> LuaTable {
         let cli_table = lua.create_table().expect("Failed to create cli table");
 
         // Load experiments
@@ -360,7 +387,7 @@ impl Cli {
             .set("exp", experiments_table)
             .expect("Failed to set experiments global");
 
-        crate::cli_extensions::load_extensions(lua, &cli_table)
+        crate::cli_extensions::load_extensions(ext_state, lua, &cli_table)
             .expect("Failed to load cli extensions");
 
         cli_table
@@ -386,12 +413,21 @@ impl Cli {
                         }
                     };
 
-                    let output = self
+                    let values = self
                         .spawn_script(&name, &contents)
                         .await
                         .expect("Failed to spawn script");
 
-                    println!("Output: {:?}", output);
+                    if !values.is_empty() {
+                        println!(
+                            "{}",
+                            values
+                                .iter()
+                                .map(|value| format!("{:#?}", value))
+                                .collect::<Vec<_>>()
+                                .join("\t")
+                        );
+                    }
 
                     self.setup_data
                         .task_mgr
@@ -514,12 +550,6 @@ impl Cli {
                 }
             },
         }
-
-        if self.verbose {
-            println!("Stopping task manager");
-        }
-
-        self.setup_data.task_mgr.stop();
     }
 
     /// Try calling a line, first as an expression with an added "return " before it

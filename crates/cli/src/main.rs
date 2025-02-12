@@ -406,8 +406,11 @@ impl CliArgs {
             }
         };
 
+        let ext_state = cli::CliExtensionState::new();
+
         (
             Cli {
+                ext_state: ext_state.clone(),
                 allowed_caps: {
                     if let Some(allowed_caps) = self.allowed_caps {
                         allowed_caps
@@ -433,7 +436,7 @@ impl CliArgs {
                     .as_ref()
                     .map(|token| Rc::new(serenity::all::Http::new(token))),
                 cached_khronos_rt_args: None,
-                setup_data: Cli::setup_lua_vm(aux_opts).await,
+                setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
                 file_storage_backend: match self.file_storage_backend {
                     #[cfg(feature = "sqlite")]
                     FileStorageBackend::SqliteInMemory => cli::FileStorageBackend::SqliteInMemory,
@@ -564,5 +567,19 @@ fn main() {
         let (mut cli, entrypoint_action) = cli_args.finalize().await;
 
         cli.entrypoint(entrypoint_action).await;
+
+        // Handle any requests to spawn new entrypoints
+        loop {
+            let next_endpoint_if_needed = {
+                let mut ext_state_guard = cli.ext_state.borrow_mut();
+                ext_state_guard.requested_entrypoint.take()
+            };
+
+            if let Some(next_endpoint) = next_endpoint_if_needed {
+                cli.entrypoint(next_endpoint).await;
+            } else {
+                break;
+            }
+        }
     });
 }

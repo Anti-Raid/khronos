@@ -1,9 +1,17 @@
-mod http;
+mod ext;
+mod http_client;
+
+use std::{cell::RefCell, rc::Rc};
 
 use mlua::prelude::*;
 
-pub fn load_extensions(lua: &Lua, cli_table: &LuaTable) -> LuaResult<()> {
-    cli_table.set("http_client", http::http_client_experiment(lua)?)?;
+pub fn load_extensions(
+    cli_ext_state: Rc<RefCell<crate::cli::CliExtensionState>>,
+    lua: &Lua,
+    cli_table: &LuaTable,
+) -> LuaResult<()> {
+    cli_table.set("http_client", http_client::http_client(lua)?)?;
+    cli_table.set("ext", ext::ext(cli_ext_state, lua)?)?;
 
     Ok(())
 }
