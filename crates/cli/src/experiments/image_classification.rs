@@ -80,5 +80,7 @@ pub fn image_classification_experiment(lua: &Lua) -> LuaResult<LuaTable> {
         )?,
     )?;
 
+    image_classification_exp.set_readonly(true);
+
     Ok(image_classification_exp)
 }

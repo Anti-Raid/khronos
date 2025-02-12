@@ -1,4 +1,5 @@
 mod cli;
+mod cli_extensions;
 mod constants;
 mod dispatch;
 mod experiments;

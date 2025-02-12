@@ -22,6 +22,7 @@ dirs = "6"
 regex = "1"
 data-encoding = "2"
 rusqlite = { version = "^0.32", features = ["bundled", "chrono"], optional = true }
+reqwest = "0.12"
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }

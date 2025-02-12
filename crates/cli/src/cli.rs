@@ -336,13 +336,9 @@ impl Cli {
             lua.globals()
         };
 
-        // Load experiments
-        let experiments_table =
-            load_experiments(&lua, &aux_opts.experiments).expect("Failed to load experiments");
-
         lua.globals()
-            .set("exp", experiments_table)
-            .expect("Failed to set experiments global");
+            .set("cli", Self::setup_cli_specific_table(&lua, &aux_opts))
+            .expect("Failed to set cli global");
 
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
@@ -351,6 +347,23 @@ impl Cli {
             global_tab,
             task_mgr,
         }
+    }
+
+    fn setup_cli_specific_table(lua: &Lua, aux_opts: &CliAuxOpts) -> LuaTable {
+        let cli_table = lua.create_table().expect("Failed to create cli table");
+
+        // Load experiments
+        let experiments_table =
+            load_experiments(lua, &aux_opts.experiments).expect("Failed to load experiments");
+
+        cli_table
+            .set("exp", experiments_table)
+            .expect("Failed to set experiments global");
+
+        crate::cli_extensions::load_extensions(lua, &cli_table)
+            .expect("Failed to load cli extensions");
+
+        cli_table
     }
 
     pub async fn entrypoint(&mut self, action: CliEntrypointAction) {
