@@ -1,6 +1,7 @@
 use axum::response::IntoResponse;
 use khronos_runtime::lua_promise;
 use khronos_runtime::plugins::antiraid::datetime::TimeDelta;
+use khronos_runtime::primitives::create_userdata_iterator_with_fields;
 use mlua::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -206,6 +207,24 @@ impl LuaUserData for ServerRequest {
 
         fields.add_field_method_get("body", |_lua, this| Ok(this.body.clone()));
     }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<ServerRequest>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "method", "url", "headers", "body",
+                    // Methods
+                ],
+            )
+        });
+    }
 }
 
 pub enum RoutedRequest {
@@ -218,6 +237,18 @@ pub enum RoutedRequest {
         callback: tokio::sync::oneshot::Sender<axum::http::Response<axum::body::Body>>,
     },
     StopServer {},
+}
+
+pub enum LuaServerResponseParsed {
+    Response {
+        resp: axum::http::Response<axum::body::Body>,
+    },
+}
+
+impl From<axum::http::Response<axum::body::Body>> for LuaServerResponseParsed {
+    fn from(resp: axum::http::Response<axum::body::Body>) -> Self {
+        LuaServerResponseParsed::Response { resp }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -315,14 +346,70 @@ impl Router {
                 }
 
                 // Start the server
-                crate::http_binder::start_rpc_server(bind, app.into_make_service(), startup_status_tx).await;
+                crate::http_binder::start_rpc_server(
+                    bind,
+                    app.into_make_service(),
+                    startup_status_tx,
+                )
+                .await;
             })
         });
 
-        startup_status_rx.await?
+        startup_status_rx
+            .await?
             .map_err(|e| format!("failed to spawn server: {}", e))?;
 
         Ok(rx)
+    }
+
+    fn parse_lua_thread_response(
+        output: LuaResult<Option<LuaResult<LuaMultiValue>>>,
+    ) -> LuaServerResponseParsed {
+        match output {
+            Ok(Some(result)) => match result {
+                Ok(output) => Self::parse_mv_response(output),
+                Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                    .into_response()
+                    .into(),
+            },
+            Ok(None) => (axum::http::StatusCode::NO_CONTENT, "")
+                .into_response()
+                .into(),
+            Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                .into_response()
+                .into(),
+        }
+    }
+
+    fn parse_mv_response(output: LuaMultiValue) -> LuaServerResponseParsed {
+        let Some(response) = output.front() else {
+            return (axum::http::StatusCode::NO_CONTENT, "")
+                .into_response()
+                .into();
+        };
+
+        match response {
+            LuaValue::UserData(ud) => {
+                if let Ok(response) = ud.take::<ServerResponse>() {
+                    (response.status, response.headers, response.body)
+                        .into_response()
+                        .into()
+                } else {
+                    (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "Invalid response from upstream!",
+                    )
+                        .into_response()
+                        .into()
+                }
+            }
+            LuaValue::String(s) => (axum::http::StatusCode::OK, s.to_string_lossy())
+                .into_response()
+                .into(),
+            r => (axum::http::StatusCode::OK, format!("{:?}", r))
+                .into_response()
+                .into(),
+        }
     }
 }
 
@@ -338,20 +425,9 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "route",
-            |_lua,this,
-             (method, pattern, th): (
-                Method,
-                String,
-                LuaFunction,
-            )| {
+            |_lua, this, (method, pattern, th): (Method, String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
-                routes.insert(
-                    (
-                        method,
-                        pattern,
-                    ),
-                    th,
-                );
+                routes.insert((method, pattern), th);
 
                 Ok(())
             },
@@ -370,15 +446,12 @@ impl LuaUserData for Router {
             },
         );
 
-        methods.add_method(
-            "get",
-            |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                let mut routes = this.routes.borrow_mut();
-                routes.insert((Method::GET, pattern), tx);
+        methods.add_method("get", |_lua, this, (pattern, tx): (String, LuaFunction)| {
+            let mut routes = this.routes.borrow_mut();
+            routes.insert((Method::GET, pattern), tx);
 
-                Ok(())
-            },
-        );
+            Ok(())
+        });
 
         methods.add_method(
             "post",
@@ -390,15 +463,12 @@ impl LuaUserData for Router {
             },
         );
 
-        methods.add_method(
-            "put",
-            |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                let mut routes = this.routes.borrow_mut();
-                routes.insert((Method::PUT, pattern), tx);
+        methods.add_method("put", |_lua, this, (pattern, tx): (String, LuaFunction)| {
+            let mut routes = this.routes.borrow_mut();
+            routes.insert((Method::PUT, pattern), tx);
 
-                Ok(())
-            },
-        );
+            Ok(())
+        });
 
         methods.add_method(
             "patch",
@@ -478,7 +548,7 @@ impl LuaUserData for Router {
                         bind: crate::http_binder::CreateRpcServerBind::Address(
                             format!("{}:{}", this.bind_addr.0, this.bind_addr.1),
                         ),
-                    },    
+                    },
                 )
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
@@ -532,89 +602,11 @@ impl LuaUserData for Router {
                                     .await;
 
                                     // Output must be a ServerResponse struct
+                                    let parsed_output = Self::parse_lua_thread_response(output);
 
-                                    match output {
-                                        Ok(Some(result)) => {
-                                            match result {
-                                                Ok(response) => {
-                                                    match response.front() {
-                                                        Some(LuaValue::UserData(ud)) => {
-                                                            if let Ok(response) = ud.take::<ServerResponse>() {
-                                                                let _ = callback.send(
-                                                                    (
-                                                                        response.status,
-                                                                        response.headers,
-                                                                        response.body,
-                                                                    )
-                                                                        .into_response(),
-                                                                );    
-                                                            } else {
-                                                                let _ = callback.send(
-                                                                    (
-                                                                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                                                        "Invalid response from upstream!",
-                                                                    )
-                                                                        .into_response(),
-                                                                );
-                                                            }
-                                                        }
-                                                        Some(LuaValue::String(s)) => {
-                                                            let _ = callback.send(
-                                                                (
-                                                                    axum::http::StatusCode::OK,
-                                                                    s.to_string_lossy(),
-                                                                )
-                                                                    .into_response(),
-                                                            );
-                                                        }
-                                                        Some(r) => {
-                                                            let _ = callback.send(
-                                                                (
-                                                                    axum::http::StatusCode::OK,
-                                                                    format!("{:?}", r),
-                                                                )
-                                                                    .into_response(),
-                                                            );
-                                                        }
-                                                        None => {
-                                                            let _ = callback.send(
-                                                                (
-                                                                    axum::http::StatusCode::NO_CONTENT,
-                                                                    "",
-                                                                )
-                                                                    .into_response(),
-                                                            );
-                                                        }
-                                                    }
-                                                },
-                                                Err(e) => {
-                                                    let _ = callback.send(
-                                                        (
-                                                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                                            e.to_string(),
-                                                        )
-                                                            .into_response(),
-                                                    );
-                                                }
-                                            }
-                                        },
-                                        Ok(None) => {
-                                            let _ = callback.send(
-                                                (
-                                                    axum::http::StatusCode::NO_CONTENT,
-                                                    ""
-                                                )
-                                                .into_response()
-                                            );
-                                        },
-                                        Err(e) => {
-                                            let _ = callback.send(
-                                                (
-                                                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                                    e.to_string(),
-                                                )
-                                                    .into_response(),
-                                            );
+                                    match parsed_output {
+                                        LuaServerResponseParsed::Response { resp } => {
+                                            let _ = callback.send(resp);
                                         }
                                     }
                                 });
@@ -631,7 +623,7 @@ impl LuaUserData for Router {
                         RoutedRequest::StopServer {} => break,
                     }
                 }
-                
+
                 Ok(())
             }))
         });
