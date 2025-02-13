@@ -437,7 +437,15 @@ impl Cli {
                                                     serde_json::json!({})
                                                 ).expect("Failed to parse bundle require mode")
                                             )
-                                        )),
+                                        ))
+                                        .with_generator(darklua_core::GeneratorParameters::default_readable())
+                                        .with_location(path.clone())
+                                        .with_rule(
+                                            {
+                                                let rule: Box<dyn darklua_core::rules::Rule> = Box::new(darklua_core::rules::RemoveTypes::default());
+                                                rule
+                                            }
+                                        ),
                                     ),
                             )
                             .expect("Failed to bundle directory");
