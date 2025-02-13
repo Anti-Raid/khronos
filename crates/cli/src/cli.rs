@@ -413,10 +413,13 @@ impl Cli {
                         }
                     };
 
-                    let values = self
-                        .spawn_script(&name, &contents)
-                        .await
-                        .expect("Failed to spawn script");
+                    let values = match self.spawn_script(&name, &contents).await {
+                        Ok(values) => values,
+                        Err(e) => {
+                            eprintln!("error: {}", e);
+                            continue;
+                        }
+                    };
 
                     if !values.is_empty() {
                         println!(

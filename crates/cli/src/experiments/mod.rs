@@ -46,5 +46,7 @@ pub fn load_experiments(lua: &Lua, experiments: &[String]) -> LuaResult<LuaTable
         }
     }
 
+    experiments_table.set_readonly(true);
+
     Ok(experiments_table)
 }

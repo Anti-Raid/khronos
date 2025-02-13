@@ -11,11 +11,11 @@ pub struct Url {
 impl LuaUserData for Url {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("host", |_, this| {
-            Ok(this.url.host_str().unwrap().to_string())
+            Ok(this.url.host_str().map(|h| h.to_string()))
         });
 
         fields.add_field_method_get("port", |_, this| {
-            Ok(this.url.port().unwrap_or(80).to_string())
+            Ok(this.url.port())
         });
 
         fields.add_field_method_get("scheme", |_, this| Ok(this.url.scheme().to_string()));
@@ -23,7 +23,7 @@ impl LuaUserData for Url {
         fields.add_field_method_get("path", |_, this| Ok(this.url.path().to_string()));
 
         fields.add_field_method_get("query", |_, this| {
-            Ok(this.url.query().map(|q| q.to_string()).unwrap_or_default())
+            Ok(this.url.query().map(|q| q.to_string()))
         });
     }
 
@@ -415,6 +415,8 @@ pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
             })
         })?
     )?;
+
+    http_client.set_readonly(true);
 
     Ok(http_client)
 }

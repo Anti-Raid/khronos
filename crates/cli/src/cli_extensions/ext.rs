@@ -55,5 +55,7 @@ pub fn ext(
         })?,
     )?;
 
+    ext.set_readonly(true);
+
     Ok(ext)
 }
