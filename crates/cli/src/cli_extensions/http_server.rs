@@ -262,6 +262,8 @@ impl LuaUserData for ServerRequestBody {
 
 pub struct ServerRequest {
     pub route_method: Method,
+    pub path:
+        Result<axum::extract::RawPathParams, axum::extract::rejection::RawPathParamsRejection>,
     pub parts: axum::http::request::Parts,
     pub body: ServerRequestBody,
 }
@@ -281,22 +283,16 @@ impl LuaUserData for ServerRequest {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_function("path", |_lua, ud: LuaAnyUserData| {
-            Ok(lua_promise!(ud, |lua, ud|, {
-                let mut sr = ud.borrow_mut::<ServerRequest>()?;
-
-                let path_params =
-                axum::extract::RawPathParams::from_request_parts(&mut sr.parts, &())
-                .await
-                .map_err(|e| mlua::Error::external(e.to_string()))?;
-
+        methods.add_method("path", |lua, this, _g: ()| match &this.path {
+            Ok(ref path) => {
                 let tab = lua.create_table()?;
-                for (key, value) in path_params.into_iter() {
+                for (key, value) in path.iter() {
                     tab.set(key, value)?;
                 }
 
                 Ok(tab)
-            }))
+            }
+            Err(e) => Err(LuaError::external(e.to_string())),
         });
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<ServerRequest>() {
@@ -320,6 +316,8 @@ pub enum RoutedRequest {
     Request {
         method: Method,
         parts: axum::http::request::Parts,
+        path_params:
+            Result<axum::extract::RawPathParams, axum::extract::rejection::RawPathParamsRejection>,
         matched_pattern: String,
         body: axum::body::Body,
         callback: tokio::sync::oneshot::Sender<axum::http::Response<axum::body::Body>>,
@@ -373,14 +371,19 @@ impl Router {
                     let pattern = pattern_outer.clone();
 
                     let route_wrapper = move |req: axum::extract::Request| {
-                        let (parts, body) = req.into_parts();
+                        let (mut parts, body) = req.into_parts();
 
                         async move {
+                            let path_params =
+                                axum::extract::RawPathParams::from_request_parts(&mut parts, &())
+                                    .await;
+
                             let (callback_tx, callback_rx) = tokio::sync::oneshot::channel();
 
                             let _ = tx.send(RoutedRequest::Request {
                                 method,
                                 parts,
+                                path_params,
                                 matched_pattern: pattern,
                                 body,
                                 callback: callback_tx,
@@ -782,6 +785,7 @@ impl LuaUserData for Router {
                         RoutedRequest::Request {
                             method,
                             parts,
+                            path_params,
                             matched_pattern,
                             body,
                             callback,
@@ -793,14 +797,6 @@ impl LuaUserData for Router {
                             };
 
                             if let Some(th) = th {
-                                let request = ServerRequest {
-                                    route_method: method,
-                                    parts,
-                                    body: ServerRequestBody {
-                                        body: Rc::new(RefCell::new(Some(body))),
-                                    },
-                                }.into_lua_multi(&lua)?;
-
                                 let th = match lua.create_thread(th) {
                                     Ok(th) => th,
                                     Err(e) => {
@@ -813,6 +809,24 @@ impl LuaUserData for Router {
                                         );
                                         continue;
                                     }
+                                };
+
+                                let Ok(request) = ServerRequest {
+                                    route_method: method,
+                                    parts,
+                                    path: path_params,
+                                    body: ServerRequestBody {
+                                        body: Rc::new(RefCell::new(Some(body))),
+                                    },
+                                }.into_lua_multi(&lua) else {
+                                    let _ = callback.send(
+                                        (
+                                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                            "Failed to create request object",
+                                        )
+                                            .into_response(),
+                                    );
+                                    continue;
                                 };
 
                                 let taskmgr = taskmgr.clone();
