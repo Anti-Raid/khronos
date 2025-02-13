@@ -26,6 +26,16 @@ router:get("/", function(req)
     return "Hello, world! " .. tostring(i)
 end)
 
+router:get("/echo/{statement}", function(req)
+    local ok, params = pcall(pyield, req:path())
+    if not ok then
+        return httpserver.jsonresponse(400, {
+            error = "Invalid path"
+        })
+    end
+    return "Echo: " .. tostring(params.statement)
+end)
+
 router:post("/get", function(req)
     local ok, json = pcall(pyield, req.body:json())
 

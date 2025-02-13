@@ -1,3 +1,4 @@
+use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
 use khronos_runtime::lua_promise;
 use khronos_runtime::plugins::antiraid::datetime::TimeDelta;
@@ -5,14 +6,16 @@ use khronos_runtime::primitives::create_userdata_iterator_with_fields;
 use mlua::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::rc::Rc;
 use std::time::Duration;
 
 use super::http_client::Headers;
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Method {
+    ANY,
     GET,
     POST,
     PUT,
@@ -31,6 +34,7 @@ impl FromLua for Method {
                 let s = s.to_str()?;
 
                 match s.as_ref() {
+                    "ANY" | "*" => Ok(Method::ANY),
                     "GET" => Ok(Method::GET),
                     "POST" => Ok(Method::POST),
                     "PUT" => Ok(Method::PUT),
@@ -51,6 +55,7 @@ impl FromLua for Method {
 impl IntoLua for Method {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let s = match self {
+            Method::ANY => "ANY",
             Method::GET => "GET",
             Method::POST => "POST",
             Method::PUT => "PUT",
@@ -131,6 +136,47 @@ impl LuaUserData for ServerResponse {
                 Ok(())
             },
         );
+
+        fields.add_field_method_get("version", |_lua, this| {
+            Ok(match this.response.version() {
+                axum::http::Version::HTTP_09 => "HTTP/0.9",
+                axum::http::Version::HTTP_10 => "HTTP/1.0",
+                axum::http::Version::HTTP_11 => "HTTP/1.1",
+                axum::http::Version::HTTP_2 => "HTTP/2",
+                axum::http::Version::HTTP_3 => "HTTP/3",
+                _ => "Unknown",
+            })
+        });
+
+        fields.add_field_method_set("version", |_lua, this, version: String| {
+            *this.response.version_mut() = match version.as_str() {
+                "HTTP/0.9" => axum::http::Version::HTTP_09,
+                "HTTP/1.0" => axum::http::Version::HTTP_10,
+                "HTTP/1.1" => axum::http::Version::HTTP_11,
+                "HTTP/2" => axum::http::Version::HTTP_2,
+                "HTTP/3" => axum::http::Version::HTTP_3,
+                _ => return Err(LuaError::external("Invalid version")),
+            };
+            Ok(())
+        });
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<ServerResponse>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "status", "headers", "body", "version",
+                    // Methods
+                ],
+            )
+        });
     }
 }
 
@@ -195,23 +241,39 @@ impl LuaUserData for ServerRequestBody {
                 lua.to_value(&json)
             }))
         });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<ServerRequestBody>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    // Methods
+                    "bytes", "tobuffer", "json",
+                ],
+            )
+        });
     }
 }
 
 pub struct ServerRequest {
-    pub method: Method,
-    pub url: axum::http::uri::Uri,
-    pub headers: axum::http::header::HeaderMap,
+    pub route_method: Method,
+    pub parts: axum::http::request::Parts,
     pub body: ServerRequestBody,
 }
 
 impl LuaUserData for ServerRequest {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("method", |_lua, this| Ok(this.method));
-        fields.add_field_method_get("url", |_lua, this| Ok(this.url.to_string()));
+        fields.add_field_method_get("route_method", |_lua, this| Ok(this.route_method));
+        fields.add_field_method_get("method", |_lua, this| Ok(this.parts.method.to_string()));
+        fields.add_field_method_get("url", |_lua, this| Ok(this.parts.uri.to_string()));
         fields.add_field_method_get("headers", |_lua, this| {
             Ok(Headers {
-                headers: this.headers.clone(),
+                headers: this.parts.headers.clone(),
             })
         });
 
@@ -219,6 +281,23 @@ impl LuaUserData for ServerRequest {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_function("path", |_lua, ud: LuaAnyUserData| {
+            Ok(lua_promise!(ud, |lua, ud|, {
+                let mut sr = ud.borrow_mut::<ServerRequest>()?;
+
+                let path_params =
+                axum::extract::RawPathParams::from_request_parts(&mut sr.parts, &())
+                .await
+                .map_err(|e| mlua::Error::external(e.to_string()))?;
+
+                let tab = lua.create_table()?;
+                for (key, value) in path_params.into_iter() {
+                    tab.set(key, value)?;
+                }
+
+                Ok(tab)
+            }))
+        });
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<ServerRequest>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
@@ -240,9 +319,8 @@ impl LuaUserData for ServerRequest {
 pub enum RoutedRequest {
     Request {
         method: Method,
-        url: axum::http::uri::Uri,
+        parts: axum::http::request::Parts,
         matched_pattern: String,
-        headers: axum::http::header::HeaderMap,
         body: axum::body::Body,
         callback: tokio::sync::oneshot::Sender<axum::http::Response<axum::body::Body>>,
     },
@@ -302,9 +380,8 @@ impl Router {
 
                             let _ = tx.send(RoutedRequest::Request {
                                 method,
-                                url: parts.uri,
+                                parts,
                                 matched_pattern: pattern,
-                                headers: parts.headers,
                                 body,
                                 callback: callback_tx,
                             });
@@ -326,6 +403,9 @@ impl Router {
                     };
 
                     match method {
+                        Method::ANY => {
+                            app = app.route(&pattern_outer, axum::routing::any(route_wrapper))
+                        }
                         Method::GET => {
                             app = app.route(&pattern_outer, axum::routing::get(route_wrapper))
                         }
@@ -427,6 +507,26 @@ impl Router {
 }
 
 impl LuaUserData for Router {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("routes", |lua, this| {
+            let routes: Vec<_> = this
+                .routes
+                .borrow()
+                .iter()
+                .map(|((method, pattern), _th)| {
+                    let duration = this
+                        .route_timeouts
+                        .get(&(*method, pattern.clone()))
+                        .copied()
+                        .unwrap_or_else(|| Duration::from_secs(30));
+                    (*method, pattern.clone(), duration)
+                })
+                .collect();
+
+            lua.to_value(&routes)
+        });
+    }
+
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut(
             "set_bind_addr",
@@ -475,6 +575,19 @@ impl LuaUserData for Router {
                 Ok(())
             },
         );
+
+        methods.add_method("any", |_lua, this, (pattern, tx): (String, LuaFunction)| {
+            if this.stop.is_some() {
+                return Err(LuaError::external(
+                    "Cannot add/change routes while server is running. Stop the server first.",
+                ));
+            }
+
+            let mut routes = this.routes.borrow_mut();
+            routes.insert((Method::ANY, pattern), tx);
+
+            Ok(())
+        });
 
         methods.add_method("get", |_lua, this, (pattern, tx): (String, LuaFunction)| {
             if this.stop.is_some() {
@@ -668,9 +781,8 @@ impl LuaUserData for Router {
                     match req {
                         RoutedRequest::Request {
                             method,
-                            url,
+                            parts,
                             matched_pattern,
-                            headers,
                             body,
                             callback,
                         } => {
@@ -682,9 +794,8 @@ impl LuaUserData for Router {
 
                             if let Some(th) = th {
                                 let request = ServerRequest {
-                                    method,
-                                    url,
-                                    headers,
+                                    route_method: method,
+                                    parts,
                                     body: ServerRequestBody {
                                         body: Rc::new(RefCell::new(Some(body))),
                                     },
@@ -736,6 +847,39 @@ impl LuaUserData for Router {
                 this.stop = None;
                 Ok(())
             }))
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<Router>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "routes",
+                    // Methods
+                    "set_bind_addr",
+                    "route",
+                    "timeout",
+                    "any",
+                    "get",
+                    "post",
+                    "put",
+                    "patch",
+                    "delete",
+                    "options",
+                    "head",
+                    "trace",
+                    "connect",
+                    "clone",
+                    "stop",
+                    "is_running",
+                    "serve",
+                ],
+            )
         });
     }
 }
