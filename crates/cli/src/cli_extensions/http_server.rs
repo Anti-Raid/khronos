@@ -765,6 +765,49 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     http_server.set(
+        "headers",
+        lua.create_function(|_lua, tab: LuaTable| {
+            let mut header_map = axum::http::header::HeaderMap::new();
+            for key in tab.pairs::<LuaString, LuaEither<LuaString, Vec<LuaString>>>() {
+                let (key, value) = key?;
+
+                let key = axum::http::header::HeaderName::from_bytes(&key.as_bytes())
+                    .map_err(LuaError::external)?;
+                match value {
+                    LuaEither::Left(value) => {
+                        header_map.insert(
+                            key,
+                            axum::http::header::HeaderValue::from_bytes(&value.as_bytes())
+                                .map_err(LuaError::external)?,
+                        );
+                    }
+                    LuaEither::Right(value) => {
+                        if let Some(first) = value.first() {
+                            header_map.insert(
+                                &key,
+                                axum::http::header::HeaderValue::from_bytes(&first.as_bytes())
+                                    .map_err(LuaError::external)?,
+                            );
+
+                            for v in value.iter().skip(1) {
+                                header_map.append(
+                                    &key,
+                                    axum::http::header::HeaderValue::from_bytes(&v.as_bytes())
+                                        .map_err(LuaError::external)?,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            Ok(Headers {
+                headers: header_map,
+            })
+        })?,
+    )?;
+
+    http_server.set(
         "jsonresponse",
         lua.create_function(
             |lua, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<Headers>>)| {

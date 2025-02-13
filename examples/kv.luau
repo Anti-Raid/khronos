@@ -59,13 +59,17 @@ router:post("/set", function(req)
     if not json.key then
         return httpserver.jsonresponse(400, {
             error = "Missing `key` field"
-        })
+        }, httpserver.headers({
+            ["X-Missing-Field"] = "key"
+        }))
     end
 
     if not json.value then
         return httpserver.jsonresponse(400, {
             error = "Missing `value` field"
-        })
+        }, httpserver.headers({
+            ["X-Missing-Field"] = "value"
+        }))
     end
 
     local value = pyield(kvexecutor:set(json.key, json.value))
