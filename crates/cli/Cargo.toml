@@ -28,6 +28,9 @@ hyper = "1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tower-service = "0.3"
 
+# Bundling 
+darklua = { git = "https://github.com/Anti-Raid/darklua" }
+
 # Antiraid
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }

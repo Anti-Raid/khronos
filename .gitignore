@@ -3,3 +3,5 @@
 *.safetensors
 *.bin
 /test_files
+bundled.luau
+**/bundled.luau

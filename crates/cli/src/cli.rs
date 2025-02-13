@@ -401,6 +401,55 @@ impl Cli {
                 }
 
                 for path in &scripts {
+                    let path = if path.is_dir() {
+                        // First, check for a bundled.luau file inside the directory
+                        let bundled_path = path.join("bundled.luau");
+                        if bundled_path
+                            .try_exists()
+                            .expect("Failed to look for bundled.luau")
+                        {
+                            bundled_path
+                        } else {
+                            // Look for an init.luau to bundle using darklua
+                            let init_path = path.join("init.luau");
+
+                            if !init_path
+                                .try_exists()
+                                .expect("Failed to look for init.luau")
+                            {
+                                eprintln!("Failed to find init.luau in directory: {:?}", path);
+                                continue;
+                            }
+
+                            // Bundle the directory
+                            println!("Bundling directory: {:?}", path);
+
+                            let resources = darklua_core::Resources::from_file_system();
+                            darklua_core::process(
+                                &resources,
+                                darklua_core::Options::new(init_path.clone())
+                                    .with_output(&bundled_path)
+                                    .with_configuration(
+                                        darklua_core::Configuration::default()
+                                        .with_bundle_configuration(darklua_core::BundleConfiguration::new(
+                                            darklua_core::rules::bundle::BundleRequireMode::Path(
+                                                serde_json::from_value(
+                                                    serde_json::json!({})
+                                                ).expect("Failed to parse bundle require mode")
+                                            )
+                                        )),
+                                    ),
+                            )
+                            .expect("Failed to bundle directory");
+
+                            bundled_path.to_path_buf()
+                        }
+                    } else {
+                        path.to_path_buf()
+                    };
+
+                    let path = &path;
+
                     let name = match fs::canonicalize(path).await {
                         Ok(p) => p.to_string_lossy().to_string(),
                         Err(_) => path.to_string_lossy().to_string(),
