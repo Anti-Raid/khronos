@@ -95,32 +95,42 @@ impl LuaUserData for ServerUrl {
 }
 
 pub struct ServerResponse {
-    pub status: axum::http::StatusCode,
-    pub headers: axum::http::header::HeaderMap,
-    pub body: Vec<u8>,
+    pub response: axum::http::Response<axum::body::Body>,
 }
 
 impl LuaUserData for ServerResponse {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("status", |_lua, this| Ok(this.status.as_u16()));
+        fields.add_field_method_get("status", |_lua, this| Ok(this.response.status().as_u16()));
 
         fields.add_field_method_set("status", |_lua, this, status: u16| {
-            this.status = axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?;
+            *this.response.status_mut() =
+                axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?;
             Ok(())
         });
 
         fields.add_field_method_get("headers", |_lua, this| {
             Ok(Headers {
-                headers: this.headers.clone(),
+                headers: this.response.headers().clone(),
             })
         });
 
         fields.add_field_method_set("headers", |_lua, this, headers: LuaUserDataRef<Headers>| {
-            this.headers = headers.headers.clone();
+            *this.response.headers_mut() = headers.headers.clone();
             Ok(())
         });
 
-        fields.add_field_method_get("body", |_lua, this| Ok(this.body.clone()));
+        fields.add_field_method_set(
+            "body",
+            |_lua, this, body: LuaUserDataRef<ServerRequestBody>| {
+                let mut body_guard = body.body.borrow_mut();
+                let Some(body) = body_guard.take() else {
+                    return Err(LuaError::external("Body has been exhausted"));
+                };
+
+                *this.response.body_mut() = body;
+                Ok(())
+            },
+        );
     }
 }
 
@@ -396,9 +406,7 @@ impl Router {
         match response {
             LuaValue::UserData(ud) => {
                 if let Ok(response) = ud.take::<ServerResponse>() {
-                    (response.status, response.headers, response.body)
-                        .into_response()
-                        .into()
+                    response.response.into()
                 } else {
                     (
                         axum::http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -411,7 +419,7 @@ impl Router {
             LuaValue::String(s) => (axum::http::StatusCode::OK, s.to_string_lossy())
                 .into_response()
                 .into(),
-            r => (axum::http::StatusCode::OK, format!("{:?}", r))
+            r => (axum::http::StatusCode::OK, format!("{:#?}", r))
                 .into_response()
                 .into(),
         }
@@ -757,14 +765,52 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     http_server.set(
-        "new_response",
+        "jsonresponse",
         lua.create_function(
-            |_, (status, headers, body): (u16, Option<LuaUserDataRef<Headers>>, Vec<u8>)| {
-                Ok(ServerResponse {
-                    status: axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
-                    headers: headers.map(|h| h.headers.clone()).unwrap_or_default(),
+            |lua, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<Headers>>)| {
+                let resp = (
+                    axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
+                    headers.map(|h| h.headers.clone()).unwrap_or_default(),
+                    axum::Json(lua.from_value::<serde_json::Value>(body)?),
+                )
+                    .into_response();
+
+                Ok(ServerResponse { response: resp })
+            },
+        )?,
+    )?;
+
+    http_server.set(
+        "fmtresponse",
+        lua.create_function(
+            |_, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<Headers>>)| {
+                let resp = (
+                    axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
+                    headers.map(|h| h.headers.clone()).unwrap_or_default(),
+                    match body {
+                        LuaValue::String(s) => s.to_str()?.to_string(),
+                        _ => format!("{:#?}", body),
+                    },
+                )
+                    .into_response();
+
+                Ok(ServerResponse { response: resp })
+            },
+        )?,
+    )?;
+
+    http_server.set(
+        "response",
+        lua.create_function(
+            |_, (status, body, headers): (u16, Vec<u8>, Option<LuaUserDataRef<Headers>>)| {
+                let resp = (
+                    axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
+                    headers.map(|h| h.headers.clone()).unwrap_or_default(),
                     body,
-                })
+                )
+                    .into_response();
+
+                Ok(ServerResponse { response: resp })
             },
         )?,
     )?;

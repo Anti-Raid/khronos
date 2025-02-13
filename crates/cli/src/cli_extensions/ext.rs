@@ -55,6 +55,11 @@ pub fn ext(
         })?,
     )?;
 
+    ext.set(
+        "format_value",
+        lua.create_function(|_, body: LuaValue| Ok(format!("{:#?}", body).into_bytes()))?,
+    )?;
+
     ext.set_readonly(true);
 
     Ok(ext)
