@@ -1003,11 +1003,19 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     http_server.set(
         "response",
         lua.create_function(
-            |_, (status, body, headers): (u16, Vec<u8>, Option<LuaUserDataRef<Headers>>)| {
+            |_,
+             (status, body, headers): (
+                u16,
+                LuaEither<Vec<u8>, mlua::Buffer>,
+                Option<LuaUserDataRef<Headers>>,
+            )| {
                 let resp = (
                     axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
                     headers.map(|h| h.headers.clone()).unwrap_or_default(),
-                    body,
+                    match body {
+                        LuaEither::Left(bytes) => bytes,
+                        LuaEither::Right(buffer) => buffer.to_vec(),
+                    },
                 )
                     .into_response();
 

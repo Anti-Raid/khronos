@@ -164,6 +164,10 @@ impl LuaUserData for Request {
                     let body = reqwest::Body::from(body);
                     *req_guard.body_mut() = Some(body);
                 }
+                LuaValue::Buffer(b) => {
+                    let body = reqwest::Body::from(b.to_vec());
+                    *req_guard.body_mut() = Some(body);
+                }
                 _ => {
                     return Err(mlua::Error::external("Invalid body type"));
                 }
