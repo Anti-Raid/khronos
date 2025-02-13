@@ -33,5 +33,9 @@ print("Server started on " .. addr .. ":" .. port)
 
 while true do 
     task.wait(1)
+    if not router:is_running() then
+        task.wait(1)
+        break
+    end
     print("hi")
 end
