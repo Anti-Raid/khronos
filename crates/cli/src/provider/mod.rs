@@ -81,7 +81,13 @@ impl KhronosContext for CliKhronosContext {
 
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
         let guild_id = match scope {
-            ExecutorScope::ThisGuild => self.guild_id?,
+            ExecutorScope::ThisGuild => {
+                if let Some(guild_id) = self.guild_id {
+                    guild_id
+                } else {
+                    default_global_guild_id()
+                }
+            }
             ExecutorScope::OwnerGuild => {
                 if let Some(owner_guild_id) = self.owner_guild_id {
                     owner_guild_id

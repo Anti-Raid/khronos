@@ -237,7 +237,17 @@ impl FileStorageProvider for LocalFileStorageProvider {
         path.extend(file_path.iter());
         path.push(Self::parse_key_to_fs_file(key));
 
-        let metadata = tokio::fs::metadata(&path).await?;
+        let metadata = match tokio::fs::metadata(&path).await {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                // Check if e is a not found error
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    return Ok(None);
+                }
+
+                return Err(e.into());
+            }
+        };
         if !metadata.is_file() {
             return Ok(None);
         }
@@ -269,6 +279,10 @@ impl FileStorageProvider for LocalFileStorageProvider {
 
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
+        // Create dir if it doesn't exist
+        tokio::fs::create_dir_all(&path).await?;
+
         path.push(Self::parse_key_to_fs_file(key));
 
         tokio::fs::write(path, data).await.map_err(Error::from)
@@ -286,6 +300,10 @@ impl FileStorageProvider for LocalFileStorageProvider {
 
         let mut path = self.base_path.clone();
         path.extend(file_path.iter());
+
+        // Create dir if it doesn't exist
+        tokio::fs::create_dir_all(&path).await?;
+
         path.push(Self::parse_key_to_fs_file(key));
 
         tokio::fs::remove_file(path).await.map_err(Error::from)
