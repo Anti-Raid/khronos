@@ -28,6 +28,7 @@ pub async fn start_rpc_server(
     opts: CreateRpcServerOptions,
     mut make_service: axum::routing::IntoMakeService<Router>,
     done_start: tokio::sync::oneshot::Sender<Result<(), String>>,
+    mut stop_chan: tokio::sync::watch::Receiver<()>,
 ) {
     match opts.bind {
         CreateRpcServerBind::Address(addr) => {
@@ -43,31 +44,38 @@ pub async fn start_rpc_server(
             let _ = done_start.send(Ok(()));
 
             loop {
-                let (socket, _remote_addr) = match listener.accept().await {
-                    Ok(ok) => ok,
-                    Err(err) => {
-                        eprintln!("failed to accept connection: {err:#}");
-                        continue;
-                    }
-                };
+                tokio::select! {
+                    recv = listener.accept() => {
+                        let (socket, _remote_addr) = match recv {
+                            Ok(ok) => ok,
+                            Err(err) => {
+                                eprintln!("failed to accept connection: {err:#}");
+                                continue;
+                            }
+                        };
 
-                let tower_service = unwrap_infallible(make_service.call(&socket).await);
+                        let tower_service = unwrap_infallible(make_service.call(&socket).await);
 
-                tokio::spawn(async move {
-                    let socket = TokioIo::new(socket);
+                        tokio::spawn(async move {
+                            let socket = TokioIo::new(socket);
 
-                    let hyper_service =
-                        hyper::service::service_fn(move |request: Request<Incoming>| {
-                            tower_service.clone().call(request)
+                            let hyper_service =
+                                hyper::service::service_fn(move |request: Request<Incoming>| {
+                                    tower_service.clone().call(request)
+                                });
+
+                            if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
+                                .serve_connection_with_upgrades(socket, hyper_service)
+                                .await
+                            {
+                                eprintln!("Failed to serve connection: {err:#}");
+                            }
                         });
-
-                    if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
-                        .serve_connection_with_upgrades(socket, hyper_service)
-                        .await
-                    {
-                        eprintln!("Failed to serve connection: {err:#}");
+                    },
+                    _ = stop_chan.changed() => {
+                        break;
                     }
-                });
+                }
             }
         }
         #[cfg(unix)]
@@ -97,31 +105,38 @@ pub async fn start_rpc_server(
             };
 
             loop {
-                let (socket, _remote_addr) = match uds.accept().await {
-                    Ok(ok) => ok,
-                    Err(err) => {
-                        eprintln!("failed to accept connection: {err:#}");
-                        continue;
-                    }
-                };
+                tokio::select! {
+                    recv = uds.accept() => {
+                        let (socket, _remote_addr) = match recv {
+                            Ok(ok) => ok,
+                            Err(err) => {
+                                eprintln!("failed to accept connection: {err:#}");
+                                continue;
+                            }
+                        };
 
-                let tower_service = unwrap_infallible(make_service.call(&socket).await);
+                        let tower_service = unwrap_infallible(make_service.call(&socket).await);
 
-                tokio::spawn(async move {
-                    let socket = TokioIo::new(socket);
+                        tokio::spawn(async move {
+                            let socket = TokioIo::new(socket);
 
-                    let hyper_service =
-                        hyper::service::service_fn(move |request: Request<Incoming>| {
-                            tower_service.clone().call(request)
+                            let hyper_service =
+                                hyper::service::service_fn(move |request: Request<Incoming>| {
+                                    tower_service.clone().call(request)
+                                });
+
+                            if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
+                                .serve_connection_with_upgrades(socket, hyper_service)
+                                .await
+                            {
+                                eprintln!("failed to serve connection: {err:#}");
+                            }
                         });
-
-                    if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
-                        .serve_connection_with_upgrades(socket, hyper_service)
-                        .await
-                    {
-                        eprintln!("failed to serve connection: {err:#}");
-                    }
-                });
+                    },
+                    _ = stop_chan.changed() => {
+                        break;
+                    },
+                }
             }
         }
     }

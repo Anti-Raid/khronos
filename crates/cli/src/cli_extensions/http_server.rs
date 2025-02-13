@@ -253,6 +253,7 @@ impl From<axum::http::Response<axum::body::Body>> for LuaServerResponseParsed {
 
 #[derive(Debug, Clone)]
 pub struct Router {
+    pub stop: Option<tokio::sync::watch::Sender<()>>,
     pub bind_addr: (String, u16),
     pub routes: Rc<RefCell<HashMap<(Method, String), LuaFunction>>>,
     pub route_timeouts: HashMap<(Method, String), Duration>,
@@ -262,6 +263,7 @@ impl Router {
     pub async fn start_routing(
         match_routes: Vec<(Method, String, Duration)>,
         bind: crate::http_binder::CreateRpcServerOptions,
+        stop_chan: tokio::sync::watch::Receiver<()>,
     ) -> Result<tokio::sync::mpsc::UnboundedReceiver<RoutedRequest>, khronos_runtime::Error> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -270,7 +272,6 @@ impl Router {
         std::thread::spawn(move || {
             // Create multi-threaded tokio runtime
             let rt = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(4)
                 .enable_all()
                 .build()
                 .unwrap();
@@ -350,8 +351,12 @@ impl Router {
                     bind,
                     app.into_make_service(),
                     startup_status_tx,
+                    stop_chan,
                 )
                 .await;
+
+                // Send stop signal
+                let _ = tx.send(RoutedRequest::StopServer {});
             })
         });
 
@@ -418,6 +423,11 @@ impl LuaUserData for Router {
         methods.add_method_mut(
             "set_bind_addr",
             |_lua, this, (addr, port): (String, u16)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
                 this.bind_addr = (addr, port);
                 Ok(())
             },
@@ -426,6 +436,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "route",
             |_lua, this, (method, pattern, th): (Method, String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((method, pattern), th);
 
@@ -438,6 +454,12 @@ impl LuaUserData for Router {
             |_lua,
              this,
              (method, pattern, duration): (Method, String, LuaUserDataRef<TimeDelta>)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 this.route_timeouts.insert(
                     (method, pattern),
                     duration.timedelta.to_std().map_err(LuaError::external)?,
@@ -447,6 +469,12 @@ impl LuaUserData for Router {
         );
 
         methods.add_method("get", |_lua, this, (pattern, tx): (String, LuaFunction)| {
+            if this.stop.is_some() {
+                return Err(LuaError::external(
+                    "Cannot add/change routes while server is running. Stop the server first.",
+                ));
+            }
+
             let mut routes = this.routes.borrow_mut();
             routes.insert((Method::GET, pattern), tx);
 
@@ -456,6 +484,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "post",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::POST, pattern), tx);
 
@@ -464,6 +498,12 @@ impl LuaUserData for Router {
         );
 
         methods.add_method("put", |_lua, this, (pattern, tx): (String, LuaFunction)| {
+            if this.stop.is_some() {
+                return Err(LuaError::external(
+                    "Cannot add/change routes while server is running. Stop the server first.",
+                ));
+            }
+
             let mut routes = this.routes.borrow_mut();
             routes.insert((Method::PUT, pattern), tx);
 
@@ -473,6 +513,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "patch",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::PATCH, pattern), tx);
 
@@ -483,6 +529,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "delete",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::DELETE, pattern), tx);
 
@@ -493,6 +545,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "options",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::OPTIONS, pattern), tx);
 
@@ -503,6 +561,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "head",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::HEAD, pattern), tx);
 
@@ -513,6 +577,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "trace",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::TRACE, pattern), tx);
 
@@ -523,6 +593,12 @@ impl LuaUserData for Router {
         methods.add_method(
             "connect",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
+                if this.stop.is_some() {
+                    return Err(LuaError::external(
+                        "Cannot add/change routes while server is running. Stop the server first.",
+                    ));
+                }
+
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::CONNECT, pattern), tx);
 
@@ -530,8 +606,32 @@ impl LuaUserData for Router {
             },
         );
 
-        methods.add_method("serve", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |lua, this, _g|, {
+        // Clones a new router
+        methods.add_method("clone", |_lua, this, _: ()| {
+            Ok(Router {
+                stop: None,
+                bind_addr: this.bind_addr.clone(),
+                routes: Rc::clone(&this.routes),
+                route_timeouts: this.route_timeouts.clone(),
+            })
+        });
+
+        // Stops the server. Is a no-op
+        methods.add_method_mut("stop", |_lua, this, _: ()| {
+            if let Some(stop) = this.stop.take() {
+                let _ = stop.send(());
+            }
+            Ok(())
+        });
+
+        // Returns if the server is running
+        methods.add_method("is_running", |_lua, this, _: ()| Ok(this.stop.is_some()));
+
+        // Starts serving requests
+        methods.add_method_mut("serve", |_lua, this, _g: ()| {
+            let (stop_tx, stop_rx) = tokio::sync::watch::channel(());
+            this.stop = Some(stop_tx);
+            Ok(lua_promise!(this, _g, stop_rx, |lua, this, _g, stop_rx|, {
                 let routes = this.routes
                 .borrow()
                 .iter()
@@ -549,6 +649,7 @@ impl LuaUserData for Router {
                             format!("{}:{}", this.bind_addr.0, this.bind_addr.1),
                         ),
                     },
+                    stop_rx
                 )
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
@@ -624,6 +725,7 @@ impl LuaUserData for Router {
                     }
                 }
 
+                this.stop = None;
                 Ok(())
             }))
         });
@@ -646,6 +748,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
         "new_router",
         lua.create_function(|_lua, (addr, port): (String, u16)| {
             Ok(Router {
+                stop: None, // serve sets this up
                 bind_addr: (addr, port),
                 routes: Rc::new(RefCell::new(HashMap::new())),
                 route_timeouts: HashMap::new(),

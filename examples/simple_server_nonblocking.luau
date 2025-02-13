@@ -25,4 +25,13 @@ router:get("/stop", function(req)
     return "Server stopped"
 end)
 
-pyield(router:serve())
+task.spawn(function()
+    pyield(router:serve())
+end)
+
+print("Server started on " .. addr .. ":" .. port)
+
+while true do 
+    task.wait(1)
+    print("hi")
+end
