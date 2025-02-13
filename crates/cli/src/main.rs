@@ -4,6 +4,7 @@ mod constants;
 mod dispatch;
 mod experiments;
 mod filestorage;
+mod http_binder;
 mod presets;
 mod provider;
 mod repl_completer;

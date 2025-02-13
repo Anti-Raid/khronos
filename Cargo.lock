@@ -1956,6 +1956,8 @@ dependencies = [
  "env_logger",
  "extract_map",
  "gwevent",
+ "hyper",
+ "hyper-util",
  "indexmap",
  "khronos_runtime",
  "kittycat",
@@ -1974,6 +1976,7 @@ dependencies = [
  "strum",
  "tch",
  "tokio",
+ "tower-service",
  "uuid",
 ]
 

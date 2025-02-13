@@ -8,9 +8,15 @@ end
 
 local addr = pyield(cli.ext.input("Enter address to listen on: "))
 
-if not addr then 
-    addr = "127.0.0.1"
+if not addr or addr == "" then 
+    addr = "localhost"
 end
 
 local router = cli.http_server.new_router(addr, port)
-return router
+
+local i = 0;
+router:get("/", function(req)
+    i = i + 1
+    return "Hello, world! " .. tostring(i)
+end)
+pyield(router:serve())

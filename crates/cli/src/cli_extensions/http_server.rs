@@ -93,6 +93,36 @@ impl LuaUserData for ServerUrl {
     }
 }
 
+pub struct ServerResponse {
+    pub status: axum::http::StatusCode,
+    pub headers: axum::http::header::HeaderMap,
+    pub body: Vec<u8>,
+}
+
+impl LuaUserData for ServerResponse {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("status", |_lua, this| Ok(this.status.as_u16()));
+
+        fields.add_field_method_set("status", |_lua, this, status: u16| {
+            this.status = axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?;
+            Ok(())
+        });
+
+        fields.add_field_method_get("headers", |_lua, this| {
+            Ok(Headers {
+                headers: this.headers.clone(),
+            })
+        });
+
+        fields.add_field_method_set("headers", |_lua, this, headers: LuaUserDataRef<Headers>| {
+            this.headers = headers.headers.clone();
+            Ok(())
+        });
+
+        fields.add_field_method_get("body", |_lua, this| Ok(this.body.clone()));
+    }
+}
+
 #[derive(Clone)]
 pub struct ServerRequestBody {
     pub(crate) body: Rc<RefCell<Option<axum::body::Body>>>,
@@ -193,15 +223,18 @@ pub enum RoutedRequest {
 #[derive(Debug, Clone)]
 pub struct Router {
     pub bind_addr: (String, u16),
-    pub routes: Rc<RefCell<HashMap<(Method, String), LuaThread>>>,
+    pub routes: Rc<RefCell<HashMap<(Method, String), LuaFunction>>>,
     pub route_timeouts: HashMap<(Method, String), Duration>,
 }
 
 impl Router {
-    pub fn start_routing(
+    pub async fn start_routing(
         match_routes: Vec<(Method, String, Duration)>,
-    ) -> tokio::sync::mpsc::UnboundedReceiver<RoutedRequest> {
+        bind: crate::http_binder::CreateRpcServerOptions,
+    ) -> Result<tokio::sync::mpsc::UnboundedReceiver<RoutedRequest>, khronos_runtime::Error> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let (startup_status_tx, startup_status_rx) = tokio::sync::oneshot::channel();
 
         std::thread::spawn(move || {
             // Create multi-threaded tokio runtime
@@ -280,10 +313,16 @@ impl Router {
                         }
                     }
                 }
+
+                // Start the server
+                crate::http_binder::start_rpc_server(bind, app.into_make_service(), startup_status_tx).await;
             })
         });
 
-        rx
+        startup_status_rx.await?
+            .map_err(|e| format!("failed to spawn server: {}", e))?;
+
+        Ok(rx)
     }
 }
 
@@ -299,25 +338,19 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "route",
-            |lua,
-             this,
+            |_lua,this,
              (method, pattern, th): (
                 Method,
                 String,
-                LuaEither<LuaFunction, LuaThread>,
+                LuaFunction,
             )| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
                 let mut routes = this.routes.borrow_mut();
                 routes.insert(
                     (
                         method,
                         pattern,
                     ),
-                    tx,
+                    th,
                 );
 
                 Ok(())
@@ -339,12 +372,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "get",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::GET, pattern), tx);
 
@@ -354,12 +382,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "post",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::POST, pattern), tx);
 
@@ -369,12 +392,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "put",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::PUT, pattern), tx);
 
@@ -384,12 +402,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "patch",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::PATCH, pattern), tx);
 
@@ -399,12 +412,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "delete",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::DELETE, pattern), tx);
 
@@ -414,12 +422,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "options",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::OPTIONS, pattern), tx);
 
@@ -429,12 +432,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "head",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::HEAD, pattern), tx);
 
@@ -444,12 +442,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "trace",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::TRACE, pattern), tx);
 
@@ -459,12 +452,7 @@ impl LuaUserData for Router {
 
         methods.add_method(
             "connect",
-            |lua, this, (pattern, th): (String, LuaEither<LuaFunction, LuaThread>)| {
-                let tx = match th {
-                    LuaEither::Left(f) => lua.create_thread(f)?,
-                    LuaEither::Right(t) => t,
-                };
-
+            |_lua, this, (pattern, tx): (String, LuaFunction)| {
                 let mut routes = this.routes.borrow_mut();
                 routes.insert((Method::CONNECT, pattern), tx);
 
@@ -474,18 +462,26 @@ impl LuaUserData for Router {
 
         methods.add_method("serve", |_lua, this, _g: ()| {
             Ok(lua_promise!(this, _g, |lua, this, _g|, {
+                let routes = this.routes
+                .borrow()
+                .iter()
+                .map(|((method, pattern), _th)| {
+                    let duration = this.route_timeouts.get(&(*method, pattern.clone()))
+                        .copied()
+                        .unwrap_or_else(|| Duration::from_secs(30));
+                    (*method, pattern.clone(), duration)
+                })
+                .collect();
                 let mut rx = Router::start_routing(
-                    this.routes
-                        .borrow()
-                        .iter()
-                        .map(|((method, pattern), _th)| {
-                            let duration = this.route_timeouts.get(&(*method, pattern.clone()))
-                                .copied()
-                                .unwrap_or_else(|| Duration::from_secs(30));
-                            (*method, pattern.clone(), duration)
-                        })
-                        .collect(),
-                );
+                    routes,
+                    crate::http_binder::CreateRpcServerOptions {
+                        bind: crate::http_binder::CreateRpcServerBind::Address(
+                            format!("{}:{}", this.bind_addr.0, this.bind_addr.1),
+                        ),
+                    },    
+                )
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
                 let taskmgr = mlua_scheduler_ext::Scheduler::get(&lua);
 
@@ -515,7 +511,113 @@ impl LuaUserData for Router {
                                     },
                                 }.into_lua_multi(&lua)?;
 
-                                taskmgr.add_deferred_thread_back(th, request);
+                                let th = match lua.create_thread(th) {
+                                    Ok(th) => th,
+                                    Err(e) => {
+                                        let _ = callback.send(
+                                            (
+                                                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                                e.to_string(),
+                                            )
+                                                .into_response(),
+                                        );
+                                        continue;
+                                    }
+                                };
+
+                                let taskmgr = taskmgr.clone();
+                                tokio::task::spawn_local(async move {
+                                    let output = taskmgr
+                                    .spawn_thread_and_wait("AxumPath", th, request)
+                                    .await;
+
+                                    // Output must be a ServerResponse struct
+
+                                    match output {
+                                        Ok(Some(result)) => {
+                                            match result {
+                                                Ok(response) => {
+                                                    match response.front() {
+                                                        Some(LuaValue::UserData(ud)) => {
+                                                            if let Ok(response) = ud.take::<ServerResponse>() {
+                                                                let _ = callback.send(
+                                                                    (
+                                                                        response.status,
+                                                                        response.headers,
+                                                                        response.body,
+                                                                    )
+                                                                        .into_response(),
+                                                                );    
+                                                            } else {
+                                                                let _ = callback.send(
+                                                                    (
+                                                                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                                                        "Invalid response from upstream!",
+                                                                    )
+                                                                        .into_response(),
+                                                                );
+                                                            }
+                                                        }
+                                                        Some(LuaValue::String(s)) => {
+                                                            let _ = callback.send(
+                                                                (
+                                                                    axum::http::StatusCode::OK,
+                                                                    s.to_string_lossy(),
+                                                                )
+                                                                    .into_response(),
+                                                            );
+                                                        }
+                                                        Some(r) => {
+                                                            let _ = callback.send(
+                                                                (
+                                                                    axum::http::StatusCode::OK,
+                                                                    format!("{:?}", r),
+                                                                )
+                                                                    .into_response(),
+                                                            );
+                                                        }
+                                                        None => {
+                                                            let _ = callback.send(
+                                                                (
+                                                                    axum::http::StatusCode::NO_CONTENT,
+                                                                    "",
+                                                                )
+                                                                    .into_response(),
+                                                            );
+                                                        }
+                                                    }
+                                                },
+                                                Err(e) => {
+                                                    let _ = callback.send(
+                                                        (
+                                                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                                            e.to_string(),
+                                                        )
+                                                            .into_response(),
+                                                    );
+                                                }
+                                            }
+                                        },
+                                        Ok(None) => {
+                                            let _ = callback.send(
+                                                (
+                                                    axum::http::StatusCode::NO_CONTENT,
+                                                    ""
+                                                )
+                                                .into_response()
+                                            );
+                                        },
+                                        Err(e) => {
+                                            let _ = callback.send(
+                                                (
+                                                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                                    e.to_string(),
+                                                )
+                                                    .into_response(),
+                                            );
+                                        }
+                                    }
+                                });
                             } else {
                                 let _ = callback.send(
                                     (
@@ -529,7 +631,7 @@ impl LuaUserData for Router {
                         RoutedRequest::StopServer {} => break,
                     }
                 }
-
+                
                 Ok(())
             }))
         });
@@ -557,6 +659,19 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
                 route_timeouts: HashMap::new(),
             })
         })?,
+    )?;
+
+    http_server.set(
+        "new_response",
+        lua.create_function(
+            |_, (status, headers, body): (u16, Option<LuaUserDataRef<Headers>>, Vec<u8>)| {
+                Ok(ServerResponse {
+                    status: axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
+                    headers: headers.map(|h| h.headers.clone()).unwrap_or_default(),
+                    body,
+                })
+            },
+        )?,
     )?;
 
     http_server.set_readonly(true);

@@ -24,6 +24,9 @@ data-encoding = "2"
 rusqlite = { version = "^0.32", features = ["bundled", "chrono"], optional = true }
 reqwest = "0.12"
 axum = { version = "0.7.5", features = ["macros"] }
+hyper = "1"
+hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
+tower-service = "0.3"
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }

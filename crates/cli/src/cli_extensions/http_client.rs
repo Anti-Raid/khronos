@@ -416,6 +416,13 @@ pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
         })?
     )?;
 
+    http_client.set(
+        "new_headers",
+        lua.create_function(|_, _: ()| Ok(Headers {
+            headers: reqwest::header::HeaderMap::new(),
+        }))?,
+    )?;
+
     http_client.set_readonly(true);
 
     Ok(http_client)
