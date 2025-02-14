@@ -7,6 +7,7 @@ use mlua::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -260,6 +261,121 @@ impl LuaUserData for ServerRequestBody {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum BindAddr {
+    Unix { path: std::path::PathBuf },
+    Tcp { addr: std::net::SocketAddr },
+}
+
+impl FromLuaMulti for BindAddr {
+    fn from_lua_multi(value: LuaMultiValue, _lua: &Lua) -> LuaResult<Self> {
+        if value.len() == 1 {
+            match value.front().unwrap() {
+                LuaValue::String(s) => {
+                    let s = s.to_str()?;
+
+                    if s.starts_with("unix:") {
+                        return Ok(BindAddr::Unix {
+                            path: if let Some(stripped) = s.strip_prefix("unix:") {
+                                stripped.into()
+                            } else {
+                                return Err(LuaError::external("Invalid Unix socket path"));
+                            },
+                        });
+                    } else {
+                        return Ok(BindAddr::Tcp {
+                            addr: s.parse().map_err(LuaError::external)?,
+                        });
+                    }
+                }
+                LuaValue::UserData(ud) => {
+                    return Ok(ud.borrow::<BindAddr>()?.clone());
+                }
+                _ => return Err(LuaError::external("Invalid bind address provided")),
+            }
+        } else if value.len() == 2 {
+            let fv = value.front().unwrap();
+            let sv = value.back().unwrap();
+
+            #[allow(clippy::single_match)]
+            let addr = match fv {
+                LuaValue::String(s) => {
+                    let s = s.to_str()?;
+
+                    if s.starts_with("unix:") {
+                        return Err(LuaError::external("Invalid bind address provided"));
+                    }
+
+                    s.to_string()
+                }
+                _ => return Err(LuaError::external("Invalid bind address provided")),
+            };
+
+            let port = match sv {
+                LuaValue::Integer(i) => *i as u16,
+                LuaValue::String(s) => s.to_str()?.parse().map_err(LuaError::external)?,
+                _ => return Err(LuaError::external("Invalid port provided")),
+            };
+
+            return Ok(BindAddr::Tcp {
+                addr: format!("{}:{}", addr, port)
+                    .to_socket_addrs()
+                    .map_err(LuaError::external)?
+                    .next()
+                    .ok_or_else(|| LuaError::external("Invalid bind address provided"))?,
+            });
+        }
+
+        Err(LuaError::external("Invalid bind address provided"))
+    }
+}
+
+impl LuaUserData for BindAddr {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("type", |_lua, this| match this {
+            BindAddr::Unix { .. } => Ok("unix".to_string()),
+            BindAddr::Tcp { .. } => Ok("tcp".to_string()),
+        });
+
+        fields.add_field_method_get("path", |_lua, this| match this {
+            BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
+            _ => Err(LuaError::external("Not a Unix socket")),
+        });
+
+        fields.add_field_method_get("addr", |_lua, this| match this {
+            BindAddr::Tcp { addr, .. } => Ok(addr.to_string()),
+            _ => Err(LuaError::external("Not a TCP socket")),
+        });
+
+        fields.add_field_method_get("port", |_lua, this| match this {
+            BindAddr::Tcp { addr, .. } => Ok(addr.port()),
+            _ => Err(LuaError::external("Not a TCP socket")),
+        });
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::ToString, |_, this, _: ()| match this {
+            BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
+            BindAddr::Tcp { addr } => Ok(addr.to_string()),
+        });
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<BindAddr>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "type", "path", "addr", "port",
+                    // Methods
+                ],
+            )
+        });
+    }
+}
+
 pub struct ServerRequest {
     pub route_method: Method,
     pub path:
@@ -339,8 +455,8 @@ impl From<axum::http::Response<axum::body::Body>> for LuaServerResponseParsed {
 
 #[derive(Debug, Clone)]
 pub struct Router {
-    pub stop: Option<tokio::sync::watch::Sender<()>>,
-    pub bind_addr: (String, u16),
+    pub stop: Rc<RefCell<Option<tokio::sync::watch::Sender<()>>>>,
+    pub bind_addr: BindAddr,
     pub routes: Rc<RefCell<HashMap<(Method, String), LuaFunction>>>,
     pub route_timeouts: HashMap<(Method, String), Duration>,
 }
@@ -440,13 +556,7 @@ impl Router {
                 }
 
                 // Start the server
-                crate::http_binder::start_rpc_server(
-                    bind,
-                    app.into_make_service(),
-                    startup_status_tx,
-                    stop_chan,
-                )
-                .await;
+                crate::http_binder::start_rpc_server(bind, app, startup_status_tx, stop_chan).await;
 
                 // Send stop signal
                 let _ = tx.send(RoutedRequest::StopServer {});
@@ -509,6 +619,13 @@ impl Router {
     }
 }
 
+impl Router {
+    fn is_running(&self) -> bool {
+        let _g = self.stop.borrow();
+        _g.is_some()
+    }
+}
+
 impl LuaUserData for Router {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("routes", |lua, this| {
@@ -528,26 +645,29 @@ impl LuaUserData for Router {
 
             lua.to_value(&routes)
         });
-    }
 
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method_mut(
-            "set_bind_addr",
-            |_lua, this, (addr, port): (String, u16)| {
-                if this.stop.is_some() {
+        fields.add_field_method_get("bind_addr", |_lua, this| Ok(this.bind_addr.clone()));
+
+        fields.add_field_method_set(
+            "bind_addr",
+            |_lua, this, bind_addr: LuaUserDataRef<BindAddr>| {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
                 }
-                this.bind_addr = (addr, port);
+
+                this.bind_addr = bind_addr.clone();
                 Ok(())
             },
         );
+    }
 
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method(
             "route",
             |_lua, this, (method, pattern, th): (Method, String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -565,7 +685,7 @@ impl LuaUserData for Router {
             |_lua,
              this,
              (method, pattern, duration): (Method, String, LuaUserDataRef<TimeDelta>)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -580,7 +700,7 @@ impl LuaUserData for Router {
         );
 
         methods.add_method("any", |_lua, this, (pattern, tx): (String, LuaFunction)| {
-            if this.stop.is_some() {
+            if this.is_running() {
                 return Err(LuaError::external(
                     "Cannot add/change routes while server is running. Stop the server first.",
                 ));
@@ -593,7 +713,7 @@ impl LuaUserData for Router {
         });
 
         methods.add_method("get", |_lua, this, (pattern, tx): (String, LuaFunction)| {
-            if this.stop.is_some() {
+            if this.is_running() {
                 return Err(LuaError::external(
                     "Cannot add/change routes while server is running. Stop the server first.",
                 ));
@@ -608,7 +728,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "post",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -622,7 +742,7 @@ impl LuaUserData for Router {
         );
 
         methods.add_method("put", |_lua, this, (pattern, tx): (String, LuaFunction)| {
-            if this.stop.is_some() {
+            if this.is_running() {
                 return Err(LuaError::external(
                     "Cannot add/change routes while server is running. Stop the server first.",
                 ));
@@ -637,7 +757,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "patch",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -653,7 +773,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "delete",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -669,7 +789,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "options",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -685,7 +805,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "head",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -701,7 +821,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "trace",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -717,7 +837,7 @@ impl LuaUserData for Router {
         methods.add_method(
             "connect",
             |_lua, this, (pattern, tx): (String, LuaFunction)| {
-                if this.stop.is_some() {
+                if this.is_running() {
                     return Err(LuaError::external(
                         "Cannot add/change routes while server is running. Stop the server first.",
                     ));
@@ -733,7 +853,7 @@ impl LuaUserData for Router {
         // Clones a new router
         methods.add_method("clone", |_lua, this, _: ()| {
             Ok(Router {
-                stop: None,
+                stop: Rc::new(RefCell::new(None)),
                 bind_addr: this.bind_addr.clone(),
                 routes: Rc::clone(&this.routes),
                 route_timeouts: this.route_timeouts.clone(),
@@ -749,12 +869,17 @@ impl LuaUserData for Router {
         });
 
         // Returns if the server is running
-        methods.add_method("is_running", |_lua, this, _: ()| Ok(this.stop.is_some()));
+        methods.add_method("is_running", |_lua, this, _: ()| Ok(this.is_running()));
 
         // Starts serving requests
         methods.add_method_mut("serve", |_lua, this, _g: ()| {
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(());
-            this.stop = Some(stop_tx);
+
+            {
+                let mut _g = this.stop.borrow_mut();
+                *_g = Some(stop_tx);
+            }
+
             Ok(lua_promise!(this, _g, stop_rx, |lua, this, _g, stop_rx|, {
                 let routes = this.routes
                 .borrow()
@@ -766,17 +891,40 @@ impl LuaUserData for Router {
                     (*method, pattern.clone(), duration)
                 })
                 .collect();
-                let mut rx = Router::start_routing(
+
+                let rx = Router::start_routing(
                     routes,
                     crate::http_binder::CreateRpcServerOptions {
-                        bind: crate::http_binder::CreateRpcServerBind::Address(
-                            format!("{}:{}", this.bind_addr.0, this.bind_addr.1),
-                        ),
+                        bind: match &this.bind_addr {
+                            BindAddr::Unix { path } => {
+                                crate::http_binder::CreateRpcServerBind::UnixSocket(
+                                    path.clone(),
+                                )
+                            }
+                            BindAddr::Tcp { addr } => {
+                                crate::http_binder::CreateRpcServerBind::Address(
+                                    *addr,
+                                )
+                            }
+                        },
                     },
                     stop_rx
                 )
                 .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
+                .map_err(|e| LuaError::external(e.to_string()));
+
+                let mut rx = match rx {
+                    Ok(rx) => rx,
+                    Err(e) => {
+
+                        {
+                            let mut _g = this.stop.borrow_mut();
+                            *_g = None;
+                        }
+
+                        return Err(e);
+                    }
+                };
 
                 let taskmgr = mlua_scheduler_ext::Scheduler::get(&lua);
 
@@ -858,7 +1006,11 @@ impl LuaUserData for Router {
                     }
                 }
 
-                this.stop = None;
+                {
+                    let mut _g = this.stop.borrow_mut();
+                    *_g = None;
+                }
+
                 Ok(())
             }))
         });
@@ -874,8 +1026,8 @@ impl LuaUserData for Router {
                 [
                     // Fields
                     "routes",
+                    "bind_addr",
                     // Methods
-                    "set_bind_addr",
                     "route",
                     "timeout",
                     "any",
@@ -911,11 +1063,16 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     http_server.set(
+        "bind_addr",
+        lua.create_function(|_lua, bind_addr: BindAddr| Ok(bind_addr))?,
+    )?;
+
+    http_server.set(
         "new_router",
-        lua.create_function(|_lua, (addr, port): (String, u16)| {
+        lua.create_function(|_lua, bind_addr: BindAddr| {
             Ok(Router {
-                stop: None, // serve sets this up
-                bind_addr: (addr, port),
+                stop: Rc::new(RefCell::new(None)), // serve sets this up
+                bind_addr,
                 routes: Rc::new(RefCell::new(HashMap::new())),
                 route_timeouts: HashMap::new(),
             })

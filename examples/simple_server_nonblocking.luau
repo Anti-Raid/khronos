@@ -26,10 +26,14 @@ router:get("/stop", function(req)
 end)
 
 task.spawn(function()
-    pyield(router:serve())
+    local ok, _ = pcall(pyield, router:serve())
+
+    if not ok then
+        print("Server stopped")
+    end
 end)
 
-print("Server started on " .. addr .. ":" .. port)
+print("Server started on " .. tostring(router.bind_addr))
 
 while true do 
     task.wait(1)

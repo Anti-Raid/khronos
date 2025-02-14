@@ -45,7 +45,7 @@ task.spawn(function()
     pyield(router:serve())
 end)
 
-print("Server started on " .. addr .. ":" .. port)
+print("Server started on " .. tostring(router.bind_addr))
 
 while true do 
     task.wait(1)

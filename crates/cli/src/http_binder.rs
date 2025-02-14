@@ -4,18 +4,19 @@ use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server,
 };
+use std::net::SocketAddr;
 use std::{convert::Infallible, path::PathBuf};
-use tokio::net::UnixListener;
-use tower_service::Service;
+use tokio::net::{TcpListener, UnixListener};
+use tower::{Service, ServiceExt};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum CreateRpcServerBind {
     /// Bind to a specific address
-    Address(String),
+    Address(SocketAddr),
     /// Bind to a unix socket
     #[cfg(unix)]
-    UnixSocket(String),
+    UnixSocket(PathBuf),
 }
 
 #[derive(Debug, Clone)]
@@ -26,14 +27,15 @@ pub struct CreateRpcServerOptions {
 
 pub async fn start_rpc_server(
     opts: CreateRpcServerOptions,
-    mut make_service: axum::routing::IntoMakeService<Router>,
+    router: Router<()>,
     done_start: tokio::sync::oneshot::Sender<Result<(), String>>,
     mut stop_chan: tokio::sync::watch::Receiver<()>,
 ) {
     match opts.bind {
         CreateRpcServerBind::Address(addr) => {
-            println!("Trying to bind to address: {addr}");
-            let listener = match tokio::net::TcpListener::bind(addr).await {
+            let mut make_service = router.into_make_service_with_connect_info::<SocketAddr>();
+
+            let listener = match TcpListener::bind(addr).await {
                 Ok(ok) => ok,
                 Err(err) => {
                     let _ = done_start.send(Err(format!("failed to bind to address: {err:#}")));
@@ -46,7 +48,7 @@ pub async fn start_rpc_server(
             loop {
                 tokio::select! {
                     recv = listener.accept() => {
-                        let (socket, _remote_addr) = match recv {
+                        let (socket, remote_addr) = match recv {
                             Ok(ok) => ok,
                             Err(err) => {
                                 eprintln!("failed to accept connection: {err:#}");
@@ -54,14 +56,14 @@ pub async fn start_rpc_server(
                             }
                         };
 
-                        let tower_service = unwrap_infallible(make_service.call(&socket).await);
+                        let tower_service = unwrap_infallible(make_service.call(remote_addr).await);
 
                         tokio::spawn(async move {
                             let socket = TokioIo::new(socket);
 
                             let hyper_service =
                                 hyper::service::service_fn(move |request: Request<Incoming>| {
-                                    tower_service.clone().call(request)
+                                    tower_service.clone().oneshot(request)
                                 });
 
                             if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
@@ -80,7 +82,7 @@ pub async fn start_rpc_server(
         }
         #[cfg(unix)]
         CreateRpcServerBind::UnixSocket(path) => {
-            let path = PathBuf::from(path);
+            let mut make_service = router.into_make_service();
 
             let _ = tokio::fs::remove_file(&path).await;
 

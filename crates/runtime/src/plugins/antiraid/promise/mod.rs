@@ -86,8 +86,7 @@ macro_rules! lua_promise {
 
                 async move {
                     $(
-                        #[allow(unused_mut)]
-                        let mut $args = $args.clone();
+                        let $args = $args.clone();
                     )*
 
                     let $lua = $lua.clone();
