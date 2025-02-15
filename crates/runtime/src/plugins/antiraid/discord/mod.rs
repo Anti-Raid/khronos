@@ -562,11 +562,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .discord_provider
                     .edit_channel_permissions(
                         data.channel_id, 
+                        data.target_id,
                         serde_json::json!({
                             "allow": data.allow,
                             "deny": data.deny,
-                            "type": data.kind.kind,
-                            "id": data.kind.id,
+                            "type": data.kind,
                         }),
                         Some(data.reason.as_str())
                     )

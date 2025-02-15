@@ -15,4 +15,3 @@ pub use channels::*;
 pub use embed::*;
 pub use interactions::*;
 pub use message::*;
-pub use permission_overwrites::*;

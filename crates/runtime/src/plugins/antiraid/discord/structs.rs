@@ -2,7 +2,7 @@ use crate::plugins::antiraid::typesext::MultiOption;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, EditChannel, PermissionOverwriteType,
+    CreateMessage, EditAutoModRule, EditChannel,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -120,9 +120,9 @@ pub struct DeleteAutoModerationRuleOptions {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct EditChannelPermissionsOptions {
     pub channel_id: serenity::all::ChannelId,
+    pub target_id: serenity::all::TargetId,
     pub allow: MultiOption<serenity::all::Permissions>,
     pub deny: MultiOption<serenity::all::Permissions>,
-    #[serde(flatten)]
-    pub kind: PermissionOverwriteType,
+    pub kind: u8,
     pub reason: String,
 }

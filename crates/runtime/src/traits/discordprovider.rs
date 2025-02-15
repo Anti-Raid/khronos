@@ -109,6 +109,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn edit_channel_permissions(
         &self,
         channel_id: serenity::all::ChannelId,
+        target_id: serenity::all::TargetId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error>;

@@ -304,6 +304,7 @@ impl DiscordProvider for SampleDiscordProvider {
     async fn edit_channel_permissions(
         &self,
         _channel_id: serenity::all::ChannelId,
+        _target_id: serenity::all::TargetId,
         _data: impl serde::Serialize,
         _audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
