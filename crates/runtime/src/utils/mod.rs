@@ -1,3 +1,4 @@
+pub mod ensure_safe;
 pub mod executorscope;
 pub mod pluginholder;
 pub mod prelude;

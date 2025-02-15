@@ -1,13 +1,29 @@
 use rustrict::{Censor, Type};
 
-/// Checks if a string contains any disallowed words
-pub fn validate_string(input: &str) -> Result<(), crate::Error> {
+use crate::utils::ensure_safe;
+
+/// Checks if a string isn't offensive
+pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
+    // Try a bit more leniency for offensive words
     let analysis = Censor::from_str(input).analyze();
 
     if analysis.is((Type::OFFENSIVE | Type::SEXUAL) & Type::SEVERE) {
-        Err(format!("Input contains disallowed words: {:?}", analysis).into())
+        if validate_string_safe(input).is_ok() {
+            return Ok(()); // validate_string_offensive is a subset of validate_string_safe
+        }
+
+        Err(format!("Input contains offensive words: {:?} {:?}", input, analysis).into())
     } else {
         Ok(())
+    }
+}
+
+/// Checks that the string only uses safe words
+pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
+    if ensure_safe::is_safe_word(input) {
+        Ok(())
+    } else {
+        Err(format!("Input contains disallowed words: {:?}", input).into())
     }
 }
 
@@ -34,7 +50,7 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
             match component {
                 serenity::all::ActionRowComponent::Button(b) => {
                     if let Some(label) = b.label.as_ref() {
-                        validate_string(label.as_str())?;
+                        validate_string_offensive(label.as_str())?;
                     }
 
                     if num_buttons >= MAX_BUTTONS_PER_ACTION_ROW {
@@ -51,11 +67,11 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
                 }
                 serenity::all::ActionRowComponent::SelectMenu(sm) => {
                     if let Some(placeholder) = sm.placeholder.as_ref() {
-                        validate_string(placeholder.as_str())?;
+                        validate_string_offensive(placeholder.as_str())?;
                     }
 
                     for option in sm.options.iter() {
-                        validate_string(option.label.as_str())?;
+                        validate_string_offensive(option.label.as_str())?;
                     }
 
                     if num_selects >= MAX_SELECTS_PER_ACTION_ROW {
@@ -270,21 +286,21 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
 }
 
 fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), crate::Error> {
-    validate_string(&option.name)?;
+    validate_string_safe(&option.name)?;
 
     if let Some(name_localizations) = option.name_localizations.as_ref() {
         for (lang, name) in name_localizations.iter() {
-            validate_string(lang)?;
-            validate_string(name)?;
+            validate_string_safe(lang)?;
+            validate_string_safe(name)?;
         }
     }
 
-    validate_string(&option.description)?;
+    validate_string_safe(&option.description)?;
 
     if let Some(description_localizations) = option.description_localizations.as_ref() {
         for (lang, desc) in description_localizations.iter() {
-            validate_string(lang)?;
-            validate_string(desc)?;
+            validate_string_safe(lang)?;
+            validate_string_safe(desc)?;
         }
     }
 
@@ -293,9 +309,9 @@ fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), cra
     }
 
     for choice in option.choices.iter() {
-        validate_string(&choice.name)?;
+        validate_string_safe(&choice.name)?;
         if let serde_json::Value::String(ref s) = &choice.value {
-            validate_string(s)?;
+            validate_string_safe(s)?;
         }
     }
 
@@ -304,21 +320,21 @@ fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), cra
 
 pub fn validate_command(command: &super::types::CreateCommand) -> Result<(), crate::Error> {
     if let Some(name) = command.fields.name.as_ref() {
-        validate_string(name)?;
+        validate_string_safe(name)?;
     }
 
     for (lang, name) in command.fields.name_localizations.iter() {
-        validate_string(lang)?;
-        validate_string(name)?;
+        validate_string_safe(lang)?;
+        validate_string_safe(name)?;
     }
 
     if let Some(description) = command.fields.description.as_ref() {
-        validate_string(description)?;
+        validate_string_safe(description)?;
     }
 
     for (lang, desc) in command.fields.description_localizations.iter() {
-        validate_string(lang)?;
-        validate_string(desc)?;
+        validate_string_safe(lang)?;
+        validate_string_safe(desc)?;
     }
 
     for option in command.fields.options.iter() {
