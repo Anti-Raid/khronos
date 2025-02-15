@@ -150,19 +150,6 @@ impl DiscordProvider for SampleDiscordProvider {
         todo!()
     }
 
-    async fn get_automod_rules(
-        &self,
-    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error> {
-        todo!()
-    }
-
-    async fn get_automod_rule(
-        &self,
-        _rule_id: serenity::all::RuleId,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
-        todo!()
-    }
-
     async fn edit_channel(
         &self,
         _channel_id: serenity::all::ChannelId,
@@ -273,6 +260,53 @@ impl DiscordProvider for SampleDiscordProvider {
         _channel_id: serenity::all::ChannelId,
         _message_id: serenity::all::MessageId,
     ) -> Result<serenity::all::Message, crate::Error> {
+        todo!()
+    }
+
+    async fn list_auto_moderation_rules(
+        &self,
+    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error> {
+        todo!()
+    }
+
+    async fn get_auto_moderation_rule(
+        &self,
+        _rule_id: serenity::all::RuleId,
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        todo!()
+    }
+
+    async fn create_auto_moderation_rule(
+        &self,
+        _map: impl serde::Serialize,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        todo!()
+    }
+
+    async fn edit_auto_moderation_rule(
+        &self,
+        _rule_id: serenity::all::RuleId,
+        _map: impl serde::Serialize,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        todo!()
+    }
+
+    async fn delete_auto_moderation_rule(
+        &self,
+        _rule_id: serenity::all::RuleId,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn edit_channel_permissions(
+        &self,
+        _channel_id: serenity::all::ChannelId,
+        _data: impl serde::Serialize,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
         todo!()
     }
 }

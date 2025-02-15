@@ -1,6 +1,8 @@
-use super::builders::{
-    CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup, CreateMessage,
-    EditChannel,
+use crate::plugins::antiraid::typesext::MultiOption;
+
+use super::types::{
+    CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
+    CreateMessage, EditAutoModRule, EditChannel, PermissionOverwriteType,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -94,4 +96,33 @@ impl MessagePagination {
             Self::Before { id } => serenity::all::MessagePagination::Before(id),
         }
     }
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct CreateAutoModerationRuleOptions {
+    pub reason: String,
+    pub data: CreateAutoModRule,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct EditAutoModerationRuleOptions {
+    pub rule_id: serenity::all::RuleId,
+    pub reason: String,
+    pub data: EditAutoModRule,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct DeleteAutoModerationRuleOptions {
+    pub rule_id: serenity::all::RuleId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct EditChannelPermissionsOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub allow: MultiOption<serenity::all::Permissions>,
+    pub deny: MultiOption<serenity::all::Permissions>,
+    #[serde(flatten)]
+    pub kind: PermissionOverwriteType,
+    pub reason: String,
 }

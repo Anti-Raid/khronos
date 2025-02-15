@@ -1,5 +1,5 @@
-mod builders;
 mod structs;
+mod types;
 mod validators;
 
 use crate::lua_promise;
@@ -11,6 +11,9 @@ use crate::utils::serenity_backports;
 use crate::{plugins::antiraid::lazy::Lazy, TemplateContextRef};
 use mlua::prelude::*;
 use serenity::all::Mentionable;
+use structs::{
+    CreateAutoModerationRuleOptions, DeleteAutoModerationRuleOptions, EditAutoModerationRuleOptions,
+};
 
 #[derive(Clone)]
 /// An action executor is used to execute actions such as kick/ban/timeout from Lua
@@ -173,8 +176,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Auto Moderation, not yet finished and hence not documented yet
-        // get_automod_rules
+        // Auto Moderation
+
+        // Documentation in progress
         methods.add_method("list_auto_moderation_rules", |_, this, _: ()| {
             Ok(lua_promise!(this, |_lua, this|, {
                 this.check_action("list_auto_moderation_rules".to_string())
@@ -190,7 +194,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let rules = this
                     .discord_provider
-                    .get_automod_rules()
+                    .list_auto_moderation_rules()
                     .await
                     .map_err(|x| LuaError::external(x.to_string()))?;
 
@@ -198,7 +202,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Not yet documented, not yet stable
+        // Documentation in progress
         methods.add_method("get_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let rule_id: serenity::all::RuleId = lua.from_value(data)?;
@@ -216,7 +220,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let rule = this
                     .discord_provider
-                    .get_automod_rule(rule_id)
+                    .get_auto_moderation_rule(rule_id)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -224,159 +228,87 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Not yet documented, not yet stable
-        /*methods.add_method("create_auto_moderation_rule", |_, this, data: LuaValue| {
+        // Documentation in progress
+        methods.add_method("create_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
-                #[derive(serde::Serialize, serde::Deserialize)]
-                pub struct CreateAutoModerationRuleOptions {
-                    name: String,
-                    reason: String,
-                    event_type: serenity::all::AutomodEventType,
-                    trigger: serenity::all::Trigger,
-                    actions: Vec<serenity::all::automod::Action>,
-                    enabled: Option<bool>,
-                    exempt_roles: Option<Vec<serenity::all::RoleId>>,
-                    exempt_channels: Option<Vec<serenity::all::ChannelId>>,
-                }
-
                 let data: CreateAutoModerationRuleOptions = lua.from_value(data)?;
 
                 this.check_action("create_auto_moderation_rule".to_string())
                     .map_err(LuaError::external)?;
 
-                let bot_userid = this.serenity_context.cache.current_user().id;
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
 
-                this.check_permissions(bot_userid, serenity::all::Permissions::MANAGE_GUILD)
+                this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
                     .await
                     .map_err(LuaError::external)?;
 
-                let mut rule = serenity::all::EditAutoModRule::new();
-                rule = rule
-                    .name(data.name)
-                    .event_type(data.event_type)
-                    .trigger(data.trigger)
-                    .actions(data.actions);
-
-                if let Some(enabled) = data.enabled {
-                    rule = rule.enabled(enabled);
-                }
-
-                if let Some(exempt_roles) = data.exempt_roles {
-                    if exempt_roles.len() > 20 {
-                        return Err(LuaError::external(
-                            "A maximum of 20 exempt_roles can be provided",
-                        ));
-                    }
-
-                    rule = rule.exempt_roles(exempt_roles);
-                }
-
-                if let Some(exempt_channels) = data.exempt_channels {
-                    if exempt_channels.len() > 50 {
-                        return Err(LuaError::external(
-                            "A maximum of 50 exempt_channels can be provided",
-                        ));
-                    }
-
-                    rule = rule.exempt_channels(exempt_channels);
-                }
+                data.data.validate().map_err(LuaError::external)?;
 
                 let rule = this
-                    .serenity_context
-                    .http
-                    .create_automod_rule(this.guild_id, &rule, Some(data.reason.as_str()))
+                    .discord_provider
+                    .create_auto_moderation_rule(&data.data, Some(data.reason.as_str()))
                     .await
-                    .map_err(LuaError::external)?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(rule))
             }))
         });
 
-        methods.add_method(
-            "edit_auto_moderation_rule",
-            |lua, this, data: LuaValue| {
-                Ok(lua_promise!(this, data, |lua, this, data|, {
-                    #[derive(serde::Serialize, serde::Deserialize)]
-                    pub struct EditAutoModerationRuleOptions {
-                        rule_id: serenity::all::RuleId,
-                        reason: String,
-                        name: Option<String>,
-                        event_type: Option<serenity::all::AutomodEventType>,
-                        trigger_metadata: Option<serenity::all::TriggerMetadata>,
-                        actions: Vec<serenity::all::automod::Action>,
-                        enabled: Option<bool>,
-                        exempt_roles: Option<Vec<serenity::all::RoleId>>,
-                        exempt_channels: Option<Vec<serenity::all::ChannelId>>,
-                    }
+        // Documentation in progress
+        methods.add_method("edit_auto_moderation_rule", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data: EditAutoModerationRuleOptions = lua.from_value(data)?;
 
-                    let data: EditAutoModerationRuleOptions = lua.from_value(data)?;
+                this.check_action("edit_auto_moderation_rule".to_string())
+                    .map_err(LuaError::external)?;
 
-                    this.check_action("edit_auto_moderation_rule".to_string())
-                        .map_err(LuaError::external)?;
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
 
-                    let bot_userid = this.serenity_context.cache.current_user().id;
+                this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
+                    .await
+                    .map_err(LuaError::external)?;
 
-                    this.check_permissions(bot_userid, serenity::all::Permissions::MANAGE_GUILD)
-                        .await
-                        .map_err(LuaError::external)?;
+                data.data.validate().map_err(LuaError::external)?;
 
-                    let mut rule = serenity::all::EditAutoModRule::new();
+                let rule = this
+                    .discord_provider
+                    .edit_auto_moderation_rule(data.rule_id, &data.data, Some(data.reason.as_str()))
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
-                    if let Some(name) = data.name {
-                        rule = rule.name(name);
-                    }
+                Ok(Lazy::new(rule))
+            }))
+        });
 
-                    if let Some(event_type) = data.event_type {
-                        rule = rule.event_type(event_type);
-                    }
+        // Documentation in progress
+        methods.add_method("delete_auto_moderation_rule", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data: DeleteAutoModerationRuleOptions = lua.from_value(data)?;
 
-                    if let Some(trigger_metadata) = data.trigger_metadata {
-                        rule = rule.trigger(trigger)
-                    }
+                this.check_action("delete_auto_moderation_rule".to_string())
+                    .map_err(LuaError::external)?;
 
-                    rule = rule
-                        .name(data.name)
-                        .event_type(data.event_type)
-                        .trigger(data.trigger)
-                        .actions(data.actions);
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
 
-                    if let Some(enabled) = data.enabled {
-                        rule = rule.enabled(enabled);
-                    }
+                this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
+                    .await
+                    .map_err(LuaError::external)?;
 
-                    if let Some(exempt_roles) = data.exempt_roles {
-                        if exempt_roles.len() > 20 {
-                            return Err(LuaError::external(
-                                "A maximum of 20 exempt_roles can be provided",
-                            ));
-                        }
+                this
+                    .discord_provider
+                    .delete_auto_moderation_rule(data.rule_id, Some(data.reason.as_str()))
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
-                        rule = rule.exempt_roles(exempt_roles);
-                    }
-
-                    if let Some(exempt_channels) = data.exempt_channels {
-                        if exempt_channels.len() > 50 {
-                            return Err(LuaError::external(
-                                "A maximum of 50 exempt_channels can be provided",
-                            ));
-                        }
-
-                        rule = rule.exempt_channels(exempt_channels);
-                    }
-
-                    let rule = this
-                        .serenity_context
-                        .http
-                        .create_automod_rule(this.guild_id, &rule, Some(data.reason.as_str()))
-                        .await
-                        .map_err(LuaError::external)?;
-
-                    let v = lua.to_value(&rule)?;
-
-                    Ok(v)
-                }))
-            },
-        );*/
+                Ok(())
+            }))
+        });
 
         // Channel
 
@@ -550,6 +482,98 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(Lazy::new(channel))
+            }))
+        });
+
+        // Should be documented
+        methods.add_method("edit_channel_permissions", |_, this, channel_id: LuaValue| {
+            Ok(lua_promise!(this, channel_id, |lua, this, channel_id|, {
+                let data = lua.from_value::<structs::EditChannelPermissionsOptions>(channel_id)?;
+
+                this.check_action("edit_channel_permissions".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let guild_channel = this.discord_provider.guild_channel(data.channel_id).await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                    .map_err(|e| LuaError::external(e.to_string()))?
+                else {
+                    return Err(LuaError::runtime("Bot user not found in guild"));
+                };
+
+                let guild = this.discord_provider.guild().await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                if !guild
+                    .user_permissions_in(&guild_channel, &bot_member)
+                    .manage_roles()
+                {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to manage roles",
+                    ));
+                }
+
+                let resolved = guild
+                .user_permissions_in(&guild_channel, &bot_member);
+
+                if !resolved
+                    .manage_roles()
+                {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to manage roles",
+                    ));
+                }
+
+                if let Some(allow_permissions) = data.allow.as_ref() {
+                    for perm in allow_permissions.iter() {
+                        if !serenity::all::Permissions::all().contains(perm) {
+                            return Err(LuaError::external(
+                                format!("Invalid/unknown permission: {:?}", perm),
+                            ));
+                        } else if !resolved.contains(perm) {
+                            return Err(LuaError::external(
+                                format!("Bot does not have permission to allow: {:?}", perm),
+                            ));
+                        }
+                    }
+                }
+
+                if let Some(deny_permissions) = data.deny.as_ref() {
+                    for perm in deny_permissions.iter() {
+                        if !serenity::all::Permissions::all().contains(perm) {
+                            return Err(LuaError::external(
+                                format!("Invalid/unknown permission: {:?}", perm),
+                            ));
+                        } else if !resolved.contains(perm) {
+                            return Err(LuaError::external(
+                                format!("Bot does not have permission to deny: {:?}", perm),
+                            ));
+                        }
+                    }
+                }
+
+                this
+                    .discord_provider
+                    .edit_channel_permissions(
+                        data.channel_id, 
+                        serde_json::json!({
+                            "allow": data.allow,
+                            "deny": data.deny,
+                            "type": data.kind.kind,
+                            "id": data.kind.id,
+                        }),
+                        Some(data.reason.as_str())
+                    )
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
             }))
         });
 

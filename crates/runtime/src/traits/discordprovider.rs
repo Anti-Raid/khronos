@@ -8,6 +8,8 @@ pub trait DiscordProvider: 'static + Clone {
     /// This should return an error if ratelimited
     fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
 
+    // Base stuff
+
     /// Fetches the target guild.
     ///
     /// This should return an error if the guild does not exist
@@ -30,6 +32,8 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
     ) -> Result<serenity::all::GuildChannel, crate::Error>;
 
+    // Audit logs
+
     /// Returns the audit logs for the guild.
     async fn get_audit_logs(
         &self,
@@ -39,16 +43,42 @@ pub trait DiscordProvider: 'static + Clone {
         limit: Option<NonMaxU8>,
     ) -> Result<serenity::all::AuditLogs, crate::Error>;
 
+    // Auto Moderation
+
     /// Retrieves all auto moderation rules in a guild.
-    async fn get_automod_rules(
+    async fn list_auto_moderation_rules(
         &self,
     ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error>;
 
     /// Retrieves an auto moderation rule in a guild.
-    async fn get_automod_rule(
+    async fn get_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
     ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+
+    /// Creates an auto moderation rule in a guild.
+    async fn create_auto_moderation_rule(
+        &self,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+
+    /// Edits an auto moderation rule in a guild.
+    async fn edit_auto_moderation_rule(
+        &self,
+        rule_id: serenity::all::RuleId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+
+    /// Deletes an auto moderation rule in a guild.
+    async fn delete_auto_moderation_rule(
+        &self,
+        rule_id: serenity::all::RuleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
+
+    // Channel
 
     /// Edits a discord channel
     async fn edit_channel(
@@ -64,6 +94,24 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::model::channel::Channel, crate::Error>;
+
+    /// Edit the channel permission overwrites for a user or role in a channel.
+    ///
+    /// Only usable for guild channels. Requires the MANAGE_ROLES permission.
+    ///
+    /// Only permissions your bot has in the guild or parent channel (if applicable) can be allowed/denied
+    ///
+    /// (unless your bot has a MANAGE_ROLES overwrite in the channel).
+    ///
+    /// Returns a 204 empty response on success.
+    ///
+    /// Fires a Channel Update Gateway event.
+    async fn edit_channel_permissions(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        data: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
 
     /// Creates a ban for a user
     async fn create_member_ban(

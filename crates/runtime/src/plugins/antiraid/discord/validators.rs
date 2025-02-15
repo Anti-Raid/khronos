@@ -81,7 +81,7 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
 }
 
 /// Validates an embed, returning total number of characters used
-pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, crate::Error> {
+pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate::Error> {
     const EMBED_TITLE_LIMIT: usize = 256;
     const EMBED_DESCRIPTION_LIMIT: usize = 4096;
     const EMBED_FOOTER_TEXT_LIMIT: usize = 2048;
@@ -202,7 +202,7 @@ pub fn validate_embed(embed: &super::builders::CreateEmbed) -> Result<usize, cra
 }
 
 /// Validates all messages
-pub fn validate_message(message: &super::builders::CreateMessage) -> Result<(), crate::Error> {
+pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), crate::Error> {
     pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
     pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
 
@@ -269,7 +269,7 @@ pub fn validate_message(message: &super::builders::CreateMessage) -> Result<(), 
     Ok(())
 }
 
-fn validate_option(option: &super::builders::CreateCommandOption) -> Result<(), crate::Error> {
+fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), crate::Error> {
     validate_string(&option.name)?;
 
     if let Some(name_localizations) = option.name_localizations.as_ref() {
@@ -302,7 +302,7 @@ fn validate_option(option: &super::builders::CreateCommandOption) -> Result<(), 
     Ok(())
 }
 
-pub fn validate_command(command: &super::builders::CreateCommand) -> Result<(), crate::Error> {
+pub fn validate_command(command: &super::types::CreateCommand) -> Result<(), crate::Error> {
     if let Some(name) = command.fields.name.as_ref() {
         validate_string(name)?;
     }

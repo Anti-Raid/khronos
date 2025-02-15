@@ -8,7 +8,7 @@ use crate::primitives::create_userdata_iterator_with_fields;
 /// Empty object: `Some(None)`
 /// Value: `Some(Some(value))`
 pub struct MultiOption<T: for<'a> serde::Deserialize<'a> + serde::Serialize> {
-    pub inner: Option<Option<T>>,
+    inner: Option<Option<T>>,
 }
 
 impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize + Clone> Clone for MultiOption<T> {
@@ -38,6 +38,18 @@ impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> MultiOption<T> {
         Self {
             inner: value.map(Some),
         }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.inner.is_none()
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.inner.is_some()
+    }
+
+    pub fn as_ref(&self) -> Option<&T> {
+        self.inner.as_ref().and_then(Option::as_ref)
     }
 
     /// Returns true if the value should not be serialized
