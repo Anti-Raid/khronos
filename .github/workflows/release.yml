@@ -82,7 +82,8 @@ jobs:
           ref: ${{ inputs.release_ref }}
 
       - name: Enable longpaths
-        run: sudo git config --system core.longpaths true
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
