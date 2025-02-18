@@ -121,11 +121,11 @@ jobs:
         run: |
           mkdir -p staging
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp "output/${{ matrix.cargo-target }}/release/khronos-cli.exe" staging/
+            cp "output/${{ matrix.cargo-target }}/release/khronos_cli.exe" staging/
             cd staging
             7z a ../release.zip *
           else
-            cp "output/${{ matrix.cargo-target }}/release/khronos-cli" staging/
+            cp "output/${{ matrix.cargo-target }}/release/khronos_cli" staging/
             cd staging
             zip ../release.zip *
           fi
