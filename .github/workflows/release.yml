@@ -84,7 +84,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           target: ${{ matrix.cargo-target }}
           override: true
           profile: minimal
@@ -107,7 +107,7 @@ jobs:
             cargo generate-lockfile
           fi
 
-      - name: Build darklua binary
+      - name: Build khronos-cli binary
         run: cargo build --locked --release --target ${{ matrix.cargo-target }}
         env:
           CARGO_TARGET_DIR: output
