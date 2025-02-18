@@ -81,6 +81,9 @@ jobs:
         with:
           ref: ${{ inputs.release_ref }}
 
+      - name: Enable longpaths
+        run: git config --system core.longpaths true
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -99,6 +102,7 @@ jobs:
             echo "[target.aarch64-unknown-linux-gnu]" > .cargo/config.toml
             echo 'linker = "aarch64-linux-gnu-gcc"' >> .cargo/config.toml
           fi
+          sudo apt install libssl-dev # Needed
 
       - name: Generate Cargo.lock if needed
         shell: bash
