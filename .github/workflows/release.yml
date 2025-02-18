@@ -53,24 +53,25 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact-name: darklua-windows-x86_64
+            artifact-name: khronos_cli-windows-x86_64
             cargo-target: x86_64-pc-windows-msvc
 
           - os: ubuntu-latest
-            artifact-name: darklua-linux-x86_64
+            artifact-name: khronos_cli-linux-x86_64
             cargo-target: x86_64-unknown-linux-gnu
 
           - os: ubuntu-latest
-            artifact-name: darklua-linux-aarch64
+            artifact-name: khronos_cli-linux-aarch64
             cargo-target: aarch64-unknown-linux-gnu
             linker: gcc-aarch64-linux-gnu
+            runs-on: ubuntu-24.04-arm
 
           - os: macos-latest
-            artifact-name: darklua-macos-x86_64
+            artifact-name: khronos_cli-macos-x86_64
             cargo-target: x86_64-apple-darwin
 
           - os: macos-latest
-            artifact-name: darklua-macos-aarch64
+            artifact-name: khronos_cli-macos-aarch64
             cargo-target: aarch64-apple-darwin
 
     name: Build darklua (${{ matrix.artifact-name }})
@@ -103,7 +104,6 @@ jobs:
             echo "[target.aarch64-unknown-linux-gnu]" > .cargo/config.toml
             echo 'linker = "aarch64-linux-gnu-gcc"' >> .cargo/config.toml
           fi
-          sudo apt install libssl-dev # Needed
 
       - name: Generate Cargo.lock if needed
         shell: bash
