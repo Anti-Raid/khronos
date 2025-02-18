@@ -263,8 +263,13 @@ impl LuaUserData for ServerRequestBody {
 
 #[derive(Debug, Clone)]
 pub enum BindAddr {
-    Unix { path: std::path::PathBuf },
-    Tcp { addr: std::net::SocketAddr },
+    #[cfg(unix)]
+    Unix {
+        path: std::path::PathBuf,
+    },
+    Tcp {
+        addr: std::net::SocketAddr,
+    },
 }
 
 impl FromLuaMulti for BindAddr {
@@ -275,6 +280,7 @@ impl FromLuaMulti for BindAddr {
                     let s = s.to_str()?;
 
                     if s.starts_with("unix:") {
+                        #[cfg(unix)]
                         return Ok(BindAddr::Unix {
                             path: if let Some(stripped) = s.strip_prefix("unix:") {
                                 stripped.into()
@@ -282,6 +288,11 @@ impl FromLuaMulti for BindAddr {
                                 return Err(LuaError::external("Invalid Unix socket path"));
                             },
                         });
+
+                        #[cfg(not(unix))]
+                        return Err(LuaError::external(
+                            "Unix sockets are not supported on this platform",
+                        ));
                     } else {
                         return Ok(BindAddr::Tcp {
                             addr: s.parse().map_err(LuaError::external)?,
@@ -333,11 +344,13 @@ impl FromLuaMulti for BindAddr {
 impl LuaUserData for BindAddr {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("type", |_lua, this| match this {
+            #[cfg(unix)]
             BindAddr::Unix { .. } => Ok("unix".to_string()),
             BindAddr::Tcp { .. } => Ok("tcp".to_string()),
         });
 
         fields.add_field_method_get("path", |_lua, this| match this {
+            #[cfg(unix)]
             BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
             _ => Err(LuaError::external("Not a Unix socket")),
         });
@@ -355,6 +368,7 @@ impl LuaUserData for BindAddr {
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, _: ()| match this {
+            #[cfg(unix)]
             BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
             BindAddr::Tcp { addr } => Ok(addr.to_string()),
         });
