@@ -349,8 +349,8 @@ impl LuaUserData for BindAddr {
             BindAddr::Tcp { .. } => Ok("tcp".to_string()),
         });
 
+        #[cfg(unix)]
         fields.add_field_method_get("path", |_lua, this| match this {
-            #[cfg(unix)]
             BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
             _ => Err(LuaError::external("Not a Unix socket")),
         });
