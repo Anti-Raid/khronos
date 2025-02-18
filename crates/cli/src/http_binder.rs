@@ -4,9 +4,13 @@ use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server,
 };
+use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::{convert::Infallible, path::PathBuf};
-use tokio::net::{TcpListener, UnixListener};
+#[cfg(unix)] // Unix sockets
+use std::path::PathBuf;
+use tokio::net::TcpListener;
+#[cfg(unix)] // Unix sockets
+use tokio::net::UnixListener;
 use tower::{Service, ServiceExt};
 
 #[allow(dead_code)]
