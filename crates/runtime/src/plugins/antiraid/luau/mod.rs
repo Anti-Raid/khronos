@@ -168,6 +168,21 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
         })?,
     )?;
 
+    module.set(
+        "format",
+        lua.create_function(|_, values: LuaMultiValue| {
+            if !values.is_empty() {
+                Ok(values
+                    .iter()
+                    .map(|value| format!("{:#?}", value))
+                    .collect::<Vec<_>>()
+                    .join("\t"))
+            } else {
+                Ok("nil".to_string())
+            }
+        })?,
+    )?;
+
     module.set_readonly(true); // Block any attempt to modify this table
 
     Ok(module)

@@ -74,3 +74,15 @@ Loads a luau code chunk. Note that setting other properties on the chunk must be
 #### Returns
 
 - `chunk` ([Chunk](#type.Chunk)): The loaded chunk.
+
+### format
+
+Formats a multivalue to a string. Useful when pretty printing evaluated luau results
+
+#### Parameters
+
+- `...` ([...](#type.any)): The values to format.
+
+#### Returns
+
+- `formatted` ([string](#type.string)): The formatted string. Arguments are separated by tabs
