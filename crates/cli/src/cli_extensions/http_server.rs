@@ -896,6 +896,7 @@ impl LuaUserData for Router {
                     routes,
                     crate::http_binder::CreateRpcServerOptions {
                         bind: match &this.bind_addr {
+                            #[cfg(unix)]
                             BindAddr::Unix { path } => {
                                 crate::http_binder::CreateRpcServerBind::UnixSocket(
                                     path.clone(),
