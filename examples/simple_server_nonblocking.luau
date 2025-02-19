@@ -29,11 +29,11 @@ task.spawn(function()
     local ok, _ = pcall(pyield, router:serve())
 
     if not ok then
-        print("Server stopped")
+        cli.ext.print("Server stopped")
     end
 end)
 
-print("Server started on " .. tostring(router.bind_addr))
+cli.ext.print("Server started on " .. tostring(router.bind_addr))
 
 while true do 
     task.wait(1)
@@ -41,5 +41,5 @@ while true do
         task.wait(1)
         break
     end
-    print("hi")
+    cli.ext.print("Stopped server")
 end

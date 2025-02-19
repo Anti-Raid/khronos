@@ -19,6 +19,8 @@ pub fn ext(
 ) -> LuaResult<LuaTable> {
     let ext = lua.create_table()?;
 
+    ext.set("print", lua.globals().get::<LuaFunction>("print")?)?;
+
     ext.set(
         "input",
         lua.create_function(move |_lua, (prompt,): (String,)| {

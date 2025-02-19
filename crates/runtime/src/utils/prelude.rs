@@ -1,25 +1,31 @@
 use mlua::prelude::*;
 
 /// Sets up the prelude for a Lua environment
-pub fn setup_prelude(lua: Lua, env: LuaTable) -> Result<(), LuaError> {
+pub fn setup_prelude(lua: &Lua, env: LuaTable) -> Result<(), LuaError> {
+    // Ensure _G.print and _G.eprint are nil
+    lua.globals().set("print", LuaValue::Nil)?;
+    lua.globals().set("eprint", LuaValue::Nil)?;
+
     // Prelude code providing some basic functions directly to the Lua VM
     lua.load(
         r#"
-            local tab = {stdout = {}, stderr = {}}
+            _G.stdout = {}
+            _G.stderr = {}
+
             -- Override print function with function that appends to stdout table
             -- We do this by executing a lua script
             _G.print = function(...)
                 local args = {...}
         
                 if #args == 0 then
-                    table.insert(tab.stdout, "nil")
+                    table.insert(_G.stdout, "nil")
                 end
     
                 local str = ""
                 for i = 1, #args do
                     str = str .. tostring(args[i])
                 end
-                table.insert(tab.stdout, str)
+                table.insert(_G.stdout, str)
             end
 
             -- Override eprint function with function that appends to stderr table
@@ -28,20 +34,15 @@ pub fn setup_prelude(lua: Lua, env: LuaTable) -> Result<(), LuaError> {
                 local args = {...}
         
                 if #args == 0 then
-                    table.insert(tab.stderr, "nil")
+                    table.insert(_G.stderr, "nil")
                 end
     
                 local str = ""
                 for i = 1, #args do
                     str = str .. tostring(args[i])
                 end
-                table.insert(tab.stderr, str)
+                table.insert(_G.stderr, str)
             end
-
-            -- Expose stdout to _G
-            _G.stdout = tab.stdout
-            -- Expose stderr to _G
-            _G.stderr = tab.stderr
         "#,
     )
     .set_name("prelude")

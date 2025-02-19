@@ -1,4 +1,4 @@
-print("Spawning repl after setting some globals!")
+cli.ext.print("Spawning repl after setting some globals!")
 foo = "you found me"
 
 -- Ask CLI to spin up a repl

@@ -9,6 +9,7 @@ use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::utils::pluginholder::PluginSet;
+use khronos_runtime::utils::prelude::setup_prelude;
 use khronos_runtime::utils::proxyglobal::proxy_global;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
@@ -362,6 +363,8 @@ impl Cli {
                 Self::setup_cli_specific_table(ext_state.clone(), &lua, &aux_opts),
             )
             .expect("Failed to set cli global");
+
+        setup_prelude(&lua, global_tab.clone()).expect("Failed to setup prelude");
 
         lua.sandbox(true).expect("Sandboxed VM"); // Sandbox VM
 
