@@ -65,12 +65,6 @@ impl CreateEventFromPresetType for AntiraidEventPresetType {
                 let data: Option<Vec<String>> = from_value(input_data)?;
                 Ok(AntiraidEvent::OnStartup(data.unwrap_or_default()))
             }
-            Self::BuiltinCommandExecute => {
-                let data: BuiltinCommandExecuteDataPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::BuiltinCommandExecute(
-                    data.into_builtin_command_execute_data(),
-                ))
-            }
             Self::PermissionCheckExecute => {
                 let data: PermissionCheckData = from_value(input_data)?;
                 Ok(AntiraidEvent::PermissionCheckExecute(
@@ -226,28 +220,6 @@ impl PunishmentPresetBaseInputData {
             reason: self.reason,
             state: self.state,
             data: self.data,
-        }
-    }
-}
-
-#[derive(serde::Deserialize)]
-pub struct BuiltinCommandExecuteDataPresetBaseInputData {
-    #[serde(default = "default_global_unknown_string")]
-    pub command: String,
-    #[serde(default = "default_global_user_id")]
-    pub user_id: serenity::all::UserId,
-    #[serde(default = "default_global_userinfo")]
-    pub user_info: UserInfo,
-}
-
-impl BuiltinCommandExecuteDataPresetBaseInputData {
-    fn into_builtin_command_execute_data(
-        self,
-    ) -> antiraid_types::ar_event::BuiltinCommandExecuteData {
-        antiraid_types::ar_event::BuiltinCommandExecuteData {
-            command: self.command,
-            user_id: self.user_id,
-            user_info: self.user_info,
         }
     }
 }

@@ -31,11 +31,6 @@ pub enum AntiraidEventPresetType {
     /// The inner Vec<String> is the list of templates modified/reloaded
     OnStartup,
 
-    /// A builtin command execute event is fired when a core/builtin command is executed
-    ///
-    /// This contains three fields, the command name, the user id and the UserInfo
-    BuiltinCommandExecute,
-
     /// A permission check event is fired when a permission check is done
     PermissionCheckExecute,
 
@@ -75,7 +70,6 @@ impl std::str::FromStr for AntiraidEventPresetType {
             "punishmentexpire" | "punishment.expire" => Ok(Self::PunishmentExpire),
             "punishmentdelete" | "punishment.delete" => Ok(Self::PunishmentDelete),
             "onstartup" | "on_startup" | "startup" | "start" | "init" => Ok(Self::OnStartup),
-            "builtincommandexecute" => Ok(Self::BuiltinCommandExecute),
             "permissioncheckexecute" => Ok(Self::PermissionCheckExecute),
             "moderationstart" => Ok(Self::ModerationStart),
             "moderationend" => Ok(Self::ModerationEnd),
