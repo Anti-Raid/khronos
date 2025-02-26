@@ -2,17 +2,15 @@
 
 This plugin allows for templates to interact with the Discord API. Types are as defined by Discord if not explicitly documented
 
-## Types
-
 <div id="Discord.CreateMessageAttachment" />
 
-### CreateMessageAttachment
+## CreateMessageAttachment
 
-The standard type for creating Discord message attachments using AntiRaid
+The standard type for creating Discord message attachments using AntiRaid. This differs slightly from what Discord does which isn't feasible in AntiRaid.
 
-#### CreateMessageAttachment (New)
+### CreateMessageAttachment (New)
 
-To create a new attachment
+To create a new attachment, provide the filename, a description (optional) and the content of the attachment.
 
 ```json
 [
@@ -28,9 +26,9 @@ To create a new attachment
 - `description` ([string?](#string)): The description (if any) of the attachment
 - `content` ([{byte}](#byte)): The content of the attachment
 
-#### CreateMessageAttachment (Existing)
+### CreateMessageAttachment (Existing)
 
-To keep an existing attachment
+To keep an existing attachment, just provide an ID field.
 
 ```json
 {
@@ -47,6 +45,20 @@ To keep an existing attachment
 ## DiscordExecutor
 
 DiscordExecutor allows templates to access/use the Discord API in a sandboxed form.
+
+### new
+
+```lua
+function new(token: TemplateContext): DiscordExecutor
+```
+
+#### Parameters
+
+- `token` ([TemplateContext](#TemplateContext)): The token of the template to use.
+
+#### Returns
+
+- `executor` ([DiscordExecutor](#DiscordExecutor)): A discord executor.
 
 ### DiscordExecutor:get_audit_logs
 
@@ -558,20 +570,3 @@ Options for creating an interaction response in Discord
 #### Returns
 
 - `Lazy<Discord.Message>` ([Discord.Message](#Discord.Message)): The message
-
-## Other Methods
-
-### new
-
-```lua
-function new(token: TemplateContext): DiscordExecutor
-```
-
-#### Parameters
-
-- `token` ([TemplateContext](#TemplateContext)): The token of the template to use.
-
-
-#### Returns
-
-- `executor` ([DiscordExecutor](#DiscordExecutor)): A discord executor.
