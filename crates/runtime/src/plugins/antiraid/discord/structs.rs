@@ -99,6 +99,11 @@ impl MessagePagination {
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct GetAutoModerationRuleOptions {
+    pub rule_id: serenity::all::RuleId,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateAutoModerationRuleOptions {
     pub reason: String,
     pub data: CreateAutoModRule,

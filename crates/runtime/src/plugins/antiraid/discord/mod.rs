@@ -178,7 +178,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         // Auto Moderation
 
-        // Documentation in progress
+        // Should be documented
         methods.add_method("list_auto_moderation_rules", |_, this, _: ()| {
             Ok(lua_promise!(this, |_lua, this|, {
                 this.check_action("list_auto_moderation_rules".to_string())
@@ -205,7 +205,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Documentation in progress
         methods.add_method("get_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
-                let rule_id: serenity::all::RuleId = lua.from_value(data)?;
+                let data = lua.from_value::<structs::GetAutoModerationRuleOptions>(data)?;
 
                 this.check_action("get_auto_moderation_rule".to_string())
                     .map_err(LuaError::external)?;
@@ -220,7 +220,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let rule = this
                     .discord_provider
-                    .get_auto_moderation_rule(rule_id)
+                    .get_auto_moderation_rule(data.rule_id)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -228,7 +228,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Documentation in progress
+        // Should be documented. Pending templating-types update
         methods.add_method("create_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data: CreateAutoModerationRuleOptions = lua.from_value(data)?;
@@ -485,7 +485,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Should be documented
+        // Documentation in progress
         methods.add_method("edit_channel_permissions", |_, this, channel_id: LuaValue| {
             Ok(lua_promise!(this, channel_id, |lua, this, channel_id|, {
                 let data = lua.from_value::<structs::EditChannelPermissionsOptions>(channel_id)?;
