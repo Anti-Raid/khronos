@@ -128,6 +128,7 @@ pub struct EditChannelPermissionsOptions {
     pub target_id: serenity::all::TargetId,
     pub allow: MultiOption<serenity::all::Permissions>,
     pub deny: MultiOption<serenity::all::Permissions>,
+    #[serde(rename = "type")]
     pub kind: u8,
     pub reason: String,
 }

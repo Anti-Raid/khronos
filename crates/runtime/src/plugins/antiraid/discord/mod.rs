@@ -178,7 +178,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         // Auto Moderation
 
-        // Should be documented
+        // Should be documented.
         methods.add_method("list_auto_moderation_rules", |_, this, _: ()| {
             Ok(lua_promise!(this, |_lua, this|, {
                 this.check_action("list_auto_moderation_rules".to_string())
@@ -202,7 +202,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Documentation in progress
+        // Should be documented.
         methods.add_method("get_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data = lua.from_value::<structs::GetAutoModerationRuleOptions>(data)?;
@@ -228,7 +228,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Should be documented. Pending templating-types update
+        // Should be documented.
         methods.add_method("create_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data: CreateAutoModerationRuleOptions = lua.from_value(data)?;
@@ -256,7 +256,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Documentation in progress
+        // Should be documented.
         methods.add_method("edit_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data: EditAutoModerationRuleOptions = lua.from_value(data)?;
@@ -284,7 +284,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Documentation in progress
+        // Should be documented.
         methods.add_method("delete_auto_moderation_rule", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data: DeleteAutoModerationRuleOptions = lua.from_value(data)?;
@@ -485,10 +485,10 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        // Documentation in progress
-        methods.add_method("edit_channel_permissions", |_, this, channel_id: LuaValue| {
-            Ok(lua_promise!(this, channel_id, |lua, this, channel_id|, {
-                let data = lua.from_value::<structs::EditChannelPermissionsOptions>(channel_id)?;
+        // Should be documented.
+        methods.add_method("edit_channel_permissions", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::EditChannelPermissionsOptions>(data)?;
 
                 this.check_action("edit_channel_permissions".to_string())
                     .map_err(LuaError::external)?;
@@ -561,7 +561,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this
                     .discord_provider
                     .edit_channel_permissions(
-                        data.channel_id, 
+                        data.channel_id,
                         data.target_id,
                         serde_json::json!({
                             "allow": data.allow,
@@ -1019,14 +1019,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     "get_audit_logs",
                     "list_auto_moderation_rules",
                     "get_auto_moderation_rule",
-                    //"create_auto_moderation_rule", // Not yet stable
-                    //"edit_auto_moderation_rule", // Not yet stable
+                    "create_auto_moderation_rule",
+                    "edit_auto_moderation_rule",
+                    "delete_auto_moderation_rule",
                     "get_channel",
                     "edit_channel",
                     "delete_channel",
-                    "create_guild_ban",
-                    "kick",
-                    "timeout",
+                    "edit_channel_permissions",
+                    //"create_guild_ban", (Not yet stable)
+                    //"kick", (Not yet stable)
+                    //"timeout", (Not yet stable)
                     "get_messages",
                     "get_message",
                     "create_message",
