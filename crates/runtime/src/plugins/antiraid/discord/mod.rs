@@ -1003,6 +1003,21 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
+        // Should be documented
+        methods.add_method("get_guild_roles", |_, this, _g: ()| {
+            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
+                this.check_action("get_guild_roles".to_string())
+                    .map_err(LuaError::external)?;
+
+                let roles = this.discord_provider
+                    .get_guild_roles()
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(roles))
+            }))
+        });                
+
         // Should be documented (get_message)
         methods.add_method("get_message", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
@@ -1242,6 +1257,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     "edit_channel_permissions",
                     "add_guild_member_role",
                     "remove_guild_member_role",
+                    "remove_guild_member",
+                    "get_guild_bans",
                     //"create_guild_ban", (Not yet stable)
                     //"kick", (Not yet stable)
                     //"timeout", (Not yet stable)

@@ -623,6 +623,18 @@ impl DiscordProvider for CliDiscordProvider {
             .map_err(|e| format!("Failed to create guild command: {}", e).into())
     }
 
+    async fn get_guild_roles(
+        &self,
+    ) -> Result<
+        extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>,
+        khronos_runtime::Error,
+    > {
+        self.http
+            .get_guild_roles(self.guild_id)
+            .await
+            .map_err(|e| format!("Failed to get guild roles: {}", e).into())
+    }
+
     async fn get_messages(
         &self,
         channel_id: serenity::all::ChannelId,

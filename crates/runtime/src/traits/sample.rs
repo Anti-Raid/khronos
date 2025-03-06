@@ -280,6 +280,13 @@ impl DiscordProvider for SampleDiscordProvider {
         todo!()
     }
 
+    async fn get_guild_roles(
+        &self,
+    ) -> Result<extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>, crate::Error>
+    {
+        todo!()
+    }
+
     async fn get_messages(
         &self,
         _channel_id: serenity::all::ChannelId,

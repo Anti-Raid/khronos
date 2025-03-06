@@ -1,3 +1,4 @@
+use extract_map::ExtractMap;
 use serenity::nonmax::NonMaxU8;
 
 /// A discord provider.
@@ -166,6 +167,11 @@ pub trait DiscordProvider: 'static + Clone {
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::Member, crate::Error>;
+
+    /// Returns the list of roles in the guild
+    async fn get_guild_roles(
+        &self,
+    ) -> Result<ExtractMap<serenity::all::RoleId, serenity::all::Role>, crate::Error>;
 
     /// Gets messages from a channel based on target+limit
     async fn get_messages(
