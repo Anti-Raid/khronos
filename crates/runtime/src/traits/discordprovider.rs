@@ -114,6 +114,36 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error>;
 
+    /// Adds a role to the member
+    async fn add_guild_member_role(
+        &self,
+        user_id: serenity::all::UserId,
+        role_id: serenity::all::RoleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
+
+    /// Removes a role from the member
+    async fn remove_guild_member_role(
+        &self,
+        user_id: serenity::all::UserId,
+        role_id: serenity::all::RoleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
+
+    /// Removes a member from the guild
+    async fn remove_guild_member(
+        &self,
+        user_id: serenity::all::UserId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error>;
+
+    /// Returns a list of guild bans
+    async fn get_guild_bans(
+        &self,
+        target: Option<serenity::all::UserPagination>,
+        limit: Option<serenity::nonmax::NonMaxU16>,
+    ) -> Result<Vec<serenity::all::Ban>, crate::Error>;
+
     /// Creates a ban for a user
     async fn create_member_ban(
         &self,

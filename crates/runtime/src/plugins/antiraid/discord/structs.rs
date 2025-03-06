@@ -132,3 +132,30 @@ pub struct EditChannelPermissionsOptions {
     pub kind: u8,
     pub reason: String,
 }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AddGuildMemberRoleOptions {
+    pub user_id: serenity::all::UserId,
+    pub role_id: serenity::all::RoleId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct RemoveGuildMemberRoleOptions {
+    pub user_id: serenity::all::UserId,
+    pub role_id: serenity::all::RoleId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct RemoveGuildMemberOptions {
+    pub user_id: serenity::all::UserId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetGuildBansOptions {
+    pub limit: Option<serenity::nonmax::NonMaxU16>,
+    pub before: Option<serenity::all::UserId>,
+    pub after: Option<serenity::all::UserId>,
+}

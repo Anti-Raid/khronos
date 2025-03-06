@@ -411,19 +411,6 @@ impl DiscordProvider for CliDiscordProvider {
             .map_err(|e| format!("Failed to delete automod rule: {}", e).into())
     }
 
-    async fn edit_channel_permissions(
-        &self,
-        channel_id: serenity::all::ChannelId,
-        target_id: serenity::all::TargetId,
-        data: impl serde::Serialize,
-        audit_log_reason: Option<&str>,
-    ) -> Result<(), khronos_runtime::Error> {
-        self.http
-            .create_permission(channel_id, target_id, &data, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to edit channel permissions: {}", e).into())
-    }
-
     async fn edit_channel(
         &self,
         channel_id: serenity::all::ChannelId,
@@ -457,6 +444,65 @@ impl DiscordProvider for CliDiscordProvider {
         CHANNEL_CACHE.remove(&channel_id).await;
 
         Ok(chan)
+    }
+
+    async fn edit_channel_permissions(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        target_id: serenity::all::TargetId,
+        data: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), khronos_runtime::Error> {
+        self.http
+            .create_permission(channel_id, target_id, &data, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to edit channel permissions: {}", e).into())
+    }
+
+    async fn add_guild_member_role(
+        &self,
+        user_id: serenity::all::UserId,
+        role_id: serenity::all::RoleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), khronos_runtime::Error> {
+        self.http
+            .add_member_role(self.guild_id, user_id, role_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to add role to member: {}", e).into())
+    }
+
+    async fn remove_guild_member_role(
+        &self,
+        user_id: serenity::all::UserId,
+        role_id: serenity::all::RoleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), khronos_runtime::Error> {
+        self.http
+            .remove_member_role(self.guild_id, user_id, role_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to remove role from member: {}", e).into())
+    }
+
+    async fn remove_guild_member(
+        &self,
+        user_id: serenity::all::UserId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), khronos_runtime::Error> {
+        self.http
+            .kick_member(self.guild_id, user_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to remove member: {}", e).into())
+    }
+
+    async fn get_guild_bans(
+        &self,
+        target: Option<serenity::all::UserPagination>,
+        limit: Option<serenity::nonmax::NonMaxU16>,
+    ) -> Result<Vec<serenity::all::Ban>, khronos_runtime::Error> {
+        self.http
+            .get_bans(self.guild_id, target, limit)
+            .await
+            .map_err(|e| format!("Failed to get guild bans: {}", e).into())
     }
 
     async fn create_member_ban(

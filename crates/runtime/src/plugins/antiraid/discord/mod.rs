@@ -7,7 +7,7 @@ use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::executorscope::ExecutorScope;
-use crate::utils::serenity_backports;
+use crate::utils::{serenity_backports, serenity_utils};
 use crate::{plugins::antiraid::lazy::Lazy, TemplateContextRef};
 use mlua::prelude::*;
 use serenity::all::Mentionable;
@@ -510,15 +510,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let guild = this.discord_provider.guild().await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                if !guild
-                    .user_permissions_in(&guild_channel, &bot_member)
-                    .manage_roles()
-                {
-                    return Err(LuaError::external(
-                        "Bot does not have permission to manage roles",
-                    ));
-                }
-
                 let resolved = guild
                 .user_permissions_in(&guild_channel, &bot_member);
 
@@ -576,6 +567,229 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 Ok(())
             }))
         });
+
+        // Should be documented
+        methods.add_method("add_guild_member_role", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::AddGuildMemberRoleOptions>(data)?;
+
+                this.check_action("add_guild_member_role".to_string())
+                    .map_err(LuaError::external)?;
+
+                    let Some(bot_user) = this.context.current_user() else {
+                        return Err(LuaError::runtime("Internal error: Current user not found"));
+                    };
+
+                    let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                        .map_err(|e| LuaError::external(e.to_string()))?
+                    else {
+                        return Err(LuaError::runtime("Bot user not found in guild"));
+                    };
+
+                    let guild = this.discord_provider.guild().await
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                    let resolved = serenity_backports::member_permissions(&guild, &bot_member);
+
+                    if !resolved
+                        .manage_roles()
+                    {
+                        return Err(LuaError::external(
+                            "Bot does not have permission to manage roles",
+                        ));
+                    }
+
+                    let Some(bot_highest_role) = serenity_utils::highest_role(&guild, &bot_member) else {
+                        return Err(LuaError::runtime("Bot does not have a role"));
+                    };
+
+                    let Some(role_to_add) = guild.roles.get(&data.role_id) else {
+                        return Err(LuaError::runtime("Role to add to member not found in guild"));
+                    };
+
+                    if role_to_add >= bot_highest_role {
+                        return Err(LuaError::external(
+                            format!("Bot does not have permission to add the requested role ({}, ``{}``) to the member", role_to_add.id, role_to_add.name.replace("`", "\\`")),
+                        ));
+                    }
+
+                    this.discord_provider
+                        .add_guild_member_role(data.user_id, data.role_id, Some(data.reason.as_str()))
+                        .await
+                        .map_err(|e| LuaError::external(e.to_string()))?;
+
+                    Ok(())
+            }))
+        });
+
+        // Should be documented
+        methods.add_method("remove_guild_member_role", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::RemoveGuildMemberRoleOptions>(data)?;
+
+                this.check_action("remove_guild_member_role".to_string())
+                    .map_err(LuaError::external)?;
+
+                    let Some(bot_user) = this.context.current_user() else {
+                        return Err(LuaError::runtime("Internal error: Current user not found"));
+                    };
+
+                    let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                        .map_err(|e| LuaError::external(e.to_string()))?
+                    else {
+                        return Err(LuaError::runtime("Bot user not found in guild"));
+                    };
+
+                    let guild = this.discord_provider.guild().await
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                    let resolved = serenity_backports::member_permissions(&guild, &bot_member);
+
+                    if !resolved
+                        .manage_roles()
+                    {
+                        return Err(LuaError::external(
+                            "Bot does not have permission to manage roles",
+                        ));
+                    }
+
+                    let Some(bot_highest_role) = serenity_utils::highest_role(&guild, &bot_member) else {
+                        return Err(LuaError::runtime("Bot does not have a role"));
+                    };
+
+                    let Some(role_to_remove) = guild.roles.get(&data.role_id) else {
+                        return Err(LuaError::runtime("Role to remove from member not found in guild"));
+                    };
+
+                    if role_to_remove >= bot_highest_role {
+                        return Err(LuaError::external(
+                            format!("Bot does not have permission to remove the requested role ({}, ``{}``) from the member", role_to_remove.id, role_to_remove.name.replace("`", "\\`")),
+                        ));
+                    }
+
+                    this.discord_provider
+                        .remove_guild_member_role(data.user_id, data.role_id, Some(data.reason.as_str()))
+                        .await
+                        .map_err(|e| LuaError::external(e.to_string()))?;
+
+                    Ok(())
+            }))
+        });
+
+        // Should be documented
+        methods.add_method("remove_guild_member", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::RemoveGuildMemberOptions>(data)?;
+
+                this.check_action("remove_guild_member".to_string())
+                    .map_err(LuaError::external)?;
+
+                    let Some(bot_user) = this.context.current_user() else {
+                        return Err(LuaError::runtime("Internal error: Current user not found"));
+                    };
+
+                    let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                        .map_err(|e| LuaError::external(e.to_string()))?
+                    else {
+                        return Err(LuaError::runtime("Bot user not found in guild"));
+                    };
+
+                    let Some(member_to_remove) = this.discord_provider.member(data.user_id).await
+                        .map_err(|e| LuaError::external(e.to_string()))?
+                    else {
+                        return Err(LuaError::runtime("Member to remove not found in guild"));
+                    };
+
+                    let guild = this.discord_provider.guild().await
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                    let resolved = serenity_backports::member_permissions(&guild, &bot_member);
+
+                    if !resolved
+                        .manage_roles()
+                    {
+                        return Err(LuaError::external(
+                            "Bot does not have permission to manage roles",
+                        ));
+                    }
+
+                    let member_highest_role = serenity_utils::highest_role(&guild, &member_to_remove);
+
+                    if let Some(member_highest_role) = member_highest_role {
+                        let Some(bot_highest_role) = serenity_utils::highest_role(&guild, &bot_member) else {
+                            return Err(LuaError::runtime("Bot does not have a role"));
+                        };    
+                        
+                        if member_highest_role >= bot_highest_role {
+                            return Err(LuaError::external(
+                                format!("Bot does not have permission to remove the requested member ({}, ``{}``) from the guild", member_to_remove.user.id, member_to_remove.user.tag().replace("`", "\\`")),
+                            ));
+                        }
+                    }
+
+                    this.discord_provider
+                        .remove_guild_member(data.user_id, Some(data.reason.as_str()))
+                        .await
+                        .map_err(|e| LuaError::external(e.to_string()))?;
+
+                    Ok(())
+            }))
+        });        
+
+        // Should be documented
+        methods.add_method("get_guild_bans", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetGuildBansOptions>(data)?;
+
+                this.check_action("get_guild_bans".to_string())
+                    .map_err(LuaError::external)?;
+
+                    let Some(bot_user) = this.context.current_user() else {
+                        return Err(LuaError::runtime("Internal error: Current user not found"));
+                    };
+
+                    let Some(bot_member) = this.discord_provider.member(bot_user.id).await
+                        .map_err(|e| LuaError::external(e.to_string()))?
+                    else {
+                        return Err(LuaError::runtime("Bot user not found in guild"));
+                    };
+
+                    let guild = this.discord_provider.guild().await
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                    let resolved = serenity_backports::member_permissions(&guild, &bot_member);
+
+                    if !resolved
+                        .ban_members()
+                    {
+                        return Err(LuaError::external(
+                            "Bot does not have permission to ban members",
+                        ));
+                    }
+
+                    let mut target = None;
+                    if let Some(before) = data.before {
+                        target = Some(serenity::all::UserPagination::Before(before));
+                    } else if let Some(after) = data.after {
+                        target = Some(serenity::all::UserPagination::After(after));
+                    } 
+
+                    if let Some(limit) = data.limit {
+                        if limit > unsafe { serenity::nonmax::NonMaxU16::new_unchecked(1000) } {
+                            return Err(LuaError::external(
+                                "Limit must be less than 1000",
+                            ));
+                        }
+                    }
+
+                    let bans = this.discord_provider
+                        .get_guild_bans(target, data.limit)
+                        .await
+                        .map_err(|e| LuaError::external(e.to_string()))?;
+
+                    Ok(Lazy::new(bans))
+            }))
+        });        
 
         // Ban/Kick/Timeout, not yet documented as it is not yet stable
         methods.add_method("create_guild_ban", |_, this, data: LuaValue| {
@@ -1026,6 +1240,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     "edit_channel",
                     "delete_channel",
                     "edit_channel_permissions",
+                    "add_guild_member_role",
+                    "remove_guild_member_role",
                     //"create_guild_ban", (Not yet stable)
                     //"kick", (Not yet stable)
                     //"timeout", (Not yet stable)

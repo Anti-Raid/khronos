@@ -176,6 +176,40 @@ impl DiscordProvider for SampleDiscordProvider {
         todo!()
     }
 
+    async fn add_guild_member_role(
+        &self,
+        _user_id: serenity::all::UserId,
+        _role_id: serenity::all::RoleId,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn remove_guild_member_role(
+        &self,
+        _user_id: serenity::all::UserId,
+        _role_id: serenity::all::RoleId,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn remove_guild_member(
+        &self,
+        _user_id: serenity::all::UserId,
+        _audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        todo!()
+    }
+
+    async fn get_guild_bans(
+        &self,
+        _target: Option<serenity::all::UserPagination>,
+        _limit: Option<serenity::nonmax::NonMaxU16>,
+    ) -> Result<Vec<serenity::all::Ban>, crate::Error> {
+        todo!()
+    }
+
     async fn kick_member(
         &self,
         _user_id: serenity::all::UserId,
