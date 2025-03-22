@@ -696,8 +696,7 @@ impl Instance {
         predicate callback and a breadth-first search.
 
         ### See Also
-        * [`FindFirstDescendant`](https://create.roblox.com/docs/reference/engine/classes/Instance#FindFirstDescendant)
-        on the Roblox Developer Hub
+        * [`FindFirstDescendant`](https://create.roblox.com/docs/reference/engine/classes/Instance#FindFirstDescendant) on the Roblox Developer Hub
     */
     pub fn find_descendant<F>(&self, predicate: F) -> Option<Instance>
     where
