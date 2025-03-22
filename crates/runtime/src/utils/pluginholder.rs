@@ -6,9 +6,6 @@ use crate::{
 };
 
 /// A plugin set that can be used to load Khronos plugins into mlua::Lua.
-///
-/// This can be used to make plugin loading easier but is not strictly required
-/// to use Khronos.
 pub struct PluginSet {
     pub plugins: indexmap::IndexMap<String, fn(&Lua) -> LuaResult<LuaTable>>,
 }
