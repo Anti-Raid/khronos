@@ -69,6 +69,7 @@ pub enum FileStorageBackend {
 
 pub struct LuaSetupResult {
     pub main_isolate: KhronosIsolate<FileAssetManager>,
+    pub file_asset_manager: FileAssetManager,
 }
 
 impl std::fmt::Debug for LuaSetupResult {
@@ -352,8 +353,9 @@ impl Cli {
             )
             .expect("Failed to set cli global");
 
+        let file_asset_manager = FileAssetManager::new(PathBuf::from(""));
         let main_isolate = runtime
-            .main_isolate(FileAssetManager::new(PathBuf::from("")), {
+            .main_isolate(file_asset_manager.clone(), {
                 let mut pset = PluginSet::new();
                 pset.add_default_plugins::<CliKhronosContext>();
                 pset
@@ -366,7 +368,10 @@ impl Cli {
             .raw_set("print", LuaValue::Nil)
             .expect("Failed to set print global");
 
-        LuaSetupResult { main_isolate }
+        LuaSetupResult {
+            main_isolate,
+            file_asset_manager,
+        }
     }
 
     fn setup_cli_specific_table(
@@ -409,8 +414,22 @@ impl Cli {
                             continue;
                         }
 
+                        self.setup_data
+                            .file_asset_manager
+                            .set_root_path(path.clone());
+
                         init_path
                     } else {
+                        // If the path is a file, get the parent directory
+                        let parent = path.parent().unwrap_or_else(|| {
+                            eprintln!("Failed to get parent directory of file: {:?}", path);
+                            std::process::exit(1);
+                        });
+
+                        self.setup_data
+                            .file_asset_manager
+                            .set_root_path(parent.to_path_buf());
+
                         path.to_path_buf()
                     };
 

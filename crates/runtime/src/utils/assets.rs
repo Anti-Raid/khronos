@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::PathBuf, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, path::PathBuf, rc::Rc};
 
 /// An asset manager is responsible for loading read-only assets.
 ///
@@ -33,7 +33,7 @@ impl<T: AssetManager> AssetManager for Rc<T> {
 #[derive(Clone)]
 /// A simple fs-based asset manager for testing purposes
 pub struct FileAssetManager {
-    root_path: PathBuf,
+    root_path: Rc<RefCell<PathBuf>>,
 }
 
 impl FileAssetManager {
@@ -43,15 +43,20 @@ impl FileAssetManager {
     ///
     /// * `root_path` - A string slice that holds the root path for the asset manager.
     pub fn new(root_path: PathBuf) -> Self {
-        Self { root_path }
+        Self {
+            root_path: Rc::new(RefCell::new(root_path)),
+        }
+    }
+
+    /// Sets the root path for the file asset manager.
+    pub fn set_root_path(&self, root_path: PathBuf) {
+        *self.root_path.borrow_mut() = root_path;
     }
 }
 
 impl AssetManager for FileAssetManager {
     fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
-        log::debug!("Current dir: {:?}", std::env::current_dir());
-
-        let path = self.root_path.join(path);
+        let path = self.root_path.borrow().join(path);
         log::debug!("[AssetFS] Getting file: {}", path.display());
         if let Ok(file) = std::fs::read_to_string(&path) {
             return Ok(Cow::Owned(file));

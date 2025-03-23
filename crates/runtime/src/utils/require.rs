@@ -170,7 +170,7 @@ pub fn require_from_controller<T: RequireController>(
         let luaurc = look_for_luaurc(&curr_path, controller);
 
         // Aliases have special resolution logic
-        match luaurc.aliases.get(&parts[0]) {
+        match luaurc.aliases.get(parts[0].trim_start_matches('@')) {
             Some(p) => {
                 let path = normalize_path(p);
 
@@ -413,15 +413,15 @@ mod require_test {
         tree.insert(
             ".luaurc".to_string(),
             create_luaurc_with_aliases(indexmap::indexmap! {
-                "@dir-alias".to_string() => "./foo/dir-alias".to_string(),
-                "@dir-alias-2".to_string() => "dogs/2".to_string()
+                "dir-alias".to_string() => "./foo/dir-alias".to_string(),
+                "dir-alias-2".to_string() => "dogs/2".to_string()
             }),
         );
         tree.insert(
             "nextluaurcarea/.luaurc".to_string(),
             create_luaurc_with_aliases(indexmap::indexmap! {
-                "@dir-alias".to_string() => "./foo/dir-alias".to_string(),
-                "@dir-alias-2".to_string() => "dogs/3".to_string()
+                "dir-alias".to_string() => "./foo/dir-alias".to_string(),
+                "dir-alias-2".to_string() => "dogs/3".to_string()
             }),
         );
 
