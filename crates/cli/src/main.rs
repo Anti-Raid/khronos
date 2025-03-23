@@ -83,20 +83,6 @@ struct CliArgs {
     #[clap(long, default_value = "false")]
     disable_test_funcs: bool,
 
-    /// Whether or not _G default proxying behavior should
-    /// be disabled (hence making _G read only due to sandboxing)
-    ///
-    /// AntiRaid uses the proxy method to allow _G to be read-write
-    /// while sandboxing lua globals, however for testing,
-    /// you may want to check how dependent the script is on
-    /// globals etc.
-    ///
-    /// Keep enabled if you are unsure
-    ///
-    /// Environment variable: `DISABLE_GLOBALS_PROXYING`
-    #[clap(long, default_value = "false")]
-    disable_globals_proxying: bool,
-
     /// Whether or not the internal "scheduler" library
     /// should be exposed to the script or not
     ///
@@ -271,12 +257,6 @@ impl CliArgs {
                 .expect("Failed to parse disable test funcs");
         }
 
-        if let Ok(disable_globals_proxying) = src.var("DISABLE_GLOBALS_PROXYING") {
-            self.disable_globals_proxying = disable_globals_proxying
-                .parse()
-                .expect("Failed to parse DISABLE_GLOBALS_PROXYING");
-        }
-
         if let Ok(disable_scheduler_lib) = src.var("DISABLE_SCHEDULER_LIB") {
             self.disable_scheduler_lib = disable_scheduler_lib
                 .parse()
@@ -373,7 +353,6 @@ impl CliArgs {
 
         let aux_opts = CliAuxOpts {
             disable_test_funcs: self.disable_test_funcs,
-            disable_globals_proxying: self.disable_globals_proxying,
             disable_scheduler_lib: self.disable_scheduler_lib,
             disable_task_lib: self.disable_task_lib,
             experiments: {

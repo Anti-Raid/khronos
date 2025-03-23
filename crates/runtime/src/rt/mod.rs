@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
+use crate::utils::prelude::{disable_harmful, setup_prelude};
 use crate::utils::proxyglobal::proxy_global;
 use crate::utils::require::{require_from_controller, RequireController};
 use crate::utils::{assets::AssetManager as AssetManagerTrait, pluginholder::PluginSet};
@@ -94,7 +95,7 @@ impl KhronosRuntime {
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub fn new<
         SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
-        OnInterruptFunc: Fn(&Lua, KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + mlua::MaybeSend + 'static,
+        OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + mlua::MaybeSend + 'static,
     >(
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
@@ -149,7 +150,7 @@ impl KhronosRuntime {
 
                 on_interrupt(
                     lua,
-                    KhronosRuntimeInterruptData {
+                    &KhronosRuntimeInterruptData {
                         last_execution_time: last_execution_time_ref.get(),
                     },
                 )
@@ -165,8 +166,7 @@ impl KhronosRuntime {
             });
         }
 
-        // Remove require from global table in favor of per-isolate require
-        lua.globals().set("require", LuaValue::Nil)?;
+        disable_harmful(&lua)?;
 
         Ok(Self {
             lua,
@@ -260,6 +260,29 @@ impl KhronosRuntime {
         self.sandboxed = false;
         Ok(())
     }
+
+    /// Create a new main isolate from the runtime
+    ///
+    /// Note that this will only work if the runtime is not sandboxed.
+    /// Also note that creating a main isolate will automatically sandbox the runtime
+    pub fn main_isolate<AssetManager: AssetManagerTrait + Clone + 'static>(
+        self,
+        asset_manager: AssetManager,
+        plugin_set: PluginSet,
+    ) -> Result<KhronosIsolate<AssetManager>, LuaError> {
+        KhronosIsolate::new_isolate(self, asset_manager, plugin_set)
+    }
+
+    /// Create a new sub isolate from the runtime
+    ///
+    /// Note that this will only work if the runtime is sandboxed
+    pub fn sub_isolate<AssetManager: AssetManagerTrait + Clone + 'static>(
+        self,
+        asset_manager: AssetManager,
+        plugin_set: PluginSet,
+    ) -> Result<KhronosIsolate<AssetManager>, LuaError> {
+        KhronosIsolate::new_subisolate(self, asset_manager, plugin_set)
+    }
 }
 
 /// A struct representing a Khronos isolate
@@ -316,7 +339,9 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
             })?,
         )?;
 
-        isolate.inner_mut().sandbox()?;
+        setup_prelude(isolate.lua(), isolate.global_table.clone())?;
+
+        isolate.inner_mut().sandbox()?; // Sandbox the runtime
 
         Ok(isolate)
     }
@@ -339,6 +364,8 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
                 require_from_controller(lua, pat, &controller_ref, None)
             })?,
         )?;
+
+        setup_prelude(isolate.lua(), isolate.global_table.clone())?;
 
         Ok(isolate)
     }
@@ -424,17 +451,14 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         self.require.as_ref().map(|r| r.as_ref())
     }
 
-    /// Runs a script from the asset manager
-    /// with the given KhronosContext and Event primitives
-    #[inline]
-    pub async fn spawn_asset<K: KhronosContextTrait>(
+    /// Converts a context, event pair to a LuaMultiValue
+    pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
         &self,
-        path: &str,
         context: TemplateContext<K>,
         event: Event,
-    ) -> Result<SpawnResult, LuaError> {
-        let args = match (event, context).into_lua_multi(&self.inner.lua) {
-            Ok(f) => f,
+    ) -> Result<LuaMultiValue, LuaError> {
+        match (event, context).into_lua_multi(self.inner.lua()) {
+            Ok(f) => Ok(f),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                 if let LuaError::MemoryError(_) = e {
@@ -442,17 +466,30 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
                     self.inner.mark_broken(true)
                 }
 
-                return Err(e);
+                Err(e)
             }
-        };
+        }
+    }
 
-        self.spawn_asset_with_args(path, args).await
+    /// Runs a script from the asset manager
+    /// with the given KhronosContext and Event primitives
+    #[inline]
+    pub async fn spawn_asset<K: KhronosContextTrait>(
+        &self,
+        cache_key: &str,
+        path: &str,
+        context: TemplateContext<K>,
+        event: Event,
+    ) -> Result<SpawnResult, LuaError> {
+        let args = self.context_event_to_lua_multi(context, event)?;
+        self.spawn_asset_with_args(cache_key, path, args).await
     }
 
     /// Runs a script from the asset manager
     #[inline]
     pub async fn spawn_asset_with_args(
         &self,
+        cache_key: &str,
         path: &str,
         args: LuaMultiValue,
     ) -> Result<SpawnResult, LuaError> {
@@ -460,7 +497,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
             .asset_manager
             .get_file(path)
             .map_err(|_| LuaError::RuntimeError(format!("Failed to load asset: {}", path)))?;
-        self.spawn_script(path, &code, args).await
+        self.spawn_script(cache_key, path, &code, args).await
     }
 
     /// Runs a script, returning the result as a LuaMultiValue
@@ -471,18 +508,19 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
     /// Note 2: You probably want spawn_asset or spawn_asset_with_args instead of this
     pub async fn spawn_script(
         &self,
+        cache_key: &str,
         name: &str,
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
         let thread = {
             let mut cache = self.bytecode_cache.inner().borrow_mut();
-            let bytecode = if let Some(bytecode) = cache.get(name) {
+            let bytecode = if let Some(bytecode) = cache.get(cache_key) {
                 Cow::Borrowed(bytecode)
             } else {
                 let compiler = self.inner.compiler();
                 let bytecode = Rc::new(compiler.compile(code)?);
-                cache.insert(name.to_string(), bytecode.clone());
+                cache.insert(cache_key.to_string(), bytecode.clone());
                 Cow::Owned(bytecode)
             };
 

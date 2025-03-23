@@ -250,7 +250,10 @@ impl Hinter for LuaStatementCompleter {
             return None;
         }
 
-        let (_pos, mut str) = Self::prepare_str(line, pos);
+        // Disable hints until we find a better way to do it using a readline impl that isn't
+        // so annoying to work with
+
+        /*let (_pos, mut str) = Self::prepare_str(line, pos);
 
         let candidates = self.get_candidates(&str).ok()?;
         // Return the first candidate
@@ -268,11 +271,12 @@ impl Hinter for LuaStatementCompleter {
             }
 
             return Some(first.clone());
-        }
+        }*/
 
         None
     }
 }
+
 impl Validator for LuaStatementCompleter {}
 
 impl Highlighter for LuaStatementCompleter {}

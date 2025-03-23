@@ -30,6 +30,7 @@ impl<T: AssetManager> AssetManager for Rc<T> {
     }
 }
 
+#[derive(Clone)]
 /// A simple fs-based asset manager for testing purposes
 pub struct FileAssetManager {
     root_path: PathBuf,
