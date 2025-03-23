@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::proxyglobal::proxy_global;
+use crate::utils::require::{require_from_controller, RequireController};
 use crate::utils::{assets::AssetManager as AssetManagerTrait, pluginholder::PluginSet};
 use crate::TemplateContext;
 use mlua::prelude::*;
@@ -164,6 +165,9 @@ impl KhronosRuntime {
             });
         }
 
+        // Remove require from global table in favor of per-isolate require
+        lua.globals().set("require", LuaValue::Nil)?;
+
         Ok(Self {
             lua,
             compiler,
@@ -228,8 +232,10 @@ impl KhronosRuntime {
         self.broken.set(broken);
     }
 
-    /// Sandboxes the VM after all extra needed setup has been performed. Note that KhronosIsolates
-    /// cannot be created until this is called.
+    /// Sandboxes the VM after all extra needed setup has been performed.
+    ///
+    /// Note that Isolates cannot be created if the runtime is sandboxed
+    /// and that Subisolates cannot be created if the runtime is not sandboxed
     pub fn sandbox(&mut self) -> Result<(), LuaError> {
         if self.sandboxed {
             return Ok(());
@@ -240,15 +246,39 @@ impl KhronosRuntime {
         self.sandboxed = true;
         Ok(())
     }
+
+    /// Un-sandboxes the VM
+    ///
+    /// DANGER: This should not be run after isolates have been created
+    pub fn unsandbox(&mut self) -> Result<(), LuaError> {
+        if !self.sandboxed {
+            return Ok(());
+        }
+
+        self.lua.sandbox(false)?;
+        self.lua.globals().set_readonly(false);
+        self.sandboxed = false;
+        Ok(())
+    }
 }
 
-/// A struct representing a Khronos context
-pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone> {
+/// A struct representing a Khronos isolate
+///
+/// An isolate allows for running scripts in a separate environment from the main runtime
+/// (although not entirely seperated as they share the same lua vm)
+///
+/// There are two specializations/flavors of isolates:
+/// - Isolates: These isolates are used when you only have a single common plugin set for
+///   multiple scripts running on the isolate. The require function is read-only
+/// - Subisolates: These isolates use a writable per-isolate require function and are useful
+///   for running one-off scripts with different plugins available to them
+#[derive(Clone)]
+pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone + 'static> {
     /// The inner khronos context for the isolate
     inner: KhronosRuntime,
 
     /// The plugin set for the isolate
-    plugin_set: PluginSet,
+    plugin_set: Rc<PluginSet>,
 
     /// The asset manager for the isolate
     asset_manager: AssetManager,
@@ -261,26 +291,81 @@ pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone> {
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
+
+    /// A handle to this isolates require controller
+    require: Option<Rc<IsolateRequireController<AssetManager>>>,
 }
 
-impl<AssetManager: AssetManagerTrait + Clone> KhronosIsolate<AssetManager> {
-    pub fn new(inner: KhronosRuntime, asset_manager: AssetManager) -> Result<Self, LuaError> {
-        if !inner.is_sandboxed() {
+impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetManager> {
+    pub fn new_isolate(
+        inner: KhronosRuntime,
+        asset_manager: AssetManager,
+        plugin_set: PluginSet,
+    ) -> Result<Self, LuaError> {
+        if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
-                "Khronos runtime must be sandboxed before creating an isolate".to_string(),
+                "Khronos runtime must not sandboxed before creating an isolate".to_string(),
             ));
         }
 
-        let lua = inner.lua();
-        let global_table = proxy_global(lua)?;
+        let (mut isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
+        isolate.lua().globals().set(
+            "require",
+            isolate.lua().create_function(move |lua, pat: String| {
+                require_from_controller(lua, pat, &controller_ref, None)
+            })?,
+        )?;
 
-        Ok(Self {
+        isolate.inner_mut().sandbox()?;
+
+        Ok(isolate)
+    }
+
+    pub fn new_subisolate(
+        inner: KhronosRuntime,
+        asset_manager: AssetManager,
+        plugin_set: PluginSet,
+    ) -> Result<Self, LuaError> {
+        if !inner.is_sandboxed() {
+            return Err(LuaError::RuntimeError(
+                "Khronos runtime must be sandboxed before creating an subisolate".to_string(),
+            ));
+        }
+
+        let (isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
+        isolate.global_table.set(
+            "require",
+            isolate.lua().create_function(move |lua, pat: String| {
+                require_from_controller(lua, pat, &controller_ref, None)
+            })?,
+        )?;
+
+        Ok(isolate)
+    }
+
+    /// Helper method to make the core isolate without any specialization
+    fn new(
+        inner: KhronosRuntime,
+        asset_manager: AssetManager,
+        plugin_set: PluginSet,
+    ) -> Result<(Self, Rc<IsolateRequireController<AssetManager>>), LuaError> {
+        let global_table = proxy_global(inner.lua())?;
+
+        let plugin_set = Rc::new(plugin_set);
+
+        let mut isolate = Self {
             inner,
-            plugin_set: PluginSet::new(),
+            plugin_set,
             asset_manager,
-            global_table,
+            global_table: global_table.clone(),
             bytecode_cache: Rc::new(BytecodeCache::new()),
-        })
+            require: None,
+        };
+
+        let controller = Rc::new(IsolateRequireController::new(isolate.clone()));
+        isolate.require = Some(controller.clone());
+
+        Ok((isolate, controller))
     }
 
     /// Returns the asset manager for the isolate
@@ -308,17 +393,11 @@ impl<AssetManager: AssetManagerTrait + Clone> KhronosIsolate<AssetManager> {
     }
 
     /// Returns the plugin set for the isolate
+    ///
+    /// This is a reference to the Rc'd plugin set, not a clone
     #[inline]
     pub fn plugin_set(&self) -> &PluginSet {
         &self.plugin_set
-    }
-
-    /// Returns the plugin set for the isolate in mutable form
-    ///
-    /// This is useful to load the default plugins into the plugin set if you want to
-    #[inline]
-    pub fn plugin_set_mut(&mut self) -> &mut PluginSet {
-        &mut self.plugin_set
     }
 
     /// Returns the global table for the isolate
@@ -338,6 +417,11 @@ impl<AssetManager: AssetManagerTrait + Clone> KhronosIsolate<AssetManager> {
     /// Sets a new bytecode cache for the isolate
     pub fn set_bytecode_cache(&mut self, cache: Rc<BytecodeCache>) {
         self.bytecode_cache = cache;
+    }
+
+    /// Returns the require controller for the isolate
+    pub fn require(&self) -> Option<&IsolateRequireController<AssetManager>> {
+        self.require.as_ref().map(|r| r.as_ref())
     }
 
     /// Runs a script from the asset manager
@@ -526,5 +610,68 @@ impl SpawnResult {
                 Ok(serde_json::Value::Array(arr))
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct IsolateRequireController<T: AssetManagerTrait + Clone + 'static> {
+    isolate: KhronosIsolate<T>,
+    requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
+}
+
+impl<T: AssetManagerTrait + Clone + 'static> IsolateRequireController<T> {
+    pub fn new(isolate: KhronosIsolate<T>) -> Self {
+        Self {
+            isolate,
+            requires_cache: RefCell::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Returns the inner isolate
+    pub fn inner(&self) -> &KhronosIsolate<T> {
+        &self.isolate
+    }
+
+    /// Returns the require cache
+    pub fn requires_cache(&self) -> &RefCell<std::collections::HashMap<String, LuaMultiValue>> {
+        &self.requires_cache
+    }
+}
+
+impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireController<T> {
+    fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>> {
+        if let Ok(table) = self.isolate.lua().globals().get::<LuaTable>(builtin) {
+            return Some(table.into_lua_multi(self.isolate.lua()));
+        }
+
+        let tab = match self.isolate.plugin_set.plugins.get(builtin) {
+            Some(plugin) => plugin(self.isolate.lua()),
+            None => return None,
+        };
+
+        match tab {
+            Ok(table) => Some(table.into_lua_multi(self.isolate.lua())),
+            Err(e) => {
+                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                if let LuaError::MemoryError(_) = e {
+                    // Mark VM as broken
+                    self.isolate.inner().mark_broken(true)
+                }
+
+                None
+            }
+        }
+    }
+
+    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+        self.isolate.asset_manager.get_file(path)
+    }
+
+    fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
+        self.requires_cache.borrow().get(path).cloned()
+    }
+
+    fn cache(&self, path: String, contents: LuaMultiValue) {
+        self.requires_cache.borrow_mut().insert(path, contents);
     }
 }

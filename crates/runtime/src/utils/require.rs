@@ -1,13 +1,10 @@
 use std::{
     borrow::Cow,
-    cell::RefCell,
     collections::HashMap,
     path::{Component, Path, PathBuf},
 };
 
 use mlua::prelude::*;
-
-use super::assets::AssetManager;
 
 // From Cargo
 pub fn normalize_path(path: &Path) -> PathBuf {
@@ -96,7 +93,7 @@ pub fn look_for_luaurc<T: RequireController>(
 /// Note that controllers should not be reused across script invocations
 pub trait RequireController {
     /// Returns a builtin
-    fn get_builtin(&self, builtin: &str) -> Option<LuaMultiValue>;
+    fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>>;
 
     /// Gets the file contents given normalized path
     fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error>;
@@ -119,7 +116,7 @@ pub fn require_from_controller<T: RequireController>(
 
     // Builtins override all else
     if let Some(builtin) = controller.get_builtin(&pat) {
-        return Ok(builtin);
+        return builtin;
     }
 
     // require path must start with a valid prefix: ./, ../ or @ for rbs
@@ -239,45 +236,46 @@ pub fn require_from_controller<T: RequireController>(
     ret
 }
 
-pub struct SimpleRequireController<T: AssetManager> {
-    asset_manager: T,
-    requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
-}
-
-impl<T: AssetManager> SimpleRequireController<T> {
-    pub fn new(asset_manager: T) -> Self {
-        Self {
-            asset_manager,
-            requires_cache: RefCell::new(std::collections::HashMap::new()),
-        }
-    }
-}
-
-impl<T: AssetManager> RequireController for SimpleRequireController<T> {
-    fn get_builtin(&self, _builtin: &str) -> Option<LuaMultiValue> {
-        None
-    }
-
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
-        self.asset_manager.get_file(path)
-    }
-
-    fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
-        self.requires_cache.borrow().get(path).cloned()
-    }
-
-    fn cache(&self, path: String, contents: LuaMultiValue) {
-        self.requires_cache.borrow_mut().insert(path, contents);
-    }
-}
-
 /// Test the require function
 #[cfg(test)]
 mod require_test {
-    use crate::utils::assets::{FileAssetManager, HashMapAssetManager};
+    use crate::utils::assets::{AssetManager, FileAssetManager, HashMapAssetManager};
 
     use super::*;
+    use std::cell::RefCell;
     use std::rc::Rc;
+
+    struct SimpleRequireController<T: AssetManager> {
+        asset_manager: T,
+        requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
+    }
+
+    impl<T: AssetManager> SimpleRequireController<T> {
+        pub fn new(asset_manager: T) -> Self {
+            Self {
+                asset_manager,
+                requires_cache: RefCell::new(std::collections::HashMap::new()),
+            }
+        }
+    }
+
+    impl<T: AssetManager> RequireController for SimpleRequireController<T> {
+        fn get_builtin(&self, _builtin: &str) -> Option<LuaResult<LuaMultiValue>> {
+            None
+        }
+
+        fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+            self.asset_manager.get_file(path)
+        }
+
+        fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
+            self.requires_cache.borrow().get(path).cloned()
+        }
+
+        fn cache(&self, path: String, contents: LuaMultiValue) {
+            self.requires_cache.borrow_mut().insert(path, contents);
+        }
+    }
 
     fn mv_is_v(lua: &Lua, mv: &LuaMultiValue, v: impl IntoLua) -> bool {
         let v = v.into_lua(lua).unwrap();
