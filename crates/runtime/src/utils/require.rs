@@ -7,6 +7,8 @@ use std::{
 
 use mlua::prelude::*;
 
+use super::assets::AssetManager;
+
 // From Cargo
 pub fn normalize_path(path: &Path) -> PathBuf {
     let mut components = path.components().peekable();
@@ -37,39 +39,56 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 
 #[derive(serde::Deserialize)]
 pub struct LuauRc {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    aliases: Option<HashMap<String, PathBuf>>,
+    #[serde(default)]
+    aliases: HashMap<String, PathBuf>,
 }
 
-/// luaurc is the standard way to handle aliases in Luau
-pub fn look_for_luaurc<T: RequireController>(
-    dir: impl AsRef<Path>,
-    require_controller: &T,
-) -> Option<LuauRc> {
-    let mut dir = dir.as_ref();
-
-    // Try cache first
-    if let Some(cached_luaurc_path) = require_controller.get_cached_luaurc(dir) {
-        if let Ok(luaurc_file) = require_controller.get_file(&cached_luaurc_path.to_string_lossy())
-        {
-            if let Ok(luaurc) = serde_json5::from_str(&luaurc_file) {
-                return Some(luaurc);
-            }
+impl LuauRc {
+    fn new() -> Self {
+        Self {
+            aliases: HashMap::new(),
         }
     }
 
+    fn merge(&mut self, other: LuauRc) {
+        if self.aliases.is_empty() {
+            self.aliases = other.aliases;
+        } else {
+            for (key, value) in other.aliases {
+                self.aliases.entry(key).or_insert(value);
+            }
+        }
+    }
+}
+
+/// luaurc is the standard way to handle aliases in Luau
+///
+/// Starts at current dir and recurses down until we reach the root merging as we go
+pub fn look_for_luaurc<T: RequireController>(
+    dir: impl AsRef<Path>,
+    require_controller: &T,
+) -> LuauRc {
+    let mut dir = dir.as_ref();
+
+    let mut luaurc = LuauRc::new();
     loop {
         // Keep recursing down from current dir
         let luaurc_path = dir.join(".luaurc");
         if let Ok(luaurc_file) = require_controller.get_file(&luaurc_path.to_string_lossy()) {
-            if let Ok(luaurc) = serde_json5::from_str(&luaurc_file) {
-                require_controller.cache_luaurc(dir.to_path_buf(), luaurc_path);
-                return Some(luaurc);
+            if let Ok(luaurc_new) = serde_json5::from_str(&luaurc_file) {
+                luaurc.merge(luaurc_new);
+                break; // For now, until Luau team makes a further RFC which is being waited on, stop at first luaurc found
             }
         }
 
-        dir = dir.parent()?;
+        if let Some(parent) = dir.parent() {
+            dir = parent;
+        } else {
+            break;
+        }
     }
+
+    luaurc
 }
 
 /// Controller to be used by `require`
@@ -87,12 +106,6 @@ pub trait RequireController {
 
     /// Caches the file contents
     fn cache(&self, path: String, contents: LuaMultiValue);
-
-    /// Returns a cached Luaurc path for a given path
-    fn get_cached_luaurc(&self, path: &Path) -> Option<PathBuf>;
-
-    /// Caches a luaurc
-    fn cache_luaurc(&self, path: PathBuf, luaurc_path: PathBuf);
 }
 
 /// Require a file with require-by-string semantics from a given controller
@@ -157,22 +170,10 @@ pub fn require_from_controller<T: RequireController>(
             )));
         }
 
-        let Some(luaurc) = look_for_luaurc(&curr_path, controller) else {
-            return Err(LuaError::external(format!(
-                "Invalid require path: {}. No valid .luaurc file found",
-                pat
-            )));
-        };
-
-        let Some(aliases) = luaurc.aliases else {
-            return Err(LuaError::external(format!(
-                "Invalid require path: {}. No aliases found in closest .luaurc file",
-                pat
-            )));
-        };
+        let luaurc = look_for_luaurc(&curr_path, controller);
 
         // Aliases have special resolution logic
-        match aliases.get(&parts[0]) {
+        match luaurc.aliases.get(&parts[0]) {
             Some(p) => {
                 let path = normalize_path(p);
 
@@ -238,35 +239,27 @@ pub fn require_from_controller<T: RequireController>(
     ret
 }
 
-/// A simple require controller for simple usecases and testing
-pub struct TestRequireController {
+pub struct SimpleRequireController<T: AssetManager> {
+    asset_manager: T,
     requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
-    fstree: std::collections::HashMap<String, String>,
-    cached_luaurc: RefCell<std::collections::HashMap<PathBuf, PathBuf>>,
 }
 
-impl TestRequireController {
-    pub fn new(tree: std::collections::HashMap<String, String>) -> Self {
+impl<T: AssetManager> SimpleRequireController<T> {
+    pub fn new(asset_manager: T) -> Self {
         Self {
+            asset_manager,
             requires_cache: RefCell::new(std::collections::HashMap::new()),
-            fstree: tree,
-            cached_luaurc: RefCell::new(std::collections::HashMap::new()),
         }
     }
 }
 
-impl RequireController for TestRequireController {
+impl<T: AssetManager> RequireController for SimpleRequireController<T> {
     fn get_builtin(&self, _builtin: &str) -> Option<LuaMultiValue> {
         None
     }
 
     fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
-        println!("[Require] Getting file: {}", path);
-        if let Some(file) = self.fstree.get(path) {
-            Ok(Cow::Borrowed(file))
-        } else {
-            Err(format!("File not found: {}", path).into())
-        }
+        self.asset_manager.get_file(path)
     }
 
     fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
@@ -275,71 +268,14 @@ impl RequireController for TestRequireController {
 
     fn cache(&self, path: String, contents: LuaMultiValue) {
         self.requires_cache.borrow_mut().insert(path, contents);
-    }
-
-    fn get_cached_luaurc(&self, path: &Path) -> Option<PathBuf> {
-        self.cached_luaurc.borrow().get(path).cloned()
-    }
-
-    fn cache_luaurc(&self, path: PathBuf, luaurc_path: PathBuf) {
-        self.cached_luaurc.borrow_mut().insert(path, luaurc_path);
-    }
-}
-
-/// A simple require controller for simple usecases and testing using a filesystem as fstree
-pub struct TestFilesystemRequireController {
-    requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
-    root_path: PathBuf,
-    cached_luaurc: RefCell<std::collections::HashMap<PathBuf, PathBuf>>,
-}
-
-impl TestFilesystemRequireController {
-    pub fn new(root_path: PathBuf) -> Self {
-        Self {
-            requires_cache: RefCell::new(std::collections::HashMap::new()),
-            root_path,
-            cached_luaurc: RefCell::new(std::collections::HashMap::new()),
-        }
-    }
-}
-
-impl RequireController for TestFilesystemRequireController {
-    fn get_builtin(&self, _builtin: &str) -> Option<LuaMultiValue> {
-        None
-    }
-
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
-        println!("Current dir: {:?}", std::env::current_dir());
-
-        let path = self.root_path.join(path);
-        println!("[RequireFS] Getting file: {}", path.display());
-        if let Ok(file) = std::fs::read_to_string(&path) {
-            return Ok(Cow::Owned(file));
-        }
-
-        Err(format!("File not found: {}", path.display()).into())
-    }
-
-    fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
-        self.requires_cache.borrow().get(path).cloned()
-    }
-
-    fn cache(&self, path: String, contents: LuaMultiValue) {
-        self.requires_cache.borrow_mut().insert(path, contents);
-    }
-
-    fn get_cached_luaurc(&self, path: &Path) -> Option<PathBuf> {
-        self.cached_luaurc.borrow().get(path).cloned()
-    }
-
-    fn cache_luaurc(&self, path: PathBuf, luaurc_path: PathBuf) {
-        self.cached_luaurc.borrow_mut().insert(path, luaurc_path);
     }
 }
 
 /// Test the require function
 #[cfg(test)]
 mod require_test {
+    use crate::utils::assets::{FileAssetManager, HashMapAssetManager};
+
     use super::*;
     use std::rc::Rc;
 
@@ -370,7 +306,7 @@ mod require_test {
         tree.insert("test.luau".to_string(), "return 2".to_string());
         tree.insert("test2.luau".to_string(), "return 3".to_string());
 
-        let controller = Rc::new(TestRequireController::new(tree));
+        let controller = Rc::new(SimpleRequireController::new(HashMapAssetManager::new(tree)));
 
         let lua = mlua::Lua::new();
         let pat = "./test".to_string();
@@ -492,7 +428,7 @@ mod require_test {
         );
 
         let controller = {
-            let c = TestRequireController::new(tree);
+            let c = SimpleRequireController::new(HashMapAssetManager::new(tree));
 
             Rc::new(c)
         };
@@ -520,9 +456,9 @@ mod require_test {
         let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         let controller = {
-            Rc::new(TestFilesystemRequireController::new(
-                base_path.join("tests"),
-            ))
+            let c = SimpleRequireController::new(FileAssetManager::new(base_path.join("tests")));
+
+            Rc::new(c)
         };
 
         let controller_b = controller.clone();

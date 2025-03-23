@@ -2,3 +2,6 @@
 resolver = "2"
 members = ["crates/cli", "crates/runtime"]
 default-members = ["crates/cli"]
+
+[profile.test]
+inherits = "release"
