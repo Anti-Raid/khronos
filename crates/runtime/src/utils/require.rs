@@ -5,6 +5,19 @@ use std::{
 };
 
 use mlua::prelude::*;
+use mlua_scheduler_ext::{traits::IntoLuaThread, Scheduler};
+
+pub const REQUIRE_LUAU_ASYNC_CODE: &str = r#"
+local luacall = ...
+
+local function callback(...)
+    local debugname = debug.info(2, "s")
+    luacall(coroutine.running(), string.sub(debugname, 10, -3), ...)
+    return coroutine.yield()
+end
+
+return callback
+"#;
 
 // From Cargo
 pub fn normalize_path(path: &Path) -> PathBuf {
@@ -35,9 +48,13 @@ pub fn normalize_path(path: &Path) -> PathBuf {
 }
 
 #[derive(serde::Deserialize)]
-pub struct LuauRc {
+pub struct LuauRcFile {
     #[serde(default)]
     aliases: HashMap<String, PathBuf>,
+}
+
+pub struct LuauRc {
+    aliases: HashMap<String, (PathBuf, PathBuf)>,
 }
 
 impl LuauRc {
@@ -47,13 +64,11 @@ impl LuauRc {
         }
     }
 
-    fn merge(&mut self, other: LuauRc) {
-        if self.aliases.is_empty() {
-            self.aliases = other.aliases;
-        } else {
-            for (key, value) in other.aliases {
-                self.aliases.entry(key).or_insert(value);
-            }
+    fn merge(&mut self, dir: &Path, other: LuauRcFile) {
+        for (key, value) in other.aliases {
+            self.aliases
+                .entry(key)
+                .or_insert((dir.to_path_buf(), value));
         }
     }
 }
@@ -73,7 +88,7 @@ pub fn look_for_luaurc<T: RequireController>(
         let luaurc_path = dir.join(".luaurc");
         if let Ok(luaurc_file) = require_controller.get_file(&luaurc_path.to_string_lossy()) {
             if let Ok(luaurc_new) = serde_json5::from_str(&luaurc_file) {
-                luaurc.merge(luaurc_new);
+                luaurc.merge(dir, luaurc_new);
                 break; // For now, until Luau team makes a further RFC which is being waited on, stop at first luaurc found
             }
         }
@@ -106,11 +121,11 @@ pub trait RequireController {
 }
 
 /// Require a file with require-by-string semantics from a given controller
-pub fn require_from_controller<T: RequireController>(
+pub async fn require_from_controller<T: RequireController>(
     lua: &Lua,
     pat: String,
     controller: impl AsRef<T>,
-    callstack_level: Option<usize>,
+    chunk_name: String,
 ) -> LuaResult<LuaMultiValue> {
     let controller = controller.as_ref();
 
@@ -128,19 +143,10 @@ pub fn require_from_controller<T: RequireController>(
     }
 
     let chunkname = {
-        let stack = lua.inspect_stack(callstack_level.unwrap_or(1)); // 1 is the function that called require
-        if let Some(stack) = stack {
-            if let Some(chunkname) = stack.source().source {
-                if chunkname.starts_with("./") {
-                    chunkname.to_string()
-                } else {
-                    "".to_string() // default to empty string
-                }
-            } else {
-                "".to_string()
-            }
+        if chunk_name.starts_with("./") {
+            chunk_name
         } else {
-            "".to_string()
+            "".to_string() // default to empty string
         }
     };
 
@@ -171,8 +177,8 @@ pub fn require_from_controller<T: RequireController>(
 
         // Aliases have special resolution logic
         match luaurc.aliases.get(parts[0].trim_start_matches('@')) {
-            Some(p) => {
-                let path = normalize_path(p);
+            Some((dir, p)) => {
+                let path = normalize_path(&dir.join(p));
 
                 if parts.len() == 2 {
                     path.join(&parts[1])
@@ -221,29 +227,39 @@ pub fn require_from_controller<T: RequireController>(
     }
 
     // Execute the file
-    let ret = lua
+    let th = lua
         .load(&*file_contents)
         .set_name(format!("./{}", pat))
-        .eval::<LuaMultiValue>();
+        .into_lua_thread(lua)?;
 
-    if let Ok(ret) = ret {
-        // Cache the result
-        controller.cache(pat, ret.clone());
+    let scheduler = Scheduler::get(lua);
+    let ret = scheduler
+        .spawn_thread_and_wait("Spawn", th, LuaMultiValue::new())
+        .await?;
 
-        return Ok(ret);
+    match ret {
+        Some(Ok(ret)) => {
+            controller.cache(pat, ret.clone());
+            Ok(ret)
+        }
+        Some(Err(ret)) => Err(ret),
+        None => Ok(LuaMultiValue::with_capacity(0)),
     }
-
-    ret
 }
 
 /// Test the require function
 #[cfg(test)]
 mod require_test {
+    use mlua_scheduler::{LuaSchedulerAsync, TaskManager};
+    use mlua_scheduler_ext::feedbacks::ThreadTracker;
+    use tokio::task::LocalSet;
+
     use crate::utils::assets::{AssetManager, FileAssetManager, HashMapAssetManager};
 
     use super::*;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use std::time::Duration;
 
     struct SimpleRequireController<T: AssetManager> {
         asset_manager: T,
@@ -296,56 +312,6 @@ mod require_test {
             "aliases": aliases
         }))
         .expect("Failed to create luaurc")
-    }
-
-    #[test]
-    fn test_basic_require() {
-        let mut tree = std::collections::HashMap::new();
-        tree.insert("test.luau".to_string(), "return 2".to_string());
-        tree.insert("test2.luau".to_string(), "return 3".to_string());
-
-        let controller = Rc::new(SimpleRequireController::new(HashMapAssetManager::new(tree)));
-
-        let lua = mlua::Lua::new();
-        let pat = "./test".to_string();
-        let ret = super::require_from_controller(&lua, pat, &controller, None);
-        assert!(mvr_is_v(&lua, &ret, 2));
-    }
-
-    #[test]
-    fn test_chunkname_extraction() {
-        let lua = mlua::Lua::new();
-        lua.globals()
-            .set(
-                "getchunkname",
-                lua.create_function(|lua, _: ()| {
-                    let stack = lua.inspect_stack(1);
-                    let Some(stack) = stack else {
-                        return Err(LuaError::external("getchunkname failed"));
-                    };
-
-                    let Some(chunkname) = stack.source().source else {
-                        return Err(LuaError::external(
-                            "Attempt to call getchunkname outside a chunk",
-                        ));
-                    };
-
-                    println!("{}", chunkname);
-                    Ok(chunkname.to_string())
-                })
-                .unwrap(),
-            ) // Mock require
-            .unwrap();
-
-        lua.load("assert(getchunkname() == 'mycoolchunk')")
-            .set_name("mycoolchunk")
-            .eval::<()>()
-            .expect("Failed to getchunkname");
-
-        lua.load("assert(getchunkname() == 'mycoolchunk2')")
-            .set_name("mycoolchunk2")
-            .eval::<()>()
-            .expect("Failed to getchunkname");
     }
 
     #[test]
@@ -420,58 +386,116 @@ mod require_test {
         tree.insert(
             "nextluaurcarea/.luaurc".to_string(),
             create_luaurc_with_aliases(indexmap::indexmap! {
-                "dir-alias".to_string() => "./foo/dir-alias".to_string(),
-                "dir-alias-2".to_string() => "dogs/3".to_string()
+                "dir-alias".to_string() => "../foo/dir-alias".to_string(),
+                "dir-alias-2".to_string() => "../dogs/3".to_string()
             }),
         );
 
-        let controller = {
-            let c = SimpleRequireController::new(HashMapAssetManager::new(tree));
-
-            Rc::new(c)
-        };
-        let controller_b = controller.clone();
-
-        let lua = mlua::Lua::new();
-        lua.globals()
-            .set(
-                "require",
-                lua.create_function(move |lua, pat: String| {
-                    super::require_from_controller(lua, pat, &controller_b, None)
-                })
-                .unwrap(),
-            ) // Mock require
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .unwrap();
-        let pat = "./test".to_string();
-        let ret = super::require_from_controller(&lua, pat, &controller, None);
-        assert!(mvr_is_v(&lua, &ret, 3));
+
+        let localset = LocalSet::new();
+        localset.block_on(&rt, async move {
+            let controller = {
+                let c = SimpleRequireController::new(HashMapAssetManager::new(tree));
+
+                Rc::new(c)
+            };
+            let controller_b = controller.clone();
+
+            let lua = mlua::Lua::new();
+            let tt = ThreadTracker::new();
+            let scheduler = Scheduler::new(TaskManager::new(
+                lua.clone(),
+                Rc::new(tt.clone()),
+                Duration::from_micros(1),
+            ));
+            lua.set_app_data(tt);
+            scheduler.attach();
+            lua.globals()
+                .set(
+                    "require",
+                    lua.create_scheduler_async_function_with(
+                        move |lua, (chunk_name, pat): (String, String)| {
+                            let controller_b_ref = controller_b.clone();
+                            async move {
+                                super::require_from_controller(
+                                    &lua,
+                                    pat,
+                                    &controller_b_ref,
+                                    chunk_name,
+                                )
+                                .await
+                            }
+                        },
+                        REQUIRE_LUAU_ASYNC_CODE,
+                    )
+                    .unwrap(),
+                ) // Mock require
+                .unwrap();
+            let pat = "./test".to_string();
+            let ret = super::require_from_controller(&lua, pat, &controller, "".to_string()).await;
+            assert!(mvr_is_v(&lua, &ret, 3));
+        });
     }
 
     #[test]
     fn test_reqtest() {
-        let lua = mlua::Lua::new();
-
-        let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        let controller = {
-            let c = SimpleRequireController::new(FileAssetManager::new(base_path.join("tests")));
-
-            Rc::new(c)
-        };
-
-        let controller_b = controller.clone();
-
-        lua.globals()
-            .set(
-                "require",
-                lua.create_function(move |lua, pat: String| {
-                    super::require_from_controller(lua, pat, &controller_b, None)
-                })
-                .unwrap(),
-            ) // Mock require
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .unwrap();
-        let pat = "./reqtest/a".to_string();
-        let ret = super::require_from_controller(&lua, pat, &controller, None);
-        assert!(mvr_is_v(&lua, &ret, 1));
+
+        let localset = LocalSet::new();
+        localset.block_on(&rt, async move {
+            let lua = mlua::Lua::new();
+
+            let tt = ThreadTracker::new();
+            let scheduler = Scheduler::new(TaskManager::new(
+                lua.clone(),
+                Rc::new(tt.clone()),
+                Duration::from_micros(1),
+            ));
+            lua.set_app_data(tt);
+            scheduler.attach();
+
+            let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+            let controller = {
+                let c =
+                    SimpleRequireController::new(FileAssetManager::new(base_path.join("tests")));
+
+                Rc::new(c)
+            };
+
+            let controller_b = controller.clone();
+
+            lua.globals()
+                .set(
+                    "require",
+                    lua.create_scheduler_async_function_with(
+                        move |lua, (chunk_name, pat): (String, String)| {
+                            let controller_b_ref = controller_b.clone();
+                            async move {
+                                super::require_from_controller(
+                                    &lua,
+                                    pat,
+                                    &controller_b_ref,
+                                    chunk_name,
+                                )
+                                .await
+                            }
+                        },
+                        REQUIRE_LUAU_ASYNC_CODE,
+                    )
+                    .unwrap(),
+                ) // Mock require
+                .unwrap();
+            let pat = "./reqtest/a".to_string();
+            let ret = super::require_from_controller(&lua, pat, &controller, "".to_string()).await;
+            assert!(mvr_is_v(&lua, &ret, 1));
+        });
     }
 }

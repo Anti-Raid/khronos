@@ -89,7 +89,15 @@ impl LuaToDomValue for LuaValue {
                 (LuaValue::Boolean(b), DomType::Bool) => Ok(DomValue::Bool(*b)),
 
                 (LuaValue::Integer(i), DomType::Int64) => Ok(DomValue::Int64(*i as i64)),
-                (LuaValue::Integer(i), DomType::Int32) => Ok(DomValue::Int32(*i)),
+                (LuaValue::Integer(i), DomType::Int32) => {
+                    Ok(DomValue::Int32((*i).try_into().map_err(
+                        |e: std::num::TryFromIntError| DomConversionError::ToDomValue {
+                            to: "Int32",
+                            from: "Integer",
+                            detail: Some(format!("Integer value too large: {e}")),
+                        },
+                    )?))
+                }
                 (LuaValue::Integer(i), DomType::Float64) => Ok(DomValue::Float64(*i as f64)),
                 (LuaValue::Integer(i), DomType::Float32) => Ok(DomValue::Float32(*i as f32)),
 
@@ -126,7 +134,7 @@ impl LuaToDomValue for LuaValue {
         } else {
             match self {
                 LuaValue::Boolean(b) => Ok(DomValue::Bool(*b)),
-                LuaValue::Integer(i) => Ok(DomValue::Int32(*i)),
+                LuaValue::Integer(i) => Ok(DomValue::Int64(*i)),
                 LuaValue::Number(n) => Ok(DomValue::Float64(*n)),
                 LuaValue::String(s) => Ok(DomValue::String(s.to_str()?.to_string())),
                 LuaValue::UserData(u) => u.lua_to_dom_value(lua, None),

@@ -29,13 +29,10 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tower = "0.3"
 termcolor = "1"
 
-# Bundling 
-darklua = { git = "https://github.com/Anti-Raid/darklua" }
-
 # Antiraid
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", branch = "dev", features = ["luau"] }
+mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau"] }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }

@@ -9,11 +9,11 @@ use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::prelude::{disable_harmful, setup_prelude};
 use crate::utils::proxyglobal::proxy_global;
-use crate::utils::require::{require_from_controller, RequireController};
+use crate::utils::require::{require_from_controller, RequireController, REQUIRE_LUAU_ASYNC_CODE};
 use crate::utils::{assets::AssetManager as AssetManagerTrait, pluginholder::PluginSet};
 use crate::TemplateContext;
 use mlua::prelude::*;
-use mlua_scheduler::TaskManager;
+use mlua_scheduler::{LuaSchedulerAsync, TaskManager};
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use mlua_scheduler_ext::Scheduler;
 
@@ -334,9 +334,15 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         let (mut isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
         isolate.lua().globals().set(
             "require",
-            isolate.lua().create_function(move |lua, pat: String| {
-                require_from_controller(lua, pat, &controller_ref, None)
-            })?,
+            isolate.lua().create_scheduler_async_function_with(
+                move |lua, (chunk_name, pat): (String, String)| {
+                    let controller_ref = controller_ref.clone();
+                    async move {
+                        require_from_controller(&lua, pat, &controller_ref, chunk_name).await
+                    }
+                },
+                REQUIRE_LUAU_ASYNC_CODE,
+            )?,
         )?;
 
         setup_prelude(isolate.lua(), isolate.global_table.clone())?;
@@ -358,11 +364,18 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         }
 
         let (isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
+
         isolate.global_table.set(
             "require",
-            isolate.lua().create_function(move |lua, pat: String| {
-                require_from_controller(lua, pat, &controller_ref, None)
-            })?,
+            isolate.lua().create_scheduler_async_function_with(
+                move |lua, (chunk_name, pat): (String, String)| {
+                    let controller_ref = controller_ref.clone();
+                    async move {
+                        require_from_controller(&lua, pat, &controller_ref, chunk_name).await
+                    }
+                },
+                REQUIRE_LUAU_ASYNC_CODE,
+            )?,
         )?;
 
         setup_prelude(isolate.lua(), isolate.global_table.clone())?;
