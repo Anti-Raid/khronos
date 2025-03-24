@@ -9,11 +9,11 @@ use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::prelude::{disable_harmful, setup_prelude};
 use crate::utils::proxyglobal::proxy_global;
-use crate::utils::require::{require_from_controller, RequireController, REQUIRE_LUAU_ASYNC_CODE};
+use crate::utils::require::{create_require_function, RequireController};
 use crate::utils::{assets::AssetManager as AssetManagerTrait, pluginholder::PluginSet};
 use crate::TemplateContext;
 use mlua::prelude::*;
-use mlua_scheduler::{LuaSchedulerAsync, TaskManager};
+use mlua_scheduler::TaskManager;
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use mlua_scheduler_ext::Scheduler;
 
@@ -334,15 +334,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         let (mut isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
         isolate.lua().globals().set(
             "require",
-            isolate.lua().create_scheduler_async_function_with(
-                move |lua, (chunk_name, pat): (String, String)| {
-                    let controller_ref = controller_ref.clone();
-                    async move {
-                        require_from_controller(&lua, pat, &controller_ref, chunk_name).await
-                    }
-                },
-                REQUIRE_LUAU_ASYNC_CODE,
-            )?,
+            create_require_function(isolate.lua(), controller_ref)?,
         )?;
 
         setup_prelude(isolate.lua(), isolate.global_table.clone())?;
@@ -367,15 +359,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
         isolate.global_table.set(
             "require",
-            isolate.lua().create_scheduler_async_function_with(
-                move |lua, (chunk_name, pat): (String, String)| {
-                    let controller_ref = controller_ref.clone();
-                    async move {
-                        require_from_controller(&lua, pat, &controller_ref, chunk_name).await
-                    }
-                },
-                REQUIRE_LUAU_ASYNC_CODE,
-            )?,
+            create_require_function(isolate.lua(), controller_ref)?,
         )?;
 
         setup_prelude(isolate.lua(), isolate.global_table.clone())?;
@@ -404,6 +388,8 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
         let controller = Rc::new(IsolateRequireController::new(isolate.clone()));
         isolate.require = Some(controller.clone());
+
+        // Convert plugin set to builtins table
 
         Ok((isolate, controller))
     }
@@ -690,15 +676,39 @@ impl<T: AssetManagerTrait + Clone + 'static> IsolateRequireController<T> {
 }
 
 impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireController<T> {
+    fn get_builtins(&self) -> Option<LuaResult<LuaTable>> {
+        let tab = match self.isolate.lua().create_table() {
+            Ok(tab) => tab,
+            Err(e) => return Some(Err(e)),
+        };
+
+        for (name, plugin) in self.isolate.plugin_set.iter() {
+            match tab.set(name.clone(), *plugin) {
+                Ok(_) => {}
+                Err(e) => {
+                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                    if let LuaError::MemoryError(_) = e {
+                        // Mark VM as broken
+                        self.isolate.inner().mark_broken(true)
+                    }
+
+                    return Some(Err(e));
+                }
+            }
+        }
+
+        Some(Ok(tab))
+    }
+
     fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>> {
         if let Ok(table) = self.isolate.lua().globals().get::<LuaTable>(builtin) {
             return Some(table.into_lua_multi(self.isolate.lua()));
         }
 
-        let tab = match self.isolate.plugin_set.plugins.get(builtin) {
-            Some(plugin) => plugin(self.isolate.lua()),
-            None => return None,
-        };
+        let tab = self
+            .isolate
+            .plugin_set
+            .load_plugin(self.isolate.lua(), builtin)?;
 
         match tab {
             Ok(table) => Some(table.into_lua_multi(self.isolate.lua())),

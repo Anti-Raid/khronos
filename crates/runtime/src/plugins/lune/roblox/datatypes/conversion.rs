@@ -88,7 +88,7 @@ impl LuaToDomValue for LuaValue {
             match (self, variant_type) {
                 (LuaValue::Boolean(b), DomType::Bool) => Ok(DomValue::Bool(*b)),
 
-                (LuaValue::Integer(i), DomType::Int64) => Ok(DomValue::Int64(*i as i64)),
+                (LuaValue::Integer(i), DomType::Int64) => Ok(DomValue::Int64(*i)),
                 (LuaValue::Integer(i), DomType::Int32) => {
                     Ok(DomValue::Int32((*i).try_into().map_err(
                         |e: std::num::TryFromIntError| DomConversionError::ToDomValue {

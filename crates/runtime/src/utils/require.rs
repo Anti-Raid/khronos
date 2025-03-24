@@ -5,14 +5,31 @@ use std::{
 };
 
 use mlua::prelude::*;
+use mlua_scheduler::LuaSchedulerAsync;
 use mlua_scheduler_ext::{traits::IntoLuaThread, Scheduler};
 
+/// The code that is run for requires
 pub const REQUIRE_LUAU_ASYNC_CODE: &str = r#"
-local luacall = ...
+local luacall, pluginreg = ...
 
-local function callback(...)
+local pluginregreqcache = {}
+local function callback(path, ...)
+    if not path then
+        error("missing argument #1 to 'require' (string expected)")
+    end
+
+    -- Fast path
+    if pluginreg[path] then
+        if pluginregreqcache[path] then
+            return pluginregreqcache[path]
+        end
+        local plugin = pluginreg[path]:load(...)
+        pluginregreqcache[path] = plugin
+        return plugin
+    end
+
     local debugname = debug.info(2, "s")
-    luacall(coroutine.running(), string.sub(debugname, 10, -3), ...)
+    luacall(coroutine.running(), string.sub(debugname, 10, -3), path, ...)
     return coroutine.yield()
 end
 
@@ -107,6 +124,9 @@ pub fn look_for_luaurc<T: RequireController>(
 ///
 /// Note that controllers should not be reused across script invocations
 pub trait RequireController {
+    /// Returns a builtins table
+    fn get_builtins(&self) -> Option<LuaResult<LuaTable>>;
+
     /// Returns a builtin
     fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>>;
 
@@ -121,6 +141,8 @@ pub trait RequireController {
 }
 
 /// Require a file with require-by-string semantics from a given controller
+///
+/// You probably want `create_require_function` instead though in practice
 pub async fn require_from_controller<T: RequireController>(
     lua: &Lua,
     pat: String,
@@ -247,10 +269,35 @@ pub async fn require_from_controller<T: RequireController>(
     }
 }
 
+pub fn create_require_function<T: RequireController>(
+    lua: &Lua,
+    controller_ref: impl AsRef<T> + Clone + 'static,
+) -> LuaResult<LuaFunction> {
+    let builtins = match controller_ref.as_ref().get_builtins() {
+        Some(builtins) => builtins?,
+        None => lua.create_table()?,
+    };
+
+    let args = {
+        let mut args = LuaMultiValue::with_capacity(1);
+        args.push_back(LuaValue::Table(builtins));
+        args
+    };
+
+    lua.create_scheduler_async_function_with(
+        move |lua, (chunk_name, pat): (String, String)| {
+            let controller_ref = controller_ref.clone();
+            async move { require_from_controller(&lua, pat, &controller_ref, chunk_name).await }
+        },
+        REQUIRE_LUAU_ASYNC_CODE,
+        args,
+    )
+}
+
 /// Test the require function
 #[cfg(test)]
 mod require_test {
-    use mlua_scheduler::{LuaSchedulerAsync, TaskManager};
+    use mlua_scheduler::TaskManager;
     use mlua_scheduler_ext::feedbacks::ThreadTracker;
     use tokio::task::LocalSet;
 
@@ -276,6 +323,10 @@ mod require_test {
     }
 
     impl<T: AssetManager> RequireController for SimpleRequireController<T> {
+        fn get_builtins(&self) -> Option<LuaResult<LuaTable>> {
+            None
+        }
+
         fn get_builtin(&self, _builtin: &str) -> Option<LuaResult<LuaMultiValue>> {
             None
         }
@@ -417,22 +468,7 @@ mod require_test {
             lua.globals()
                 .set(
                     "require",
-                    lua.create_scheduler_async_function_with(
-                        move |lua, (chunk_name, pat): (String, String)| {
-                            let controller_b_ref = controller_b.clone();
-                            async move {
-                                super::require_from_controller(
-                                    &lua,
-                                    pat,
-                                    &controller_b_ref,
-                                    chunk_name,
-                                )
-                                .await
-                            }
-                        },
-                        REQUIRE_LUAU_ASYNC_CODE,
-                    )
-                    .unwrap(),
+                    create_require_function(&lua, controller_b.clone()).unwrap(),
                 ) // Mock require
                 .unwrap();
             let pat = "./test".to_string();
@@ -475,22 +511,7 @@ mod require_test {
             lua.globals()
                 .set(
                     "require",
-                    lua.create_scheduler_async_function_with(
-                        move |lua, (chunk_name, pat): (String, String)| {
-                            let controller_b_ref = controller_b.clone();
-                            async move {
-                                super::require_from_controller(
-                                    &lua,
-                                    pat,
-                                    &controller_b_ref,
-                                    chunk_name,
-                                )
-                                .await
-                            }
-                        },
-                        REQUIRE_LUAU_ASYNC_CODE,
-                    )
-                    .unwrap(),
+                    create_require_function(&lua, controller_b.clone()).unwrap(),
                 ) // Mock require
                 .unwrap();
             let pat = "./reqtest/a".to_string();

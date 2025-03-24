@@ -5,9 +5,27 @@ use crate::{
     traits::context::KhronosContext,
 };
 
+#[derive(Clone, Copy, Debug)]
+pub struct Plugin(fn(&Lua) -> LuaResult<LuaTable>);
+
+impl From<fn(&Lua) -> LuaResult<LuaTable>> for Plugin {
+    fn from(func: fn(&Lua) -> LuaResult<LuaTable>) -> Self {
+        Self(func)
+    }
+}
+
+impl LuaUserData for Plugin {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("load", |lua, this, ()| {
+            let table = (this.0)(lua)?;
+            Ok(table)
+        });
+    }
+}
+
 /// A plugin set that can be used to load Khronos plugins into mlua::Lua.
 pub struct PluginSet {
-    pub plugins: indexmap::IndexMap<String, fn(&Lua) -> LuaResult<LuaTable>>,
+    plugins: indexmap::IndexMap<String, Plugin>,
 }
 
 impl Default for PluginSet {
@@ -52,22 +70,36 @@ impl PluginSet {
 
     /// Adds a plugin to the plugin set.
     pub fn add_plugin(&mut self, name: impl ToString, function: fn(&Lua) -> LuaResult<LuaTable>) {
-        self.plugins.insert(name.to_string(), function);
+        self.plugins.insert(name.to_string(), function.into());
+    }
+
+    /// Iterator over plugins
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Plugin)> {
+        self.plugins.iter()
     }
 
     /// Requires a plugin by name.
-    pub fn require(&self, lua: &Lua, plugin_name: String) -> LuaResult<LuaTable> {
-        if let Ok(table) = lua.globals().get::<LuaTable>(plugin_name.clone()) {
-            return Ok(table);
+    pub fn load_plugin(&self, lua: &Lua, plugin_name: &str) -> Option<LuaResult<LuaTable>> {
+        if let Ok(table) = lua.globals().get::<LuaTable>(plugin_name) {
+            return Some(Ok(table));
         }
 
-        match self.plugins.get(plugin_name.as_str()) {
-            Some(plugin) => plugin(lua),
-            None => Err(LuaError::runtime(format!(
-                "module '{}' not found",
-                plugin_name
-            ))),
-        }
+        self.plugins.get(plugin_name).map(|plugin| (plugin.0)(lua))
+    }
+}
+
+impl LuaUserData for PluginSet {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("load", |lua, this, plugin_name: String| {
+            let Some(plugin) = this.load_plugin(lua, &plugin_name) else {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "module '{}' not found",
+                    plugin_name
+                )));
+            };
+
+            plugin
+        });
     }
 }
 
