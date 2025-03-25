@@ -18,8 +18,6 @@ use khronos_runtime::utils::threadlimitmw::ThreadLimiter;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
-use mlua_scheduler_ext::feedbacks::ThreadAddMiddlewareFeedback;
-use mlua_scheduler_ext::feedbacks::ThreadTracker;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
@@ -277,9 +275,8 @@ impl Cli {
         aux_opts: CliAuxOpts,
         ext_state: Rc<RefCell<CliExtensionState>>,
     ) -> LuaSetupResult {
-        let tt = ThreadTracker::new();
         let runtime = KhronosRuntime::new(
-            ThreadAddMiddlewareFeedback::new(tt.clone(), ThreadLimiter::new(1000000)),
+            ThreadLimiter::new(1000000),
             RuntimeCreateOpts {
                 disable_scheduler_lib: aux_opts.disable_scheduler_lib,
                 disable_task_lib: aux_opts.disable_task_lib,
@@ -289,8 +286,6 @@ impl Cli {
             }),
         )
         .expect("Failed to create runtime");
-
-        runtime.lua().set_app_data(tt);
 
         // Test related functions, not available outside of script runner
         if !aux_opts.disable_test_funcs {

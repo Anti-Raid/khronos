@@ -14,6 +14,7 @@ use crate::utils::{assets::AssetManager as AssetManagerTrait, pluginholder::Plug
 use crate::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::TaskManager;
+use mlua_scheduler_ext::feedbacks::{ChainFeedback, ThreadTracker};
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use mlua_scheduler_ext::Scheduler;
 
@@ -111,6 +112,11 @@ impl KhronosRuntime {
             .set_type_info_level(1);
 
         lua.set_compiler(compiler.clone());
+
+        let tt = ThreadTracker::new(); // Set up the critical thread tracker feedback
+        lua.set_app_data(tt.clone());
+
+        let sched_feedback = ChainFeedback::new(tt.clone(), sched_feedback);
 
         let scheduler = Scheduler::new(TaskManager::new(
             lua.clone(),
