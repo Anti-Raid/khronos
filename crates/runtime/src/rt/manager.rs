@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::isolate::KhronosIsolate;
-use super::runtime::KhronosRuntime;
+use super::runtime::{KhronosRuntime, OnBrokenFunc};
 use crate::utils::assets::AssetManager as AssetManagerTrait;
 
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
@@ -19,6 +19,9 @@ pub struct KhronosRuntimeManager<T: AssetManagerTrait + Clone + 'static> {
 
     /// The main isolate (if any)
     main_isolate: Rc<RefCell<Option<KhronosIsolate<T>>>>,
+
+    /// A function to be called if the runtime is marked as broken
+    on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
 }
 
 impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
@@ -32,6 +35,7 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
             rt: rt.clone(),
             sub_isolates: Rc::new(RefCell::new(HashMap::new())),
             main_isolate: Rc::new(RefCell::new(None)),
+            on_broken: Rc::new(RefCell::new(None)),
         };
 
         let m_ref = m.clone();
@@ -39,7 +43,13 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
         // Ensure to clear out the isolates when the runtime is broken
         rt.set_on_broken(Box::new(move |_lua| {
             m_ref.main_isolate.borrow_mut().take();
-            m_ref.clear_sub_isolates()
+            m_ref.clear_sub_isolates();
+
+            let Some(on_broken) = m_ref.on_broken.borrow_mut().take() else {
+                return;
+            };
+
+            on_broken(_lua);
         }));
 
         m
@@ -78,5 +88,15 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
     /// Clears all sub-isolates
     pub fn clear_sub_isolates(&self) {
         self.sub_isolates.borrow_mut().clear();
+    }
+
+    /// Returns if a on_broken callback is set
+    pub fn has_on_broken(&self) -> bool {
+        self.on_broken.borrow().is_some()
+    }
+
+    /// Registers a callback to be called when the runtime is marked as broken
+    pub fn set_on_broken(&self, callback: OnBrokenFunc) {
+        self.on_broken.borrow_mut().replace(callback);
     }
 }
