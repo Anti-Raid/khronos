@@ -71,7 +71,7 @@ pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone + 'static> {
     plugin_set: Rc<PluginSet>,
 
     /// The asset manager for the isolate
-    asset_manager: AssetManager,
+    asset_manager: Rc<AssetManager>,
 
     /// The internal bytecode cache for the isolate
     ///
@@ -147,7 +147,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         let mut isolate = Self {
             inner,
             plugin_set,
-            asset_manager,
+            asset_manager: Rc::new(asset_manager),
             global_table: global_table.clone(),
             bytecode_cache: Rc::new(BytecodeCache::new()),
             require: None,
@@ -165,6 +165,12 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
     #[inline]
     pub fn asset_manager(&self) -> &AssetManager {
         &self.asset_manager
+    }
+
+    /// Sets a new asset manager for the isolate
+    #[inline]
+    pub fn set_asset_manager(&mut self, asset_manager: AssetManager) {
+        self.asset_manager = Rc::new(asset_manager);
     }
 
     /// Returns the lua vm for the isolate
