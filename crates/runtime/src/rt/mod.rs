@@ -116,7 +116,7 @@ impl KhronosRuntime {
         let tt = ThreadTracker::new(); // Set up the critical thread tracker feedback
         lua.set_app_data(tt.clone());
 
-        let sched_feedback = ChainFeedback::new(tt.clone(), sched_feedback);
+        let sched_feedback = ChainFeedback::new(tt, sched_feedback);
 
         let scheduler = Scheduler::new(TaskManager::new(
             lua.clone(),
