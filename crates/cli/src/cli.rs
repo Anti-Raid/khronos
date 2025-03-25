@@ -349,13 +349,13 @@ impl Cli {
             .expect("Failed to set cli global");
 
         let file_asset_manager = FileAssetManager::new(PathBuf::from(""));
-        let main_isolate = runtime
-            .main_isolate(file_asset_manager.clone(), {
-                let mut pset = PluginSet::new();
-                pset.add_default_plugins::<CliKhronosContext>();
-                pset
-            })
-            .expect("Failed to create main isolate");
+
+        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager.clone(), {
+            let mut pset = PluginSet::new();
+            pset.add_default_plugins::<CliKhronosContext>();
+            pset
+        })
+        .expect("Failed to create main isolate");
 
         // Disable print in the main isolate so it points to the global one
         main_isolate
