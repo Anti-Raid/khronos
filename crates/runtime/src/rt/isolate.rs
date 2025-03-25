@@ -259,10 +259,9 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         path: &str,
         args: LuaMultiValue,
     ) -> Result<SpawnResult, LuaError> {
-        let code = self
-            .asset_manager
-            .get_file(path)
-            .map_err(|_| LuaError::RuntimeError(format!("Failed to load asset: {}", path)))?;
+        let code = self.asset_manager.get_file(path).map_err(|e| {
+            LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
+        })?;
         self.spawn_script(cache_key, path, &code, args).await
     }
 
