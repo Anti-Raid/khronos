@@ -1,6 +1,6 @@
-<div id="@antiraid/datetime.luau"></div>
+<div id="@antiraid/datetime"></div>
 
-# @antiraid/datetime.luau
+# @antiraid/datetime
 
 <div id="Types"></div>
 
@@ -1613,9 +1613,9 @@ function timedelta_nanos(nanos: number) -> TimeDelta end
 
 ---
 
-<div id="@antiraid/discord.luau"></div>
+<div id="@antiraid/discord"></div>
 
-# @antiraid/discord.luau
+# @antiraid/discord
 
 <div id="Types"></div>
 
@@ -3430,9 +3430,9 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 
 ---
 
-<div id="@antiraid/img_captcha.luau"></div>
+<div id="@antiraid/img_captcha"></div>
 
-# @antiraid/img_captcha.luau
+# @antiraid/img_captcha
 
 <div id="Types"></div>
 
@@ -4158,9 +4158,9 @@ function new(config: CaptchaConfig) -> promise.LuaPromise<{Primitives.u8}> end
 
 ---
 
-<div id="@antiraid/interop.luau"></div>
+<div id="@antiraid/interop"></div>
 
-# @antiraid/interop.luau
+# @antiraid/interop
 
 <div id="Types"></div>
 
@@ -4191,9 +4191,9 @@ type null = {
 
 ---
 
-<div id="@antiraid/kv.luau"></div>
+<div id="@antiraid/kv"></div>
 
-# @antiraid/kv.luau
+# @antiraid/kv
 
 <div id="Types"></div>
 
@@ -4593,9 +4593,9 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 
 ---
 
-<div id="@antiraid/lazy.luau"></div>
+<div id="@antiraid/lazy"></div>
 
-# @antiraid/lazy.luau
+# @antiraid/lazy
 
 <div id="Types"></div>
 
@@ -4688,9 +4688,9 @@ This generic is unconstrained and can be any type
 
 ---
 
-<div id="@antiraid/lockdowns.luau"></div>
+<div id="@antiraid/lockdowns"></div>
 
-# @antiraid/lockdowns.luau
+# @antiraid/lockdowns
 
 <div id="Types"></div>
 
@@ -5094,9 +5094,9 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 
 ---
 
-<div id="@antiraid/luau.luau"></div>
+<div id="@antiraid/luau"></div>
 
-# @antiraid/luau.luau
+# @antiraid/luau
 
 <div id="Types"></div>
 
@@ -5342,9 +5342,9 @@ function format(...: any) -> string end
 
 ---
 
-<div id="@antiraid/pages.luau"></div>
+<div id="@antiraid/pages"></div>
 
-# @antiraid/pages.luau
+# @antiraid/pages
 
 <div id="Types"></div>
 
@@ -6245,9 +6245,9 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 
 ---
 
-<div id="@antiraid/permissions.luau"></div>
+<div id="@antiraid/permissions"></div>
 
-# @antiraid/permissions.luau
+# @antiraid/permissions
 
 <div id="Types"></div>
 
@@ -6544,9 +6544,9 @@ function check_patch_changes(manager_perms: {kittycat.Permission}, current_perms
 
 ---
 
-<div id="@antiraid/promise.luau"></div>
+<div id="@antiraid/promise"></div>
 
-# @antiraid/promise.luau
+# @antiraid/promise
 
 <div id="Types"></div>
 
@@ -6629,9 +6629,9 @@ This generic is unconstrained and can be any type
 
 ---
 
-<div id="@antiraid/stings.luau"></div>
+<div id="@antiraid/stings"></div>
 
-# @antiraid/stings.luau
+# @antiraid/stings
 
 <div id="Types"></div>
 
@@ -7276,9 +7276,9 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 
 ---
 
-<div id="@antiraid/typesext.luau"></div>
+<div id="@antiraid/typesext"></div>
 
-# @antiraid/typesext.luau
+# @antiraid/typesext
 
 <div id="Types"></div>
 
@@ -7327,9 +7327,9 @@ Union with variants:
 
 ---
 
-<div id="@antiraid/userinfo.luau"></div>
+<div id="@antiraid/userinfo"></div>
 
-# @antiraid/userinfo.luau
+# @antiraid/userinfo
 
 <div id="Types"></div>
 

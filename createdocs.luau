@@ -26,14 +26,14 @@ for i, docfile in fs.readDir("types/@antiraid") do
     print("Creating docs for "..docfile)
 
     -- module name is @antiraid + filename (without .luau)
-    local modname = "@antiraid"..docfile:sub(1, -6)
+    local modname = "@antiraid/"..docfile:sub(1, -6)
 
     globals.fs_ops.fs_writefile = function(path: string, content: string) 
         if path ~= "@virtualpath" then error("Invalid path: "..path) end
         fragments[#fragments + 1] = {module = modname, content = content}
     end
 
-    (globals :: any).documentor_args = {"types/@antiraid/"..docfile, "--output", "@virtualpath", "--modname", "@antiraid/"..docfile}
+    (globals :: any).documentor_args = {"types/@antiraid/"..docfile, "--output", "@virtualpath", "--modname", modname}
 
     documentor(globals)
 end
