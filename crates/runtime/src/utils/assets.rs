@@ -5,7 +5,7 @@ use std::{borrow::Cow, cell::RefCell, path::PathBuf, rc::Rc};
 /// This can/will be used in AntiRaid (at least) for multifile scripts
 pub trait AssetManager {
     /// Gets the file contents given normalized path
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error>;
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error>;
 }
 
 /// All Into<AssetManager> implementations should be able to be used as an AssetManager
@@ -13,19 +13,19 @@ impl<T: ?Sized> AssetManager for &T
 where
     T: AssetManager,
 {
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         (**self).get_file(path)
     }
 }
 
 impl<T: AssetManager> AssetManager for Box<T> {
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         (**self).get_file(path)
     }
 }
 
 impl<T: AssetManager> AssetManager for Rc<T> {
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         (**self).get_file(path)
     }
 }
@@ -55,7 +55,7 @@ impl FileAssetManager {
 }
 
 impl AssetManager for FileAssetManager {
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         let path = self.root_path.borrow().join(path);
         log::debug!("[AssetFS] Getting file: {}", path.display());
         if let Ok(file) = std::fs::read_to_string(&path) {
@@ -83,7 +83,7 @@ impl HashMapAssetManager {
 }
 
 impl AssetManager for HashMapAssetManager {
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         log::debug!("[Require] Getting file: {}", path);
         if let Some(file) = self.assets.get(path) {
             Ok(Cow::Borrowed(file))

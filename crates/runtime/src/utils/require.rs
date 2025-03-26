@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::HashMap,
     path::{Component, Path, PathBuf},
 };
@@ -104,7 +103,7 @@ pub fn look_for_luaurc<T: RequireController>(
         // Keep recursing down from current dir
         let luaurc_path = dir.join(".luaurc");
         if let Ok(luaurc_file) = require_controller.get_file(&luaurc_path.to_string_lossy()) {
-            if let Ok(luaurc_new) = serde_json5::from_str(&luaurc_file) {
+            if let Ok(luaurc_new) = serde_json5::from_str(luaurc_file.as_ref()) {
                 luaurc.merge(dir, luaurc_new);
                 break; // For now, until Luau team makes a further RFC which is being waited on, stop at first luaurc found
             }
@@ -131,7 +130,7 @@ pub trait RequireController {
     fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>>;
 
     /// Gets the file contents given normalized path
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error>;
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error>;
 
     /// Returns a LuaMultiValue from the cache (if any)
     fn get_cached(&self, path: &str) -> Option<LuaMultiValue>;
@@ -250,7 +249,7 @@ pub async fn require_from_controller<T: RequireController>(
 
     // Execute the file
     let th = lua
-        .load(&*file_contents)
+        .load(file_contents.as_ref())
         .set_name(format!("./{}", pat))
         .into_lua_thread(lua)?;
 
@@ -261,7 +260,7 @@ pub async fn require_from_controller<T: RequireController>(
 
     match ret {
         Some(Ok(ret)) => {
-            controller.cache(pat, ret.clone());
+            controller.cache(pat.clone(), ret.clone());
             Ok(ret)
         }
         Some(Err(ret)) => Err(ret),
@@ -331,7 +330,7 @@ mod require_test {
             None
         }
 
-        fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+        fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
             self.asset_manager.get_file(path)
         }
 

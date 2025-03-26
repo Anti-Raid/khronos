@@ -268,7 +268,8 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         let code = self.asset_manager.get_file(path).map_err(|e| {
             LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
         })?;
-        self.spawn_script(cache_key, path, &code, args).await
+        self.spawn_script(cache_key, path, code.as_ref(), args)
+            .await
     }
 
     /// Runs a script, returning the result as a LuaMultiValue
@@ -495,7 +496,7 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
         }
     }
 
-    fn get_file(&self, path: &str) -> Result<Cow<'_, str>, crate::Error> {
+    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
         self.isolate.asset_manager.get_file(path)
     }
 
