@@ -1,0 +1,6 @@
+[submodule "types"]
+	path = types
+	url = https://github.com/anti-raid/templating-types
+[submodule "luau-docgen"]
+	path = luau-docgen
+	url = https://github.com/anti-raid/luau-docgen
