@@ -4,8 +4,6 @@
 
 /// KV IR
 pub mod kv;
-/// Lockdowns IR
-pub mod lockdowns;
 /// Settings IR
 pub mod settings_ir;
 

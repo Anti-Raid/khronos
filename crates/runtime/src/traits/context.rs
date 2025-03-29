@@ -8,7 +8,8 @@ pub trait KhronosContext: 'static + Clone {
     type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
-    type LockdownProvider: LockdownProvider;
+    type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
+    type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
     type PageProvider: PageProvider;

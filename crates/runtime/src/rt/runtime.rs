@@ -1,5 +1,7 @@
 //! Single threaded khronos runtime struct/runner
 
+#![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
+
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};

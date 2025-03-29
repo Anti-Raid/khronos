@@ -109,6 +109,19 @@ where
     pub dt: chrono::DateTime<Tz>,
 }
 
+impl<Tz> DateTime<Tz>
+where
+    Tz: chrono::TimeZone + 'static + From<chrono_tz::Tz>,
+    chrono_tz::Tz: From<Tz>,
+    Tz::Offset: std::fmt::Display,
+{
+    pub fn from_utc(dt: chrono::DateTime<chrono::Utc>) -> Self {
+        DateTime {
+            dt: dt.with_timezone(&Tz::from(chrono_tz::Tz::UTC)),
+        }
+    }
+}
+
 impl<Tz> LuaUserData for DateTime<Tz>
 where
     Tz: chrono::TimeZone + 'static + From<chrono_tz::Tz>,

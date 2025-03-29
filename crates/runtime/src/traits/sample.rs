@@ -20,10 +20,68 @@ pub struct SampleKhronosContext {
     _rc: Rc<String>,
 }
 
+#[derive(Clone)]
+pub struct SampleLockdownDataStore {}
+
+impl lockdowns::LockdownDataStore for SampleLockdownDataStore {
+    async fn get_guild_lockdown_settings(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<lockdowns::GuildLockdownSettings, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn get_lockdowns(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<Vec<lockdowns::Lockdown>, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn insert_lockdown(
+        &self,
+        _guild_id: serenity::all::GuildId,
+        _lockdown: lockdowns::CreateLockdown,
+    ) -> Result<lockdowns::Lockdown, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn remove_lockdown(
+        &self,
+        _guild_id: serenity::all::GuildId,
+        _id: uuid::Uuid,
+    ) -> Result<(), lockdowns::Error> {
+        todo!()
+    }
+
+    async fn guild(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<serenity::all::PartialGuild, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn guild_channels(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<Vec<serenity::all::GuildChannel>, lockdowns::Error> {
+        todo!()
+    }
+
+    fn cache(&self) -> Option<&serenity::all::Cache> {
+        todo!()
+    }
+
+    fn http(&self) -> &serenity::all::Http {
+        todo!()
+    }
+}
+
 impl KhronosContext for SampleKhronosContext {
     type Data = ();
     type KVProvider = SampleKVProvider;
     type DiscordProvider = SampleDiscordProvider;
+    type LockdownDataStore = SampleLockdownDataStore;
     type LockdownProvider = SampleLockdownProvider;
     type UserInfoProvider = SampleUserInfoProvider;
     type StingProvider = SampleStingProvider;
@@ -63,7 +121,9 @@ impl KhronosContext for SampleKhronosContext {
     }
 
     fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
-        Some(SampleLockdownProvider {})
+        Some(SampleLockdownProvider {
+            _store: SampleLockdownDataStore {},
+        })
     }
 
     fn userinfo_provider(&self, _scope: ExecutorScope) -> Option<Self::UserInfoProvider> {
@@ -354,43 +414,17 @@ impl DiscordProvider for SampleDiscordProvider {
 }
 
 #[derive(Clone)]
-pub struct SampleLockdownProvider {}
+pub struct SampleLockdownProvider {
+    _store: SampleLockdownDataStore,
+}
 
-impl LockdownProvider for SampleLockdownProvider {
+impl LockdownProvider<SampleLockdownDataStore> for SampleLockdownProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), crate::Error> {
         todo!()
     }
 
-    async fn list(&self) -> Result<Vec<super::ir::Lockdown>, crate::Error> {
-        todo!()
-    }
-
-    async fn qsl(&self, _reason: String) -> Result<uuid::Uuid, crate::Error> {
-        todo!()
-    }
-
-    async fn tsl(&self, _reason: String) -> Result<uuid::Uuid, crate::Error> {
-        todo!()
-    }
-
-    async fn scl(
-        &self,
-        _channel_id: serenity::all::ChannelId,
-        _reason: String,
-    ) -> Result<uuid::Uuid, crate::Error> {
-        todo!()
-    }
-
-    async fn role(
-        &self,
-        _role_id: serenity::all::RoleId,
-        _reason: String,
-    ) -> Result<uuid::Uuid, crate::Error> {
-        todo!()
-    }
-
-    async fn remove(&self, _id: uuid::Uuid) -> Result<(), crate::Error> {
-        todo!()
+    fn lockdown_data_store(&self) -> &SampleLockdownDataStore {
+        &self._store
     }
 }
 

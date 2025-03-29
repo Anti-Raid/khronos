@@ -50,13 +50,20 @@ impl FileAssetManager {
 
     /// Sets the root path for the file asset manager.
     pub fn set_root_path(&self, root_path: PathBuf) {
-        *self.root_path.borrow_mut() = root_path;
+        if let Ok(mut path) = self.root_path.try_borrow_mut() {
+            *path = root_path;
+        }
     }
 }
 
 impl AssetManager for FileAssetManager {
     fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
-        let path = self.root_path.borrow().join(path);
+        let path_ref = self
+            .root_path
+            .try_borrow()
+            .map_err(|_| "Failed to borrow root path (concurrent access?)".to_string())?;
+
+        let path = path_ref.join(path);
         log::debug!("[AssetFS] Getting file: {}", path.display());
         if let Ok(file) = std::fs::read_to_string(&path) {
             return Ok(Cow::Owned(file));

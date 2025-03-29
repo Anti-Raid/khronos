@@ -1,0 +1,5 @@
+disallowed-methods = [
+    # fully qualified function/method name:
+    "std::cell::RefCell::borrow",
+    "std::cell::RefCell::borrow_mut"
+]

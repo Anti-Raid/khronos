@@ -21,6 +21,7 @@ mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau", "serialize"] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
+lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}

@@ -19,7 +19,7 @@ impl LuaPromise {
     }
 
     pub fn new_generic<
-        T: Future<Output = LuaResult<R>> + 'static,
+        T: Future<Output = LuaResult<R>>,
         U: Fn(&Lua) -> T + Clone + 'static,
         R: IntoLuaMulti + 'static,
     >(

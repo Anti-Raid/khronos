@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

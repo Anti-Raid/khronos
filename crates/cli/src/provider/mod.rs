@@ -26,6 +26,63 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
     });
 
 #[derive(Clone)]
+pub struct CliLockdownDataStore {}
+
+impl lockdowns::LockdownDataStore for CliLockdownDataStore {
+    async fn get_guild_lockdown_settings(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<lockdowns::GuildLockdownSettings, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn get_lockdowns(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<Vec<lockdowns::Lockdown>, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn insert_lockdown(
+        &self,
+        _guild_id: serenity::all::GuildId,
+        _lockdown: lockdowns::CreateLockdown,
+    ) -> Result<lockdowns::Lockdown, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn remove_lockdown(
+        &self,
+        _guild_id: serenity::all::GuildId,
+        _id: uuid::Uuid,
+    ) -> Result<(), lockdowns::Error> {
+        todo!()
+    }
+
+    async fn guild(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<serenity::all::PartialGuild, lockdowns::Error> {
+        todo!()
+    }
+
+    async fn guild_channels(
+        &self,
+        _guild_id: serenity::all::GuildId,
+    ) -> Result<Vec<serenity::all::GuildChannel>, lockdowns::Error> {
+        todo!()
+    }
+
+    fn cache(&self) -> Option<&serenity::all::Cache> {
+        todo!()
+    }
+
+    fn http(&self) -> &serenity::all::Http {
+        todo!()
+    }
+}
+
+#[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
@@ -42,6 +99,7 @@ impl KhronosContext for CliKhronosContext {
     type Data = serde_json::Value;
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
+    type LockdownDataStore = CliLockdownDataStore;
     type LockdownProvider = CliLockdownProvider;
     type UserInfoProvider = CliUserInfoProvider;
     type StingProvider = CliStingProvider;
@@ -129,7 +187,9 @@ impl KhronosContext for CliKhronosContext {
     }
 
     fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
-        Some(CliLockdownProvider {})
+        Some(CliLockdownProvider {
+            _lockdown_data_store: CliLockdownDataStore {},
+        })
     }
 
     fn userinfo_provider(&self, _scope: ExecutorScope) -> Option<Self::UserInfoProvider> {
@@ -660,45 +720,17 @@ impl DiscordProvider for CliDiscordProvider {
 }
 
 #[derive(Clone)]
-pub struct CliLockdownProvider {}
+pub struct CliLockdownProvider {
+    _lockdown_data_store: CliLockdownDataStore,
+}
 
-impl LockdownProvider for CliLockdownProvider {
+impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         todo!()
     }
 
-    async fn list(
-        &self,
-    ) -> Result<Vec<khronos_runtime::traits::ir::Lockdown>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn qsl(&self, _reason: String) -> Result<uuid::Uuid, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn tsl(&self, _reason: String) -> Result<uuid::Uuid, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn scl(
-        &self,
-        _channel_id: serenity::all::ChannelId,
-        _reason: String,
-    ) -> Result<uuid::Uuid, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn role(
-        &self,
-        _role_id: serenity::all::RoleId,
-        _reason: String,
-    ) -> Result<uuid::Uuid, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn remove(&self, _id: uuid::Uuid) -> Result<(), khronos_runtime::Error> {
-        todo!()
+    fn lockdown_data_store(&self) -> &CliLockdownDataStore {
+        &self._lockdown_data_store
     }
 }
 

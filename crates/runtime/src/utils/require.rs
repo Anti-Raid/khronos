@@ -335,11 +335,16 @@ mod require_test {
         }
 
         fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
-            self.requires_cache.borrow().get(path).cloned()
+            if let Ok(requires_cache) = self.requires_cache.try_borrow() {
+                return requires_cache.get(path).cloned();
+            }
+            None
         }
 
         fn cache(&self, path: String, contents: LuaMultiValue) {
-            self.requires_cache.borrow_mut().insert(path, contents);
+            if let Ok(mut requires_cache) = self.requires_cache.try_borrow_mut() {
+                requires_cache.insert(path, contents);
+            }
         }
     }
 

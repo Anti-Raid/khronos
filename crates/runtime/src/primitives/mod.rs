@@ -12,7 +12,9 @@ pub fn create_userdata_iterator_with_fields<const N: usize>(
 ) -> LuaResult<mlua::Function> {
     let i = RefCell::new(0);
     lua.create_function(move |lua, _: ()| {
-        let mut i_val = i.borrow_mut();
+        let mut i_val = i.try_borrow_mut().map_err(|_| {
+            mlua::Error::external("This iterator does not support concurrent access")
+        })?;
         *i_val += 1;
         if *i_val <= fields.len() {
             loop {
