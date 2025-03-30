@@ -306,7 +306,25 @@ impl FileStorageProvider for LocalFileStorageProvider {
 
         path.push(Self::parse_key_to_fs_file(key));
 
-        tokio::fs::remove_file(path).await.map_err(Error::from)
+        match tokio::fs::remove_file(path).await {
+            Ok(_) => {
+                if self.verbose {
+                    println!("[LocalFileStorageProvider] Deleted file successfully");
+                }
+                Ok(())
+            }
+            Err(e) => {
+                // Handle the case where the file does not exist
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    if self.verbose {
+                        println!("[LocalFileStorageProvider] File not found for deletion");
+                    }
+                    Ok(())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
     }
 }
 

@@ -348,7 +348,7 @@ impl Cli {
             )
             .expect("Failed to set cli global");
 
-        let file_asset_manager = FileAssetManager::new(PathBuf::from(""));
+        let file_asset_manager = FileAssetManager::new(PathBuf::from("/"));
 
         let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager.clone(), {
             let mut pset = PluginSet::new();
@@ -409,22 +409,8 @@ impl Cli {
                             continue;
                         }
 
-                        self.setup_data
-                            .file_asset_manager
-                            .set_root_path(path.clone());
-
                         init_path
                     } else {
-                        // If the path is a file, get the parent directory
-                        let parent = path.parent().unwrap_or_else(|| {
-                            eprintln!("Failed to get parent directory of file: {:?}", path);
-                            std::process::exit(1);
-                        });
-
-                        self.setup_data
-                            .file_asset_manager
-                            .set_root_path(parent.to_path_buf());
-
                         path.to_path_buf()
                     };
 
@@ -442,7 +428,10 @@ impl Cli {
                         }
                     };
 
-                    let values = match self.spawn_script(&name, &name, &contents).await {
+                    let values = match self
+                        .spawn_script(&name, &format!(".{}", path.display()), &contents)
+                        .await
+                    {
                         Ok(values) => values,
                         Err(e) => {
                             eprintln!("error: {}", e);

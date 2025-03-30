@@ -100,6 +100,7 @@ pub fn look_for_luaurc<T: RequireController>(
 
     let mut luaurc = LuauRc::new();
     loop {
+        log::info!("In directory for require resolution: {:?}", dir);
         // Keep recursing down from current dir
         let luaurc_path = dir.join(".luaurc");
         if let Ok(luaurc_file) = require_controller.get_file(&luaurc_path.to_string_lossy()) {
@@ -111,6 +112,10 @@ pub fn look_for_luaurc<T: RequireController>(
 
         if let Some(parent) = dir.parent() {
             dir = parent;
+            log::info!(
+                "Trying to find .luaurc in: {:?} for require resolution",
+                dir
+            );
         } else {
             break;
         }
