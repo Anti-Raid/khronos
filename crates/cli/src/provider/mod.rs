@@ -1,3 +1,4 @@
+use khronos_runtime::utils::assets::FileAssetManager;
 use moka::future::Cache;
 use serenity::all::InteractionId;
 use std::rc::Rc;
@@ -90,7 +91,7 @@ pub struct CliKhronosContext {
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
-    pub global_table: mlua::Table,
+    pub isolate: khronos_runtime::rt::KhronosIsolate<FileAssetManager>,
     pub http: Option<Rc<serenity::all::Http>>,
     pub cache: Option<Rc<serenity::cache::Cache>>,
 }
@@ -104,6 +105,7 @@ impl KhronosContext for CliKhronosContext {
     type UserInfoProvider = CliUserInfoProvider;
     type StingProvider = CliStingProvider;
     type PageProvider = CliPageProvider;
+    type AssetManager = FileAssetManager;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -132,8 +134,8 @@ impl KhronosContext for CliKhronosContext {
     }
 
     /// Returns the global table to use
-    fn global_table(&self) -> mlua::Table {
-        self.global_table.clone()
+    fn isolate(&self) -> &khronos_runtime::rt::KhronosIsolate<FileAssetManager> {
+        &self.isolate
     }
 
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {

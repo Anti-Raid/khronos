@@ -65,6 +65,9 @@ pub struct KhronosRuntime {
     /// The last time the VM executed a script
     last_execution_time: Rc<Cell<Option<Instant>>>,
 
+    /// The shared store table for the runtime
+    store_table: LuaTable,
+
     /// runtime creation options
     opts: RuntimeCreateOpts,
 }
@@ -226,6 +229,7 @@ impl KhronosRuntime {
         }
 
         Ok(Self {
+            store_table: lua.create_table()?,
             lua,
             compiler,
             scheduler,
@@ -359,5 +363,10 @@ impl KhronosRuntime {
     /// The current number of threads is immutable and cannot be directly modified by the user.
     pub fn current_threads(&self) -> i64 {
         self.current_threads.get()
+    }
+
+    /// Returns the store table for the runtime
+    pub fn store_table(&self) -> &LuaTable {
+        &self.store_table
     }
 }

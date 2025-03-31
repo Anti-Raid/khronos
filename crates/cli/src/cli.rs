@@ -209,7 +209,7 @@ impl Cli {
     }
 
     /// Create a khronos context
-    fn create_khronos_context(&self, global_table: LuaTable) -> provider::CliKhronosContext {
+    fn create_khronos_context(&self) -> provider::CliKhronosContext {
         let context_data = if let Some(ref context_data) = self.context_data {
             serde_json::from_str(context_data).expect("Failed to parse context data")
         } else {
@@ -222,7 +222,7 @@ impl Cli {
             allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
-            global_table,
+            isolate: self.setup_data.main_isolate.clone(),
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
@@ -245,8 +245,7 @@ impl Cli {
         let args = match &self.cached_khronos_rt_args {
             Some(context) => context.clone(),
             None => {
-                let context = self
-                    .create_khronos_context(self.setup_data.main_isolate.global_table().clone());
+                let context = self.create_khronos_context();
 
                 let template_context: TemplateContext<provider::CliKhronosContext> =
                     TemplateContext::new(context);

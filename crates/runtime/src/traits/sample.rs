@@ -86,6 +86,7 @@ impl KhronosContext for SampleKhronosContext {
     type UserInfoProvider = SampleUserInfoProvider;
     type StingProvider = SampleStingProvider;
     type PageProvider = DummyPageProvider;
+    type AssetManager = crate::utils::assets::FileAssetManager;
 
     fn data(&self) -> Self::Data {
         todo!()
@@ -107,8 +108,7 @@ impl KhronosContext for SampleKhronosContext {
         None::<serenity::all::CurrentUser>
     }
 
-    /// Returns the global table to use
-    fn global_table(&self) -> mlua::Table {
+    fn isolate(&self) -> &crate::rt::KhronosIsolate<Self::AssetManager> {
         todo!()
     }
 

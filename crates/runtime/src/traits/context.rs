@@ -2,7 +2,7 @@ use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
     pageprovider::PageProvider, stingprovider::StingProvider, userinfoprovider::UserInfoProvider,
 };
-use crate::utils::executorscope::ExecutorScope;
+use crate::utils::{assets::AssetManager, executorscope::ExecutorScope};
 
 pub trait KhronosContext: 'static + Clone {
     type Data: serde::Serialize;
@@ -13,6 +13,7 @@ pub trait KhronosContext: 'static + Clone {
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
     type PageProvider: PageProvider;
+    type AssetManager: AssetManager + Clone;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -39,8 +40,8 @@ pub trait KhronosContext: 'static + Clone {
     /// Returns the current Discord user, if any
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
-    /// Returns the global table to use
-    fn global_table(&self) -> mlua::Table;
+    /// Returns the Khronos isolate being used
+    fn isolate(&self) -> &crate::rt::KhronosIsolate<Self::AssetManager>;
 
     /// Returns a key-value provider with the given scope
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider>;

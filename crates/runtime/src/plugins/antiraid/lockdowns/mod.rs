@@ -8,6 +8,7 @@ use crate::utils::executorscope::ExecutorScope;
 use crate::TemplateContextRef;
 use lockdowns::LockdownSet;
 use mlua::prelude::*;
+use types::{CreateLockdownMode, LockdownMode};
 
 #[derive(Clone)]
 /// An lockdown executor is used to manage AntiRaid lockdowns from Lua
@@ -103,6 +104,61 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                 Ok(executor)
             },
         )?,
+    )?;
+
+    module.set(
+        "CreateQuickServerLockdown",
+        CreateLockdownMode(Box::new(lockdowns::qsl::CreateQuickServerLockdown)),
+    )?;
+    module.set(
+        "CreateTraditionalServerLockdown",
+        CreateLockdownMode(Box::new(lockdowns::tsl::CreateTraditionalServerLockdown)),
+    )?;
+    module.set(
+        "CreateSingleChannelLockdown",
+        CreateLockdownMode(Box::new(lockdowns::scl::CreateSingleChannelLockdown)),
+    )?;
+    module.set(
+        "CreateSingleChannelLockdown",
+        CreateLockdownMode(Box::new(lockdowns::role::CreateRoleLockdown)),
+    )?;
+    module.set(
+        "QuickServerLockdown",
+        lua.create_function(|_lua, _g: ()| {
+            Ok(LockdownMode(Box::new(lockdowns::qsl::QuickServerLockdown)))
+        })?,
+    )?;
+    module.set(
+        "TraditionalServerLockdown",
+        lua.create_function(|_lua, _g: ()| {
+            Ok(LockdownMode(Box::new(
+                lockdowns::tsl::TraditionalServerLockdown,
+            )))
+        })?,
+    )?;
+    module.set(
+        "SingleChannelLockdown",
+        lua.create_function(|_lua, channel_id: String| {
+            let channel_id = channel_id
+                .parse::<serenity::all::ChannelId>()
+                .map_err(|_| LuaError::external("Failed to parse string to u64"))?;
+
+            Ok(LockdownMode(Box::new(
+                lockdowns::scl::SingleChannelLockdown(channel_id),
+            )))
+        })?,
+    )?;
+    module.set(
+        "RoleLockdown",
+        lua.create_function(|_lua, role_id: String| {
+            let role_id = role_id
+                .parse::<serenity::all::RoleId>()
+                .map_err(|_| LuaError::external("Failed to parse string to u64"))?;
+
+            Ok(LockdownMode(Box::new(lockdowns::role::RoleLockdown(
+                role_id,
+            ))))
+        })?,
     )?;
 
     module.set_readonly(true); // Block any attempt to modify this table
