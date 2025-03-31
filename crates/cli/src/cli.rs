@@ -67,7 +67,6 @@ pub enum FileStorageBackend {
 
 pub struct LuaSetupResult {
     pub main_isolate: KhronosIsolate<FileAssetManager>,
-    pub file_asset_manager: FileAssetManager,
 }
 
 impl std::fmt::Debug for LuaSetupResult {
@@ -87,6 +86,7 @@ pub struct CliAuxOpts {
     pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
     pub experiments: Vec<String>,
+    pub max_threads: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -284,8 +284,13 @@ impl Cli {
             Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
                 Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
             }),
+            None,
         )
         .expect("Failed to create runtime");
+
+        if let Some(max_threads) = aux_opts.max_threads {
+            runtime.set_max_threads(max_threads)
+        }
 
         // Test related functions, not available outside of script runner
         if !aux_opts.disable_test_funcs {
@@ -363,10 +368,7 @@ impl Cli {
             .raw_set("print", LuaValue::Nil)
             .expect("Failed to set print global");
 
-        LuaSetupResult {
-            main_isolate,
-            file_asset_manager,
-        }
+        LuaSetupResult { main_isolate }
     }
 
     fn setup_cli_specific_table(

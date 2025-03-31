@@ -2213,9 +2213,9 @@ dependencies = [
 
 [[package]]
 name = "luau0-src"
-version = "0.12.3+luau663"
+version = "0.13.0+luau667"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ae337c644bbf86a8d8e9ce3ee023311833d41741baf5e51acc31b37843aba1"
+checksum = "06da345d11ee4cb827892fb63eab424790ae33dc12b428a72b0253ec86ebe919"
 dependencies = [
  "cc",
 ]
@@ -2336,7 +2336,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/mlua-rs/mlua#1f970824b4f8187a86794fb08e0a1093a58737af"
+source = "git+https://github.com/mlua-rs/mlua#72682198ebb6391fd1e68a686ce276d88344a30e"
 dependencies = [
  "bstr",
  "either",
@@ -2354,7 +2354,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/mlua-rs/mlua#1f970824b4f8187a86794fb08e0a1093a58737af"
+source = "git+https://github.com/mlua-rs/mlua#72682198ebb6391fd1e68a686ce276d88344a30e"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2365,7 +2365,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#e32983962320290f7f286ad3ab826f96c9d21558"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#d2a39e1a373107f8b7a3363f1006c217fcd5c23d"
 dependencies = [
  "futures-util",
  "log",
@@ -2376,7 +2376,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#e32983962320290f7f286ad3ab826f96c9d21558"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#d2a39e1a373107f8b7a3363f1006c217fcd5c23d"
 dependencies = [
  "log",
  "mlua",
@@ -4031,9 +4031,9 @@ checksum = "7fcf8323ef1faaee30a44a340193b1ac6814fd9b7b4e88e9d4519a3e4abe1cfd"
 
 [[package]]
 name = "socket2"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c970269d99b64e60ec3bd6ad27270092a5394c4e309314b18ae3fe575695fbe8"
+checksum = "4f5fd57c80058a56cf5c777ab8a126398ece8e442983605d280a44ce79d0edef"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",

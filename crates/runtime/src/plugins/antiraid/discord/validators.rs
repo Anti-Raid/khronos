@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use rustrict::{Censor, Type};
 
 use crate::utils::ensure_safe;
@@ -285,13 +287,34 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
     Ok(())
 }
 
-fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), crate::Error> {
+fn validate_option(
+    option: &super::types::CreateCommandOption,
+    kind: serenity::all::CommandType,
+    depth: u8,
+) -> Result<(), crate::Error> {
+    if depth > 3 {
+        // Prevent nested options (which are not supported by Discord itself)
+        return Err("Exceeded maximum depth of 3 for command options".into());
+    }
+
     validate_string_safe(&option.name)?;
 
+    // For CHAT_INPUT commands, validate against Discord's regex
+    if kind == serenity::all::CommandType::ChatInput {
+        // Validate the name against Discord's regex for CHAT_INPUT commands
+        validate_name_option_chatinput(&option.name)?;
+    }
+
+    // Check for name localizations
     if let Some(name_localizations) = option.name_localizations.as_ref() {
         for (lang, name) in name_localizations.iter() {
             validate_string_safe(lang)?;
             validate_string_safe(name)?;
+
+            // For CHAT_INPUT commands, validate against Discord's regex
+            if kind == serenity::all::CommandType::ChatInput {
+                validate_name_option_chatinput(name)?;
+            }
         }
     }
 
@@ -305,7 +328,7 @@ fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), cra
     }
 
     for option in option.options.iter() {
-        validate_option(option)?;
+        validate_option(option, kind, depth + 1)?;
     }
 
     for choice in option.choices.iter() {
@@ -319,13 +342,26 @@ fn validate_option(option: &super::types::CreateCommandOption) -> Result<(), cra
 }
 
 pub fn validate_command(command: &super::types::CreateCommand) -> Result<(), crate::Error> {
+    let kind = command
+        .kind
+        .unwrap_or(serenity::all::CommandType::ChatInput);
+
     if let Some(name) = command.fields.name.as_ref() {
         validate_string_safe(name)?;
+        // For CHAT_INPUT commands, validate against Discord's regex
+        if kind == serenity::all::CommandType::ChatInput {
+            validate_name_option_chatinput(name)?;
+        }
     }
 
     for (lang, name) in command.fields.name_localizations.iter() {
         validate_string_safe(lang)?;
         validate_string_safe(name)?;
+
+        // For CHAT_INPUT commands, validate against Discord's regex
+        if kind == serenity::all::CommandType::ChatInput {
+            validate_name_option_chatinput(name)?;
+        }
     }
 
     if let Some(description) = command.fields.description.as_ref() {
@@ -338,8 +374,52 @@ pub fn validate_command(command: &super::types::CreateCommand) -> Result<(), cra
     }
 
     for option in command.fields.options.iter() {
-        validate_option(option)?;
+        validate_option(option, kind, 1)?;
     }
 
     Ok(())
+}
+
+static DISCORD_NAME_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
+    // Compile the regex for Discord name validation
+    regex::Regex::new(r"^[-_'\p{L}\p{N}\p{sc=Deva}\p{sc=Thai}]{1,32}$")
+        .expect("Failed to compile regex for Discord name validation")
+});
+
+/// Discord provides the regex `^[-_'\p{L}\p{N}\p{sc=Deva}\p{sc=Thai}]{1,32}$` for validating names in CHAT_INPUT commands
+pub fn validate_name_option_chatinput(name: &str) -> Result<(), crate::Error> {
+    // Check if the name matches the Discord regex for CHAT_INPUT commands
+    if DISCORD_NAME_REGEX.is_match(name) {
+        Ok(())
+    } else {
+        // Return an error if it doesn't match
+        Err(format!(
+            "Name '{}' does not match Discord's regex for CHAT_INPUT commands",
+            name
+        )
+        .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Basic test to validate the `validate_name_option_chatinput` function
+    #[test]
+    fn test_validate_name_option_chatinput() {
+        assert!(validate_name_option_chatinput("valid_name").is_ok());
+        assert!(validate_name_option_chatinput("valid-name").is_ok());
+        assert!(validate_name_option_chatinput("valid_name123").is_ok());
+        assert!(validate_name_option_chatinput("valid'name").is_ok());
+        assert!(validate_name_option_chatinput("valid'name_123").is_ok());
+        assert!(validate_name_option_chatinput("valid-name_123").is_ok());
+
+        assert!(validate_name_option_chatinput("invalid name").is_err());
+        assert!(validate_name_option_chatinput("invalid@name").is_err());
+        assert!(validate_name_option_chatinput(
+            "too_long_name_that_exceeds_the_limit_of_thirty_two_characters"
+        )
+        .is_err());
+    }
 }

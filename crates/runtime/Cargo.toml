@@ -30,7 +30,7 @@ chrono_lc = "0.1"
 thiserror = "1.0"
 self_cell = "1"
 
-# @lune/regex
+# @lune/regex and @antiraid/discord
 regex = "1"
 
 # @lune/serde

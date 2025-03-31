@@ -179,6 +179,12 @@ struct CliArgs {
     #[clap(long, default_value = "local-fs")]
     file_storage_backend: FileStorageBackend,
 
+    /// Set a limit on the total number of threads that can be spawned by the script.
+    ///
+    /// Environment variable: `MAX_THREADS`
+    #[clap(long)]
+    max_threads: Option<i64>,
+
     /// The base path to use for file storage
     ///
     /// If unset, See the rules from https://docs.rs/dirs/latest/dirs/fn.data_dir.html
@@ -322,6 +328,14 @@ impl CliArgs {
             self.file_storage_base_path = Some(PathBuf::from(file_storage_base_path));
         }
 
+        if let Ok(max_threads) = src.var("MAX_THREADS") {
+            self.max_threads = Some(
+                max_threads
+                    .parse::<i64>()
+                    .expect("Failed to parse max threads"),
+            );
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -365,6 +379,7 @@ impl CliArgs {
                     vec![]
                 }
             },
+            max_threads: self.max_threads,
         };
 
         let entrypoint_action = {

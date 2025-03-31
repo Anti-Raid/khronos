@@ -12,7 +12,13 @@ use mlua_scheduler::TaskManager;
 use mlua_scheduler_ext::feedbacks::{ChainFeedback, ThreadTracker};
 use mlua_scheduler_ext::Scheduler;
 
+/// A function to be called when the Khronos runtime is marked as broken
 pub type OnBrokenFunc = Box<dyn Fn(&Lua)>;
+
+/// A function to be called upon recieving a thread event callback
+///
+/// A LuaValue::Thread means a new thread has been created, while a LightUserData or other value indicates a thread has exited.
+pub type ThreadEventCallbackFunc = Box<dyn Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static>;
 
 /// Auxillary options for the creation of a Khronos runtime
 #[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize, Default)]
@@ -45,6 +51,14 @@ pub struct KhronosRuntime {
     /// Is the runtime instance 'broken' or not
     broken: Rc<Cell<bool>>,
 
+    /// The maximum number of threads the runtime can spawn. This is internally verified using a thread callback
+    ///
+    /// If unset, this will be set to i64::MAX by default, meaning there is no limit on the number of threads that can be spawned
+    max_threads: Rc<Cell<i64>>,
+
+    /// Stores the current number of threads
+    current_threads: Rc<Cell<i64>>,
+
     /// A function to be called if the runtime is marked as broken
     on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
 
@@ -66,6 +80,7 @@ impl KhronosRuntime {
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
+        on_thread_event_callback: Option<ThreadEventCallbackFunc>,
     ) -> Result<Self, LuaError> {
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
@@ -105,8 +120,6 @@ impl KhronosRuntime {
             )?;
         }
 
-        mlua_scheduler::userdata::patch_coroutine_lib(&lua)?;
-
         let broken = Rc::new(Cell::new(false));
         let broken_ref = broken.clone();
         let last_execution_time = Rc::new(Cell::new(None));
@@ -141,12 +154,85 @@ impl KhronosRuntime {
 
         disable_harmful(&lua)?;
 
+        let current_threads = Rc::new(Cell::new(0));
+        let max_threads = Rc::new(Cell::new(i64::MAX)); // Default to i64::MAX if not set
+
+        let current_threads_ref = current_threads.clone();
+        let max_threads_ref = max_threads.clone();
+
+        if let Some(on_thread_event_callback) = on_thread_event_callback {
+            lua.set_thread_event_callback(move |lua, value| {
+                let new = match value {
+                    LuaValue::Thread(_) => {
+                        let new = current_threads_ref.get() + 1;
+                        current_threads_ref.set(new);
+                        new
+                    }
+                    _ => {
+                        let mut new = current_threads_ref.get() - 1;
+                        // Ensure we don't go negative
+                        if new < 0 {
+                            new = 0;
+                        }
+                        current_threads_ref.set(new);
+                        new
+                    }
+                };
+
+                if new > max_threads_ref.get() {
+                    // Prevent runaway threads
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Maximum number of threads exceeded: {} (current: {}, max: {})",
+                        new,
+                        current_threads_ref.get(),
+                        max_threads_ref.get()
+                    )));
+                }
+
+                // Call the user provided callback
+                on_thread_event_callback(lua, value)
+            });
+        } else {
+            lua.set_thread_event_callback(move |_lua, value| {
+                let new = match value {
+                    LuaValue::Thread(_) => {
+                        let new = current_threads_ref.get() + 1;
+                        current_threads_ref.set(new);
+                        new
+                    }
+                    _ => {
+                        let mut new = current_threads_ref.get() - 1;
+                        // Ensure we don't go negative
+                        if new < 0 {
+                            new = 0;
+                        }
+                        current_threads_ref.set(new);
+                        new
+                    }
+                };
+
+                if new > max_threads_ref.get() {
+                    // Prevent runaway threads
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Maximum number of threads exceeded: {} (current: {}, max: {})",
+                        new,
+                        current_threads_ref.get(),
+                        max_threads_ref.get()
+                    )));
+                }
+
+                Ok(())
+            });
+        }
+
         Ok(Self {
             lua,
             compiler,
             scheduler,
             sandboxed: false,
             broken,
+            max_threads,
+            current_threads,
             on_broken: Rc::new(RefCell::new(None)),
             last_execution_time,
             opts,
@@ -251,5 +337,27 @@ impl KhronosRuntime {
         self.lua.globals().set_readonly(false);
         self.sandboxed = false;
         Ok(())
+    }
+
+    /// Returns the maximum number of threads allowed in the runtime
+    pub fn max_threads(&self) -> i64 {
+        self.max_threads.get()
+    }
+
+    /// Sets the maximum number of threads allowed in the runtime
+    pub fn set_max_threads(&self, max_threads: i64) {
+        // Ensure we don't set a negative value
+        if max_threads < 0 {
+            self.max_threads.set(0);
+        } else {
+            self.max_threads.set(max_threads);
+        }
+    }
+
+    /// Returns the current number of threads in the runtime
+    ///
+    /// The current number of threads is immutable and cannot be directly modified by the user.
+    pub fn current_threads(&self) -> i64 {
+        self.current_threads.get()
     }
 }

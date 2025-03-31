@@ -233,9 +233,6 @@ mod lockdown_test {
                 )
                 .expect("Failed to set task lib");
 
-            mlua_scheduler::userdata::patch_coroutine_lib(&lua)
-                .expect("Failed to patch coroutine lib"); // Patch the coroutine library to work with the scheduler
-
             lua.sandbox(true)
                 .expect("Failed to enable sandboxing for Lua instance");
 
