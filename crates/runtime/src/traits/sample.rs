@@ -426,6 +426,10 @@ impl LockdownProvider<SampleLockdownDataStore> for SampleLockdownProvider {
     fn lockdown_data_store(&self) -> &SampleLockdownDataStore {
         &self._store
     }
+
+    fn serenity_http(&self) -> &serenity::http::Http {
+        todo!()
+    }
 }
 
 #[derive(Clone)]

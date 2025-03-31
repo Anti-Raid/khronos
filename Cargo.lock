@@ -1601,9 +1601,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df2dcfbe0677734ab2f3ffa7fa7bfd4706bfdc1ef393f2ee30184aed67e631b4"
+checksum = "497bbc33a26fdd4af9ed9c70d63f61cf56a938375fbb32df34db9b1cd6d643f2"
 dependencies = [
  "bytes 1.10.1",
  "futures-channel",
@@ -1611,6 +1611,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
+ "libc",
  "pin-project-lite 0.2.16",
  "socket2",
  "tokio 1.44.1",
@@ -1620,9 +1621,9 @@ dependencies = [
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.62"
+version = "0.1.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2fd658b06e56721792c5df4475705b6cda790e9298d19d2f8af083457bcd127"
+checksum = "b0c919e5debc312ad217002b8048a17b7d83f80703865bbfcfebb0458b0b27d8"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
@@ -1630,7 +1631,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.52.0",
+ "windows-core 0.61.0",
 ]
 
 [[package]]
@@ -2169,7 +2170,7 @@ dependencies = [
 [[package]]
 name = "lockdowns"
 version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/lockdowns#4d26e0d4e49ed1248ff64c9869f01dad16990de6"
+source = "git+https://github.com/Anti-Raid/lockdowns#ad940f13f96d9529407ded869a4932d1f53a2bdb"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2336,7 +2337,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/mlua-rs/mlua#72682198ebb6391fd1e68a686ce276d88344a30e"
+source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
 dependencies = [
  "bstr",
  "either",
@@ -2354,7 +2355,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/mlua-rs/mlua#72682198ebb6391fd1e68a686ce276d88344a30e"
+source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2365,7 +2366,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#d2a39e1a373107f8b7a3363f1006c217fcd5c23d"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#47eaa08504e8f82dc3b2532f66a2e6e49bae1cfc"
 dependencies = [
  "futures-util",
  "log",
@@ -2376,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#d2a39e1a373107f8b7a3363f1006c217fcd5c23d"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#47eaa08504e8f82dc3b2532f66a2e6e49bae1cfc"
 dependencies = [
  "log",
  "mlua",
@@ -5176,24 +5177,28 @@ dependencies = [
 
 [[package]]
 name = "windows-core"
-version = "0.52.0"
+version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ab640c8d7e35bf8ba19b884ba838ceb4fba93a4e8c65a9059d08afcfc683d9"
+checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
 dependencies = [
+ "windows-implement 0.58.0",
+ "windows-interface 0.58.0",
+ "windows-result 0.2.0",
+ "windows-strings 0.1.0",
  "windows-targets 0.52.6",
 ]
 
 [[package]]
 name = "windows-core"
-version = "0.58.0"
+version = "0.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
+checksum = "4763c1de310c86d75a878046489e2e5ba02c649d185f21c67d4cf8a56d098980"
 dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-result 0.2.0",
- "windows-strings 0.1.0",
- "windows-targets 0.52.6",
+ "windows-implement 0.60.0",
+ "windows-interface 0.59.1",
+ "windows-link",
+ "windows-result 0.3.2",
+ "windows-strings 0.4.0",
 ]
 
 [[package]]
@@ -5208,10 +5213,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-implement"
+version = "0.60.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a47fddd13af08290e67f4acabf4b459f647552718f683a7b415d290ac744a836"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "windows-interface"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "windows-interface"
+version = "0.59.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd9211b69f8dcdfa817bfd14bf1c97c9188afa36f4750130fcdf3f400eca9fa8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5268,6 +5295,15 @@ name = "windows-strings"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87fa48cc5d406560701792be122a10132491cff9d0aeb23583cc2dcafc847319"
+dependencies = [
+ "windows-link",
+]
+
+[[package]]
+name = "windows-strings"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a2ba9642430ee452d5a7aa78d72907ebe8cfda358e8cb7918a2050581322f97"
 dependencies = [
  "windows-link",
 ]

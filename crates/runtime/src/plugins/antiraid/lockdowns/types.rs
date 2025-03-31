@@ -68,6 +68,16 @@ impl LuaUserData for LockdownMode {
             let creator = this.0.creator();
             Ok(CreateLockdownMode(creator))
         });
+
+        fields.add_field_method_get("string_form", |_, this| {
+            let string_form = this.0.string_form();
+            Ok(string_form)
+        });
+
+        fields.add_field_method_get("specificity", |_, this| {
+            let specificity = this.0.specificity();
+            Ok(specificity)
+        });
     }
 }
 
@@ -218,6 +228,7 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
                                 lockdowns::LockdownError::LockdownTestFailed(e) => {
                                     Ok(LockdownAddStatus::LockdownTestFailed(LockdownTestResult(
                                         Rc::new(e),
+                                        std::marker::PhantomData::<T>
                                     )))
                                 }
                                 lockdowns::LockdownError::Error(e) => {
@@ -252,6 +263,7 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
                                 lockdowns::LockdownError::LockdownTestFailed(e) => {
                                     Ok(LockdownRemoveStatus::LockdownTestFailed(LockdownTestResult(
                                         Rc::new(e),
+                                        std::marker::PhantomData::<T>,
                                     )))
                                 }
                                 lockdowns::LockdownError::Error(e) => {
@@ -263,16 +275,37 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
                 )
             },
         );
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<LockdownSet<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "lockdowns", "settings",
+                    // Methods
+                    "apply", "remove", "sort",
+                ],
+            )
+        });
     }
 }
 
-pub enum LockdownAddStatus {
+pub enum LockdownAddStatus<T: KhronosContext> {
     Ok(uuid::Uuid),
     Error(String),
-    LockdownTestFailed(LockdownTestResult),
+    LockdownTestFailed(LockdownTestResult<T>),
 }
 
-impl LuaUserData for LockdownAddStatus {
+impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "LockdownAddStatus");
+    }
+
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // Define __index metamethod
         methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
@@ -309,6 +342,11 @@ impl LuaUserData for LockdownAddStatus {
                         e.into_lua(lua)?
                     }
                 },
+                "error" => match this {
+                    LockdownAddStatus::Ok(_) => LuaValue::Nil,
+                    LockdownAddStatus::Error(e) => lua.to_value(e)?,
+                    LockdownAddStatus::LockdownTestFailed(e) => lua.to_value(&e.0.display_error())?,
+                },
                 _ => mlua::Value::Nil,
             };
 
@@ -317,7 +355,7 @@ impl LuaUserData for LockdownAddStatus {
 
         // Iter
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<LockdownAddStatus>() {
+            if !ud.is::<LockdownAddStatus<T>>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
             }
 
@@ -327,6 +365,7 @@ impl LuaUserData for LockdownAddStatus {
                 [
                     // Fields
                     "ok", "type", "id",
+                    "error", "test_result",
                     // Methods
                 ],
             )
@@ -344,13 +383,13 @@ impl LuaUserData for LockdownAddStatus {
     }
 }
 
-pub enum LockdownRemoveStatus {
+pub enum LockdownRemoveStatus<T: KhronosContext> {
     Ok,
     Error(String),
-    LockdownTestFailed(LockdownTestResult),
+    LockdownTestFailed(LockdownTestResult<T>),
 }
 
-impl LuaUserData for LockdownRemoveStatus {
+impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // Define __index metamethod
         methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
@@ -382,6 +421,11 @@ impl LuaUserData for LockdownRemoveStatus {
                         e.into_lua(lua)?
                     }
                 },
+                "error" => match this {
+                    LockdownRemoveStatus::Ok => LuaValue::Nil,
+                    LockdownRemoveStatus::Error(e) => lua.to_value(e)?,
+                    LockdownRemoveStatus::LockdownTestFailed(e) => lua.to_value(&e.0.display_error())?,
+                },
                 _ => mlua::Value::Nil,
             };
 
@@ -390,7 +434,7 @@ impl LuaUserData for LockdownRemoveStatus {
 
         // Iter
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<LockdownRemoveStatus>() {
+            if !ud.is::<LockdownRemoveStatus<T>>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
             }
 
@@ -400,6 +444,7 @@ impl LuaUserData for LockdownRemoveStatus {
                 [
                     // Fields
                     "ok", "type",
+                    "error", "test_result",
                     // Methods
                 ],
             )
@@ -418,8 +463,88 @@ impl LuaUserData for LockdownRemoveStatus {
 }
 
 #[derive(Clone)]
-pub struct LockdownTestResult(Rc<lockdowns::LockdownTestResult>);
+pub struct LockdownTestResult<T: KhronosContext>(Rc<lockdowns::LockdownTestResult>, std::marker::PhantomData<T>);
 
-impl LuaUserData for LockdownTestResult {
-    // TODO
+impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("can_apply_perfectly", |_, this| {
+            let can_apply_perfectly = this.0.can_apply_perfectly();
+            Ok(can_apply_perfectly)
+        });
+
+        fields.add_field_method_get("role_changes_needed", |lua, this| {
+            lua.to_value(&this.0.role_changes_needed)
+                .map_err(|e| LuaError::external(format!("Error while serializing role changes needed: {}", e)))
+        });
+
+        fields.add_field_method_get("other_changes_needed", |lua, this| {
+            lua.to_value(&this.0.other_changes_needed)
+                .map_err(|e| LuaError::external(format!("Error while serializing other changes needed: {}", e)))
+        });
+
+        fields.add_meta_field(LuaMetaMethod::Type, "LockdownTestResult");
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("display_error", |_, this, _: ()| {
+            let s = this.0.display_error();
+            Ok(s)
+        });
+        
+        methods.add_method("display_changeset", |_, this, lockdown_set: LuaAnyUserData| {
+            Ok(lua_promise!(this, lockdown_set, |_lua, this, lockdown_set|, {
+                let mut lockdown_set = lockdown_set
+                    .borrow_mut::<LockdownSet<T>>()
+                    .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
+
+                let partial_guild = lockdown_set.lockdown_set.partial_guild().await
+                .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
+
+                let changeset = this.0.display_changeset(partial_guild);
+
+                Ok(changeset)
+            }))
+        });
+
+        methods.add_method("try_auto_fix", |_, this, lockdown_set: LuaAnyUserData| {
+            Ok(lua_promise!(this, lockdown_set, |_lua, this, lockdown_set|, {
+                let mut lockdown_set = lockdown_set
+                    .borrow_mut::<LockdownSet<T>>()
+                    .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
+
+                let lockdown_provider = lockdown_set.lockdown_provider.clone();
+                let http = lockdown_provider.serenity_http();
+                let partial_guild = lockdown_set.lockdown_set.partial_guild_mut().await
+                .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
+
+                this.0.try_auto_fix(http, partial_guild)
+                .await
+                .map_err(|e| LuaError::external(format!("Failed to apply changes: {}", e)))?;
+
+                Ok(())
+            }))
+        });
+
+        methods.add_meta_method(LuaMetaMethod::ToString, |_, this, _: ()| {
+            let s = this.0.display_error();
+            Ok(s)
+        });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<LockdownTestResult<T>>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "can_apply_perfectly", "role_changes_needed", "other_changes_needed",
+                    // Methods
+                    "display_changeset",
+                ],
+            )
+        });
+    }
 }

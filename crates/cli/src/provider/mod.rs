@@ -189,8 +189,13 @@ impl KhronosContext for CliKhronosContext {
     }
 
     fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
+        let Some(http) = &self.http else {
+            return None;
+        };
+
         Some(CliLockdownProvider {
             _lockdown_data_store: CliLockdownDataStore {},
+            http: http.clone(),
         })
     }
 
@@ -724,6 +729,7 @@ impl DiscordProvider for CliDiscordProvider {
 #[derive(Clone)]
 pub struct CliLockdownProvider {
     _lockdown_data_store: CliLockdownDataStore,
+    http: Rc<serenity::all::Http>,
 }
 
 impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
@@ -733,6 +739,10 @@ impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
 
     fn lockdown_data_store(&self) -> &CliLockdownDataStore {
         &self._lockdown_data_store
+    }
+
+    fn serenity_http(&self) -> &serenity::http::Http {
+        &self.http
     }
 }
 

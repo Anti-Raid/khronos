@@ -10,4 +10,7 @@ pub trait LockdownProvider<T: lockdowns::LockdownDataStore + Clone>: 'static + C
 
     /// Returns a lockdown data store to be used with the lockdown library
     fn lockdown_data_store(&self) -> &T;
+
+    /// Serenity HTTP client
+    fn serenity_http(&self) -> &serenity::http::Http;
 }
