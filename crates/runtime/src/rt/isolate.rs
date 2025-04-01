@@ -511,6 +511,6 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
     }
 
     fn global_table(&self) -> LuaTable {
-        self.isolate.global_table()
+        self.isolate.global_table().clone()
     }
 }

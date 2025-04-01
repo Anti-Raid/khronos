@@ -520,10 +520,10 @@ mod require_test {
             let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
             let controller = {
-                let c = SimpleRequireController::new(FileAssetManager::new(
-                    base_path.join("tests"),
+                let c = SimpleRequireController::new(
+                    FileAssetManager::new(base_path.join("tests")),
                     lua.clone(),
-                ));
+                );
 
                 Rc::new(c)
             };
