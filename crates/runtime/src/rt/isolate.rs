@@ -509,4 +509,8 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
     fn cache(&self, path: String, contents: LuaMultiValue) {
         self.requires_cache.borrow_mut().insert(path, contents);
     }
+
+    fn global_table(&self) -> LuaTable {
+        self.isolate.global_table()
+    }
 }

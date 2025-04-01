@@ -142,6 +142,9 @@ pub trait RequireController {
 
     /// Caches the file contents
     fn cache(&self, path: String, contents: LuaMultiValue);
+
+    /// Returns the global table to provide to the required file
+    fn global_table(&self) -> LuaTable;
 }
 
 /// Require a file with require-by-string semantics from a given controller
@@ -256,6 +259,7 @@ pub async fn require_from_controller<T: RequireController>(
     let th = lua
         .load(file_contents.as_ref())
         .set_name(format!("./{}", pat))
+        .set_environment(controller.global_table())
         .into_lua_thread(lua)?;
 
     let scheduler = Scheduler::get(lua);
@@ -315,13 +319,15 @@ mod require_test {
     struct SimpleRequireController<T: AssetManager> {
         asset_manager: T,
         requires_cache: RefCell<std::collections::HashMap<String, LuaMultiValue>>,
+        lua: Lua,
     }
 
     impl<T: AssetManager> SimpleRequireController<T> {
-        pub fn new(asset_manager: T) -> Self {
+        pub fn new(asset_manager: T, lua: Lua) -> Self {
             Self {
                 asset_manager,
                 requires_cache: RefCell::new(std::collections::HashMap::new()),
+                lua,
             }
         }
     }
@@ -350,6 +356,10 @@ mod require_test {
             if let Ok(mut requires_cache) = self.requires_cache.try_borrow_mut() {
                 requires_cache.insert(path, contents);
             }
+        }
+
+        fn global_table(&self) -> LuaTable {
+            self.lua.globals()
         }
     }
 
@@ -458,14 +468,15 @@ mod require_test {
 
         let localset = LocalSet::new();
         localset.block_on(&rt, async move {
+            let lua = mlua::Lua::new();
+
             let controller = {
-                let c = SimpleRequireController::new(HashMapAssetManager::new(tree));
+                let c = SimpleRequireController::new(HashMapAssetManager::new(tree), lua.clone());
 
                 Rc::new(c)
             };
             let controller_b = controller.clone();
 
-            let lua = mlua::Lua::new();
             let tt = ThreadTracker::new();
             let scheduler = Scheduler::new(TaskManager::new(
                 lua.clone(),
@@ -509,8 +520,10 @@ mod require_test {
             let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
             let controller = {
-                let c =
-                    SimpleRequireController::new(FileAssetManager::new(base_path.join("tests")));
+                let c = SimpleRequireController::new(FileAssetManager::new(
+                    base_path.join("tests"),
+                    lua.clone(),
+                ));
 
                 Rc::new(c)
             };
