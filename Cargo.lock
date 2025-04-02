@@ -2215,9 +2215,8 @@ dependencies = [
 
 [[package]]
 name = "luau0-src"
-version = "0.12.3+luau663"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ae337c644bbf86a8d8e9ce3ee023311833d41741baf5e51acc31b37843aba1"
+version = "0.13.0+luau667"
+source = "git+https://github.com/cheesycod/luau-src-rs#7f88ddf5648eb1f56367ca79e983045386d8ed24"
 dependencies = [
  "cc",
 ]
@@ -2338,7 +2337,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/mlua-rs/mlua?rev=cdd6a99136b90d028bf842865136060bd46ce335#cdd6a99136b90d028bf842865136060bd46ce335"
+source = "git+https://github.com/Anti-Raid/mlua#b1c6b19a1a26ea151c2d3aad4c0165c2daff938e"
 dependencies = [
  "bstr",
  "either",
@@ -2348,6 +2347,7 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "rustc-hash 2.1.1",
+ "rustversion",
  "serde",
  "serde-value",
 ]
@@ -2355,7 +2355,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/mlua-rs/mlua?rev=cdd6a99136b90d028bf842865136060bd46ce335#cdd6a99136b90d028bf842865136060bd46ce335"
+source = "git+https://github.com/Anti-Raid/mlua#b1c6b19a1a26ea151c2d3aad4c0165c2daff938e"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2366,7 +2366,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#c080f30bcd0f589f9d5299227699f6c1c3842ed1"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#749f23a3b8aa1afc896d85956de78fb69ac86db4"
 dependencies = [
  "futures-util",
  "log",
@@ -2377,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#c080f30bcd0f589f9d5299227699f6c1c3842ed1"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#749f23a3b8aa1afc896d85956de78fb69ac86db4"
 dependencies = [
  "log",
  "mlua",

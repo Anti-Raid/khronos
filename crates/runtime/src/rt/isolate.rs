@@ -226,9 +226,10 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
     }
 
     /// Converts a context, event pair to a LuaMultiValue
+    #[inline(always)]
     pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
         &self,
-        context: TemplateContext<K>,
+        context: Box<TemplateContext<K>,
         event: Event,
     ) -> Result<LuaMultiValue, LuaError> {
         match (event, context).into_lua_multi(self.inner.lua()) {
@@ -255,7 +256,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<SpawnResult, LuaError> {
-        let args = self.context_event_to_lua_multi(context, event)?;
+        let args = self.context_event_to_lua_multi(context, Box::new(event))?;
         self.spawn_asset_with_args(cache_key, path, args).await
     }
 
