@@ -182,6 +182,7 @@ impl KhronosRuntime {
                     }
                 };
 
+                log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
                     // Prevent runaway threads
                     return Err(mlua::Error::RuntimeError(format!(
@@ -214,6 +215,7 @@ impl KhronosRuntime {
                     }
                 };
 
+                log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
                     // Prevent runaway threads
                     return Err(mlua::Error::RuntimeError(format!(
