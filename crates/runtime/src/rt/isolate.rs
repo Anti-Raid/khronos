@@ -245,7 +245,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
                 Err(e)
             }
-        };
+        }?;
 
         self.spawn_asset_with_args(cache_key, path, args).await
     }
