@@ -41,7 +41,7 @@ pub trait KhronosContext: 'static + Clone {
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
     /// Returns the Khronos isolate being used
-    fn isolate(&self) -> &crate::rt::KhronosIsolate<Self::AssetManager>;
+    fn isolate(&self) -> crate::rt::KhronosIsolate<Self::AssetManager>;
 
     /// Returns a key-value provider with the given scope
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider>;
