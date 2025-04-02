@@ -225,14 +225,16 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         self.require.as_ref().map(|r| r.as_ref())
     }
 
-    /// Converts a context, event pair to a LuaMultiValue
-    #[inline(always)]
-    fn context_event_to_lua_multi<K: KhronosContextTrait>(
+    /// Runs a script from the asset manager
+    /// with the given KhronosContext and Event primitives
+    pub async fn spawn_asset<K: KhronosContextTrait>(
         &self,
-        context: Box<TemplateContext<K>>,
+        cache_key: &str,
+        path: &str,
+        context: TemplateContext<K>,
         event: Event,
-    ) -> Result<LuaMultiValue, LuaError> {
-        match (event, context).into_lua_multi(self.inner.lua()) {
+    ) -> Result<SpawnResult, LuaError> {
+        let args = match (event, context).into_lua_multi(self.inner.lua()) {
             Ok(f) => Ok(f),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -243,19 +245,8 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
                 Err(e)
             }
-        }
-    }
+        };
 
-    /// Runs a script from the asset manager
-    /// with the given KhronosContext and Event primitives
-    pub async fn spawn_asset<K: KhronosContextTrait>(
-        &self,
-        cache_key: &str,
-        path: &str,
-        context: TemplateContext<K>,
-        event: Event,
-    ) -> Result<SpawnResult, LuaError> {
-        let args = self.context_event_to_lua_multi(Box::new(context), event)?;
         self.spawn_asset_with_args(cache_key, path, args).await
     }
 
