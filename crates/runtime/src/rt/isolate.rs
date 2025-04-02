@@ -225,16 +225,28 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         self.require.as_ref().map(|r| r.as_ref())
     }
 
-    /// Runs a script from the asset manager
-    /// with the given KhronosContext and Event primitives
-    pub async fn spawn_asset<K: KhronosContextTrait>(
+    pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
         &self,
-        cache_key: &str,
-        path: &str,
         context: TemplateContext<K>,
         event: Event,
-    ) -> Result<SpawnResult, LuaError> {
-        let args = match (event, context).into_lua_multi(self.inner.lua()) {
+    ) -> Result<LuaMultiValue, LuaError> {
+        let context = match context.into_lua(self.inner.lua()) {
+            Ok(f) => f,
+            Err(e) => {
+                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                if let LuaError::MemoryError(_) = e {
+                    // Mark VM as broken
+                    self.inner.mark_broken(true)
+                }
+
+                return Err(e);
+            }
+        };
+
+        // Temp workaround: store context in registry
+        self.lua().create_registry_value(context.clone())?;
+
+        match (event, context).into_lua_multi(self.inner.lua()) {
             Ok(f) => Ok(f),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -245,7 +257,19 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
                 Err(e)
             }
-        }?;
+        }
+    }
+
+    /// Runs a script from the asset manager
+    /// with the given KhronosContext and Event primitives
+    pub async fn spawn_asset<K: KhronosContextTrait>(
+        &self,
+        cache_key: &str,
+        path: &str,
+        context: TemplateContext<K>,
+        event: Event,
+    ) -> Result<SpawnResult, LuaError> {
+        let args = self.context_event_to_lua_multi(context, event)?;
 
         self.spawn_asset_with_args(cache_key, path, args).await
     }
