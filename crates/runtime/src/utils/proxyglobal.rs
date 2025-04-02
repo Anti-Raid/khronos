@@ -32,39 +32,62 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
         )?,
     )?;
 
+    lua.gc_collect()?;
+
+    let lua_func = {
+        let mut tries = 0;
+        loop {
+            match lua.load(
+                r#"
+                local GLOBAL_TAB = ...
+                local function iter(t)
+                    local on_iter = 0 -- 0 = users globals, 1 = lua.globals()
+                    local curr_key = nil
+                    return function()
+                        if on_iter == 0 then
+                            local k, v = next(t, curr_key)
+                            if k ~= nil then
+                                curr_key = k
+                                return k, v
+                            end
+                            on_iter = 1
+                            curr_key = nil
+                        end
+                        local k, v = next(GLOBAL_TAB, curr_key)
+                        if k ~= nil then
+                            curr_key = k
+                            return k, v
+                        end
+                    end
+                end
+                return iter
+            "#,
+            )
+            .set_name("proxy_global_iter")
+            .call::<LuaFunction>((lua.globals(),)) {
+                Ok(func) => {
+                    break func;
+                },
+                Err(e) => {
+                    if tries > 10 {
+                        return Err(e);
+                    } else {
+                        tries += 1;
+                        lua.gc_collect()?;
+                        log::error!("Failed to create iterator function: {}", e);
+                        continue;
+                    }
+                }
+            }    
+        }
+    };
+
     // Provides iteration over first the users globals, then lua.globals()
     //
     // This is done using a Luau script to avoid borrowing issues
     global_mt.set(
         "__iter",
-        lua.load(
-            r#"
-            local GLOBAL_TAB = ...
-            local function iter(t)
-                local on_iter = 0 -- 0 = users globals, 1 = lua.globals()
-                local curr_key = nil
-                return function()
-                    if on_iter == 0 then
-                        local k, v = next(t, curr_key)
-                        if k ~= nil then
-                            curr_key = k
-                            return k, v
-                        end
-                        on_iter = 1
-                        curr_key = nil
-                    end
-                    local k, v = next(GLOBAL_TAB, curr_key)
-                    if k ~= nil then
-                        curr_key = k
-                        return k, v
-                    end
-                end
-            end
-            return iter
-        "#,
-        )
-        .set_name("proxy_global_iter")
-        .call::<LuaFunction>((lua.globals(),))?,
+        lua_func,
     )?;
 
     // Block getmetatable
