@@ -2216,7 +2216,8 @@ dependencies = [
 [[package]]
 name = "luau0-src"
 version = "0.13.0+luau667"
-source = "git+https://github.com/cheesycod/luau-src-rs#7f88ddf5648eb1f56367ca79e983045386d8ed24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06da345d11ee4cb827892fb63eab424790ae33dc12b428a72b0253ec86ebe919"
 dependencies = [
  "cc",
 ]
@@ -2337,7 +2338,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/Anti-Raid/mlua#b1c6b19a1a26ea151c2d3aad4c0165c2daff938e"
+source = "git+https://github.com/Anti-Raid/mlua#176b6f6e17d9cba5dbbf8da61a047376e092b2d1"
 dependencies = [
  "bstr",
  "either",
@@ -2355,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/Anti-Raid/mlua#b1c6b19a1a26ea151c2d3aad4c0165c2daff938e"
+source = "git+https://github.com/Anti-Raid/mlua#176b6f6e17d9cba5dbbf8da61a047376e092b2d1"
 dependencies = [
  "cc",
  "cfg-if",

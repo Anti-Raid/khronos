@@ -1,4 +1,6 @@
 use mlua::prelude::*;
+use std::cell::Cell;
+use std::rc::Rc;
 
 /// Creates a proxy global table that forwards reads to the global table if the key is in the global table
 ///
@@ -34,60 +36,58 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
 
     lua.gc_collect()?;
 
-    let lua_func = {
-        let mut tries = 0;
-        loop {
-            match lua.load(
-                r#"
-                local GLOBAL_TAB = ...
-                local function iter(t)
-                    local on_iter = 0 -- 0 = users globals, 1 = lua.globals()
-                    local curr_key = nil
-                    return function()
-                        if on_iter == 0 then
-                            local k, v = next(t, curr_key)
-                            if k ~= nil then
-                                curr_key = k
-                                return k, v
-                            end
-                            on_iter = 1
-                            curr_key = nil
-                        end
-                        local k, v = next(GLOBAL_TAB, curr_key)
-                        if k ~= nil then
-                            curr_key = k
-                            return k, v
-                        end
-                    end
-                end
-                return iter
-            "#,
-            )
-            .set_name("proxy_global_iter")
-            .call::<LuaFunction>((lua.globals(),)) {
-                Ok(func) => {
-                    break func;
-                },
-                Err(e) => {
-                    if tries > 10 {
-                        return Err(e);
-                    } else {
-                        tries += 1;
-                        lua.gc_collect()?;
-                        log::error!("Failed to create iterator function: {}", e);
-                        continue;
-                    }
-                }
-            }    
-        }
-    };
+    // Used in iterator
+    let lua_global_pairs = Rc::new(lua
+    .globals()
+    .pairs()
+    .collect::<LuaResult<Vec<(LuaValue, LuaValue)>>>()?);
 
     // Provides iteration over first the users globals, then lua.globals()
     //
     // This is done using a Luau script to avoid borrowing issues
     global_mt.set(
         "__iter",
-        lua_func,
+        lua.create_function(move |lua, globals: LuaTable| {
+            let global_pairs = globals
+                .pairs()
+                .collect::<LuaResult<Vec<(LuaValue, LuaValue)>>>()?;
+
+            let lua_global_pairs = lua_global_pairs.clone();
+
+            let i = Cell::new(0);
+            let iter = lua.create_function(move |_lua, ()| {
+                let curr_i = i.get();
+
+                if curr_i < global_pairs.len() {
+                    let Some((key, value)) = global_pairs.get(curr_i).cloned() else {
+                        return Ok((LuaValue::Nil, LuaValue::Nil))
+                    };
+                    i.set(curr_i + 1);
+                    return Ok((key, value))
+                }
+
+                if curr_i < global_pairs.len() + lua_global_pairs.len() {
+                    let Some((key, value)) = lua_global_pairs.get(curr_i - global_pairs.len()).cloned() else {
+                        return Ok((LuaValue::Nil, LuaValue::Nil))
+                    };
+                    i.set(curr_i + 1);
+                    return Ok((key, value))
+                }
+
+                return Ok((LuaValue::Nil, LuaValue::Nil))
+            })?;
+
+            Ok(iter)
+        })?
+    )?;
+
+    global_mt.set(
+        "__len",
+        lua.create_function(move |lua, globals: LuaTable| {
+            let globals_len = globals.raw_len();
+            let len = lua.globals().raw_len();
+            Ok(globals_len + len)
+        })?
     )?;
 
     // Block getmetatable
