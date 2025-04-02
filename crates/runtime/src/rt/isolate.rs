@@ -255,7 +255,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<SpawnResult, LuaError> {
-        let args = self.context_event_to_lua_multi(context, Box::new(event))?;
+        let args = self.context_event_to_lua_multi(Box::new(context), event)?;
         self.spawn_asset_with_args(cache_key, path, args).await
     }
 
