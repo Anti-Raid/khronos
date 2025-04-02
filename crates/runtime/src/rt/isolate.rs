@@ -248,7 +248,6 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
     /// Runs a script from the asset manager
     /// with the given KhronosContext and Event primitives
-    #[inline]
     pub async fn spawn_asset<K: KhronosContextTrait>(
         &self,
         cache_key: &str,
