@@ -4,7 +4,7 @@ use super::{
 };
 use crate::utils::{assets::AssetManager, executorscope::ExecutorScope};
 
-pub trait KhronosContext: 'static + Clone {
+pub trait KhronosContext: 'static + Clone + Sized {
     type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
