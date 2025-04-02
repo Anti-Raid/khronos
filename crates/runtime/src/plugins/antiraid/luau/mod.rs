@@ -42,8 +42,8 @@ impl<T: KhronosContext> Chunk<T> {
 
         if let Some(env) = &self.environment {
             chunk = chunk.set_environment(env.clone());
-            /*} else {
-            chunk = chunk.set_environment(self.context.isolate().global_table().clone());*/
+            } else {
+            chunk = chunk.set_environment(self.context.runtime_shareable_data().global_table.clone());
         }
 
         chunk = chunk.set_compiler(compiler);

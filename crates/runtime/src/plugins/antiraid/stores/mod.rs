@@ -4,7 +4,7 @@ use mlua::prelude::*;
 pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    /*module.set(
+    module.set(
         "store",
         lua.create_function(|_, token: TemplateContextRef<T>| {
             if !token.context.has_cap("store") {
@@ -13,9 +13,9 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                 ));
             }
 
-            Ok(token.context.isolate().inner().store_table().clone())
+            Ok(token.context.runtime_shareable_data().store_table.clone())
         })?,
-    )?;*/
+    )?;
 
     module.set_readonly(true); // Block any attempt to modify this table
 

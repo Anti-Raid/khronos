@@ -1,4 +1,3 @@
-use khronos_runtime::utils::assets::FileAssetManager;
 use moka::future::Cache;
 use serenity::all::InteractionId;
 use std::rc::Rc;
@@ -17,6 +16,7 @@ use khronos_runtime::traits::pageprovider::PageProvider;
 use khronos_runtime::traits::stingprovider::StingProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
+use khronos_runtime::rt::RuntimeShareableData;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -91,7 +91,7 @@ pub struct CliKhronosContext {
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
-    pub isolate: khronos_runtime::rt::KhronosIsolate<FileAssetManager>,
+    pub runtime_shareable_data: RuntimeShareableData,
     pub http: Option<Rc<serenity::all::Http>>,
     pub cache: Option<Rc<serenity::cache::Cache>>,
 }
@@ -105,7 +105,6 @@ impl KhronosContext for CliKhronosContext {
     type UserInfoProvider = CliUserInfoProvider;
     type StingProvider = CliStingProvider;
     type PageProvider = CliPageProvider;
-    type AssetManager = FileAssetManager;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -133,10 +132,10 @@ impl KhronosContext for CliKhronosContext {
         self.cache.as_ref().map(|c| c.current_user().clone())
     }
 
-    /// Returns the global table to use
-    /*fn isolate(&self) -> khronos_runtime::rt::KhronosIsolate<FileAssetManager> {
-        self.isolate.clone()
-    }*/
+    /// Returns the runtime shareable data
+    fn runtime_shareable_data(&self) -> khronos_runtime::rt::RuntimeShareableData {
+        self.runtime_shareable_data.clone()
+    }
 
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
         let guild_id = match scope {

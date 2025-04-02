@@ -64,6 +64,9 @@ impl BytecodeCache {
 ///   for running one-off scripts with different plugins available to them
 ///
 /// Isolates are cheap to clone
+/// 
+/// Note: it is considered unsafe to store an Isolate in any Lua userdata
+/// due to the potential possibility of mlua bugs occurring
 #[derive(Clone)]
 pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone + 'static> {
     /// The inner khronos context for the isolate
@@ -223,6 +226,14 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
     /// Returns the require controller for the isolate
     pub fn require(&self) -> Option<&IsolateRequireController<AssetManager>> {
         self.require.as_ref().map(|r| r.as_ref())
+    }
+
+    /// Creates a runtime shareable data object
+    pub fn runtime_shareable_data(&self) -> RuntimeShareableData {
+        RuntimeShareableData {
+            global_table: self.global_table.clone(),
+            store_table: self.inner.store_table().clone(),
+        }
     }
 
     pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
@@ -511,4 +522,14 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
     fn global_table(&self) -> LuaTable {
         self.isolate.global_table().clone()
     }
+}
+
+/// Workaround to a mlua bug where storing a mlua::Lua in a userdata
+/// leads to a segfault when the userdata is dropped
+#[derive(Clone)]
+pub struct RuntimeShareableData {
+    /// Global table
+    pub global_table: LuaTable,
+    /// Store table
+    pub store_table: LuaTable,
 }

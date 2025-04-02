@@ -74,12 +74,12 @@ impl KhronosRuntime {
     pub fn new<
         SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
-        //ThreadEventCallbackFunc: Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static,
+        ThreadEventCallbackFunc: Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static,
     >(
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
-        //on_thread_event_callback: Option<ThreadEventCallbackFunc>,
+        on_thread_event_callback: Option<ThreadEventCallbackFunc>,
     ) -> Result<Self, LuaError> {
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
@@ -159,8 +159,7 @@ impl KhronosRuntime {
         let current_threads_ref = current_threads.clone();
         let max_threads_ref = max_threads.clone();
 
-        // Currently blocked on mlua bugs
-        /*if let Some(on_thread_event_callback) = on_thread_event_callback {
+        if let Some(on_thread_event_callback) = on_thread_event_callback {
             lua.set_thread_event_callback(move |lua, value| {
                 let new = match value {
                     LuaValue::Thread(_) => {
@@ -225,7 +224,7 @@ impl KhronosRuntime {
 
                 Ok(())
             });
-        }*/
+        }
 
         Ok(Self {
             store_table: lua.create_table()?,

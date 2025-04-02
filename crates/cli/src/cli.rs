@@ -222,7 +222,7 @@ impl Cli {
             allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
-            isolate: self.setup_data.main_isolate.clone(),
+            runtime_shareable_data: self.setup_data.main_isolate.runtime_shareable_data(),
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
@@ -283,7 +283,7 @@ impl Cli {
             Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
                 Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
             }),
-            //None,
+            None::<fn(&Lua, LuaValue) -> Result<(), mlua::Error>>,
         )
         .expect("Failed to create runtime");
 
