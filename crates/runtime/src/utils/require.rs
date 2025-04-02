@@ -259,7 +259,7 @@ pub async fn require_from_controller<T: RequireController>(
     let th = lua
         .load(file_contents.as_ref())
         .set_name(format!("./{}", pat))
-        .set_environment(controller.global_table())
+        //.set_environment(controller.global_table())
         .into_lua_thread(lua)?;
 
     let scheduler = Scheduler::get(lua);
