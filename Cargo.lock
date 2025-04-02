@@ -1170,9 +1170,9 @@ checksum = "94c970b525906eb37d3940083aa65b95e481fc1857d467d13374e1d925cfc163"
 
 [[package]]
 name = "flate2"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11faaf5a5236997af9848be0bef4db95824b1d534ebc64d0f0c6cf3e67bd38dc"
+checksum = "7ced92e76e966ca2fd84c8f7aa01a4aea65b0eb6648d72f7c8f3e2764a67fece"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -2215,9 +2215,9 @@ dependencies = [
 
 [[package]]
 name = "luau0-src"
-version = "0.13.0+luau667"
+version = "0.12.3+luau663"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06da345d11ee4cb827892fb63eab424790ae33dc12b428a72b0253ec86ebe919"
+checksum = "76ae337c644bbf86a8d8e9ce3ee023311833d41741baf5e51acc31b37843aba1"
 dependencies = [
  "cc",
 ]
@@ -2338,7 +2338,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
+source = "git+https://github.com/mlua-rs/mlua?rev=cdd6a99136b90d028bf842865136060bd46ce335#cdd6a99136b90d028bf842865136060bd46ce335"
 dependencies = [
  "bstr",
  "either",
@@ -2348,7 +2348,6 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "rustc-hash 2.1.1",
- "rustversion",
  "serde",
  "serde-value",
 ]
@@ -2356,7 +2355,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
+source = "git+https://github.com/mlua-rs/mlua?rev=cdd6a99136b90d028bf842865136060bd46ce335#cdd6a99136b90d028bf842865136060bd46ce335"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2367,7 +2366,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler?rev=e32983962320290f7f286ad3ab826f96c9d21558#e32983962320290f7f286ad3ab826f96c9d21558"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#c080f30bcd0f589f9d5299227699f6c1c3842ed1"
 dependencies = [
  "futures-util",
  "log",
@@ -2378,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler?rev=e32983962320290f7f286ad3ab826f96c9d21558#e32983962320290f7f286ad3ab826f96c9d21558"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#c080f30bcd0f589f9d5299227699f6c1c3842ed1"
 dependencies = [
  "log",
  "mlua",

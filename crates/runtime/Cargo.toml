@@ -16,9 +16,9 @@ env_logger = "0.11"
 arrayvec = "0.7"
 rustrict = "0.7"
 
-mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler", rev = "e32983962320290f7f286ad3ab826f96c9d21558" }
-mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler", rev = "e32983962320290f7f286ad3ab826f96c9d21558" }
-mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau", "serialize"] }
+mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
+mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau", "serialize"], rev = "cdd6a99136b90d028bf842865136060bd46ce335" }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
