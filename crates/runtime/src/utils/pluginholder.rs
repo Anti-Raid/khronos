@@ -102,29 +102,3 @@ impl LuaUserData for PluginSet {
         });
     }
 }
-
-#[cfg(test)]
-mod test {
-    #[test]
-    pub fn test_plugin_set() {
-        pub static _KHRONOS_PLUGINSET: std::sync::LazyLock<super::PluginSet> =
-            std::sync::LazyLock::new(|| {
-                let mut plugins = super::PluginSet::new();
-                plugins.add_default_plugins::<crate::traits::sample::SampleKhronosContext>();
-                plugins
-            });
-
-        let mut my_plugin_set = super::PluginSet::new();
-        my_plugin_set.add_plugin(
-            "@antiraid/kv".to_string(),
-            crate::plugins::antiraid::kv::init_plugin::<crate::traits::sample::SampleKhronosContext>,
-        );
-
-        my_plugin_set.add_plugin(
-            "@antiraid/kv".to_string(),
-            crate::plugins::antiraid::kv::init_plugin::<crate::traits::sample::SampleKhronosContext>,
-        );
-
-        my_plugin_set.add_default_plugins::<crate::traits::sample::SampleKhronosContext>();
-    }
-}

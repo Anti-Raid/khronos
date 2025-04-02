@@ -134,9 +134,9 @@ impl KhronosContext for CliKhronosContext {
     }
 
     /// Returns the global table to use
-    fn isolate(&self) -> khronos_runtime::rt::KhronosIsolate<FileAssetManager> {
+    /*fn isolate(&self) -> khronos_runtime::rt::KhronosIsolate<FileAssetManager> {
         self.isolate.clone()
-    }
+    }*/
 
     fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
         let guild_id = match scope {

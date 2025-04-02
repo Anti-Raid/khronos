@@ -2366,7 +2366,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#749f23a3b8aa1afc896d85956de78fb69ac86db4"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#80109f159c456e1dd26ed4899b2d3d46b7ce6997"
 dependencies = [
  "futures-util",
  "log",
@@ -2377,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#749f23a3b8aa1afc896d85956de78fb69ac86db4"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#80109f159c456e1dd26ed4899b2d3d46b7ce6997"
 dependencies = [
  "log",
  "mlua",
