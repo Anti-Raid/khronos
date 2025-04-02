@@ -32,7 +32,7 @@ termcolor = "1"
 # Antiraid
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
-mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau"] }
+mlua = { git = "https://github.com/mlua-rs/mlua", features = ["luau"], rev = "87fa663ac11a857ab69723949a7895da3fe6dfb5" }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }

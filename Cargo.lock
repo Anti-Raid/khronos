@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.34"
+version = "4.5.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e958897981290da2a852763fe9cdb89cd36977a5d729023127095fa94d95e2ff"
+checksum = "d8aa86934b44c19c50f87cc2790e19f54f7a67aedb64101c2e1a2e5ecfb73944"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -704,9 +704,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.34"
+version = "4.5.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83b0f35019843db2160b5bb19ae09b4e6411ac33fc6a712003c33e03090e2489"
+checksum = "2414dbb2dd0695280da6ea9261e327479e9d37b0630f6b53ba2a11c60c679fd9"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1035,9 +1035,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.7"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3716d7a920fb4fac5d84e9d4bce8ceb321e9414b4409da61b07b75c1e3d0697"
+checksum = "13c863f0904021b108aa8b2f55046443e6b1ebde8fd4a15c399893aae4fa069f"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1947,10 +1947,11 @@ dependencies = [
 
 [[package]]
 name = "jobserver"
-version = "0.1.32"
+version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48d1dbcbbeb6a7fec7e059840aa538bd62aaccf972c7346c4d9d2059312853d0"
+checksum = "38f262f097c174adebe41eb73d66ae9c06b2844fb0da69969647bbddd9b0538a"
 dependencies = [
+ "getrandom 0.3.2",
  "libc",
 ]
 
@@ -2214,9 +2215,9 @@ dependencies = [
 
 [[package]]
 name = "luau0-src"
-version = "0.13.0+luau667"
+version = "0.12.3+luau663"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06da345d11ee4cb827892fb63eab424790ae33dc12b428a72b0253ec86ebe919"
+checksum = "76ae337c644bbf86a8d8e9ce3ee023311833d41741baf5e51acc31b37843aba1"
 dependencies = [
  "cc",
 ]
@@ -2337,7 +2338,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.10.3"
-source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
+source = "git+https://github.com/mlua-rs/mlua?rev=87fa663ac11a857ab69723949a7895da3fe6dfb5#87fa663ac11a857ab69723949a7895da3fe6dfb5"
 dependencies = [
  "bstr",
  "either",
@@ -2355,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.6.7"
-source = "git+https://github.com/mlua-rs/mlua#c1a018a60d31fb6ad008ff816592b081a18f4797"
+source = "git+https://github.com/mlua-rs/mlua?rev=87fa663ac11a857ab69723949a7895da3fe6dfb5#87fa663ac11a857ab69723949a7895da3fe6dfb5"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2366,7 +2367,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#47eaa08504e8f82dc3b2532f66a2e6e49bae1cfc"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#9f300cc98434e579d09b30fd2717d6ecb02ebf95"
 dependencies = [
  "futures-util",
  "log",
@@ -2377,7 +2378,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#47eaa08504e8f82dc3b2532f66a2e6e49bae1cfc"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#9f300cc98434e579d09b30fd2717d6ecb02ebf95"
 dependencies = [
  "log",
  "mlua",
@@ -3523,9 +3524,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.0.3"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e56a18552996ac8d29ecc3b190b4fdbb2d91ca4ec396de7bbffaf43f3d637e96"
+checksum = "d97817398dd4bb2e6da002002db259209759911da105da92bec29ccb12cf58bf"
 dependencies = [
  "bitflags 2.9.0",
  "errno",
