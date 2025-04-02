@@ -230,7 +230,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<LuaMultiValue, LuaError> {
-        match (event, context).into_lua_multi(self.inner.lua()) {
+        match (event /*context*/,).into_lua_multi(self.inner.lua()) {
             Ok(f) => Ok(f),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
