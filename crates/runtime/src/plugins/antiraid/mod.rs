@@ -4,7 +4,7 @@ pub mod img_captcha;
 pub mod interop;
 pub mod kv;
 pub mod lazy;
-pub mod lockdowns;
+//pub mod lockdowns;
 pub mod luau;
 pub mod pages;
 pub mod permissions;
