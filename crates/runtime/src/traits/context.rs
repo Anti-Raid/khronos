@@ -8,12 +8,12 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
-    type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
+    type LockdownDataStore: lockdowns::LockdownDataStore;
     type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
     type PageProvider: PageProvider;
-    type AssetManager: AssetManager + Clone;
+    type AssetManager: AssetManager;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
