@@ -62,7 +62,7 @@ impl PluginSet {
         self.add_plugin("@antiraid/userinfo", antiraid::userinfo::init_plugin::<T>);
 
         // External plugins
-        self.add_plugin("@lune/datetime", lune::datetime::init_plugin);
+        //self.add_plugin("@lune/datetime", lune::datetime::init_plugin);
         self.add_plugin("@lune/regex", lune::regex::init_plugin);
         self.add_plugin("@lune/serde", lune::serde::init_plugin);
         //self.add_plugin("@lune/roblox", lune::roblox::init_plugin);
