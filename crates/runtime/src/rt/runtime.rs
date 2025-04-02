@@ -15,11 +15,6 @@ use mlua_scheduler_ext::Scheduler;
 /// A function to be called when the Khronos runtime is marked as broken
 pub type OnBrokenFunc = Box<dyn Fn(&Lua)>;
 
-/// A function to be called upon recieving a thread event callback
-///
-/// A LuaValue::Thread means a new thread has been created, while a LightUserData or other value indicates a thread has exited.
-pub type ThreadEventCallbackFunc = Box<dyn Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static>;
-
 /// Auxillary options for the creation of a Khronos runtime
 #[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize, Default)]
 pub struct RuntimeCreateOpts {
@@ -78,12 +73,13 @@ impl KhronosRuntime {
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub fn new<
         SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
-        OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + mlua::MaybeSend + 'static,
+        OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
+        //ThreadEventCallbackFunc: Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static,
     >(
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
-        on_thread_event_callback: Option<ThreadEventCallbackFunc>,
+        //on_thread_event_callback: Option<ThreadEventCallbackFunc>,
     ) -> Result<Self, LuaError> {
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,

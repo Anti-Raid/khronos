@@ -8,8 +8,8 @@ pub trait KhronosContext: 'static + Clone {
     type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
-    //type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
-    //type LockdownProvider: LockdownProvider<Box<dyn LockdownDataStore>>;
+    type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
+    type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
     type PageProvider: PageProvider;
@@ -51,7 +51,7 @@ pub trait KhronosContext: 'static + Clone {
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider>;
 
     /// Returns a Lockdown provider with the given scope
-    //fn lockdown_provider(&self, scope: ExecutorScope) -> Option<Self::LockdownProvider>;
+    fn lockdown_provider(&self, scope: ExecutorScope) -> Option<Self::LockdownProvider>;
 
     /// Returns a UserInfo provider with the given scope
     fn userinfo_provider(&self, scope: ExecutorScope) -> Option<Self::UserInfoProvider>;

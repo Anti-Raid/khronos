@@ -100,8 +100,8 @@ impl KhronosContext for CliKhronosContext {
     type Data = serde_json::Value;
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
-    //type LockdownDataStore = CliLockdownDataStore;
-    //type LockdownProvider = CliLockdownProvider;
+    type LockdownDataStore = CliLockdownDataStore;
+    type LockdownProvider = CliLockdownProvider;
     type UserInfoProvider = CliUserInfoProvider;
     type StingProvider = CliStingProvider;
     type PageProvider = CliPageProvider;
@@ -188,7 +188,7 @@ impl KhronosContext for CliKhronosContext {
         }
     }
 
-    /*fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
+    fn lockdown_provider(&self, _scope: ExecutorScope) -> Option<Self::LockdownProvider> {
         let Some(http) = &self.http else {
             return None;
         };
@@ -197,7 +197,7 @@ impl KhronosContext for CliKhronosContext {
             _lockdown_data_store: CliLockdownDataStore {},
             http: http.clone(),
         })
-    }*/
+    }
 
     fn userinfo_provider(&self, _scope: ExecutorScope) -> Option<Self::UserInfoProvider> {
         Some(CliUserInfoProvider {})

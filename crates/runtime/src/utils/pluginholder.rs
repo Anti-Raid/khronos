@@ -51,7 +51,7 @@ impl PluginSet {
         self.add_plugin("@antiraid/img_captcha", antiraid::img_captcha::init_plugin);
         self.add_plugin("@antiraid/kv", antiraid::kv::init_plugin::<T>);
         self.add_plugin("@antiraid/lazy", antiraid::lazy::init_plugin);
-        //self.add_plugin("@antiraid/lockdowns", antiraid::lockdowns::init_plugin::<T>);
+        self.add_plugin("@antiraid/lockdowns", antiraid::lockdowns::init_plugin::<T>);
         self.add_plugin("@antiraid/luau", antiraid::luau::init_plugin::<T>);
         self.add_plugin("@antiraid/pages", antiraid::pages::init_plugin::<T>);
         self.add_plugin("@antiraid/permissions", antiraid::permissions::init_plugin);

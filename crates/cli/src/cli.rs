@@ -283,7 +283,7 @@ impl Cli {
             Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
                 Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
             }),
-            None,
+            //None,
         )
         .expect("Failed to create runtime");
 
