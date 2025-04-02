@@ -230,22 +230,6 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<LuaMultiValue, LuaError> {
-        let context = match context.into_lua(self.inner.lua()) {
-            Ok(f) => f,
-            Err(e) => {
-                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                if let LuaError::MemoryError(_) = e {
-                    // Mark VM as broken
-                    self.inner.mark_broken(true)
-                }
-
-                return Err(e);
-            }
-        };
-
-        // Temp workaround: store context in registry
-        self.lua().create_registry_value(context.clone())?;
-
         match (event, context).into_lua_multi(self.inner.lua()) {
             Ok(f) => Ok(f),
             Err(e) => {
