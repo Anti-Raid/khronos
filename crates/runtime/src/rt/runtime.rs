@@ -163,7 +163,8 @@ impl KhronosRuntime {
         let current_threads_ref = current_threads.clone();
         let max_threads_ref = max_threads.clone();
 
-        if let Some(on_thread_event_callback) = on_thread_event_callback {
+        // Currently blocked on mlua bugs
+        /*if let Some(on_thread_event_callback) = on_thread_event_callback {
             lua.set_thread_event_callback(move |lua, value| {
                 let new = match value {
                     LuaValue::Thread(_) => {
@@ -228,7 +229,7 @@ impl KhronosRuntime {
 
                 Ok(())
             });
-        }
+        }*/
 
         Ok(Self {
             store_table: lua.create_table()?,
