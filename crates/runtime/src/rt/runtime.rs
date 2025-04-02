@@ -111,6 +111,8 @@ impl KhronosRuntime {
 
         let scheduler_lib = mlua_scheduler::userdata::scheduler_lib(&lua)?;
 
+        mlua_scheduler::userdata::patch_coroutine_lib(&lua)?;
+
         // Add in basic globals
         if !opts.disable_scheduler_lib {
             lua.globals().set("scheduler", scheduler_lib.clone())?;
