@@ -18,7 +18,7 @@ rustrict = "0.7"
 
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua = { git = "https://github.com/AntiRaid/mlua", features = ["luau", "serialize"] }
+mlua = { git = "https://github.com/Anti-Raid/mlua", features = ["luau", "serialize"] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
