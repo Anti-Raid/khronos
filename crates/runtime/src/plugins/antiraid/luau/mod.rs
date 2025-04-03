@@ -16,7 +16,7 @@ pub struct Chunk<T: KhronosContext> {
 
 impl<T: KhronosContext> Chunk<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("luau:{}", action)) {
+        if !self.context.has_cap(&format!("luau:{}", action)) && !self.context.has_cap("luau:*") {
             return Err(LuaError::runtime(
                 "Luau action is not allowed in this template context",
             ));
