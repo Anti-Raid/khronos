@@ -52,7 +52,7 @@ impl<T: KhronosContext> TemplateContext<T> {
             return Ok(v.clone());
         }
 
-        let v = lua.to_value(&self.context.data())?;
+        let v = lua.to_value(&self.context.current_user())?;
 
         *cached_data = Some(v.clone());
 
