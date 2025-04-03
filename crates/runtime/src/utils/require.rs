@@ -253,7 +253,7 @@ pub async fn require_from_controller<T: RequireController>(
         return Err(LuaError::external(format!("module '{}' not found", pat.display())));
     };
 
-    if let Some(cached) = controller.get_cached(&path_used) {
+    if let Some(cached) = controller.get_cached(path_used) {
         log::debug!("[Require] Cached: {:?}", cached);
         return Ok(cached.clone());
     }

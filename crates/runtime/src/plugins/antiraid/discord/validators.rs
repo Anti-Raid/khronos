@@ -26,7 +26,13 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
         return Ok(());
     }
 
-    for word in input.split_whitespace() {
+    let replaced_input = input.replace("-", " ").replace("_", " ");
+
+    if ensure_safe::is_safe_word(replaced_input) {
+        return Ok(());
+    }
+
+    for word in replaced_input.split_whitespace() {
         if !ensure_safe::is_safe_word(word) {
             return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
         }
