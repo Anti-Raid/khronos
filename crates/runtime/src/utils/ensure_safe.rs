@@ -65,5 +65,7 @@ mod trie_speed_test {
 
         // Special characters are safe words
         assert!(is_safe_word("!"));
+
+        assert!(is_safe_word("provides"));
     }
 }

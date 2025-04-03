@@ -22,11 +22,17 @@ pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
 
 /// Checks that the string only uses safe words
 pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
-    if ensure_safe::is_safe_word(input) || ensure_safe::is_safe_word(&input.replace(" ", "")) {
-        Ok(())
-    } else {
-        Err(format!("Input contains disallowed words: {:?}", input).into())
+    if ensure_safe::is_safe_word(input) {
+        return Ok(());
     }
+
+    for word in input.split_whitespace() {
+        if !ensure_safe::is_safe_word(word) {
+            return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
+        }
+    }
+
+    Ok(())
 }
 
 /// Validates a set of components
