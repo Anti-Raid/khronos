@@ -28,7 +28,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
 
     let replaced_input = input.replace("-", " ").replace("_", " ");
 
-    if ensure_safe::is_safe_word(replaced_input) {
+    if ensure_safe::is_safe_word(&replaced_input) {
         return Ok(());
     }
 
