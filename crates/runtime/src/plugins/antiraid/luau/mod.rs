@@ -150,7 +150,7 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     module.set(
         "load",
         lua.create_function(|_, (token, code): (TemplateContextRef<T>, String)| {
-            if !token.context.has_cap("luau:eval") {
+            if !token.context.has_cap("luau:eval") && !token.context.has_cap("luau:*") {
                 return Err(LuaError::runtime(
                     "You don't have permission to evaluate Luau code in this template context",
                 ));
