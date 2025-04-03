@@ -1247,7 +1247,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
 
                 let resp = this.discord_provider
-                    .create_guild_commands(&data)
+                    .create_guild_commands(&data.data)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
