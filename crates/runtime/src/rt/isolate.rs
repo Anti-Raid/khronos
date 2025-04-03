@@ -228,6 +228,13 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         self.require.as_ref().map(|r| r.as_ref())
     }
 
+    /// Clears the require cache for the isolate
+    pub fn clear_require_cache(&self) {
+        if let Some(controller) = self.require() {
+            controller.clear_require_cache();
+        }
+    }
+
     /// Creates a runtime shareable data object
     pub fn runtime_shareable_data(&self) -> RuntimeShareableData {
         RuntimeShareableData {
