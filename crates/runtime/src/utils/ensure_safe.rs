@@ -30,7 +30,7 @@ pub fn is_safe_word(word: &str) -> bool {
 
         // Ignore numbers and special characters for analysis
         if c.is_alphabetic() {
-            new_word.push(c);
+            new_word.push(c.to_ascii_lowercase());
         }
     }
 
