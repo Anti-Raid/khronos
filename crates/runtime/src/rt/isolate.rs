@@ -456,6 +456,11 @@ impl<T: AssetManagerTrait + Clone + 'static> IsolateRequireController<T> {
     pub fn requires_cache(&self) -> &RefCell<std::collections::HashMap<String, LuaMultiValue>> {
         &self.requires_cache
     }
+
+    /// Clears the require cache
+    pub fn clear_require_cache(&self) {
+        self.requires_cache.borrow_mut().clear();
+    }
 }
 
 impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireController<T> {
