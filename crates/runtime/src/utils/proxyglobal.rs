@@ -37,10 +37,11 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
     lua.gc_collect()?;
 
     // Used in iterator
-    let lua_global_pairs = Rc::new(lua
-    .globals()
-    .pairs()
-    .collect::<LuaResult<Vec<(LuaValue, LuaValue)>>>()?);
+    let lua_global_pairs = Rc::new(
+        lua.globals()
+            .pairs()
+            .collect::<LuaResult<Vec<(LuaValue, LuaValue)>>>()?,
+    );
 
     // Provides iteration over first the users globals, then lua.globals()
     //
@@ -60,25 +61,27 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
 
                 if curr_i < global_pairs.len() {
                     let Some((key, value)) = global_pairs.get(curr_i).cloned() else {
-                        return Ok((LuaValue::Nil, LuaValue::Nil))
+                        return Ok((LuaValue::Nil, LuaValue::Nil));
                     };
                     i.set(curr_i + 1);
-                    return Ok((key, value))
+                    return Ok((key, value));
                 }
 
                 if curr_i < global_pairs.len() + lua_global_pairs.len() {
-                    let Some((key, value)) = lua_global_pairs.get(curr_i - global_pairs.len()).cloned() else {
-                        return Ok((LuaValue::Nil, LuaValue::Nil))
+                    let Some((key, value)) =
+                        lua_global_pairs.get(curr_i - global_pairs.len()).cloned()
+                    else {
+                        return Ok((LuaValue::Nil, LuaValue::Nil));
                     };
                     i.set(curr_i + 1);
-                    return Ok((key, value))
+                    return Ok((key, value));
                 }
 
-                return Ok((LuaValue::Nil, LuaValue::Nil))
+                Ok((LuaValue::Nil, LuaValue::Nil))
             })?;
 
             Ok(iter)
-        })?
+        })?,
     )?;
 
     global_mt.set(
@@ -87,7 +90,7 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
             let globals_len = globals.raw_len();
             let len = lua.globals().raw_len();
             Ok(globals_len + len)
-        })?
+        })?,
     )?;
 
     // Block getmetatable

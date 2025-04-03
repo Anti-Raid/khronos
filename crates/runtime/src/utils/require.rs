@@ -239,18 +239,21 @@ pub async fn require_from_controller<T: RequireController>(
         )));
     }
 
-    let pat = format!("{}.luau", pat.to_string_lossy()).to_string();
+    let pat_a = format!("{}.luau", pat.to_string_lossy()).to_string();
+    let pat_with_init_luau: String = format!("{}/init.luau", pat.to_string_lossy()).to_string();
 
     let mut file_contents = None;
-    if let Ok(file) = controller.get_file(&pat) {
-        file_contents = Some(file);
+    if let Ok(file) = controller.get_file(&pat_a) {
+        file_contents = Some((file, &pat_a));
+    } else if let Ok(file) = controller.get_file(&pat_with_init_luau) {
+        file_contents = Some((file, &pat_with_init_luau));
+    }
+
+    let Some((file_contents, path_used)) = file_contents else {
+        return Err(LuaError::external(format!("module '{}' not found", pat.display())));
     };
 
-    let Some(file_contents) = file_contents else {
-        return Err(LuaError::external(format!("module '{}' not found", pat)));
-    };
-
-    if let Some(cached) = controller.get_cached(&pat) {
+    if let Some(cached) = controller.get_cached(&path_used) {
         log::debug!("[Require] Cached: {:?}", cached);
         return Ok(cached.clone());
     }
@@ -258,7 +261,7 @@ pub async fn require_from_controller<T: RequireController>(
     // Execute the file
     let th = lua
         .load(file_contents.as_ref())
-        .set_name(format!("./{}", pat))
+        .set_name(format!("./{}", path_used))
         .set_environment(controller.global_table())
         .into_lua_thread(lua)?;
 
@@ -269,7 +272,7 @@ pub async fn require_from_controller<T: RequireController>(
 
     match ret {
         Some(Ok(ret)) => {
-            controller.cache(pat.clone(), ret.clone());
+            controller.cache(path_used.clone(), ret.clone());
             Ok(ret)
         }
         Some(Err(ret)) => Err(ret),
