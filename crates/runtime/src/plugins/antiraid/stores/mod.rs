@@ -7,12 +7,6 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     module.set(
         "store",
         lua.create_function(|_, token: TemplateContextRef<T>| {
-            if !token.context.has_cap("store") {
-                return Err(LuaError::runtime(
-                    "You don't have permission to get the shared store in this template context",
-                ));
-            }
-
             Ok(token.context.runtime_shareable_data().store_table.clone())
         })?,
     )?;

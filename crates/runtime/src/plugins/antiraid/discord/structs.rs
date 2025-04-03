@@ -67,6 +67,11 @@ pub struct CreateCommandOptions {
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct CreateCommandsOptions {
+    pub data: Vec<CreateCommand>,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateInteractionResponseOptions {
     pub interaction_id: serenity::all::InteractionId,
     pub interaction_token: String,

@@ -1,5 +1,4 @@
-use extract_map::ExtractMap;
-use serenity::nonmax::NonMaxU8;
+use serenity::all::InteractionId;
 
 /// A discord provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -10,6 +9,9 @@ pub trait DiscordProvider: 'static + Clone {
     fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
 
     // Base stuff
+
+    /// Returns the guild ID
+    fn guild_id(&self) -> serenity::all::GuildId;
 
     /// Fetches the target guild.
     ///
@@ -33,204 +35,326 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::ChannelId,
     ) -> Result<serenity::all::GuildChannel, crate::Error>;
 
-    // Audit logs
+    /// Http client
+    fn serenity_http(&self) -> &serenity::http::Http;
+
+    // Pre-provided stuff that can be overridden
 
     /// Returns the audit logs for the guild.
     async fn get_audit_logs(
         &self,
         action_type: Option<serenity::all::audit_log::Action>,
-        user_id: Option<serenity::all::UserId>,
-        before: Option<serenity::all::AuditLogEntryId>,
-        limit: Option<NonMaxU8>,
-    ) -> Result<serenity::all::AuditLogs, crate::Error>;
+        user_id: Option<serenity::model::prelude::UserId>,
+        before: Option<serenity::model::prelude::AuditLogEntryId>,
+        limit: Option<serenity::nonmax::NonMaxU8>,
+    ) -> Result<serenity::model::prelude::AuditLogs, crate::Error> {
+        self.serenity_http()
+            .get_audit_logs(self.guild_id(), action_type, user_id, before, limit)
+            .await
+            .map_err(|e| format!("Failed to fetch audit logs: {}", e).into())
+    }
 
-    // Auto Moderation
-
-    /// Retrieves all auto moderation rules in a guild.
     async fn list_auto_moderation_rules(
         &self,
-    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error>;
+    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error> {
+        self.serenity_http()
+            .get_automod_rules(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to fetch automod rules: {}", e).into())
+    }
 
-    /// Retrieves an auto moderation rule in a guild.
     async fn get_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        self.serenity_http()
+            .get_automod_rule(self.guild_id(), rule_id)
+            .await
+            .map_err(|e| format!("Failed to fetch automod rule: {}", e).into())
+    }
 
-    /// Creates an auto moderation rule in a guild.
     async fn create_auto_moderation_rule(
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        self.serenity_http()
+            .create_automod_rule(self.guild_id(), &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to create automod rule: {}", e).into())
+    }
 
-    /// Edits an auto moderation rule in a guild.
     async fn edit_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error>;
+    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+        self.serenity_http()
+            .edit_automod_rule(self.guild_id(), rule_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to edit automod rule: {}", e).into())
+    }
 
-    /// Deletes an auto moderation rule in a guild.
     async fn delete_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
         audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_automod_rule(self.guild_id(), rule_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete automod rule: {}", e).into())
+    }
 
-    // Channel
-
-    /// Edits a discord channel
     async fn edit_channel(
         &self,
         channel_id: serenity::all::ChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::GuildChannel, crate::Error>;
+    ) -> Result<serenity::model::channel::GuildChannel, crate::Error> {
+        let chan = self
+            .serenity_http()
+            .edit_channel(channel_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to edit channel: {}", e))?;
 
-    /// Deletes a discord channel
+        Ok(chan)
+    }
+
     async fn delete_channel(
         &self,
         channel_id: serenity::all::ChannelId,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel, crate::Error>;
+    ) -> Result<serenity::model::channel::Channel, crate::Error> {
+        let chan = self
+            .serenity_http()
+            .delete_channel(channel_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete channel: {}", e))?;
 
-    /// Edit the channel permission overwrites for a user or role in a channel.
-    ///
-    /// Only usable for guild channels. Requires the MANAGE_ROLES permission.
-    ///
-    /// Only permissions your bot has in the guild or parent channel (if applicable) can be allowed/denied
-    ///
-    /// (unless your bot has a MANAGE_ROLES overwrite in the channel).
-    ///
-    /// Returns a 204 empty response on success.
-    ///
-    /// Fires a Channel Update Gateway event.
+        Ok(chan)
+    }
+
     async fn edit_channel_permissions(
         &self,
         channel_id: serenity::all::ChannelId,
         target_id: serenity::all::TargetId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .create_permission(channel_id, target_id, &data, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to edit channel permissions: {}", e).into())
+    }
 
-    /// Adds a role to the member
     async fn add_guild_member_role(
         &self,
         user_id: serenity::all::UserId,
         role_id: serenity::all::RoleId,
         audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .add_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to add role to member: {}", e).into())
+    }
 
-    /// Removes a role from the member
     async fn remove_guild_member_role(
         &self,
         user_id: serenity::all::UserId,
         role_id: serenity::all::RoleId,
         audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .remove_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to remove role from member: {}", e).into())
+    }
 
-    /// Removes a member from the guild
     async fn remove_guild_member(
         &self,
         user_id: serenity::all::UserId,
         audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .kick_member(self.guild_id(), user_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to remove member: {}", e).into())
+    }
 
-    /// Returns a list of guild bans
     async fn get_guild_bans(
         &self,
         target: Option<serenity::all::UserPagination>,
         limit: Option<serenity::nonmax::NonMaxU16>,
-    ) -> Result<Vec<serenity::all::Ban>, crate::Error>;
+    ) -> Result<Vec<serenity::all::Ban>, crate::Error> {
+        self.serenity_http()
+            .get_bans(self.guild_id(), target, limit)
+            .await
+            .map_err(|e| format!("Failed to get guild bans: {}", e).into())
+    }
 
-    /// Creates a ban for a user
     async fn create_member_ban(
         &self,
         user_id: serenity::all::UserId,
         delete_message_seconds: u32,
         reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .ban_user(
+                self.guild_id(),
+                user_id,
+                (delete_message_seconds / 86400)
+                    .try_into()
+                    .map_err(|e| format!("Failed to convert ban duration to days: {}", e))?,
+                reason,
+            )
+            .await
+            .map_err(|e| format!("Failed to ban user: {}", e).into())
+    }
 
-    /// Kicks a member from the guild
     async fn kick_member(
         &self,
         user_id: serenity::all::UserId,
         reason: Option<&str>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .kick_member(self.guild_id(), user_id, reason)
+            .await
+            .map_err(|e| format!("Failed to kick user: {}", e).into())
+    }
 
-    /// Edits a member on the guild
     async fn edit_member(
         &self,
         user_id: serenity::all::UserId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Member, crate::Error>;
+    ) -> Result<serenity::all::Member, crate::Error> {
+        self.serenity_http()
+            .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to edit member: {}", e).into())
+    }
 
-    /// Returns the list of roles in the guild
-    async fn get_guild_roles(
-        &self,
-    ) -> Result<ExtractMap<serenity::all::RoleId, serenity::all::Role>, crate::Error>;
-
-    /// Gets messages from a channel based on target+limit
-    async fn get_messages(
-        &self,
-        channel_id: serenity::all::ChannelId,
-        target: Option<serenity::all::MessagePagination>,
-        limit: Option<NonMaxU8>,
-    ) -> Result<Vec<serenity::all::Message>, crate::Error>;
-
-    /// Gets a message from a channel
-    async fn get_message(
-        &self,
-        channel_id: serenity::all::ChannelId,
-        message_id: serenity::all::MessageId,
-    ) -> Result<serenity::all::Message, crate::Error>;
-
-    /// Creates a discord message
     async fn create_message(
         &self,
         channel_id: serenity::all::ChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serenity::model::channel::Message, crate::Error>;
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        self.serenity_http()
+            .send_message(channel_id, files, &data)
+            .await
+            .map_err(|e| format!("Failed to send message: {}", e).into())
+    }
 
-    /// Creates an interaction response
     async fn create_interaction_response(
         &self,
-        interaction_id: serenity::all::InteractionId,
+        interaction_id: InteractionId,
         interaction_token: &str,
         response: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<(), crate::Error>;
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .create_interaction_response(interaction_id, interaction_token, &response, files)
+            .await
+            .map_err(|e| format!("Failed to create interaction response: {}", e).into())
+    }
 
-    /// Creates a followup response
     async fn create_followup_message(
         &self,
         interaction_token: &str,
         response: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serenity::all::Message, crate::Error>;
+    ) -> Result<serenity::all::Message, crate::Error> {
+        self.serenity_http()
+            .create_followup_message(interaction_token, &response, files)
+            .await
+            .map_err(|e| format!("Failed to create interaction followup: {}", e).into())
+    }
 
-    /// Gets the original interaction response
     async fn get_original_interaction_response(
         &self,
         interaction_token: &str,
-    ) -> Result<serenity::model::channel::Message, crate::Error>;
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        self.serenity_http()
+            .get_original_interaction_response(interaction_token)
+            .await
+            .map_err(|e| format!("Failed to get original interaction response: {}", e).into())
+    }
 
-    /// Returns the guilds commands
-    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error>;
+    async fn get_guild_commands(
+        &self,
+    ) -> Result<Vec<serenity::all::Command>, crate::Error> {
+        self.serenity_http()
+            .get_guild_commands(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to get guild commands: {}", e).into())
+    }
 
-    /// Returns a guild command by id
     async fn get_guild_command(
         &self,
         command_id: serenity::all::CommandId,
-    ) -> Result<serenity::all::Command, crate::Error>;
+    ) -> Result<serenity::all::Command, crate::Error> {
+        self.serenity_http()
+            .get_guild_command(self.guild_id(), command_id)
+            .await
+            .map_err(|e| format!("Failed to get guild command: {}", e).into())
+    }
 
-    /// Creates a guild command
     async fn create_guild_command(
         &self,
         map: impl serde::Serialize,
-    ) -> Result<serenity::all::Command, crate::Error>;
+    ) -> Result<serenity::all::Command, crate::Error> {
+        self.serenity_http()
+            .create_guild_command(self.guild_id(), &map)
+            .await
+            .map_err(|e| format!("Failed to create guild command: {}", e).into())
+    }
+
+    async fn create_guild_commands(
+        &self,
+        map: impl serde::Serialize,
+    ) -> Result<Vec<serenity::all::Command>, crate::Error> {
+        self.serenity_http()
+            .create_guild_commands(self.guild_id(), &map)
+            .await
+            .map_err(|e| format!("Failed to create guild commands: {}", e).into())
+    }
+
+    async fn get_guild_roles(
+        &self,
+    ) -> Result<
+        extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>,
+        crate::Error,
+    > {
+        self.serenity_http()
+            .get_guild_roles(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to get guild roles: {}", e).into())
+    }
+
+    async fn get_messages(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        target: Option<serenity::all::MessagePagination>,
+        limit: Option<serenity::nonmax::NonMaxU8>,
+    ) -> Result<Vec<serenity::all::Message>, crate::Error> {
+        self.serenity_http()
+            .get_messages(channel_id, target, limit)
+            .await
+            .map_err(|e| format!("Failed to get messages: {}", e).into())
+    }
+
+    async fn get_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        self.serenity_http()
+            .get_message(channel_id, message_id)
+            .await
+            .map_err(|e| format!("Failed to get message: {}", e).into())
+    }
 }

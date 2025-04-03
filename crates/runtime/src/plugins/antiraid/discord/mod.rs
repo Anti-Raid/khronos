@@ -1234,6 +1234,27 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
+        methods.add_method("create_guild_commands", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                this.check_action("create_guild_commands".to_string())
+                    .map_err(LuaError::external)?;
+
+                let data = lua.from_value::<structs::CreateCommandsOptions>(data)?;
+
+                for data in &data.data {
+                    validators::validate_command(&data)
+                        .map_err(|x| LuaError::external(x.to_string()))?;
+                }
+
+                let resp = this.discord_provider
+                    .create_guild_command(&data)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(resp))
+            }))
+        });
+
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<DiscordActionExecutor<T>>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
@@ -1271,6 +1292,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     "get_guild_command",
                     "get_guild_commands",
                     "create_guild_command",
+                    "create_guild_commands",
                 ],
             )
         });
