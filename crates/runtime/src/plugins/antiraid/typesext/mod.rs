@@ -145,7 +145,7 @@ impl LuaUserData for U64 {
         });
 
         methods.add_meta_method(LuaMetaMethod::Sub, |_, this, value: U64| {
-            let v = this.0.wrapping_add(value.0);
+            let v = this.0.wrapping_sub(value.0);
             Ok(U64(v))
         });
 
