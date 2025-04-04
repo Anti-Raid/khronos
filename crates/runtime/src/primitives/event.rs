@@ -1,3 +1,4 @@
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use std::{cell::RefCell, sync::Arc};
 
@@ -80,7 +81,7 @@ impl Event {
             return Ok(v.clone());
         }
 
-        let v = lua.to_value(&self.inner.data)?;
+        let v = lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?;
 
         *cached_data = Some(v.clone());
 
@@ -91,11 +92,11 @@ impl Event {
 impl LuaUserData for Event {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("base_name", |lua, this| {
-            let base_name = lua.to_value(&this.inner.base_name)?;
+            let base_name = lua.to_value_with(&this.inner.base_name, LUA_SERIALIZE_OPTIONS)?;
             Ok(base_name)
         });
         fields.add_field_method_get("name", |lua, this| {
-            let name = lua.to_value(&this.inner.name)?;
+            let name = lua.to_value_with(&this.inner.name, LUA_SERIALIZE_OPTIONS)?;
             Ok(name)
         });
         fields.add_field_method_get("data", |lua, this| {
@@ -103,7 +104,7 @@ impl LuaUserData for Event {
             Ok(data)
         });
         fields.add_field_method_get("author", |lua, this| {
-            let author = lua.to_value(&this.inner.author)?;
+            let author = lua.to_value_with(&this.inner.author, LUA_SERIALIZE_OPTIONS)?;
             Ok(author)
         });
     }

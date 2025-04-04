@@ -1,6 +1,7 @@
 // To avoid over-relying on Settings
 mod settings_ir;
 
+use super::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::pageprovider::PageProvider;
@@ -70,7 +71,7 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
                     settings: page.settings.into_iter().map(|e| e.into()).collect(),
                 };
 
-                let page = lua.to_value(&page)?;
+                let page = lua.to_value_with(&page, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(page)
             }))

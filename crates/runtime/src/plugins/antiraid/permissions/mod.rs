@@ -1,3 +1,4 @@
+use super::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
@@ -7,7 +8,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         "permission_from_string",
         lua.create_function(|lua, (perm_string,): (String,)| {
             let ps = kittycat::perms::Permission::from_string(&perm_string);
-            lua.to_value(&ps)
+            lua.to_value_with(&ps, LUA_SERIALIZE_OPTIONS)
         })?,
     )?;
 
@@ -40,7 +41,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|lua, sp: LuaValue| {
             let sp = lua.from_value::<kittycat::perms::StaffPermissions>(sp)?;
             let resolved = sp.resolve();
-            lua.to_value(&resolved)
+            lua.to_value_with(&resolved, LUA_SERIALIZE_OPTIONS)
         })?,
     )?;
 
@@ -65,10 +66,13 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                         kittycat::perms::CheckPatchChangesError::NoPermission { permission } => {
                             Ok((
                                 false,
-                                lua.to_value(&serde_json::json!({
-                                    "type": "NoPermission",
-                                    "permission": permission
-                                }))?,
+                                lua.to_value_with(
+                                    &serde_json::json!({
+                                        "type": "NoPermission",
+                                        "permission": permission
+                                    }),
+                                    LUA_SERIALIZE_OPTIONS,
+                                )?,
                             ))
                         }
                         kittycat::perms::CheckPatchChangesError::LacksNegatorForWildcard {
@@ -76,11 +80,14 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                             negator,
                         } => Ok((
                             false,
-                            lua.to_value(&serde_json::json!({
-                                "type": "LacksNegatorForWildcard",
-                                "wildcard": wildcard,
-                                "negator": negator
-                            }))?,
+                            lua.to_value_with(
+                                &serde_json::json!({
+                                    "type": "LacksNegatorForWildcard",
+                                    "wildcard": wildcard,
+                                    "negator": negator
+                                }),
+                                LUA_SERIALIZE_OPTIONS,
+                            )?,
                         )),
                     },
                 }

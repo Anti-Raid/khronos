@@ -1,5 +1,6 @@
 mod types;
 
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
@@ -97,7 +98,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     })
                     .collect::<Vec<KvRecord>>();
 
-                let records: LuaValue = lua.to_value(&records)?;
+                let records: LuaValue = lua.to_value_with(&records, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(records)
             }))
@@ -131,7 +132,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 match record {
                     // Return None and true if record was found but value is null
                     Some(rec) => {
-                        let value: LuaValue = lua.to_value(&rec.value)?;
+                        let value: LuaValue = lua.to_value_with(&rec.value, LUA_SERIALIZE_OPTIONS)?;
                         Ok((Some(value), true))
                     },
                     // Return None and 0 if record was not found
@@ -159,7 +160,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     None => KvRecord::default(),
                 };
 
-                let record: LuaValue = lua.to_value(&record)?;
+                let record: LuaValue = lua.to_value_with(&record,LUA_SERIALIZE_OPTIONS)?;
                 Ok(record)
             }))
         });

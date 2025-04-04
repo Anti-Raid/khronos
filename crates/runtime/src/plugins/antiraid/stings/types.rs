@@ -3,6 +3,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::str::FromStr;
 
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+
 /// Represents a sting on AntiRaid
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sting {
@@ -303,7 +305,7 @@ impl LuaUserData for StingAggregateSet {
             let (userid_map, system_stings) =
                 StingAggregate::total_stings_per_user(this.aggregates.clone());
 
-            let userid_map = lua.to_value(&userid_map)?;
+            let userid_map = lua.to_value_with(&userid_map, LUA_SERIALIZE_OPTIONS)?;
 
             Ok((userid_map, system_stings))
         });

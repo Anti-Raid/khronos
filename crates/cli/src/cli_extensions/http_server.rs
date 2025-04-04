@@ -10,6 +10,7 @@ use std::hash::Hash;
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::time::Duration;
+use khronos_runtime::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 
 use super::http_client::Headers;
 
@@ -239,7 +240,7 @@ impl LuaUserData for ServerRequestBody {
                 let json: serde_json::Value = serde_json::from_slice(&bytes)
                     .map_err(|e| mlua::Error::external(e.to_string()))?;
 
-                lua.to_value(&json)
+                lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)
             }))
         });
 
@@ -657,7 +658,7 @@ impl LuaUserData for Router {
                 })
                 .collect();
 
-            lua.to_value(&routes)
+            lua.to_value_with(&routes, LUA_SERIALIZE_OPTIONS)
         });
 
         fields.add_field_method_get("bind_addr", |_lua, this| Ok(this.bind_addr.clone()));

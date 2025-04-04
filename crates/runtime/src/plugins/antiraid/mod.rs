@@ -14,6 +14,14 @@ pub mod stores;
 pub mod typesext;
 pub mod userinfo;
 
+use mlua::prelude::*;
+
+// NOTE: These are options for going from other format -> lua ("serializing" lua values)
+pub const LUA_SERIALIZE_OPTIONS: LuaSerializeOptions = LuaSerializeOptions::new()
+    .set_array_metatable(true) // PATCH: Set array metatable to true as AntiRaid needs this anyways
+    .serialize_none_to_null(false)
+    .serialize_unit_to_null(false);
+
 #[cfg(test)]
 pub mod test_type_metamethod {
     #[test]

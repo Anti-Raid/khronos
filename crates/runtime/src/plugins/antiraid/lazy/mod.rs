@@ -1,3 +1,4 @@
+use super::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use std::cell::RefCell;
 
@@ -58,7 +59,7 @@ impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> LuaUserData for 
                 return Ok(v.clone());
             }
 
-            let v = lua.to_value(&this.data)?;
+            let v = lua.to_value_with(&this.data, LUA_SERIALIZE_OPTIONS)?;
 
             *cached_data = Some(v.clone());
 

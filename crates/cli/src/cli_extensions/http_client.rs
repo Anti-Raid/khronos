@@ -1,6 +1,6 @@
 //! HTTP Client Extensions (cli.httpclient)
 
-use khronos_runtime::{lua_promise, primitives::create_userdata_iterator_with_fields};
+use khronos_runtime::{lua_promise, primitives::create_userdata_iterator_with_fields, plugins::antiraid::LUA_SERIALIZE_OPTIONS};
 use mlua::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 
@@ -83,7 +83,7 @@ impl LuaUserData for Headers {
 
         methods.add_method("headers", |lua, this, _: ()| {
             let headers = this.to_headers_list();
-            let value = lua.to_value(&headers)?;
+            let value = lua.to_value_with(&headers, LUA_SERIALIZE_OPTIONS)?;
             Ok(value)
         });
     }
@@ -144,7 +144,7 @@ impl LuaUserData for Request {
 
             let bytes = body.as_bytes();
 
-            let value = lua.to_value(&bytes)?;
+            let value = lua.to_value_with(&bytes, LUA_SERIALIZE_OPTIONS)?;
             Ok(value)
         });
 
@@ -358,7 +358,7 @@ impl LuaUserData for Response {
 
                 let json = response.json::<serde_json::Value>().await.map_err(mlua::Error::external)?;
                 
-                let lua_value = lua.to_value(&json)?;
+                let lua_value = lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(lua_value)
             }))

@@ -1,3 +1,5 @@
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+
 use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 use std::cell::RefCell;
@@ -34,7 +36,7 @@ impl<T: KhronosContext> TemplateContext<T> {
             return Ok(v.clone());
         }
 
-        let v = lua.to_value(&self.context.data())?;
+        let v = lua.to_value_with(&self.context.data(), LUA_SERIALIZE_OPTIONS)?;
 
         *cached_data = Some(v.clone());
 
@@ -52,7 +54,7 @@ impl<T: KhronosContext> TemplateContext<T> {
             return Ok(v.clone());
         }
 
-        let v = lua.to_value(&self.context.current_user())?;
+        let v = lua.to_value_with(&self.context.current_user(), LUA_SERIALIZE_OPTIONS)?;
 
         *cached_data = Some(v.clone());
 
@@ -62,24 +64,6 @@ impl<T: KhronosContext> TemplateContext<T> {
 
 pub type TemplateContextRef<T> = LuaUserDataRef<TemplateContext<T>>;
 
-/*
-            // Check for cached serialized data
-            let mut cached_data = this
-                .current_discord_user
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value(&this.context.data())?;
-
-            *cached_data = Some(v.clone());
-
-            Ok(v)
-*/
-
 impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("data", |lua, this| {
@@ -88,19 +72,19 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         });
 
         fields.add_field_method_get("guild_id", |lua, this| {
-            let v = lua.to_value(&this.context.guild_id())?;
+            let v = lua.to_value_with(&this.context.guild_id(), LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
         });
 
         fields.add_field_method_get("owner_guild_id", |lua, this| {
-            let v = lua.to_value(&this.context.owner_guild_id())?;
+            let v = lua.to_value_with(&this.context.owner_guild_id(), LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
         });
 
         fields.add_field_method_get("allowed_caps", |lua, this| {
-            let v = lua.to_value(this.context.allowed_caps())?;
+            let v = lua.to_value_with(this.context.allowed_caps(), LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
         });

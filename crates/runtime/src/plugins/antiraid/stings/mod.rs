@@ -1,5 +1,6 @@
 mod types;
 use crate::{
+    plugins::antiraid::LUA_SERIALIZE_OPTIONS,
     primitives::create_userdata_iterator_with_fields,
     traits::{context::KhronosContext, stingprovider::StingProvider},
     utils::executorscope::ExecutorScope,
@@ -48,7 +49,7 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                 .map(types::Sting::from)
                 .collect::<Vec<_>>();
 
-                let v = lua.to_value(&stings)?;
+                let v = lua.to_value_with(&stings, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(v)
             }))
@@ -70,7 +71,7 @@ impl<T: KhronosContext> LuaUserData for StingExecutor<T> {
                 )?
                 .map(types::Sting::from);
 
-                let v = lua.to_value(&sting)?;
+                let v = lua.to_value_with(&sting, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(v)
             }))

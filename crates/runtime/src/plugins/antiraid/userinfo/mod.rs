@@ -1,6 +1,7 @@
 use mlua::prelude::*;
 
 use crate::lua_promise;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::userinfoprovider::UserInfoProvider;
@@ -50,7 +51,7 @@ impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
                 let userinfo = this.userinfo_provider.get(user).await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let value = lua.to_value(&userinfo)?;
+                let value = lua.to_value_with(&userinfo, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(value)
             }))

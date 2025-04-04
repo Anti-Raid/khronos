@@ -1,3 +1,4 @@
+use super::LUA_SERIALIZE_OPTIONS;
 use crate::lua_promise;
 use captcha::filters::Filter;
 use mlua::prelude::*;
@@ -184,7 +185,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                     content: Some("Please enter the text from the image".to_string()),
                 };
 
-                lua.to_value(&captcha) // Return the captcha object
+                lua.to_value_with(&captcha, LUA_SERIALIZE_OPTIONS) // Return the captcha object
             }))
         })?,
     )?;

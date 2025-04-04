@@ -1,6 +1,5 @@
 use crate::{
-    lua_promise,
-    traits::{context::KhronosContext, lockdownprovider::LockdownProvider},
+    lua_promise, plugins::antiraid::LUA_SERIALIZE_OPTIONS, traits::{context::KhronosContext, lockdownprovider::LockdownProvider}
 };
 use mlua::prelude::*;
 use std::rc::Rc;
@@ -183,7 +182,7 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
         });
 
         fields.add_field_method_get("settings", |lua, this| {
-            let settings = lua.to_value(&this.lockdown_set.settings()).map_err(|e| {
+            let settings = lua.to_value_with(&this.lockdown_set.settings(), LUA_SERIALIZE_OPTIONS).map_err(|e| {
                 LuaError::external(format!("Error while serializing settings: {}", e))
             })?;
 
@@ -323,14 +322,14 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                     LockdownAddStatus::LockdownTestFailed(_) => LuaValue::Boolean(false),
                 },
                 "type" => match this {
-                    LockdownAddStatus::Ok(_) => lua.to_value("Ok")?,
-                    LockdownAddStatus::Error(_) => lua.to_value("Error")?,
+                    LockdownAddStatus::Ok(_) => LuaValue::String(lua.create_string("Ok")?),
+                    LockdownAddStatus::Error(_) => LuaValue::String(lua.create_string("Error")?),
                     LockdownAddStatus::LockdownTestFailed(_) => {
-                        lua.to_value("LockdownTestFailed")?
+                        LuaValue::String(lua.create_string("LockdownTestFailed")?)
                     }
                 },
                 "id" => match this {
-                    LockdownAddStatus::Ok(id) => lua.to_value(&id.to_string())?,
+                    LockdownAddStatus::Ok(id) => LuaValue::String(lua.create_string(&id.to_string())?),
                     LockdownAddStatus::Error(_) => LuaValue::Nil,
                     LockdownAddStatus::LockdownTestFailed(_) => LuaValue::Nil,
                 },
@@ -344,8 +343,8 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                 },
                 "error" => match this {
                     LockdownAddStatus::Ok(_) => LuaValue::Nil,
-                    LockdownAddStatus::Error(e) => lua.to_value(e)?,
-                    LockdownAddStatus::LockdownTestFailed(e) => lua.to_value(&e.0.display_error())?,
+                    LockdownAddStatus::Error(e) => LuaValue::String(lua.create_string(e)?),
+                    LockdownAddStatus::LockdownTestFailed(e) => LuaValue::String(lua.create_string(&e.0.display_error())?),
                 },
                 _ => mlua::Value::Nil,
             };
@@ -407,10 +406,10 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
                     LockdownRemoveStatus::LockdownTestFailed(_) => LuaValue::Boolean(false),
                 },
                 "type" => match this {
-                    LockdownRemoveStatus::Ok => lua.to_value("Ok")?,
-                    LockdownRemoveStatus::Error(_) => lua.to_value("Error")?,
+                    LockdownRemoveStatus::Ok => LuaValue::String(lua.create_string("Ok")?),
+                    LockdownRemoveStatus::Error(_) => LuaValue::String(lua.create_string("Error")?),
                     LockdownRemoveStatus::LockdownTestFailed(_) => {
-                        lua.to_value("LockdownTestFailed")?
+                        LuaValue::String(lua.create_string("LockdownTestFailed")?)
                     }
                 },
                 "test_result" => match this {
@@ -423,8 +422,8 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
                 },
                 "error" => match this {
                     LockdownRemoveStatus::Ok => LuaValue::Nil,
-                    LockdownRemoveStatus::Error(e) => lua.to_value(e)?,
-                    LockdownRemoveStatus::LockdownTestFailed(e) => lua.to_value(&e.0.display_error())?,
+                    LockdownRemoveStatus::Error(e) => LuaValue::String(lua.create_string(e)?),
+                    LockdownRemoveStatus::LockdownTestFailed(e) => LuaValue::String(lua.create_string(&e.0.display_error())?),
                 },
                 _ => mlua::Value::Nil,
             };
@@ -473,12 +472,12 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
         });
 
         fields.add_field_method_get("role_changes_needed", |lua, this| {
-            lua.to_value(&this.0.role_changes_needed)
+            lua.to_value_with(&this.0.role_changes_needed, LUA_SERIALIZE_OPTIONS)
                 .map_err(|e| LuaError::external(format!("Error while serializing role changes needed: {}", e)))
         });
 
         fields.add_field_method_get("other_changes_needed", |lua, this| {
-            lua.to_value(&this.0.other_changes_needed)
+            lua.to_value_with(&this.0.other_changes_needed, LUA_SERIALIZE_OPTIONS)
                 .map_err(|e| LuaError::external(format!("Error while serializing other changes needed: {}", e)))
         });
 
