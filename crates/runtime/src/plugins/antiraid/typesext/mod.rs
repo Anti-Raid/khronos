@@ -99,7 +99,7 @@ impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> serde::Serialize for 
 
 // U64 type
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct U64(u64);
+pub struct U64(pub u64);
 
 impl FromLua for U64 {
     fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
@@ -280,7 +280,7 @@ impl LuaUserData for U64 {
 
 // U64 type
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct I64(i64);
+pub struct I64(pub i64);
 
 impl FromLua for I64 {
     fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
@@ -298,6 +298,27 @@ impl FromLua for I64 {
                     })
             }
             LuaValue::UserData(u) => {
+                if u.is::<U64>() {
+                    // Try converting the U64 to I64
+                    let u64t = u
+                        .borrow::<U64>()
+                        .map_err(|_| LuaError::FromLuaConversionError {
+                            from: "UserData",
+                            to: "I64".to_string(),
+                            message: Some("UserData must be a U64".to_string()),
+                        })?;
+                    
+                    if u64t.0 > i64::MAX as u64 {
+                        return Err(LuaError::FromLuaConversionError {
+                            from: "UserData",
+                            to: "I64".to_string(),
+                            message: Some("Value is too large to convert to i64".to_string()),
+                        });
+                    }
+
+                    return Ok(I64(u64t.0 as i64));
+                }
+
                 let i64 = u
                     .borrow::<I64>()
                     .map_err(|_| LuaError::FromLuaConversionError {
