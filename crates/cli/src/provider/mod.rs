@@ -16,6 +16,7 @@ use khronos_runtime::traits::stingprovider::StingProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 use khronos_runtime::rt::RuntimeShareableData;
+use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -82,6 +83,36 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
     }
 }
 
+
+#[derive(Clone)]
+pub struct CliScheduledExecProvider {}
+
+impl ScheduledExecProvider<CliKhronosContext> for CliScheduledExecProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+
+    async fn list(
+        &self,
+        _context: &CliKhronosContext,
+    ) -> Result<Vec<(String, serde_json::Value)>, khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn add(
+        &self,
+        _id: String,
+        _data: serde_json::Value,
+        _run_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn remove(&self, _id: String) -> Result<(), khronos_runtime::Error> {
+        todo!()
+    }
+}
+
 #[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
@@ -104,6 +135,7 @@ impl KhronosContext for CliKhronosContext {
     type UserInfoProvider = CliUserInfoProvider;
     type StingProvider = CliStingProvider;
     type PageProvider = CliPageProvider;
+    type ScheduledExecProvider = CliScheduledExecProvider;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -479,7 +511,7 @@ pub struct CliLockdownProvider {
 
 impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
+        Ok(())
     }
 
     fn lockdown_data_store(&self) -> &CliLockdownDataStore {
