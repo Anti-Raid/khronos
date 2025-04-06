@@ -16,6 +16,7 @@ use crate::utils::executorscope::ExecutorScope;
 #[derive(Clone)]
 pub struct KvExecutor<T: KhronosContext> {
     context: T,
+    kv_scope: String,
     kv_provider: T::KVProvider,
 }
 
@@ -42,8 +43,63 @@ impl KvRecord {
 }
 
 impl<T: KhronosContext> KvExecutor<T> {
+    pub fn check_list_scopes(&self) -> Result<(), crate::Error> {
+        if !self
+            .context
+            .has_cap("kv.meta:list_scopes") // KV:* means all KV operations are allowed
+        {
+            return Err(
+                "The kv.meta:list_scopes capability is required to list scopes in this template context"
+                .into()
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn check_keys(&self) -> Result<(), crate::Error> {
+        if !self
+            .context
+            .has_cap(&format!("kv.meta:{}:keys", self.kv_scope)) // kv:{scope}:meta:list_keys means that the action can be performed on any key
+        {
+            return Err(
+                format!(
+                    "The kv.meta:{}:keys capability is required to list keys in this scope for this template context",
+                    self.kv_scope
+                )
+                .into()
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn check(&self, action: String, key: String) -> Result<(), crate::Error> {
         if !self
+        .context
+        .has_cap(&format!("kv.{}:*", self.kv_scope)) // KV:* means all KV operations are allowed
+        && !self
+        .context
+        .has_cap(&format!("kv.{}:{}:*", self.kv_scope, action)) // kv:{action}:* means that the action can be performed on any key
+        && !self
+        .context
+        .has_cap(&format!("kv.{}:{}:{}", self.kv_scope, action, key)) // kv:{action}:{key} means that the action can only be performed on said key
+        && !self
+        .context
+        .has_cap(&format!("kv.{}:*:{}", self.kv_scope, key))
+        && self.kv_scope != "unscoped"
+        // kv:*:{key} means that any action can be performed on said key
+        {
+            return Err(format!(
+                "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
+                action, key,
+                self.kv_scope
+            )
+            .into());
+        }
+
+        if self.kv_scope == "unscoped" 
+        && !self
         .context
         .has_cap("kv:*") // KV:* means all KV operations are allowed
         && !self
@@ -78,6 +134,18 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("KvExecutor"));
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));
+
+        methods.add_method("list_scopes", |_, this, _g: ()| {
+            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
+                this.check_list_scopes()
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let scopes = this.kv_provider.list_scopes().await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(scopes)
+            }))
+        });
 
         methods.add_method("find", |_, this, key: String| {
             Ok(lua_promise!(this, key, |lua, this, key|, {
@@ -165,6 +233,18 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             }))
         });
 
+        methods.add_method("keys", |_, this, _g: ()| {
+            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
+                this.check_keys()
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let keys = this.kv_provider.keys().await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(keys)
+            }))
+        });
+
         methods.add_method("set", |_, this, (key, value): (String, LuaValue)| {
             Ok(lua_promise!(this, key, value, |lua, this, key, value|, {
                 this.check("set".to_string(), key.clone())
@@ -199,10 +279,12 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 [
                     // Fields
                     // Methods
+                    "list_scopes",
                     "find",
                     "exists",
                     "get",
                     "getrecord",
+                    "keys",
                     "set",
                     "delete",
                 ],
@@ -217,9 +299,10 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     module.set(
         "new",
         lua.create_function(
-            |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
+            |_, (token, scope, kv_scope): (TemplateContextRef<T>, Option<String>, Option<String>)| {
                 let scope = ExecutorScope::scope_str(scope)?;
-                let Some(kv_provider) = token.context.kv_provider(scope) else {
+                let kv_scope = kv_scope.unwrap_or("unscoped".to_string());
+                let Some(kv_provider) = token.context.kv_provider(scope, &kv_scope) else {
                     return Err(LuaError::external(
                         "The key-value plugin is not supported in this context",
                     ));
@@ -227,6 +310,7 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                 let executor = KvExecutor {
                     context: token.context.clone(),
                     kv_provider,
+                    kv_scope
                 };
 
                 Ok(executor)

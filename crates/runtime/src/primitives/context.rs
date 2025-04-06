@@ -89,6 +89,10 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(v)
         });
 
+        fields.add_field_method_get("template_name", |_lua, this| {
+            Ok(this.context.template_name())
+        });
+
         fields.add_field_method_get("current_user", |lua, this| {
             let v = this.get_cached_current_user(lua)?;
 

@@ -1,7 +1,6 @@
 use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
-    pageprovider::PageProvider, stingprovider::StingProvider, userinfoprovider::UserInfoProvider,
-    scheduledexecprovider::ScheduledExecProvider
+    pageprovider::PageProvider, userinfoprovider::UserInfoProvider, scheduledexecprovider::ScheduledExecProvider
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -12,7 +11,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
     type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
-    type StingProvider: StingProvider;
     type PageProvider: PageProvider;
     type ScheduledExecProvider: ScheduledExecProvider;
 
@@ -38,6 +36,9 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// In local development, both owner_guild_id and guild_id will be the same, unless configured otherwise.
     fn owner_guild_id(&self) -> Option<serenity::all::GuildId>;
 
+    /// Returns the templates name
+    fn template_name(&self) -> String;
+
     /// Returns the current Discord user, if any
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
@@ -45,7 +46,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     fn runtime_shareable_data(&self) -> crate::rt::RuntimeShareableData;
 
     /// Returns a key-value provider with the given scope
-    fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider>;
+    fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider>;
 
     /// Returns a Discord provider with the given scope
     /// This is used to interact with Discord API
@@ -56,9 +57,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a UserInfo provider with the given scope
     fn userinfo_provider(&self, scope: ExecutorScope) -> Option<Self::UserInfoProvider>;
-
-    /// Returns a Sting provider with the given scope
-    fn sting_provider(&self, scope: ExecutorScope) -> Option<Self::StingProvider>;
 
     /// Returns a Page provider with the given scope
     fn page_provider(&self, scope: ExecutorScope) -> Option<Self::PageProvider>;

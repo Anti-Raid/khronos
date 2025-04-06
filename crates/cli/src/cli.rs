@@ -147,6 +147,9 @@ pub struct Cli {
     /// The file storage backend to use
     pub file_storage_backend: FileStorageBackend,
 
+    /// What template name to use
+    pub template_name: String,
+
     /// The file storage to use
     ///
     /// If unset, the following will be used:
@@ -226,6 +229,7 @@ impl Cli {
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
+            template_name: self.template_name.clone()
         }
     }
 

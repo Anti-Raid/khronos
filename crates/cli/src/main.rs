@@ -156,6 +156,12 @@ struct CliArgs {
     #[clap(long)]
     owner_guild_id: Option<serenity::all::GuildId>,
 
+    /// Template name. Defaults to 'main'
+    /// 
+    /// Environment variable: `TEMPLATE_NAME`
+    #[clap(long, default_value = "main")]
+    template_name: String,
+
     #[clap(long)]
     /// The discord bot token to use for discord-related operations
     ///
@@ -310,6 +316,10 @@ impl CliArgs {
             ));
         }
 
+        if let Ok(template_name) = src.var("TEMPLATE_NAME") {
+            self.template_name = template_name;
+        }
+
         if let Ok(bot_token) = src.var("BOT_TOKEN") {
             self.bot_token = Some(bot_token);
         }
@@ -424,6 +434,7 @@ impl CliArgs {
                 context_data: self.context_data,
                 guild_id: self.guild_id,
                 owner_guild_id: self.owner_guild_id,
+                template_name: self.template_name,
                 bot_token: self.bot_token.clone(),
                 config_file: self.config_file,
                 http: self

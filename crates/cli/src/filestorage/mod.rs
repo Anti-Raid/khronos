@@ -34,6 +34,8 @@ pub trait FileStorageProvider: Debug {
     /// List all files in file path. Must return a vec of FileListEntry
     ///
     /// If pattern is not empty, only return files that match the pattern (% matches any sequence of characters, _ matches any single character)
+    /// 
+    /// NOTE: this method should *not* be recursive/recurse down into subdirectories
     async fn list_files(
         &self,
         path: &[String],
@@ -335,6 +337,10 @@ impl FileStorageProvider for LocalFileStorageProvider {
 ///
 /// Code is not implemented yet but schema would be as simple as:
 /// CREATE TABLE files (path TEXT NOT NULL, key TEXT NOT NULL, data BLOB NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, last_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (path, key));
+/// 
+/// ## Current Limitations
+/// 
+/// - Scoped KV keys() operation currently does not work too well with it
 #[allow(dead_code)]
 #[cfg(feature = "sqlite")]
 #[derive(Debug, Clone)]

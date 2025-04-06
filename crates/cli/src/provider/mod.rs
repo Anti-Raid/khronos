@@ -5,14 +5,12 @@ use std::sync::LazyLock;
 use crate::cli::CliAuxOpts;
 use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
-use antiraid_types::stings::{Sting, StingAggregate, StingCreate};
 use antiraid_types::userinfo::UserInfo;
 use khronos_runtime::traits::context::KhronosContext;
 use khronos_runtime::traits::discordprovider::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
-use khronos_runtime::traits::stingprovider::StingProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 use khronos_runtime::rt::RuntimeShareableData;
@@ -122,6 +120,7 @@ pub struct CliKhronosContext {
     pub runtime_shareable_data: RuntimeShareableData,
     pub http: Option<Rc<serenity::all::Http>>,
     pub cache: Option<Rc<serenity::cache::Cache>>,
+    pub template_name: String,
 }
 
 impl KhronosContext for CliKhronosContext {
@@ -131,7 +130,6 @@ impl KhronosContext for CliKhronosContext {
     type LockdownDataStore = CliLockdownDataStore;
     type LockdownProvider = CliLockdownProvider;
     type UserInfoProvider = CliUserInfoProvider;
-    type StingProvider = CliStingProvider;
     type PageProvider = CliPageProvider;
     type ScheduledExecProvider = CliScheduledExecProvider;
 
@@ -157,6 +155,10 @@ impl KhronosContext for CliKhronosContext {
         self.owner_guild_id
     }
 
+    fn template_name(&self) -> String {
+        self.template_name.clone()
+    }
+
     fn current_user(&self) -> Option<serenity::all::CurrentUser> {
         self.cache.as_ref().map(|c| c.current_user().clone())
     }
@@ -166,7 +168,7 @@ impl KhronosContext for CliKhronosContext {
         self.runtime_shareable_data.clone()
     }
 
-    fn kv_provider(&self, scope: ExecutorScope) -> Option<Self::KVProvider> {
+    fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider> {
         let guild_id = match scope {
             ExecutorScope::ThisGuild => {
                 if let Some(guild_id) = self.guild_id {
@@ -188,6 +190,7 @@ impl KhronosContext for CliKhronosContext {
 
         Some(CliKVProvider {
             guild_id,
+            kv_scope: kv_scope.to_string(),
             file_storage_provider: self.file_storage_provider.clone(),
         })
     }
@@ -231,26 +234,6 @@ impl KhronosContext for CliKhronosContext {
         Some(CliUserInfoProvider {})
     }
 
-    fn sting_provider(&self, scope: ExecutorScope) -> Option<Self::StingProvider> {
-        let guild_id = match scope {
-            ExecutorScope::ThisGuild => self.guild_id?,
-            ExecutorScope::OwnerGuild => {
-                if let Some(owner_guild_id) = self.owner_guild_id {
-                    owner_guild_id
-                } else if let Some(guild_id) = self.guild_id {
-                    guild_id
-                } else {
-                    default_global_guild_id()
-                }
-            }
-        };
-
-        Some(CliStingProvider {
-            guild_id,
-            file_storage_provider: self.file_storage_provider.clone(),
-        })
-    }
-
     fn page_provider(&self, _scope: ExecutorScope) -> Option<Self::PageProvider> {
         Some(CliPageProvider {})
     }
@@ -264,16 +247,24 @@ impl KhronosContext for CliKhronosContext {
 pub struct CliKVProvider {
     pub guild_id: serenity::all::GuildId,
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
+    pub kv_scope: String,
 }
 
 impl KVProvider for CliKVProvider {
+    async fn list_scopes(&self) -> Result<Vec<String>, khronos_runtime::Error> {
+        self.file_storage_provider
+        .list_files(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], None, None)
+        .await
+        .map(|entries| entries.into_iter().map(|e| e.name).collect())
+    }
+
     async fn get(
         &self,
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(file_contents) = self
             .file_storage_provider
-            .get_file(&[self.guild_id.to_string(), "keys".to_string()], &key)
+            .get_file(&[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()], &key)
             .await
             .map_err(|e| format!("Failed to get file: {}", e))?
         else {
@@ -301,7 +292,7 @@ impl KVProvider for CliKVProvider {
 
         self.file_storage_provider
             .save_file(
-                &[self.guild_id.to_string(), "keys".to_string()],
+                &[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()],
                 &key,
                 value.as_bytes(),
             )
@@ -310,7 +301,7 @@ impl KVProvider for CliKVProvider {
 
     async fn delete(&self, key: String) -> Result<(), khronos_runtime::Error> {
         self.file_storage_provider
-            .delete_file(&[self.guild_id.to_string(), "keys".to_string()], &key)
+            .delete_file(&[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()], &key)
             .await
     }
 
@@ -325,7 +316,7 @@ impl KVProvider for CliKVProvider {
         let entries = self
             .file_storage_provider
             .list_files(
-                &[self.guild_id.to_string(), "keys".to_string()],
+                &[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()],
                 Some(query),
                 None,
             )
@@ -349,13 +340,13 @@ impl KVProvider for CliKVProvider {
 
     async fn exists(&self, key: String) -> Result<bool, khronos_runtime::Error> {
         self.file_storage_provider
-            .file_exists(&["keys".to_string(), self.guild_id.to_string()], &key)
+            .file_exists(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], &key)
             .await
     }
 
     async fn keys(&self) -> Result<Vec<String>, khronos_runtime::Error> {
         self.file_storage_provider
-            .list_files(&["keys".to_string(), self.guild_id.to_string()], None, None)
+            .list_files(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], None, None)
             .await
             .map(|entries| entries.into_iter().map(|e| e.name).collect())
     }
@@ -537,52 +528,6 @@ impl UserInfoProvider for CliUserInfoProvider {
         &self,
         _user_id: serenity::all::UserId,
     ) -> Result<UserInfo, khronos_runtime::Error> {
-        todo!()
-    }
-}
-
-#[allow(dead_code)] // TODO: Implement
-#[derive(Clone)]
-pub struct CliStingProvider {
-    pub guild_id: serenity::all::GuildId,
-    pub file_storage_provider: Rc<dyn FileStorageProvider>,
-}
-
-impl StingProvider for CliStingProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    async fn list(&self, _page: usize) -> Result<Vec<Sting>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn get(&self, _id: uuid::Uuid) -> Result<Option<Sting>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn create(&self, _sting: StingCreate) -> Result<uuid::Uuid, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn update(&self, _sting: Sting) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn delete(&self, _id: uuid::Uuid) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    /// Returns a StingAggregate set for a user in the guild
-    async fn guild_user_aggregate(
-        &self,
-        _target: serenity::all::UserId,
-    ) -> Result<Vec<StingAggregate>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    /// Returns a StingAggregate set for the guild
-    async fn guild_aggregate(&self) -> Result<Vec<StingAggregate>, khronos_runtime::Error> {
         todo!()
     }
 }
