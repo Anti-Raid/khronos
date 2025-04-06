@@ -160,7 +160,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     None => KvRecord::default(),
                 };
 
-                let record: LuaValue = lua.to_value_with(&record,LUA_SERIALIZE_OPTIONS)?;
+                let record: LuaValue = lua.to_value_with(&record, LUA_SERIALIZE_OPTIONS)?;
                 Ok(record)
             }))
         });
