@@ -6,7 +6,10 @@
 pub mod kv;
 /// Settings IR
 pub mod settings_ir;
+/// Scheduled Exec IR
+pub mod scheduled_exec;
 
 pub use kv::*;
 pub use lockdowns::*;
 pub use settings_ir::*;
+pub use scheduled_exec::*;

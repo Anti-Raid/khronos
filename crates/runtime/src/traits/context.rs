@@ -14,7 +14,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type UserInfoProvider: UserInfoProvider;
     type StingProvider: StingProvider;
     type PageProvider: PageProvider;
-    type ScheduledExecProvider: ScheduledExecProvider<Self>;
+    type ScheduledExecProvider: ScheduledExecProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;

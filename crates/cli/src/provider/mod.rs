@@ -17,6 +17,7 @@ use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 use khronos_runtime::rt::RuntimeShareableData;
 use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
+use khronos_runtime::traits::ir::ScheduledExecution;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -87,23 +88,20 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
 #[derive(Clone)]
 pub struct CliScheduledExecProvider {}
 
-impl ScheduledExecProvider<CliKhronosContext> for CliScheduledExecProvider {
+impl ScheduledExecProvider for CliScheduledExecProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
 
     async fn list(
         &self,
-        _context: &CliKhronosContext,
-    ) -> Result<Vec<(String, serde_json::Value)>, khronos_runtime::Error> {
+    ) -> Result<Vec<ScheduledExecution>, khronos_runtime::Error> {
         todo!()
     }
 
     async fn add(
         &self,
-        _id: String,
-        _data: serde_json::Value,
-        _run_at: chrono::DateTime<chrono::Utc>,
+        _exec: ScheduledExecution,
     ) -> Result<(), khronos_runtime::Error> {
         todo!()
     }
