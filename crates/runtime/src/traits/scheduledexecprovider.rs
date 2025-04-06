@@ -17,6 +17,7 @@ pub trait ScheduledExecProvider: 'static + Clone {
     /// Lists all scheduled executions
     async fn list(
         &self,
+        id: Option<String>,
     ) -> Result<Vec<ScheduledExecution>, crate::Error>;
 
     /// Adds a new scheduled execution

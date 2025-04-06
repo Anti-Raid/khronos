@@ -100,7 +100,7 @@ pub fn look_for_luaurc<T: RequireController>(
 
     let mut luaurc = LuauRc::new();
     loop {
-        log::info!("In directory for require resolution: {:?}", dir);
+        log::trace!("In directory for require resolution: {:?}", dir);
         // Keep recursing down from current dir
         let luaurc_path = dir.join(".luaurc");
         if let Ok(luaurc_file) = require_controller.get_file(&luaurc_path.to_string_lossy()) {
@@ -112,7 +112,7 @@ pub fn look_for_luaurc<T: RequireController>(
 
         if let Some(parent) = dir.parent() {
             dir = parent;
-            log::info!(
+            log::trace!(
                 "Trying to find .luaurc in: {:?} for require resolution",
                 dir
             );
@@ -187,7 +187,7 @@ pub async fn require_from_controller<T: RequireController>(
         chunk_path
     };
 
-    log::debug!("Current path: {:?} when requiring {}", curr_path, pat);
+    log::trace!("Current path: {:?} when requiring {}", curr_path, pat);
     let pat = if pat.starts_with('@') {
         // Split the path into alias and file
         let parts = pat
@@ -226,7 +226,7 @@ pub async fn require_from_controller<T: RequireController>(
         normalize_path(&curr_path.join(&pat))
     };
 
-    log::debug!(
+    log::trace!(
         "Resolved: Current path: {:?} when requiring {}",
         curr_path,
         pat.display()
@@ -254,7 +254,7 @@ pub async fn require_from_controller<T: RequireController>(
     };
 
     if let Some(cached) = controller.get_cached(path_used) {
-        log::debug!("[Require] Cached: {:?}", cached);
+        log::trace!("[Require] Cached: {:?}", cached);
         return Ok(cached.clone());
     }
 

@@ -12,6 +12,7 @@ pub mod promise;
 pub mod stores;
 pub mod typesext;
 pub mod userinfo;
+pub mod scheduledexec;
 
 use mlua::prelude::*;
 

@@ -56,6 +56,7 @@ impl PluginSet {
         self.add_plugin("@antiraid/pages", antiraid::pages::init_plugin::<T>);
         self.add_plugin("@antiraid/permissions", antiraid::permissions::init_plugin);
         self.add_plugin("@antiraid/promise", antiraid::promise::init_plugin);
+        self.add_plugin("@antiraid/scheduledexec", antiraid::scheduledexec::init_plugin::<T>);
         self.add_plugin("@antiraid/stores", antiraid::stores::init_plugin::<T>);
         self.add_plugin("@antiraid/datetime", antiraid::datetime::init_plugin);
         self.add_plugin("@antiraid/typesext", antiraid::typesext::init_plugin);

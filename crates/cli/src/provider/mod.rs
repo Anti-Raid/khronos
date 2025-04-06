@@ -93,6 +93,7 @@ impl ScheduledExecProvider for CliScheduledExecProvider {
 
     async fn list(
         &self,
+        _id: Option<String>
     ) -> Result<Vec<ScheduledExecution>, khronos_runtime::Error> {
         todo!()
     }
