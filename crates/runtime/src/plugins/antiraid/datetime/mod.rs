@@ -274,6 +274,16 @@ impl LuaUserData for Timezone {
             |_, this, other: LuaUserDataRef<Timezone>| Ok(this.tz == other.tz),
         );
 
+        // Parses a string to a datetime in the said specific timezone
+        methods.add_method("fromString", |_, this, date: String| {
+            let dt = date.parse::<chrono::DateTime<chrono::FixedOffset>>()
+            .map_err(|e| mlua::Error::RuntimeError(format!("Invalid date: {}", e)))?;
+
+            Ok(DateTime {
+                dt: dt.with_timezone(&this.tz),
+            })
+        });
+
         // Translates a timestamp in UTC time to a datetime in the said specific timezone
         methods.add_method(
             "utcToTz",
@@ -444,6 +454,7 @@ impl LuaUserData for Timezone {
                 [
                     // Fields
                     // Methods
+                    "fromString",
                     "utcToTz",
                     "tzToUtc",
                     "timeUtcToTz",
@@ -489,7 +500,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     // The standard UTC timezone
-    module.set("UTC", lua.create_userdata(Timezone { tz: chrono_tz::UTC })?)?;
+    module.set("UTC", Timezone { tz: chrono_tz::UTC })?;
 
     // Creates a new TimeDelta object
     module.set(
@@ -653,6 +664,9 @@ mod tests {
             local est = tz.new("Europe/London")
             local date = est:utcToTz(2016, 5, 10, 12, 0, 0)
             assert(date.dst_offset.seconds == 3600, "22: Expected 3600, got " .. date.dst_offset.seconds)
+
+            -- Test fromString
+            assert(tz.UTC:fromString("2021-01-01T08:00:00+00:00"):format("%Y-%m-%dT%H:%M:%S%z") == "2021-01-01T08:00:00+0000", "23: Expected 2021-01-01T08:00:00+0000, got " .. tz.UTC:fromString("2021-01-01T08:00:00+00:00"):format("%Y-%m-%dT%H:%M:%S%z"))
         "#,
         )
         .call::<()>(module)

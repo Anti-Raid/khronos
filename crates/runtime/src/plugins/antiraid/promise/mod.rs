@@ -45,24 +45,7 @@ impl LuaPromise {
 }
 
 /// Macro lua_promise!(arg1, arg2: Type2, |lua, {args}|, {
-///     // Future code
-/// })
-///
-/// Creates:
-///
-/// LuaPromise::new_generic(move |lua| {
-///     let arg1 = arg1.clone();
-///     let arg2 = arg2.clone();
-///   
-///     async move {
-///        let c = |lua, arg1, arg2| {
-///          // Future code
-///        };
-///
-///        c(lua, args).await    
-///    }
-/// })
-///
+/// }) -> LuaPromise
 /// Clones all arguments and the lua instance
 #[macro_export]
 macro_rules! lua_promise {
