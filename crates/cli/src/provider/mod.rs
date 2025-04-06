@@ -254,6 +254,10 @@ impl KhronosContext for CliKhronosContext {
     fn page_provider(&self, _scope: ExecutorScope) -> Option<Self::PageProvider> {
         Some(CliPageProvider {})
     }
+
+    fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider> {
+        Some(CliScheduledExecProvider {})
+    }
 }
 
 #[derive(Clone)]

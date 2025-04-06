@@ -62,4 +62,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a Page provider with the given scope
     fn page_provider(&self, scope: ExecutorScope) -> Option<Self::PageProvider>;
+
+    /// Returns a ScheduledExec provider
+    fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider>;
 }
