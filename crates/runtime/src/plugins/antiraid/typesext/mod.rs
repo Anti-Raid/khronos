@@ -40,15 +40,25 @@ impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> MultiOption<T> {
         }
     }
 
+    /// Returns true if the value is None
     pub fn is_none(&self) -> bool {
         self.inner.is_none()
     }
 
+    /// Returns true if the value is Some(None)
     pub fn is_some(&self) -> bool {
         self.inner.is_some()
     }
 
-    pub fn as_ref(&self) -> Option<&T> {
+    /// Returns true if the value is Some(Some(_))
+    pub fn is_deep_some(&self) -> bool {
+        match &self.inner {
+            Some(Some(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_inner_ref(&self) -> Option<&T> {
         self.inner.as_ref().and_then(Option::as_ref)
     }
 
@@ -94,6 +104,14 @@ impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> serde::Serialize for 
             Some(None) => serializer.serialize_none(), // We want to send null in this case
             Some(Some(value)) => value.serialize(serializer),
         }
+    }
+}
+
+impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> std::ops::Deref for MultiOption<T> {
+    type Target = Option<Option<T>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -787,4 +805,45 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     module.set_readonly(true); // Block any attempt to modify this table
 
     Ok(module)
+}
+
+#[cfg(test)]
+mod tests {
+    use mlua::prelude::*;
+
+    #[test]
+    fn test_multi_option() {
+        
+        let lua = mlua::Lua::new();
+
+        lua.globals().set("testmo", lua.create_function(
+            |lua, data: LuaValue| {
+                let v = lua.from_value::<super::MultiOption<u64>>(data)?;
+
+                #[derive(serde::Serialize)]
+                pub struct Dummy {
+                    #[serde(skip_serializing_if = "super::MultiOption::should_not_serialize")]
+                    a: super::MultiOption<u64>,
+                }
+
+                let d = Dummy { a: v.clone() };
+
+                println!("{:?}, serde: {:?}", v, serde_json::to_string(&d).unwrap());
+
+                Ok(())
+            }
+        ).unwrap()).unwrap();
+
+        lua.load(
+            r#"
+            print("Solid input")
+            testmo(1)
+            print("Empty object")
+            testmo({})
+            print("Actual unpassed")
+            testmo(nil)
+        "#)
+        .exec()
+        .unwrap();
+    }
 }

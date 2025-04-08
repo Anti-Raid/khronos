@@ -2,7 +2,7 @@ use crate::plugins::antiraid::typesext::MultiOption;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, CreateChannel, EditChannel,
+    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -190,4 +190,23 @@ pub struct ModifyChannelPosition {
     pub position: u16,
     pub lock_permissions: Option<bool>,
     pub parent_id: Option<serenity::all::ChannelId>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetGuildMembersOptions {
+    pub limit: Option<serenity::nonmax::NonMaxU16>,
+    pub after: Option<serenity::all::UserId>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SearchGuildMembersOptions {
+    pub query: String,
+    pub limit: Option<serenity::nonmax::NonMaxU16>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ModifyGuildMemberOptions {
+    pub user_id: serenity::all::UserId,
+    pub reason: String,
+    pub data: EditMember,
 }

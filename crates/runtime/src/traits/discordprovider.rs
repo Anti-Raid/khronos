@@ -272,6 +272,16 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to modify guild channel positions: {}", e).into())
     }
 
+    /// List Active Guild Threads
+    async fn list_active_guild_threads(
+        &self
+    ) -> Result<serenity::all::ThreadsData, crate::Error> {
+        self.serenity_http()
+        .get_guild_active_threads(self.guild_id())
+        .await
+        .map_err(|e| format!("Failed to list active threads: {}", e).into())
+    } 
+
     /// Returns a member from the guild.
     ///
     /// This should return a Ok(None) if the member does not exist
@@ -293,6 +303,47 @@ pub trait DiscordProvider: 'static + Clone {
             Err(e) => Err(format!("Failed to fetch member: {:?}", e).into()),
         }
     }
+
+    /// List guild members
+    async fn list_guild_members(
+        &self,
+        limit: Option<serenity::nonmax::NonMaxU16>,
+        after: Option<serenity::all::UserId>,    
+    ) -> Result<Vec<serenity::all::Member>, crate::Error> {
+        self.serenity_http()
+            .get_guild_members(self.guild_id(), limit, after)
+            .await
+            .map_err(|e| format!("Failed to list guild members: {}", e).into())
+    }
+
+    /// Search Guild Members
+    async fn search_guild_members(
+        &self,
+        query: &str,
+        limit: Option<serenity::nonmax::NonMaxU16>,
+    ) -> Result<Vec<serenity::all::Member>, crate::Error> {
+        self.serenity_http()
+            .search_guild_members(self.guild_id(), query, limit)
+            .await
+            .map_err(|e| format!("Failed to search guild members: {}", e).into())
+    }
+
+    // Add Guild Member is intentionally not supported as it needs OAuth2 to work
+
+    /// Modify Guild Member
+    async fn modify_guild_member(
+        &self,
+        user_id: serenity::all::UserId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::Member, crate::Error> {
+        self.serenity_http()
+            .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify guild member: {}", e).into())
+    }
+
+    // Modify Current Member and Modify Current Member Nick are intentionally not supported due to privacy reasons
 
     async fn add_guild_member_role(
         &self,
