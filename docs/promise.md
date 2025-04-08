@@ -19,15 +19,15 @@ Opaque promise type returned by antiraid
 --- Opaque promise type returned by antiraid
 type LuaPromise<T> = {
 	--- Note: this will always actually be nil but is required to enforce nominal typing properly
-	__phantom_LuaPromiseT: T
+	__phantom: T
 }
 ```
 
 </details>
 
-<div id="__phantom_LuaPromiseT"></div>
+<div id="__phantom"></div>
 
-### __phantom_LuaPromiseT
+### __phantom
 
 Note: this will always actually be nil but is required to enforce nominal typing properly
 

@@ -684,6 +684,33 @@ The data to create the command with
 
 [discordRest](./discordrest.md).[CreateGuildApplicationCommandRequest](./discordrest.md#CreateGuildApplicationCommandRequest)
 
+<div id="CreateCommandsOptions"></div>
+
+## CreateCommandsOptions
+
+Options for creating multiple command in Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for creating multiple command in Discord
+type CreateCommandsOptions = {
+	--- The data to create the command with
+	data: {discordRest.CreateGuildApplicationCommandRequest}
+}
+```
+
+</details>
+
+<div id="data"></div>
+
+### data
+
+The data to create the command with
+
+{[discordRest](./discordrest.md).[CreateGuildApplicationCommandRequest](./discordrest.md#CreateGuildApplicationCommandRequest)}
+
 <div id="CreateInteractionResponseOptions"></div>
 
 ## CreateInteractionResponseOptions
@@ -921,6 +948,57 @@ The message ID
 
 [discord](./discord.md).[Snowflake](./discord.md#Snowflake)
 
+<div id="CreateGuildBanOptions"></div>
+
+## CreateGuildBanOptions
+
+Options for creating a guild ban in Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for creating a guild ban in Discord
+type CreateGuildBanOptions = {
+	--- The user ID to ban
+	user_id: discord.Snowflake,
+
+	--- The reason for the ban
+	reason: string,
+
+	--- The number of seconds to delete messages from
+	delete_message_seconds: number?
+}
+```
+
+</details>
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID to ban
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the ban
+
+[string](#string)
+
+<div id="delete_message_seconds"></div>
+
+### delete_message_seconds
+
+The number of seconds to delete messages from
+
+*This field is optional and may not be specified*
+
+[number](#number)?
+
 <div id="DiscordExecutor"></div>
 
 ## DiscordExecutor
@@ -963,6 +1041,22 @@ type DiscordExecutor = {
 	--- Edits channel permissions for a target
 	edit_channel_permissions: (self: DiscordExecutor, data: EditChannelPermissionsOptions) -> promise.LuaPromise<nil>,
 
+	-- Guild
+	--- Gets the guild
+	get_guild: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildObject>,
+
+	--- Gets the guilds preview
+	get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildPreviewObject>,
+
+	--- Gets the guild channels
+	get_guild_channels: (self: DiscordExecutor) -> promise.LuaPromise<LazyChannelsObject>,
+
+	--- Creates a guild channel
+	create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChannelRequest) -> promise.LuaPromise<LazyChannelObject>,
+
+	--- Modify guild channel permissions
+	modify_guild_channel_positions: (self: DiscordExecutor, data: {discordRest.ModifyGuildChannelPositionsRequest}) -> promise.LuaPromise<nil>,
+
 	--- Adds a role to a member
 	add_guild_member_role: (self: DiscordExecutor, data: AddGuildMemberRoleOptions) -> promise.LuaPromise<nil>,
 
@@ -972,8 +1066,14 @@ type DiscordExecutor = {
 	-- Removes a member from a guild
 	remove_guild_member: (self: DiscordExecutor, data: RemoveGuildMemberOptions) -> promise.LuaPromise<nil>,
 
+	--- Gets a guild ban for a user or nil if it does not exist
+	get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>,
+
 	--- Gets guild bans
 	get_guild_bans: (self: DiscordExecutor, data: GetGuildBansOptions) -> promise.LuaPromise<LazyBanObjectList>,
+
+	--- Creates a guild ban
+	create_guild_ban: (self: DiscordExecutor, data: CreateGuildBanOptions) -> promise.LuaPromise<nil>,
 
 	--- Returns the guild roles of a guild
 	get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise.LuaPromise<LazyRolesMap>,
@@ -1000,7 +1100,10 @@ type DiscordExecutor = {
 	get_guild_commands: (self: DiscordExecutor) -> promise.LuaPromise<LazyApplicationCommandObject>,
 
 	--- Creates a guild command
-	create_guild_command: (self: DiscordExecutor, data: CreateCommandOptions) -> promise.LuaPromise<LazyApplicationCommandObject>
+	create_guild_command: (self: DiscordExecutor, data: CreateCommandOptions) -> promise.LuaPromise<LazyApplicationCommandObject>,
+
+	--- Creates multiple guild commands
+	create_guild_commands: (self: DiscordExecutor, data: CreateCommandsOptions) -> promise.LuaPromise<LazyApplicationCommandsObject>
 }
 ```
 
@@ -1336,6 +1439,149 @@ edit_channel_permissions: (self: DiscordExecutor, data: EditChannelPermissionsOp
 
 ##### ret1
 
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild"></div>
+
+### get_guild
+
+Guild
+
+Gets the guild
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+-- Guild
+--- Gets the guild
+get_guild: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildObject>
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[discord](./discord.md).[GuildObject](./discord.md#GuildObject)&gt;<div id="get_guild_preview"></div>
+
+### get_guild_preview
+
+Gets the guilds preview
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Gets the guilds preview
+get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildPreviewObject>
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[discord](./discord.md).[GuildPreviewObject](./discord.md#GuildPreviewObject)&gt;<div id="get_guild_channels"></div>
+
+### get_guild_channels
+
+Gets the guild channels
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Gets the guild channels
+get_guild_channels: (self: DiscordExecutor) -> promise.LuaPromise<LazyChannelsObject>
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyChannelsObject](#LazyChannelsObject)&gt;<div id="create_guild_channel"></div>
+
+### create_guild_channel
+
+Creates a guild channel
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Creates a guild channel
+create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChannelRequest) -> promise.LuaPromise<LazyChannelObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[discordRest](./discordrest.md).[CreateGuildChannelRequest](./discordrest.md#CreateGuildChannelRequest)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyChannelObject](#LazyChannelObject)&gt;<div id="modify_guild_channel_positions"></div>
+
+### modify_guild_channel_positions
+
+Modify guild channel permissions
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Modify guild channel permissions
+modify_guild_channel_positions: (self: DiscordExecutor, data: {discordRest.ModifyGuildChannelPositionsRequest}) -> promise.LuaPromise<nil>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+{[discordRest](./discordrest.md).[ModifyGuildChannelPositionsRequest](./discordrest.md#ModifyGuildChannelPositionsRequest)}
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
 [promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="add_guild_member_role"></div>
 
 ### add_guild_member_role
@@ -1438,7 +1684,41 @@ remove_guild_member: (self: DiscordExecutor, data: RemoveGuildMemberOptions) -> 
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_bans"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_ban"></div>
+
+### get_guild_ban
+
+Gets a guild ban for a user or nil if it does not exist
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Gets a guild ban for a user or nil if it does not exist
+get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="user_id"></div>
+
+##### user_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanOptionalObject](#LazyBanOptionalObject)&gt;<div id="get_guild_bans"></div>
 
 ### get_guild_bans
 
@@ -1472,7 +1752,41 @@ get_guild_bans: (self: DiscordExecutor, data: GetGuildBansOptions) -> promise.Lu
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanObjectList](#LazyBanObjectList)&gt;<div id="get_guild_roles"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanObjectList](#LazyBanObjectList)&gt;<div id="create_guild_ban"></div>
+
+### create_guild_ban
+
+Creates a guild ban
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Creates a guild ban
+create_guild_ban: (self: DiscordExecutor, data: CreateGuildBanOptions) -> promise.LuaPromise<nil>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[CreateGuildBanOptions](#CreateGuildBanOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_roles"></div>
 
 ### get_guild_roles
 
@@ -1768,7 +2082,41 @@ create_guild_command: (self: DiscordExecutor, data: CreateCommandOptions) -> pro
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyApplicationCommandObject](#LazyApplicationCommandObject)&gt;<div id="Functions"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyApplicationCommandObject](#LazyApplicationCommandObject)&gt;<div id="create_guild_commands"></div>
+
+### create_guild_commands
+
+Creates multiple guild commands
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Creates multiple guild commands
+create_guild_commands: (self: DiscordExecutor, data: CreateCommandsOptions) -> promise.LuaPromise<LazyApplicationCommandsObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[CreateCommandsOptions](#CreateCommandsOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyApplicationCommandsObject](#LazyApplicationCommandsObject)&gt;<div id="Functions"></div>
 
 # Functions
 

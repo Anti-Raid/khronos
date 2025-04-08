@@ -1,4 +1,6 @@
 use serenity::all::InteractionId;
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use reqwest::header::{HeaderMap as Headers, HeaderValue};
 
 /// A discord provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -8,37 +10,13 @@ pub trait DiscordProvider: 'static + Clone {
     /// This should return an error if ratelimited
     fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
 
-    // Base stuff
+    /// Http client
+    fn serenity_http(&self) -> &serenity::http::Http;
 
     /// Returns the guild ID
     fn guild_id(&self) -> serenity::all::GuildId;
 
-    /// Fetches the target guild.
-    ///
-    /// This should return an error if the guild does not exist
-    async fn guild(&self) -> Result<serenity::all::PartialGuild, crate::Error>;
-
-    /// Returns a member from the guild.
-    ///
-    /// This should return a Ok(None) if the member does not exist
-    async fn member(
-        &self,
-        user_id: serenity::all::UserId,
-    ) -> Result<Option<serenity::all::Member>, crate::Error>;
-
-    /// Fetches a channel from the guild.
-    ///
-    /// This should return an error if the channel does not exist
-    /// or does not belong to the guild
-    async fn guild_channel(
-        &self,
-        channel_id: serenity::all::ChannelId,
-    ) -> Result<serenity::all::GuildChannel, crate::Error>;
-
-    /// Http client
-    fn serenity_http(&self) -> &serenity::http::Http;
-
-    // Pre-provided stuff that can be overridden
+    // Audit Log
 
     /// Returns the audit logs for the guild.
     async fn get_audit_logs(
@@ -53,6 +31,8 @@ pub trait DiscordProvider: 'static + Clone {
             .await
             .map_err(|e| format!("Failed to fetch audit logs: {}", e).into())
     }
+
+    // Auto Moderation
 
     async fn list_auto_moderation_rules(
         &self,
@@ -107,6 +87,33 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to delete automod rule: {}", e).into())
     }
 
+    // Channel
+
+    /// Fetches a channel from the guild.
+    ///
+    /// This should return an error if the channel does not exist
+    /// or does not belong to the guild
+    async fn get_channel(
+        &self,
+        channel_id: serenity::all::ChannelId,
+    ) -> Result<serenity::all::GuildChannel, crate::Error> {
+        let chan = self.serenity_http()
+            .get_channel(channel_id)
+            .await;
+
+        match chan {
+            Ok(serenity::all::Channel::Guild(chan)) => {
+                if chan.guild_id != self.guild_id() {
+                    return Err(format!("Channel {} does not belong to the guild", channel_id).into());
+                }
+
+                Ok(chan)
+            },
+            Ok(_) => Err(format!("Channel {} does not belong to a guild", channel_id).into()),
+            Err(e) => Err(format!("Failed to fetch channel: {}", e).into()),
+        }
+    }
+
     async fn edit_channel(
         &self,
         channel_id: serenity::all::ChannelId,
@@ -147,6 +154,144 @@ pub trait DiscordProvider: 'static + Clone {
             .create_permission(channel_id, target_id, &data, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to edit channel permissions: {}", e).into())
+    }
+
+    async fn get_channel_invites(
+        &self,
+        channel_id: serenity::all::ChannelId,
+    ) -> Result<Vec<serenity::all::RichInvite>, crate::Error> {
+        self.serenity_http()
+            .get_channel_invites(channel_id)
+            .await
+            .map_err(|e| format!("Failed to get channel invites: {}", e).into())
+    }
+
+    async fn create_channel_invite(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::RichInvite, crate::Error> {
+        self.serenity_http()
+            .create_invite(channel_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to create channel invite: {}", e).into())
+    }
+
+    async fn delete_channel_permission(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        target_id: serenity::all::TargetId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_permission(channel_id, target_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete channel permission: {}", e).into())
+    }
+
+    async fn follow_announcement_channel(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::FollowedChannel, crate::Error> {
+        Ok(
+            self.serenity_http().fire(
+                serenity::all::Request::new(
+                    serenity::all::Route::ChannelFollowNews {
+                        channel_id,
+                    },
+                    serenity::all::LightMethod::Post
+                )
+                .body(Some(serde_json::to_vec(&map)?))
+                .headers(audit_log_reason.map(reason_into_header))
+            )
+            .await
+            .map_err(|e| format!("Failed to follow announcement channel: {}", e))?
+        )
+    }
+
+    // Guild
+
+    /// Fetches the target guild.
+    ///
+    /// This should return an error if the guild does not exist
+    async fn get_guild(&self) -> Result<serenity::all::PartialGuild, crate::Error> {
+        self.serenity_http()
+            .get_guild_with_counts(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to fetch guild: {}", e).into())
+    }
+
+    /// Fetches a guild preview
+    async fn get_guild_preview(
+        &self,
+    ) -> Result<serenity::all::GuildPreview, crate::Error> {
+        self.serenity_http()
+            .get_guild_preview(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to fetch guild preview: {}", e).into())
+    }
+
+    // Modify guild is intentionally skipped for now. TODO: Add later
+    // Delete guild will not be implemented as we can't really use it
+
+    /// Gets all guild channels
+    async fn get_guild_channels(
+        &self,
+    ) -> Result<Vec<serenity::all::GuildChannel>, crate::Error> {
+        Ok(self.serenity_http()
+            .get_channels(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to fetch guild channels: {:?}", e))?
+            .into_iter()
+            .collect::<Vec<_>>())
+    }
+
+    /// Create a guild channel
+    async fn create_guild_channel(
+        &self,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::GuildChannel, crate::Error> {
+        self.serenity_http()
+            .create_channel(self.guild_id(), &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to create guild channel: {}", e).into())
+    }
+
+    /// Modify Guild Channel Positions
+    async fn modify_guild_channel_positions(
+        &self,
+        map: impl Iterator<Item: serde::Serialize>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .edit_guild_channel_positions(self.guild_id(), map)
+            .await
+            .map_err(|e| format!("Failed to modify guild channel positions: {}", e).into())
+    }
+
+    /// Returns a member from the guild.
+    ///
+    /// This should return a Ok(None) if the member does not exist
+    async fn get_guild_member(
+        &self,
+        user_id: serenity::all::UserId,
+    ) -> Result<Option<serenity::all::Member>, crate::Error> {
+        match self.serenity_http()
+            .get_member(self.guild_id(), user_id)
+            .await {
+            Ok(member) => Ok(Some(member)),
+            Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
+                if e.status_code == serenity::all::StatusCode::NOT_FOUND {
+                    Ok(None)
+                } else {
+                    Err(format!("Failed to fetch member: {:?}", e).into())
+                }
+            },
+            Err(e) => Err(format!("Failed to fetch member: {:?}", e).into()),
+        }
     }
 
     async fn add_guild_member_role(
@@ -195,6 +340,32 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to get guild bans: {}", e).into())
     }
 
+    async fn get_guild_ban(
+        &self,
+        user_id: serenity::all::UserId,
+    ) -> Result<Option<serenity::all::Ban>, crate::Error> {
+        match self.serenity_http().fire(
+            serenity::all::Request::new(
+                serenity::all::Route::GuildBan {
+                    guild_id: self.guild_id(),
+                    user_id,
+                },
+                serenity::all::LightMethod::Get
+            )
+        )
+        .await {
+            Ok(v) => Ok(Some(v)),
+            Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
+                if e.status_code == serenity::all::StatusCode::NOT_FOUND {
+                    Ok(None)
+                } else {
+                    Err(format!("Failed to get guild ban: {:?}", e).into())
+                }
+            },
+            Err(e) => Err(format!("Failed to get guild ban: {:?}", e).into()),
+        }
+    }
+
     async fn create_member_ban(
         &self,
         user_id: serenity::all::UserId,
@@ -212,17 +383,6 @@ pub trait DiscordProvider: 'static + Clone {
             )
             .await
             .map_err(|e| format!("Failed to ban user: {}", e).into())
-    }
-
-    async fn kick_member(
-        &self,
-        user_id: serenity::all::UserId,
-        reason: Option<&str>,
-    ) -> Result<(), crate::Error> {
-        self.serenity_http()
-            .kick_member(self.guild_id(), user_id, reason)
-            .await
-            .map_err(|e| format!("Failed to kick user: {}", e).into())
     }
 
     async fn edit_member(
@@ -357,4 +517,19 @@ pub trait DiscordProvider: 'static + Clone {
             .await
             .map_err(|e| format!("Failed to get message: {}", e).into())
     }
+}
+
+fn reason_into_header(reason: &str) -> Headers {
+    let mut headers = Headers::new();
+
+    // "The X-Audit-Log-Reason header supports 1-512 URL-encoded UTF-8 characters."
+    // https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object
+    let header_value = match std::borrow::Cow::from(utf8_percent_encode(reason, NON_ALPHANUMERIC)) {
+        std::borrow::Cow::Borrowed(value) => HeaderValue::from_str(value),
+        std::borrow::Cow::Owned(value) => HeaderValue::try_from(value),
+    }
+    .expect("Invalid header value even after percent encode");
+
+    headers.insert("X-Audit-Log-Reason", header_value);
+    headers
 }

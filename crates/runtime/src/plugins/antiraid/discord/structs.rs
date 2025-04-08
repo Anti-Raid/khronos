@@ -2,7 +2,7 @@ use crate::plugins::antiraid::typesext::MultiOption;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, EditChannel,
+    CreateMessage, EditAutoModRule, CreateChannel, EditChannel,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -27,6 +27,12 @@ impl Default for GetAuditLogOptions {
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct GetChannelOptions {
     pub channel_id: serenity::all::ChannelId,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct CreateChannelOptions {
+    pub reason: String,
+    pub data: CreateChannel,
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
@@ -163,4 +169,25 @@ pub struct GetGuildBansOptions {
     pub limit: Option<serenity::nonmax::NonMaxU16>,
     pub before: Option<serenity::all::UserId>,
     pub after: Option<serenity::all::UserId>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CreateGuildBanOptions {
+    pub user_id: serenity::all::UserId,
+    pub reason: String,
+    pub delete_message_seconds: Option<u32>,
+}
+
+/*
+id	snowflake	channel id
+position?	?integer	sorting position of the channel (channels with the same position are sorted by id)
+lock_permissions?	?boolean	syncs the permission overwrites with the new parent, if moving to a new category
+parent_id?	?snowflake	the new parent ID for the channel that is moved
+*/
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ModifyChannelPosition {
+    pub id: serenity::all::ChannelId,
+    pub position: u16,
+    pub lock_permissions: Option<bool>,
+    pub parent_id: Option<serenity::all::ChannelId>,
 }

@@ -365,7 +365,7 @@ impl DiscordProvider for CliDiscordProvider {
         Ok(())
     }
 
-    async fn guild(
+    async fn get_guild(
         &self,
     ) -> serenity::Result<serenity::model::prelude::PartialGuild, khronos_runtime::Error> {
         {
@@ -383,7 +383,7 @@ impl DiscordProvider for CliDiscordProvider {
             .map_err(|e| format!("Failed to fetch guild: {}", e).into())
     }
 
-    async fn member(
+    async fn get_guild_member(
         &self,
         user_id: serenity::all::UserId,
     ) -> serenity::Result<Option<serenity::all::Member>, khronos_runtime::Error> {
@@ -405,7 +405,7 @@ impl DiscordProvider for CliDiscordProvider {
             .map(Some)
     }
 
-    async fn guild_channel(
+    async fn get_channel(
         &self,
         channel_id: serenity::all::ChannelId,
     ) -> serenity::Result<serenity::all::GuildChannel, khronos_runtime::Error> {

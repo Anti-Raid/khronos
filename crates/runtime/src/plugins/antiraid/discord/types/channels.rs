@@ -8,6 +8,76 @@ pub struct GetChannelOptions {
     pub channel_id: serenity::all::ChannelId,
 }
 
+/// A builder for creating a new [`GuildChannel`] in a [`Guild`].
+///
+/// Except [`Self::name`], all fields are optional.
+///
+/// [Discord docs](https://discord.com/developers/docs/resources/guild#create-guild-channel).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[must_use]
+pub struct CreateChannel {
+    pub name: String,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<ChannelType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitrate: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_limit: Option<NonMaxU16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_per_user: Option<NonMaxU16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<ChannelId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nsfw: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtc_region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_quality_mode: Option<VideoQualityMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_auto_archive_duration: Option<AutoArchiveDuration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_reaction_emoji: Option<ForumEmoji>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available_tags: Option<Vec<ForumTag>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_sort_order: Option<SortOrder>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_forum_layout: Option<ForumLayoutType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_thread_rate_limit_per_user: Option<NonMaxU16>,
+}
+
+impl Default for CreateChannel {
+    fn default() -> Self {
+        Self {
+            name: "my-channel".into(),
+            kind: Some(ChannelType::Text),
+            topic: Some("My channel topic".into()),
+            bitrate: None,
+            user_limit: None,
+            rate_limit_per_user: Some(serenity::nonmax::NonMaxU16::new(5).unwrap()),
+            position: Some(7),
+            permission_overwrites: Some(vec![]),
+            parent_id: None,
+            nsfw: Some(true),
+            rtc_region: Some("us-west".into()),
+            video_quality_mode: Some(serenity::all::VideoQualityMode::Auto),
+            default_auto_archive_duration: Some(serenity::all::AutoArchiveDuration::OneDay),
+            default_reaction_emoji: None,
+            available_tags: Some(vec![]),
+            default_sort_order: None,
+            default_forum_layout: None,
+            default_thread_rate_limit_per_user: None,
+        }
+    }
+}
+
 /// [Discord docs](https://discord.com/developers/docs/resources/channel#modify-channel-json-params-guild-channel).
 ///
 /// Unlike Serenity, AntiRaid combines EditChannel and EditThread to allow using standard Discord typings
@@ -56,15 +126,15 @@ pub struct EditChannel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    archived: Option<bool>,
+    pub archived: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    auto_archive_duration: Option<AutoArchiveDuration>,
+    pub auto_archive_duration: Option<AutoArchiveDuration>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    locked: Option<bool>,
+    pub locked: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    invitable: Option<bool>,
+    pub invitable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    applied_tags: Option<Vec<ForumTagId>>,
+    pub applied_tags: Option<Vec<ForumTagId>>,
 }
 
 impl Default for EditChannel {
@@ -102,13 +172,25 @@ impl Default for EditChannel {
 }
 
 /// [Discord docs](https://discord.com/developers/docs/resources/channel#forum-tag-object-forum-tag-structure)
+#[must_use]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ForumTag {
+    pub id: ForumTagId,
+    pub name: String,
+    pub moderated: bool,
+    pub emoji_id: Option<EmojiId>,
+    pub emoji_name: Option<String>,
+}
+
+/// [Discord docs](https://discord.com/developers/docs/resources/channel#forum-tag-object-forum-tag-structure)
 ///
 /// Contrary to the [`ForumTag`] struct, only the name field is required.
 #[must_use]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreateForumTag {
+    pub id: Option<ForumTagId>,
     pub name: String,
-    pub moderated: bool,
+    pub moderated: Option<bool>,
     pub emoji_id: Option<EmojiId>,
     pub emoji_name: Option<String>,
 }

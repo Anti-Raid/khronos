@@ -334,6 +334,9 @@ A timezone object.
 --- @within TimeZone
 --- A timezone object.
 type TimeZone = {
+	--- Parses a datetime string and returns a DateTime object.
+	fromString: (self: TimeZone, datetime: string) -> DateTime,
+
 	--- @function (year: number, month: number, day: number, hour: number, minute: number, second: number, all: boolean?) -> DateTime
 	--- Translates a timestamp in UTC time to a datetime in the said specific timezone. If `all` is set to true, then multiple times
 	--- may be returned in the case of ambiguous times, otherwise the first time is returned.
@@ -356,6 +359,15 @@ type TimeZone = {
 	--- Translates the current timestamp to a datetime in the said specific timezone
 	now: (self: TimeZone) -> DateTime,
 
+	--- Converts a unix timestamp to a datetime in the said specific timezone
+	fromTime: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime,
+
+	--- Converts a unix timestamp in milliseconds to a datetime in the said specific timezone
+	fromTimeMillis: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime,
+
+	--- Converts a unix timestamp in microseconds to a datetime in the said specific timezone
+	fromTimeMicros: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime,
+
 	-- Metatable
 	__tostring: (TimeZone) -> string,
 	__eq: (TimeZone, TimeZone) -> boolean
@@ -364,7 +376,41 @@ type TimeZone = {
 
 </details>
 
-<div id="utcToTz"></div>
+<div id="fromString"></div>
+
+### fromString
+
+Parses a datetime string and returns a DateTime object.
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Parses a datetime string and returns a DateTime object.
+fromString: (self: TimeZone, datetime: string) -> DateTime
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="datetime"></div>
+
+##### datetime
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[DateTime](#DateTime)<div id="utcToTz"></div>
 
 ### utcToTz
 
@@ -620,6 +666,108 @@ now: (self: TimeZone) -> DateTime
 ```
 
 </details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[DateTime](#DateTime)<div id="fromTime"></div>
+
+### fromTime
+
+Converts a unix timestamp to a datetime in the said specific timezone
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Converts a unix timestamp to a datetime in the said specific timezone
+fromTime: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="timestamp"></div>
+
+##### timestamp
+
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[DateTime](#DateTime)<div id="fromTimeMillis"></div>
+
+### fromTimeMillis
+
+Converts a unix timestamp in milliseconds to a datetime in the said specific timezone
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Converts a unix timestamp in milliseconds to a datetime in the said specific timezone
+fromTimeMillis: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="timestamp"></div>
+
+##### timestamp
+
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[DateTime](#DateTime)<div id="fromTimeMicros"></div>
+
+### fromTimeMicros
+
+Converts a unix timestamp in microseconds to a datetime in the said specific timezone
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Converts a unix timestamp in microseconds to a datetime in the said specific timezone
+fromTimeMicros: (self: TimeZone, timestamp: typesext.I64Convertibles) -> DateTime
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="timestamp"></div>
+
+##### timestamp
+
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1297,7 +1445,7 @@ Creates a new TimeDelta object with the specified number of weeks.
 --- @param weeks: number (The number of weeks to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of weeks.
-function timedelta_weeks(weeks: number) -> TimeDelta end
+function timedelta_weeks(weeks: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1310,7 +1458,7 @@ function timedelta_weeks(weeks: number) -> TimeDelta end
 
 ### weeks
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1336,7 +1484,7 @@ Creates a new TimeDelta object with the specified number of days.
 --- @param days: number (The number of days to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of days.
-function timedelta_days(days: number) -> TimeDelta end
+function timedelta_days(days: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1349,7 +1497,7 @@ function timedelta_days(days: number) -> TimeDelta end
 
 ### days
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1375,7 +1523,7 @@ Creates a new TimeDelta object with the specified number of hours.
 --- @param hours: number (The number of hours to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of hours.
-function timedelta_hours(hours: number) -> TimeDelta end
+function timedelta_hours(hours: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1388,7 +1536,7 @@ function timedelta_hours(hours: number) -> TimeDelta end
 
 ### hours
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1414,7 +1562,7 @@ Creates a new TimeDelta object with the specified number of minutes.
 --- @param minutes: number (The number of minutes to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of minutes.
-function timedelta_minutes(minutes: number) -> TimeDelta end
+function timedelta_minutes(minutes: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1427,7 +1575,7 @@ function timedelta_minutes(minutes: number) -> TimeDelta end
 
 ### minutes
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1453,7 +1601,7 @@ Creates a new TimeDelta object with the specified number of seconds.
 --- @param seconds: number (The number of seconds to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of seconds.
-function timedelta_seconds(seconds: number) -> TimeDelta end
+function timedelta_seconds(seconds: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1466,7 +1614,7 @@ function timedelta_seconds(seconds: number) -> TimeDelta end
 
 ### seconds
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1492,7 +1640,7 @@ Creates a new TimeDelta object with the specified number of milliseconds.
 --- @param millis: number (The number of milliseconds to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of milliseconds.
-function timedelta_millis(millis: number) -> TimeDelta end
+function timedelta_millis(millis: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1505,7 +1653,7 @@ function timedelta_millis(millis: number) -> TimeDelta end
 
 ### millis
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1531,7 +1679,7 @@ Creates a new TimeDelta object with the specified number of microseconds.
 --- @param micros: number (The number of microseconds to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of microseconds.
-function timedelta_micros(micros: number) -> TimeDelta end
+function timedelta_micros(micros: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1544,7 +1692,7 @@ function timedelta_micros(micros: number) -> TimeDelta end
 
 ### micros
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 
@@ -1570,7 +1718,7 @@ Creates a new TimeDelta object with the specified number of nanoseconds.
 --- @param nanos: number (The number of nanoseconds to create the TimeDelta object with.)
 --- @return TimeDelta
 --- Creates a new TimeDelta object with the specified number of nanoseconds.
-function timedelta_nanos(nanos: number) -> TimeDelta end
+function timedelta_nanos(nanos: typesext.I64Convertibles) -> TimeDelta end
 ```
 
 </details>
@@ -1583,7 +1731,7 @@ function timedelta_nanos(nanos: number) -> TimeDelta end
 
 ### nanos
 
-[number](#number)
+[typesext](./typesext.md).[I64Convertibles](./typesext.md#I64Convertibles)
 
 <div id="Returns"></div>
 

@@ -15,15 +15,54 @@
 
 ```luau
 type null = {
-	___placeholder: number
+	__phantom: number,
+
+	-- Metatable
+	__eq: (self: any, other: any) -> boolean
 }
 ```
 
 </details>
 
-<div id="___placeholder"></div>
+<div id="__phantom"></div>
 
-### ___placeholder
+### __phantom
 
 [number](#number)
 
+<div id="MetatableFields"></div>
+
+### Metatable Fields
+
+<div id="__eq"></div>
+
+#### __eq
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+__eq: (self: any, other: any) -> boolean
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+##### Arguments
+
+<div id="other"></div>
+
+##### other
+
+[any](#any)
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[boolean](#boolean)

@@ -20,20 +20,20 @@ KvRecord represents a key-value record with metadata.
 ```luau
 --- KvRecord represents a key-value record with metadata.
 ---@class KvRecord
----@field key string The key of the record.
----@field value any The value of the record.
----@field exists boolean Whether the record exists.
----@field created_at string The timestamp when the record was created.
----@field last_updated_at string The timestamp when the record was last updated.
 type KvRecord = {
+	--- The key of the record.
 	key: string,
 
+	--- The value of the record. This can be any type, depending on what was stored.
 	value: any,
 
+	--- Indicates whether the record exists in the key-value store.
 	exists: boolean,
 
+	--- The timestamp when the record was created, in ISO 8601 format (e.g., "2023-10-01T12:00:00Z").
 	created_at: string,
 
+	--- The timestamp when the record was last updated, in ISO 8601 format (e.g., "2023-10-01T12:00:00Z").
 	last_updated_at: string
 }
 ```
@@ -44,11 +44,15 @@ type KvRecord = {
 
 ### key
 
+The key of the record.
+
 [string](#string)
 
 <div id="value"></div>
 
 ### value
+
+The value of the record. This can be any type, depending on what was stored.
 
 [any](#any)
 
@@ -56,11 +60,15 @@ type KvRecord = {
 
 ### exists
 
+Indicates whether the record exists in the key-value store.
+
 [boolean](#boolean)
 
 <div id="created_at"></div>
 
 ### created_at
+
+The timestamp when the record was created, in ISO 8601 format (e.g., "2023-10-01T12:00:00Z").
 
 [string](#string)
 
@@ -68,7 +76,27 @@ type KvRecord = {
 
 ### last_updated_at
 
+The timestamp when the record was last updated, in ISO 8601 format (e.g., "2023-10-01T12:00:00Z").
+
 [string](#string)
+
+<div id="KvRecordList"></div>
+
+## KvRecordList
+
+A list of KvRecords
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- A list of KvRecords
+type KvRecordList = {KvRecord}
+```
+
+</details>
+
+{[KvRecord](#KvRecord)}
 
 <div id="KvExecutor"></div>
 
@@ -94,20 +122,32 @@ type KvExecutor = {
 	--- The scope of the executor.
 	scope: ExecutorScope.ExecutorScope,
 
-	--- Finds records in the key-value store.
+	--- Returns a list of all key-value scopes/
+	--- This is only guaranteed to return scopes that actually have at least one key inside it.
+	---
+	--- Needs the `kv.meta:list_scopes` capability to use
+	list_scopes: (self: KvExecutor) -> {string},
+
+	--- Finds matching records in this key-value scope.
 	--- @param query string The key to search for. % matches zero or more characters; _ matches a single character. To search anywhere in a string, surround {KEY} with %, e.g. %{KEY}%
 	--- @return {KvRecord} The records.
-	find: (self: KvExecutor, query: string) -> Promise.LuaPromise<{KvRecord}>,
+	find: (self: KvExecutor, query: string) -> Promise.LuaPromise<KvRecordList>,
 
-	--- Gets a value from the key-value store.
+	--- Gets a value from this key-value scope.
 	--- @param key string The key of the record.
 	--- @return any The value of the record.
 	get: (self: KvExecutor, key: string) -> Promise.LuaPromise<any>,
 
-	--- Gets a record from the key-value store.
+	--- Gets a record from this key-value scope.
 	--- @param key string The key of the record.
 	--- @return KvRecord The record.
 	getrecord: (self: KvExecutor, key: string) -> Promise.LuaPromise<KvRecord>,
+
+	--- Returns all keys present in this key-value scope.
+	---
+	--- This needs the ``kv.meta:{SCOPE}:keys`` capability where `{SCOPE}` is the name of the scope
+	--- being accessed
+	keys: (self: KvExecutor) -> Promise.LuaPromise<KvRecordList>,
 
 	--- Sets a record in the key-value store.
 	--- @param key string The key of the record.
@@ -115,7 +155,7 @@ type KvExecutor = {
 	--- @return KvRecord The record.
 	set: (self: KvExecutor, key: string, value: any) -> Promise.LuaPromise<KvRecord>,
 
-	--- Deletes a record from the key-value store.
+	--- Deletes a record from this key-value scope
 	--- @param key string The key of the record.
 	delete: (self: KvExecutor, key: string) -> Promise.LuaPromise<nil>
 }
@@ -123,20 +163,53 @@ type KvExecutor = {
 
 </details>
 
-<div id="find"></div>
+<div id="list_scopes"></div>
 
-### find
+### list_scopes
 
-Finds records in the key-value store.
+Returns a list of all key-value scopes/
+
+This is only guaranteed to return scopes that actually have at least one key inside it.
+
+
+
+Needs the `kv.meta:list_scopes` capability to use
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Finds records in the key-value store.
+--- Returns a list of all key-value scopes/
+--- This is only guaranteed to return scopes that actually have at least one key inside it.
+---
+--- Needs the `kv.meta:list_scopes` capability to use
+list_scopes: (self: KvExecutor) -> {string}
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+{[string](#string)}<div id="find"></div>
+
+### find
+
+Finds matching records in this key-value scope.
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Finds matching records in this key-value scope.
 --- @param query string The key to search for. % matches zero or more characters; _ matches a single character. To search anywhere in a string, surround {KEY} with %, e.g. %{KEY}%
 --- @return {KvRecord} The records.
-find: (self: KvExecutor, query: string) -> Promise.LuaPromise<{KvRecord}>
+find: (self: KvExecutor, query: string) -> Promise.LuaPromise<KvRecordList>
 ```
 
 </details>
@@ -163,17 +236,17 @@ string The key to search for. % matches zero or more characters; _ matches a sin
 
 The records.
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;{[KvRecord](#KvRecord)}&gt;<div id="get"></div>
+[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[KvRecordList](#KvRecordList)&gt;<div id="get"></div>
 
 ### get
 
-Gets a value from the key-value store.
+Gets a value from this key-value scope.
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Gets a value from the key-value store.
+--- Gets a value from this key-value scope.
 --- @param key string The key of the record.
 --- @return any The value of the record.
 get: (self: KvExecutor, key: string) -> Promise.LuaPromise<any>
@@ -207,13 +280,13 @@ The value of the record.
 
 ### getrecord
 
-Gets a record from the key-value store.
+Gets a record from this key-value scope.
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Gets a record from the key-value store.
+--- Gets a record from this key-value scope.
 --- @param key string The key of the record.
 --- @return KvRecord The record.
 getrecord: (self: KvExecutor, key: string) -> Promise.LuaPromise<KvRecord>
@@ -243,7 +316,40 @@ string The key of the record.
 
 The record.
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[KvRecord](#KvRecord)&gt;<div id="set"></div>
+[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[KvRecord](#KvRecord)&gt;<div id="keys"></div>
+
+### keys
+
+Returns all keys present in this key-value scope.
+
+
+
+This needs the ``kv.meta:{SCOPE}:keys`` capability where `{SCOPE}` is the name of the scope
+
+being accessed
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Returns all keys present in this key-value scope.
+---
+--- This needs the ``kv.meta:{SCOPE}:keys`` capability where `{SCOPE}` is the name of the scope
+--- being accessed
+keys: (self: KvExecutor) -> Promise.LuaPromise<KvRecordList>
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[KvRecordList](#KvRecordList)&gt;<div id="set"></div>
 
 ### set
 
@@ -296,13 +402,13 @@ The record.
 
 ### delete
 
-Deletes a record from the key-value store.
+Deletes a record from this key-value scope
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Deletes a record from the key-value store.
+--- Deletes a record from this key-value scope
 --- @param key string The key of the record.
 delete: (self: KvExecutor, key: string) -> Promise.LuaPromise<nil>
 ```
@@ -361,11 +467,35 @@ The scope of the executor.
 
 ## new
 
+Creates a new key-value executor with the desired executor scope and the desired kv scope
+
+
+
+KV scopes allow for fast access to getting/setting/listing keys within a scope without needing expensive and potentially
+
+heavily internally ratelimited operations like find() etc. as well as allowing for isolated
+
+get/sets (as operations within one scope do not affect other scopes)
+
+
+
+Note that the all keys are scoped. The default scope with the name `unscoped` is used when an explicit named
+
+scope is not provided
+
 <details>
 <summary>Function Signature</summary>
 
 ```luau
-function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorScope?) -> KvExecutor end
+--- Creates a new key-value executor with the desired executor scope and the desired kv scope
+---
+--- KV scopes allow for fast access to getting/setting/listing keys within a scope without needing expensive and potentially
+--- heavily internally ratelimited operations like find() etc. as well as allowing for isolated
+--- get/sets (as operations within one scope do not affect other scopes)
+---
+--- Note that the all keys are scoped. The default scope with the name `unscoped` is used when an explicit named
+--- scope is not provided
+function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorScope?, kv_scope: string?) -> KvExecutor end
 ```
 
 </details>
@@ -387,6 +517,14 @@ function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorSco
 *This field is optional and may not be specified*
 
 [ExecutorScope](./executorscope.md).[ExecutorScope](./executorscope.md#ExecutorScope)?
+
+<div id="kv_scope"></div>
+
+### kv_scope
+
+*This field is optional and may not be specified*
+
+[string](#string)?
 
 <div id="Returns"></div>
 
