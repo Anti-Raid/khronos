@@ -1,8 +1,9 @@
 use crate::plugins::antiraid::typesext::MultiOption;
+use std::cmp::Ordering;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild
+    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild, EditRole
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -184,12 +185,6 @@ pub struct CreateGuildBanOptions {
     pub delete_message_seconds: Option<u32>,
 }
 
-/*
-id	snowflake	channel id
-position?	?integer	sorting position of the channel (channels with the same position are sorted by id)
-lock_permissions?	?boolean	syncs the permission overwrites with the new parent, if moving to a new category
-parent_id?	?snowflake	the new parent ID for the channel that is moved
-*/
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ModifyChannelPosition {
     pub id: serenity::all::ChannelId,
@@ -215,4 +210,64 @@ pub struct ModifyGuildMemberOptions {
     pub user_id: serenity::all::UserId,
     pub reason: String,
     pub data: EditMember,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckPermissionsOptions {
+    pub user_id: serenity::all::UserId,
+    pub needed_permissions: serenity::all::Permissions,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckPermissionsAndHierarchyOptions {
+    pub user_id: serenity::all::UserId,
+    pub target_id: serenity::all::UserId,
+    pub needed_permissions: serenity::all::Permissions,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckPermissionsResponse {
+    pub partial_guild: serenity::all::PartialGuild,
+    pub member: serenity::all::Member,
+    pub permissions: serenity::all::Permissions
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct RemoveGuildBanOptions {
+    pub user_id: serenity::all::UserId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CreateGuildRoleOptions {
+    pub reason: String,
+    pub data: EditRole,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ModifyRolePositionOptions {
+    pub data: Vec<ModifyRolePosition>,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ModifyRolePosition {
+    pub id: serenity::all::RoleId,
+    pub position: i16,
+}
+
+impl PartialEq<serenity::all::Role> for ModifyRolePosition {
+    fn eq(&self, other: &serenity::all::Role) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialOrd<serenity::all::Role> for ModifyRolePosition {
+    fn partial_cmp(&self, other: &serenity::all::Role) -> Option<Ordering> {
+        if self.position == other.position {
+            Some(self.id.cmp(&other.id))
+        } else {
+            Some(self.position.cmp(&other.position))
+        }
+    }
 }

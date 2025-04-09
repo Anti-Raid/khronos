@@ -158,6 +158,57 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok("DiscordActionExecutor")
         });
 
+        // Basic helper functions
+        methods.add_method("antiraid_check_reason", |_, this, reason: String| {
+            Ok(this.check_reason(&reason))
+        });
+
+        methods.add_method("antiraid_check_permissions", |
+            _, 
+            this,
+            data: LuaValue,
+        | {
+            Ok(
+                lua_promise!(this, data, |lua, this, data|, {
+                    let data = lua.from_value::<structs::AntiRaidCheckPermissionsOptions>(data)?;
+                    let (partial_guild, member, permissions) = this.check_permissions(data.user_id, data.needed_permissions)
+                        .await
+                        .map_err(LuaError::external)?;
+
+                    Ok(Lazy::new(
+                        structs::AntiRaidCheckPermissionsResponse {
+                            partial_guild,
+                            member,
+                            permissions,
+                        }
+                    ))
+                })
+            ) 
+        });
+
+        methods.add_method("antiraid_check_permissions_and_hierarchy", |
+            _, 
+            this,
+            data: LuaValue,
+        | {
+            Ok(
+                lua_promise!(this, data, |lua, this, data|, {
+                    let data = lua.from_value::<structs::AntiRaidCheckPermissionsAndHierarchyOptions>(data)?;
+                    let (partial_guild, member, permissions) = this.check_permissions_and_hierarchy(data.user_id, data.target_id, data.needed_permissions)
+                        .await
+                        .map_err(LuaError::external)?;
+
+                    Ok(Lazy::new(
+                        structs::AntiRaidCheckPermissionsResponse {
+                            partial_guild,
+                            member,
+                            permissions,
+                        }
+                    ))
+                })
+            ) 
+        });
+
         // Audit Log
 
         // Should be documented
@@ -1017,6 +1068,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
+        // Should be documented
         methods.add_method("modify_guild_member", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let mut data = lua.from_value::<structs::ModifyGuildMemberOptions>(data)?;
@@ -1027,6 +1079,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
+
+                // TODO: Rethink this position on not allowing self-modification
+                if bot_user.id == data.user_id {
+                    return Err(LuaError::external("Cannot modify self"));
+                }
 
                 let mut needed_perms = serenity::all::Permissions::empty();
 
@@ -1279,32 +1336,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });      
 
         // Should be documented
-        methods.add_method("get_guild_ban", |_, this, user_id: String| {
-            Ok(lua_promise!(this, user_id, |_lua, this, user_id|, {
-                let user_id = user_id.parse::<serenity::all::UserId>()
-                    .map_err(|e| LuaError::external(format!("Error while parsing user id: {}", e)))?;
-
-                this.check_action("get_guild_ban".to_string())
-                    .map_err(LuaError::external)?;
-
-                let Some(bot_user) = this.context.current_user() else {
-                    return Err(LuaError::runtime("Internal error: Current user not found"));
-                };    
-
-                this.check_permissions(bot_user.id, serenity::all::Permissions::BAN_MEMBERS)
-                .await
-                .map_err(LuaError::external)?;
-
-                let ban = this.discord_provider
-                    .get_guild_ban(user_id)
-                    .await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                Ok(Lazy::new(ban))
-            }))
-        });     
-
-        // Should be documented
         methods.add_method("get_guild_bans", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data = lua.from_value::<structs::GetGuildBansOptions>(data)?;
@@ -1345,6 +1376,32 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });        
 
         // Should be documented
+        methods.add_method("get_guild_ban", |_, this, user_id: String| {
+            Ok(lua_promise!(this, user_id, |_lua, this, user_id|, {
+                let user_id = user_id.parse::<serenity::all::UserId>()
+                    .map_err(|e| LuaError::external(format!("Error while parsing user id: {}", e)))?;
+
+                this.check_action("get_guild_ban".to_string())
+                    .map_err(LuaError::external)?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };    
+
+                this.check_permissions(bot_user.id, serenity::all::Permissions::BAN_MEMBERS)
+                .await
+                .map_err(LuaError::external)?;
+
+                let ban = this.discord_provider
+                    .get_guild_ban(user_id)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(ban))
+            }))
+        });     
+
+        // Should be documented
         methods.add_method("create_guild_ban", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
                 let data = lua.from_value::<structs::CreateGuildBanOptions>(data)?;
@@ -1382,7 +1439,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .map_err(LuaError::external)?;
 
                 this.discord_provider
-                    .create_member_ban(
+                    .create_guild_ban(
                         data.user_id,
                         delete_message_seconds,
                         Some(data.reason.as_str()),
@@ -1395,54 +1452,36 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_method("get_messages", |_, this, data: LuaValue| {
+        methods.add_method("remove_guild_ban", |_, this, data: LuaValue| {
             Ok(lua_promise!(this, data, |lua, this, data|, {
-                let data = lua.from_value::<structs::GetMessagesOptions>(data)?;
+                let data = lua.from_value::<structs::RemoveGuildBanOptions>(data)?;
 
-                this.check_action("get_messages".to_string())
+                this.check_action("remove_guild_ban".to_string())
                     .map_err(LuaError::external)?;
-
-                // Perform required checks
-                let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
 
-                let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                else {
-                    return Err(LuaError::runtime("Bot user not found in guild"));
-                };
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
 
-                let guild = this.discord_provider.get_guild().await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                this.check_permissions(
+                    bot_user.id,
+                    serenity::all::Permissions::BAN_MEMBERS,
+                )
+                .await
+                .map_err(LuaError::external)?;
 
-                // Check if the bot has permissions to send messages in the given channel
-                if !guild
-                    .user_permissions_in(&guild_channel, &bot_member)
-                    .view_channel()
-                {
-                    return Err(LuaError::external(
-                        "Bot does not have permission to send messages in the given channel",
-                    ));
-                }
-
-                if guild_channel.kind == serenity::all::ChannelType::Voice && !guild
-                .user_permissions_in(&guild_channel, &bot_member)
-                .connect() {
-                    return Err(LuaError::external(
-                        "Bot does not have permission to connect to the given voice channel",
-                    ));
-                }
-
-                let msg = this.discord_provider
-                    .get_messages(data.channel_id, data.target.map(|x| x.to_serenity()), data.limit)
+                this.discord_provider
+                    .remove_guild_ban(
+                        data.user_id,
+                        Some(data.reason.as_str()),
+                    )
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
-                Ok(Lazy::new(msg))
+                Ok(())
             }))
         });
 
@@ -1461,12 +1500,147 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });                
 
-        // Should be documented (get_message)
-        methods.add_method("get_message", |_, this, data: LuaValue| {
-            Ok(lua_promise!(this, data, |lua, this, data|, {
-                let data = lua.from_value::<structs::GetMessageOptions>(data)?;
+        // Should be documented
+        methods.add_method("get_guild_role", |_, this, role_id: String| {
+            Ok(lua_promise!(this, role_id, |_lua, this, role_id|, {
+                let role_id = role_id.parse::<serenity::all::RoleId>()
+                    .map_err(LuaError::external)?;
 
-                this.check_action("get_message".to_string())
+                this.check_action("get_guild_role".to_string())
+                    .map_err(LuaError::external)?;
+
+                let role = this.discord_provider
+                    .get_guild_role(role_id)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(role))
+            }))
+        });                
+
+        // Should be documented
+        methods.add_method("create_guild_role", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::CreateGuildRoleOptions>(data)?;
+
+                this.check_action("create_guild_role".to_string())
+                    .map_err(LuaError::external)?;
+
+                if let Some(ref name) = data.data.name {
+                    if name.len() > 100 || name.is_empty() {
+                        return Err(LuaError::external(
+                            "Role name must be a maximum of 100 characters and not empty",
+                        ));
+                    }
+                }
+
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                let (guild, _, bot_perms) = this.check_permissions(
+                    bot_user.id,
+                    serenity::all::Permissions::MANAGE_ROLES,
+                )
+                .await
+                .map_err(LuaError::external)?; 
+
+                let mut guild_has_role_icons = false;
+                for feature in guild.features.iter() {
+                    match feature.as_str() {
+                        "ROLE_ICONS" => guild_has_role_icons = true,
+                        _ => {}
+                    }
+                }
+                
+                if let Some(permissions) = data.data.permissions {
+                    if !bot_perms.contains(permissions) {
+                        return Err(LuaError::external(
+                            format!("Bot does not have permissions: {:?}", permissions.difference(bot_perms)),
+                        ));
+                    }
+                }
+
+                if let Some(ref icon) = data.data.icon.as_inner_ref() {
+                    if !guild_has_role_icons {
+                        return Err(LuaError::external("Guild does not have the Role Icons feature and as such cannot create a role with a role_icon field"));
+                    }
+
+                    let format = get_format_from_image_data(icon)
+                    .map_err(LuaError::external)?;
+
+                    if format != "png" && format != "jpeg" && format != "gif" {
+                        return Err(LuaError::external(
+                            "Icon must be a PNG, JPEG, or GIF format",
+                        ));
+                    }
+                }
+
+                let role = this.discord_provider
+                    .create_guild_role(data.data, Some(data.reason.as_str()))
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(role))
+            }))
+        });  
+        
+        // Should be documented
+        methods.add_method("modify_guild_role_positions", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::ModifyRolePositionOptions>(data)?;
+
+                this.check_action("modify_guild_role_positions".to_string())
+                    .map_err(LuaError::external)?;
+
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };    
+
+                let (guild, member, _) = this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_ROLES)
+                    .await
+                    .map_err(LuaError::external)?;
+
+                // Check roles
+                let bot_highest_role = serenity_utils::highest_role(&guild, &member)
+                    .ok_or_else(|| LuaError::runtime("Bot does not have a role"))?;
+
+                for modify_role_position in data.data.iter() {
+                    let Some(role) = guild.roles.get(&modify_role_position.id) else {
+                        return Err(LuaError::runtime("Role not found in guild"));
+                    };
+
+                    // Check current
+                    if role >= bot_highest_role || modify_role_position >= bot_highest_role {
+                        return Err(LuaError::external(
+                            format!("Bot does not have permission to modify the requested role ({}, ``{}``)", role.id, role.name.replace("`", "\\`")),
+                        ));
+                    }
+                }
+
+                let roles = this.discord_provider
+                    .modify_guild_role_positions(data.data.iter(), Some(data.reason.as_str()))
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(roles))
+            }))
+        });
+
+        // Messages
+
+        // Should be documented
+        methods.add_method("get_channel_messages", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetMessagesOptions>(data)?;
+
+                this.check_action("get_channel_messages".to_string())
                     .map_err(LuaError::external)?;
 
                 // Perform required checks
@@ -1505,7 +1679,59 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
 
                 let msg = this.discord_provider
-                    .get_message(data.channel_id, data.message_id)
+                    .get_channel_messages(data.channel_id, data.target.map(|x| x.to_serenity()), data.limit)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        // Should be documented 
+        methods.add_method("get_channel_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetMessageOptions>(data)?;
+
+                this.check_action("get_channel_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let guild_channel = this.discord_provider.get_channel(data.channel_id).await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
+                    .map_err(|e| LuaError::external(e.to_string()))?
+                else {
+                    return Err(LuaError::runtime("Bot user not found in guild"));
+                };
+
+                let guild = this.discord_provider.get_guild().await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                // Check if the bot has permissions to send messages in the given channel
+                if !guild
+                    .user_permissions_in(&guild_channel, &bot_member)
+                    .view_channel()
+                {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to send messages in the given channel",
+                    ));
+                }
+
+                if guild_channel.kind == serenity::all::ChannelType::Voice && !guild
+                .user_permissions_in(&guild_channel, &bot_member)
+                .connect() {
+                    return Err(LuaError::external(
+                        "Bot does not have permission to connect to the given voice channel",
+                    ));
+                }
+
+                let msg = this.discord_provider
+                    .get_channel_message(data.channel_id, data.message_id)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 

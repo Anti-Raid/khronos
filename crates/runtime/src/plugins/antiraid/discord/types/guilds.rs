@@ -66,3 +66,24 @@ pub struct EditMember {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<GuildMemberFlags>,
 }
+
+/// [Discord docs](https://discord.com/developers/docs/resources/guild#modify-guild-role)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[must_use]
+pub struct EditRole {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<serenity::all::Permissions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "color")]
+    pub colour: Option<Colour>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hoist: Option<bool>,
+    #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
+    pub icon: MultiOption<String>,
+    #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
+    pub unicode_emoji: MultiOption<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mentionable: Option<bool>,
+}

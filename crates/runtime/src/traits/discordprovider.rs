@@ -355,7 +355,7 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to modify guild member: {}", e).into())
     }
 
-    // Modify Current Member and Modify Current Member Nick are intentionally not supported due to privacy reasons
+    // Modify Current Member and Modify Current Member Nick are intentionally not supported due to our current self-modification position
 
     async fn add_guild_member_role(
         &self,
@@ -429,7 +429,7 @@ pub trait DiscordProvider: 'static + Clone {
         }
     }
 
-    async fn create_member_ban(
+    async fn create_guild_ban(
         &self,
         user_id: serenity::all::UserId,
         delete_message_seconds: u32,
@@ -448,16 +448,87 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to ban user: {}", e).into())
     }
 
-    async fn edit_member(
+    async fn remove_guild_ban(
         &self,
         user_id: serenity::all::UserId,
+        reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .remove_ban(self.guild_id(), user_id, reason)
+            .await
+            .map_err(|e| format!("Failed to unban user: {}", e).into())
+    }
+
+    // Bulk Guild Ban is intentionally super-disabled (both Khronos + infra wide endpoint ban)
+    // due to severe possibility of damage
+
+    async fn get_guild_roles(
+        &self,
+    ) -> Result<
+        extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>,
+        crate::Error,
+    > {
+        self.serenity_http()
+            .get_guild_roles(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to get guild roles: {}", e).into())
+    }
+
+    async fn get_guild_role(
+        &self,
+        role_id: serenity::all::RoleId,
+    ) -> Result<serenity::all::Role, crate::Error> {
+        self.serenity_http()
+            .get_guild_role(self.guild_id(), role_id)
+            .await
+            .map_err(|e| format!("Failed to get guild role: {}", e).into())
+    }
+
+    async fn create_guild_role(
+        &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Member, crate::Error> {
+    ) -> Result<serenity::all::Role, crate::Error> {
         self.serenity_http()
-            .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
+            .create_role(self.guild_id(), &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit member: {}", e).into())
+            .map_err(|e| format!("Failed to create guild role: {}", e).into())
+    }
+
+    async fn modify_guild_role_positions(
+        &self,
+        map: impl Iterator<Item: serde::Serialize>,
+        audit_log_reason: Option<&str>,
+    ) -> Result<Vec<serenity::all::Role>, crate::Error> {
+        self.serenity_http()
+            .edit_role_positions(self.guild_id(), map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify guild role positions: {}", e).into())
+    }
+
+    // Messages
+
+    async fn get_channel_messages(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        target: Option<serenity::all::MessagePagination>,
+        limit: Option<serenity::nonmax::NonMaxU8>,
+    ) -> Result<Vec<serenity::all::Message>, crate::Error> {
+        self.serenity_http()
+            .get_messages(channel_id, target, limit)
+            .await
+            .map_err(|e| format!("Failed to get messages: {}", e).into())
+    }
+
+    async fn get_channel_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        self.serenity_http()
+            .get_message(channel_id, message_id)
+            .await
+            .map_err(|e| format!("Failed to get message: {}", e).into())
     }
 
     async fn create_message(
@@ -544,41 +615,6 @@ pub trait DiscordProvider: 'static + Clone {
             .create_guild_commands(self.guild_id(), &map)
             .await
             .map_err(|e| format!("Failed to create guild commands: {}", e).into())
-    }
-
-    async fn get_guild_roles(
-        &self,
-    ) -> Result<
-        extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>,
-        crate::Error,
-    > {
-        self.serenity_http()
-            .get_guild_roles(self.guild_id())
-            .await
-            .map_err(|e| format!("Failed to get guild roles: {}", e).into())
-    }
-
-    async fn get_messages(
-        &self,
-        channel_id: serenity::all::ChannelId,
-        target: Option<serenity::all::MessagePagination>,
-        limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<Vec<serenity::all::Message>, crate::Error> {
-        self.serenity_http()
-            .get_messages(channel_id, target, limit)
-            .await
-            .map_err(|e| format!("Failed to get messages: {}", e).into())
-    }
-
-    async fn get_message(
-        &self,
-        channel_id: serenity::all::ChannelId,
-        message_id: serenity::all::MessageId,
-    ) -> Result<serenity::all::Message, crate::Error> {
-        self.serenity_http()
-            .get_message(channel_id, message_id)
-            .await
-            .map_err(|e| format!("Failed to get message: {}", e).into())
     }
 }
 
