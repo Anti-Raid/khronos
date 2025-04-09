@@ -648,6 +648,163 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
+        methods.add_method("modify_guild", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::ModifyGuildOptions>(data)?;
+
+                this.check_action("modify_guild".to_string())
+                    .map_err(LuaError::external)?;
+
+                this.check_reason(&data.reason)
+                    .map_err(LuaError::external)?;    
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                if let Some(ref name) = data.data.name {
+                    if name.len() < 2 || name.len() > 100 {
+                        return Err(LuaError::external(
+                            "Name must be between 2 and 100 characters",
+                        ));
+                    }
+                }
+
+                if let Some(ref description) = data.data.description {
+                    if description.len() > 300 {
+                        return Err(LuaError::external(
+                            "Description must be less than 300 characters",
+                        ));
+                    }
+                }
+
+                if let Some(ref icon) = data.data.icon.as_inner_ref() {
+                    let format = get_format_from_image_data(icon)
+                    .map_err(LuaError::external)?;
+
+                    if format != "png" && format != "jpeg" && format != "gif" {
+                        return Err(LuaError::external(
+                            "Icon must be a PNG, JPEG, or GIF format",
+                        ));
+                    }
+                }
+
+                let splash_format = {
+                    if let Some(ref splash) = data.data.splash.as_inner_ref() {
+                        let format = get_format_from_image_data(splash)
+                        .map_err(LuaError::external)?;
+
+                        if format != "png" && format != "jpeg" {
+                            return Err(LuaError::external(
+                                "Splash must be a PNG or JPEG format",
+                            ));
+                        }
+
+                        Some(format)
+                    } else {
+                        None
+                    }
+                };
+
+                let discovery_splash_format = {
+                    if let Some(ref discovery_splash) = data.data.discovery_splash.as_inner_ref() {
+                        let format = get_format_from_image_data(discovery_splash)
+                        .map_err(LuaError::external)?;
+
+                        if format != "png" && format != "jpeg" {
+                            return Err(LuaError::external(
+                                "Discovery splash must be a PNG or JPEG format",
+                            ));
+                        }
+
+                        Some(format)
+                    } else {
+                        None
+                    }
+                };
+
+                let banner_format = {
+                    if let Some(ref banner) = data.data.banner.as_inner_ref() {
+                        let format = get_format_from_image_data(banner)
+                        .map_err(LuaError::external)?;
+
+                        if format != "png" && format != "jpeg" && format != "gif" {
+                            return Err(LuaError::external(
+                                "Banner must be a PNG, JPEG, or GIF format",
+                            ));
+                        }
+
+                        Some(format)
+                    } else {
+                        None
+                    }
+                };
+
+                // TODO: Check afk_channel_id, system_channel_id, rules_channel_id, public_updates_channel_id, safety_alerts_channel_id too
+
+                let (guild, _member, perms) = this.check_permissions(
+                    bot_user.id,
+                    serenity::all::Permissions::MANAGE_GUILD,
+                )
+                .await
+                .map_err(LuaError::external)?;
+
+                let mut guild_has_community = false;
+                let mut guild_has_invite_splash = false;
+                let mut guild_has_discoverable = false;
+                let mut guild_has_banner = false;
+                let mut guild_has_animated_banner = false;
+
+                for feature in guild.features.iter() {
+                    match feature.as_str() {
+                        "COMMUNITY" => guild_has_community = true,
+                        "INVITE_SPLASH" => guild_has_invite_splash = true,
+                        "DISCOVERABLE" => guild_has_discoverable = true,
+                        "BANNER" => guild_has_banner = true,
+                        "ANIMATED_BANNER" => guild_has_animated_banner = true,
+                        _ => {}
+                    }
+                }
+
+                if let Some(ref features) = data.data.features {
+                    if (
+                        (features.contains(&"COMMUNITY".into()) && !guild_has_community) || 
+                        (!features.contains(&"COMMUNITY".into()) && guild_has_community)
+                    ) && !perms.contains(serenity::all::Permissions::ADMINISTRATOR) {
+                        return Err(LuaError::external("Enabling/disabling the community feature requires the bot to have the Administrator permission"));
+                    }
+                }
+
+                if !guild_has_invite_splash && splash_format.is_some() {
+                    return Err(LuaError::external("Guild does not have the Invite Splash feature and as such cannot have an invite splash"));
+                }
+
+                if !guild_has_discoverable && discovery_splash_format.is_some() {
+                    return Err(LuaError::external("Guild does not have the Discoverable feature and as such cannot have a discovery splash"));
+                }
+
+                if banner_format.is_some() {
+                    if !guild_has_banner {
+                        return Err(LuaError::external("Guild does not have the Banner feature and as such cannot have a banner"));
+                    }
+
+                    if !guild_has_animated_banner && banner_format == Some("gif".to_string()) {
+                        return Err(LuaError::external("Guild does not have the Animated Banner feature and as such cannot have an (animated) GIF banner"));
+                    }
+                }
+
+                let new_guild = this.discord_provider
+                    .modify_guild(
+                        data.data,
+                        Some(data.reason.as_str()),
+                    )
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(new_guild))
+            }))
+        });
+
         // Modify guild is intentionally skipped for now. TODO: Add later
         // Delete guild will not be implemented as we can't really use it
 
@@ -921,9 +1078,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     needed_perms |= serenity::all::Permissions::MODERATE_MEMBERS;
                 }
 
-                let (guild, member, perms) = this.check_permissions_and_hierarchy(
+                let (guild, member, perms) = this.check_permissions(
                     bot_user.id,
-                    data.user_id,
                     needed_perms,
                 )
                 .await
@@ -1613,4 +1769,26 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     module.set_readonly(true); // Block any attempt to modify this table
 
     Ok(module)
+}
+
+fn get_format_from_image_data(data: &str) -> Result<String, LuaError> {
+    if !data.starts_with("data:image/") {
+        return Err(LuaError::external(
+            "Image must be a data URL",
+        ));
+    }
+
+    let Some(format) = data.split(";").next() else {
+        return Err(LuaError::external(
+            "Image is not a valid data URL",
+        ));
+    };
+
+    let Some(format) = format.split("/").nth(1) else {
+        return Err(LuaError::external(
+            "No format found in data URL",
+        ));
+    };
+
+    Ok(format.to_string())
 }

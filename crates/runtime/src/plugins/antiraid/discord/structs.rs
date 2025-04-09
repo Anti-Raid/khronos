@@ -2,7 +2,7 @@ use crate::plugins::antiraid::typesext::MultiOption;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember,
+    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -141,6 +141,12 @@ pub struct EditChannelPermissionsOptions {
     pub deny: MultiOption<serenity::all::Permissions>,
     #[serde(rename = "type")]
     pub kind: u8,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ModifyGuildOptions {
+    pub data: EditGuild,
     pub reason: String,
 }
 

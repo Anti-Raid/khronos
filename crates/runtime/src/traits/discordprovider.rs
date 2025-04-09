@@ -234,7 +234,18 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to fetch guild preview: {}", e).into())
     }
 
-    // Modify guild is intentionally skipped for now. TODO: Add later
+    // Modify Guild
+    async fn modify_guild(
+        &self,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::PartialGuild, crate::Error> {
+        self.serenity_http()
+            .edit_guild(self.guild_id(), &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify guild: {}", e).into())
+    }
+
     // Delete guild will not be implemented as we can't really use it
 
     /// Gets all guild channels
@@ -329,6 +340,7 @@ pub trait DiscordProvider: 'static + Clone {
     }
 
     // Add Guild Member is intentionally not supported as it needs OAuth2 to work
+    // and has security implications
 
     /// Modify Guild Member
     async fn modify_guild_member(
