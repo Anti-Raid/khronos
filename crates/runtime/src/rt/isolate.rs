@@ -530,7 +530,7 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
         match self.requires_cache.borrow().get(path).cloned() {
             Some(v) => Some(v),
             None => {
-                match self.isolate.asset_manager.get_cached_lua_value(path) {
+                match self.isolate.asset_manager.get_cached_lua_value(&self.isolate.lua(), path) {
                     Some(v) => Some(v),
                     None => None,
                 }

@@ -8,14 +8,14 @@ pub trait AssetManager {
     fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error>;
 
     /// (optional) Gets a cached LuaValue, can be used to avoid repeated parsing of common things (like templating-types)
-    fn get_cached_lua_value(&self, _: &str) -> Option<mlua::MultiValue> {
+    fn get_cached_lua_value(&self, _: &mlua::Lua, _: &str) -> Option<mlua::MultiValue> {
         None
     }
 
     /// (optional) Clears all lua values if in a cache
     /// 
     /// Can be used to clear the cache of ``get_cached_lua_value``
-    fn clear_cached_lua_values(&self) {}
+    fn clear_cached_lua_values(&self) {}        
 }
 
 /// All Into<AssetManager> implementations should be able to be used as an AssetManager
