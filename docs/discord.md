@@ -422,6 +422,44 @@ The reason for the edit
 
 [string](#string)
 
+<div id="CreateChannelOptions"></div>
+
+## CreateChannelOptions
+
+Options for editing a channel in Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for editing a channel in Discord
+type CreateChannelOptions = {
+	--- The reason for the create
+	reason: string,
+
+	--- The data to edit the channel with
+	data: discordRest.CreateGuildChannelRequest
+}
+```
+
+</details>
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the create
+
+[string](#string)
+
+<div id="data"></div>
+
+### data
+
+The data to edit the channel with
+
+[discordRest](./discordrest.md).[CreateGuildChannelRequest](./discordrest.md#CreateGuildChannelRequest)
+
 <div id="AddGuildMemberRoleOptions"></div>
 
 ## AddGuildMemberRoleOptions
@@ -999,6 +1037,422 @@ The number of seconds to delete messages from
 
 [number](#number)?
 
+<div id="RemoveGuildBanOptions"></div>
+
+## RemoveGuildBanOptions
+
+Options for removing a guild ban in Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for removing a guild ban in Discord
+type RemoveGuildBanOptions = {
+	--- The user ID to unban
+	user_id: discord.Snowflake,
+
+	--- The reason for the unban
+	reason: string
+}
+```
+
+</details>
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID to unban
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the unban
+
+[string](#string)
+
+<div id="GetGuildMembersOptions"></div>
+
+## GetGuildMembersOptions
+
+Options for getting guild members
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for getting guild members
+type GetGuildMembersOptions = {
+	--- The limit of members to get
+	limit: number?,
+
+	--- The user ID to get members after
+	after: discord.Snowflake?
+}
+```
+
+</details>
+
+<div id="limit"></div>
+
+### limit
+
+The limit of members to get
+
+*This field is optional and may not be specified*
+
+[number](#number)?
+
+<div id="after"></div>
+
+### after
+
+The user ID to get members after
+
+*This field is optional and may not be specified*
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)?
+
+<div id="SearchGuildMembersOptions"></div>
+
+## SearchGuildMembersOptions
+
+Options for searching guild members
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for searching guild members
+type SearchGuildMembersOptions = {
+	--- The query to search for
+	query: string,
+
+	--- The limit of members to get
+	limit: number?
+}
+```
+
+</details>
+
+<div id="query"></div>
+
+### query
+
+The query to search for
+
+[string](#string)
+
+<div id="limit"></div>
+
+### limit
+
+The limit of members to get
+
+*This field is optional and may not be specified*
+
+[number](#number)?
+
+<div id="ModifyGuildMemberOptions"></div>
+
+## ModifyGuildMemberOptions
+
+Options for modifying a guild member
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for modifying a guild member
+type ModifyGuildMemberOptions = {
+	--- The user ID to modify
+	user_id: discord.Snowflake,
+
+	--- The reason for the modification
+	reason: string,
+
+	--- The data to modify the member with
+	data: discordRest.ModifyGuildMemberRequest
+}
+```
+
+</details>
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID to modify
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the modification
+
+[string](#string)
+
+<div id="data"></div>
+
+### data
+
+The data to modify the member with
+
+[discordRest](./discordrest.md).[ModifyGuildMemberRequest](./discordrest.md#ModifyGuildMemberRequest)
+
+<div id="ModifyGuildOptions"></div>
+
+## ModifyGuildOptions
+
+Options for modifying a guild
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for modifying a guild
+type ModifyGuildOptions = {
+	data: discordRest.ModifyGuildRequest,
+
+	reason: string
+}
+```
+
+</details>
+
+<div id="data"></div>
+
+### data
+
+[discordRest](./discordrest.md).[ModifyGuildRequest](./discordrest.md#ModifyGuildRequest)
+
+<div id="reason"></div>
+
+### reason
+
+[string](#string)
+
+<div id="AntiRaidCheckPermissionsOptions"></div>
+
+## AntiRaidCheckPermissionsOptions
+
+Options for checking if a user has the needed Discord permissions to perform an action
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for checking if a user has the needed Discord permissions to perform an action
+type AntiRaidCheckPermissionsOptions = {
+	--- The user ID to check permissions for
+	user_id: discord.Snowflake,
+
+	--- The needed permissions
+	needed_permissions: typesext.MultiOption<string>
+}
+```
+
+</details>
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID to check permissions for
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="needed_permissions"></div>
+
+### needed_permissions
+
+The needed permissions
+
+[typesext](./typesext.md).[MultiOption](./typesext.md#MultiOption)&lt;[string](#string)&gt;
+
+<div id="AntiRaidCheckPermissionsAndHierarchyOptions"></div>
+
+## AntiRaidCheckPermissionsAndHierarchyOptions
+
+Options for checking if a user has the needed Discord permissions to perform an action
+
+and is above the target user in terms of hierarchy
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for checking if a user has the needed Discord permissions to perform an action 
+--- and is above the target user in terms of hierarchy
+type AntiRaidCheckPermissionsAndHierarchyOptions = {
+	--- The user ID to check permissions for
+	user_id: discord.Snowflake,
+
+	--- The target ID to check permissions for
+	target_id: discord.Snowflake,
+
+	--- The needed permissions
+	needed_permissions: typesext.MultiOption<string>
+}
+```
+
+</details>
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID to check permissions for
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="target_id"></div>
+
+### target_id
+
+The target ID to check permissions for
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="needed_permissions"></div>
+
+### needed_permissions
+
+The needed permissions
+
+[typesext](./typesext.md).[MultiOption](./typesext.md#MultiOption)&lt;[string](#string)&gt;
+
+<div id="AntiRaidCheckPermissionsResponse"></div>
+
+## AntiRaidCheckPermissionsResponse
+
+Extra/additional success response for checking if a user has the needed Discord permissions to perform an action
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Extra/additional success response for checking if a user has the needed Discord permissions to perform an action
+type AntiRaidCheckPermissionsResponse = {
+	--- The partial guild
+	partial_guild: discord.Partial<discord.GuildObject>,
+
+	--- The member
+	member: discord.GuildMemberObject,
+
+	--- The permissions
+	permissions: typesext.MultiOption<string>
+}
+```
+
+</details>
+
+<div id="partial_guild"></div>
+
+### partial_guild
+
+The partial guild
+
+[discord](./discord.md).[Partial](./discord.md#Partial)&lt;[discord](./discord.md).[GuildObject](./discord.md#GuildObject)&gt;
+
+<div id="member"></div>
+
+### member
+
+The member
+
+[discord](./discord.md).[GuildMemberObject](./discord.md#GuildMemberObject)
+
+<div id="permissions"></div>
+
+### permissions
+
+The permissions
+
+[typesext](./typesext.md).[MultiOption](./typesext.md#MultiOption)&lt;[string](#string)&gt;
+
+<div id="CreateGuildRoleOptions"></div>
+
+## CreateGuildRoleOptions
+
+Options for creating a guild role
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for creating a guild role
+type CreateGuildRoleOptions = {
+	--- The reason for the creation
+	reason: string,
+
+	--- The data to create the role with
+	data: discordRest.CreateGuildRoleRequest
+}
+```
+
+</details>
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the creation
+
+[string](#string)
+
+<div id="data"></div>
+
+### data
+
+The data to create the role with
+
+[discordRest](./discordrest.md).[CreateGuildRoleRequest](./discordrest.md#CreateGuildRoleRequest)
+
+<div id="ModifyRolePositionOptions"></div>
+
+## ModifyRolePositionOptions
+
+Options for modifying a guild role position
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for modifying a guild role position
+type ModifyRolePositionOptions = {
+	--- The data to modify the role position with
+	data: {discordRest.ModifyGuildRolePositionsRequest},
+
+	--- The reason for the modification
+	reason: string
+}
+```
+
+</details>
+
+<div id="data"></div>
+
+### data
+
+The data to modify the role position with
+
+{[discordRest](./discordrest.md).[ModifyGuildRolePositionsRequest](./discordrest.md#ModifyGuildRolePositionsRequest)}
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the modification
+
+[string](#string)
+
 <div id="DiscordExecutor"></div>
 
 ## DiscordExecutor
@@ -1011,6 +1465,17 @@ DiscordExecutor allows templates to access/use the Discord API in a sandboxed fo
 ```luau
 --- DiscordExecutor allows templates to access/use the Discord API in a sandboxed form.
 type DiscordExecutor = {
+	-- Antiraid helpers
+	-- Checks an audit log reason for validity, errors out if invalid
+	antiraid_check_reason: (self: DiscordExecutor, reason: string) -> nil,
+
+	-- Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server
+	antiraid_check_permissions: (self: DiscordExecutor, data: AntiRaidCheckPermissionsOptions) -> promise.LuaPromise<AntiRaidCheckPermissionsResponse>,
+
+	-- Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server and is above the target user with an ID of `data.target_id` in terms of hierarchy
+	antiraid_check_permissions_and_hierarchy: (self: DiscordExecutor, data: AntiRaidCheckPermissionsAndHierarchyOptions) -> promise.LuaPromise<AntiRaidCheckPermissionsResponse>,
+
+	-- Discord API
 	--- Gets the audit logs
 	get_audit_logs: (self: DiscordExecutor, data: GetAuditLogOptions) -> promise.LuaPromise<LazyAuditLogObject>,
 
@@ -1043,19 +1508,37 @@ type DiscordExecutor = {
 
 	-- Guild
 	--- Gets the guild
-	get_guild: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildObject>,
+	get_guild: (self: DiscordExecutor) -> promise.LuaPromise<LazyGuildObject>,
 
 	--- Gets the guilds preview
-	get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildPreviewObject>,
+	get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<LazyGuildPreviewObject>,
+
+	--- Edits the guild
+	modify_guild: (self: DiscordExecutor, data: ModifyGuildOptions) -> promise.LuaPromise<LazyGuildObject>,
 
 	--- Gets the guild channels
 	get_guild_channels: (self: DiscordExecutor) -> promise.LuaPromise<LazyChannelsObject>,
 
 	--- Creates a guild channel
-	create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChannelRequest) -> promise.LuaPromise<LazyChannelObject>,
+	create_guild_channel: (self: DiscordExecutor, data: CreateChannelOptions) -> promise.LuaPromise<LazyChannelObject>,
 
-	--- Modify guild channel permissions
+	--- Modify guild channel positions. Only channels to be modified are required to be passed in `data`.
 	modify_guild_channel_positions: (self: DiscordExecutor, data: {discordRest.ModifyGuildChannelPositionsRequest}) -> promise.LuaPromise<nil>,
+
+	--- List active guild threads
+	list_active_guild_threads: (self: DiscordExecutor) -> promise.LuaPromise<LazyActiveGuildThreadsResponse>,
+
+	--- Gets a guild member by ID
+	get_guild_member: (self: DiscordExecutor, user_id: string) -> promise.LuaPromise<LazyGuildMemberObject>,
+
+	--- List all guild members
+	list_guild_members: (self: DiscordExecutor, data: GetGuildMembersOptions) -> promise.LuaPromise<LazyGuildMembersObject>,
+
+	--- Search guild members
+	search_guild_members: (self: DiscordExecutor, data: SearchGuildMembersOptions) -> promise.LuaPromise<LazyGuildMembersObject>,
+
+	--- Modify guild member (this includes timing out a member using `communication_disabled_until`)
+	modify_guild_member: (self: DiscordExecutor, data: ModifyGuildMemberOptions) -> promise.LuaPromise<LazyGuildMemberObject>,
 
 	--- Adds a role to a member
 	add_guild_member_role: (self: DiscordExecutor, data: AddGuildMemberRoleOptions) -> promise.LuaPromise<nil>,
@@ -1066,27 +1549,41 @@ type DiscordExecutor = {
 	-- Removes a member from a guild
 	remove_guild_member: (self: DiscordExecutor, data: RemoveGuildMemberOptions) -> promise.LuaPromise<nil>,
 
-	--- Gets a guild ban for a user or nil if it does not exist
-	get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>,
-
 	--- Gets guild bans
 	get_guild_bans: (self: DiscordExecutor, data: GetGuildBansOptions) -> promise.LuaPromise<LazyBanObjectList>,
+
+	--- Gets a guild ban for a user or nil if it does not exist
+	get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>,
 
 	--- Creates a guild ban
 	create_guild_ban: (self: DiscordExecutor, data: CreateGuildBanOptions) -> promise.LuaPromise<nil>,
 
-	--- Returns the guild roles of a guild
-	get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise.LuaPromise<LazyRolesMap>,
+	--- Removes a guild ban
+	remove_guild_ban: (self: DiscordExecutor, data: RemoveGuildBanOptions) -> promise.LuaPromise<nil>,
 
+	--- Returns the guild roles of a guild
+	get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise.LuaPromise<LazyRolesObject>,
+
+	--- Returns a guild role by ID
+	get_guild_role: (self: DiscordExecutor, role_id: discord.Snowflake) -> promise.LuaPromise<LazyRoleObject>,
+
+	--- Creates a guild role
+	create_guild_role: (self: DiscordExecutor, data: CreateGuildRoleOptions) -> promise.LuaPromise<LazyRoleObject>,
+
+	--- Modify guild role positions
+	modify_guild_role_positions: (self: DiscordExecutor, data: ModifyRolePositionOptions) -> promise.LuaPromise<LazyRolesObject>,
+
+	-- Messages
 	--- Gets messages from a channel
-	get_messages: (self: DiscordExecutor, data: GetMessagesOptions) -> promise.LuaPromise<LazyMessagesObject>,
+	get_channel_messages: (self: DiscordExecutor, data: GetMessagesOptions) -> promise.LuaPromise<LazyMessagesObject>,
 
 	--- Gets a message
-	get_message: (self: DiscordExecutor, data: GetMessageOptions) -> promise.LuaPromise<LazyMessageObject>,
+	get_channel_message: (self: DiscordExecutor, data: GetMessageOptions) -> promise.LuaPromise<LazyMessageObject>,
 
 	--- Creates a message
 	create_message: (self: DiscordExecutor, data: CreateMessageOptions) -> promise.LuaPromise<LazyMessageObject>,
 
+	-- Uncategorized (for now)
 	--- Creates an interaction response
 	create_interaction_response: (self: DiscordExecutor, data: CreateInteractionResponseOptions) -> promise.LuaPromise<nil>,
 
@@ -1109,9 +1606,116 @@ type DiscordExecutor = {
 
 </details>
 
-<div id="get_audit_logs"></div>
+<div id="antiraid_check_reason"></div>
+
+### antiraid_check_reason
+
+Antiraid helpers
+
+Checks an audit log reason for validity, errors out if invalid
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+-- Antiraid helpers
+-- Checks an audit log reason for validity, errors out if invalid
+antiraid_check_reason: (self: DiscordExecutor, reason: string) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="reason"></div>
+
+##### reason
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="antiraid_check_permissions"></div>
+
+### antiraid_check_permissions
+
+Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+-- Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server
+antiraid_check_permissions: (self: DiscordExecutor, data: AntiRaidCheckPermissionsOptions) -> promise.LuaPromise<AntiRaidCheckPermissionsResponse>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[AntiRaidCheckPermissionsOptions](#AntiRaidCheckPermissionsOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[AntiRaidCheckPermissionsResponse](#AntiRaidCheckPermissionsResponse)&gt;<div id="antiraid_check_permissions_and_hierarchy"></div>
+
+### antiraid_check_permissions_and_hierarchy
+
+Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server and is above the target user with an ID of `data.target_id` in terms of hierarchy
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+-- Checks if a specified user with an ID of `data.user_id` has the specified permissions in the server and is above the target user with an ID of `data.target_id` in terms of hierarchy
+antiraid_check_permissions_and_hierarchy: (self: DiscordExecutor, data: AntiRaidCheckPermissionsAndHierarchyOptions) -> promise.LuaPromise<AntiRaidCheckPermissionsResponse>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[AntiRaidCheckPermissionsAndHierarchyOptions](#AntiRaidCheckPermissionsAndHierarchyOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[AntiRaidCheckPermissionsResponse](#AntiRaidCheckPermissionsResponse)&gt;<div id="get_audit_logs"></div>
 
 ### get_audit_logs
+
+Discord API
 
 Gets the audit logs
 
@@ -1119,6 +1723,7 @@ Gets the audit logs
 <summary>Function Signature</summary>
 
 ```luau
+-- Discord API
 --- Gets the audit logs
 get_audit_logs: (self: DiscordExecutor, data: GetAuditLogOptions) -> promise.LuaPromise<LazyAuditLogObject>
 ```
@@ -1453,7 +2058,7 @@ Gets the guild
 ```luau
 -- Guild
 --- Gets the guild
-get_guild: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildObject>
+get_guild: (self: DiscordExecutor) -> promise.LuaPromise<LazyGuildObject>
 ```
 
 </details>
@@ -1466,7 +2071,7 @@ get_guild: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildObject>
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[discord](./discord.md).[GuildObject](./discord.md#GuildObject)&gt;<div id="get_guild_preview"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildObject](#LazyGuildObject)&gt;<div id="get_guild_preview"></div>
 
 ### get_guild_preview
 
@@ -1477,7 +2082,7 @@ Gets the guilds preview
 
 ```luau
 --- Gets the guilds preview
-get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildPreviewObject>
+get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<LazyGuildPreviewObject>
 ```
 
 </details>
@@ -1490,7 +2095,41 @@ get_guild_preview: (self: DiscordExecutor) -> promise.LuaPromise<discord.GuildPr
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[discord](./discord.md).[GuildPreviewObject](./discord.md#GuildPreviewObject)&gt;<div id="get_guild_channels"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildPreviewObject](#LazyGuildPreviewObject)&gt;<div id="modify_guild"></div>
+
+### modify_guild
+
+Edits the guild
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Edits the guild
+modify_guild: (self: DiscordExecutor, data: ModifyGuildOptions) -> promise.LuaPromise<LazyGuildObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[ModifyGuildOptions](#ModifyGuildOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildObject](#LazyGuildObject)&gt;<div id="get_guild_channels"></div>
 
 ### get_guild_channels
 
@@ -1525,7 +2164,7 @@ Creates a guild channel
 
 ```luau
 --- Creates a guild channel
-create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChannelRequest) -> promise.LuaPromise<LazyChannelObject>
+create_guild_channel: (self: DiscordExecutor, data: CreateChannelOptions) -> promise.LuaPromise<LazyChannelObject>
 ```
 
 </details>
@@ -1538,7 +2177,7 @@ create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChann
 
 ##### data
 
-[discordRest](./discordrest.md).[CreateGuildChannelRequest](./discordrest.md#CreateGuildChannelRequest)
+[CreateChannelOptions](#CreateChannelOptions)
 
 <div id="Returns"></div>
 
@@ -1552,13 +2191,13 @@ create_guild_channel: (self: DiscordExecutor, data: discordRest.CreateGuildChann
 
 ### modify_guild_channel_positions
 
-Modify guild channel permissions
+Modify guild channel positions. Only channels to be modified are required to be passed in `data`.
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Modify guild channel permissions
+--- Modify guild channel positions. Only channels to be modified are required to be passed in `data`.
 modify_guild_channel_positions: (self: DiscordExecutor, data: {discordRest.ModifyGuildChannelPositionsRequest}) -> promise.LuaPromise<nil>
 ```
 
@@ -1582,7 +2221,167 @@ modify_guild_channel_positions: (self: DiscordExecutor, data: {discordRest.Modif
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="add_guild_member_role"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="list_active_guild_threads"></div>
+
+### list_active_guild_threads
+
+List active guild threads
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- List active guild threads
+list_active_guild_threads: (self: DiscordExecutor) -> promise.LuaPromise<LazyActiveGuildThreadsResponse>
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyActiveGuildThreadsResponse](#LazyActiveGuildThreadsResponse)&gt;<div id="get_guild_member"></div>
+
+### get_guild_member
+
+Gets a guild member by ID
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Gets a guild member by ID
+get_guild_member: (self: DiscordExecutor, user_id: string) -> promise.LuaPromise<LazyGuildMemberObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="user_id"></div>
+
+##### user_id
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildMemberObject](#LazyGuildMemberObject)&gt;<div id="list_guild_members"></div>
+
+### list_guild_members
+
+List all guild members
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- List all guild members
+list_guild_members: (self: DiscordExecutor, data: GetGuildMembersOptions) -> promise.LuaPromise<LazyGuildMembersObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[GetGuildMembersOptions](#GetGuildMembersOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildMembersObject](#LazyGuildMembersObject)&gt;<div id="search_guild_members"></div>
+
+### search_guild_members
+
+Search guild members
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Search guild members
+search_guild_members: (self: DiscordExecutor, data: SearchGuildMembersOptions) -> promise.LuaPromise<LazyGuildMembersObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[SearchGuildMembersOptions](#SearchGuildMembersOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildMembersObject](#LazyGuildMembersObject)&gt;<div id="modify_guild_member"></div>
+
+### modify_guild_member
+
+Modify guild member (this includes timing out a member using `communication_disabled_until`)
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Modify guild member (this includes timing out a member using `communication_disabled_until`)
+modify_guild_member: (self: DiscordExecutor, data: ModifyGuildMemberOptions) -> promise.LuaPromise<LazyGuildMemberObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[ModifyGuildMemberOptions](#ModifyGuildMemberOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyGuildMemberObject](#LazyGuildMemberObject)&gt;<div id="add_guild_member_role"></div>
 
 ### add_guild_member_role
 
@@ -1684,41 +2483,7 @@ remove_guild_member: (self: DiscordExecutor, data: RemoveGuildMemberOptions) -> 
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_ban"></div>
-
-### get_guild_ban
-
-Gets a guild ban for a user or nil if it does not exist
-
-<details>
-<summary>Function Signature</summary>
-
-```luau
---- Gets a guild ban for a user or nil if it does not exist
-get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>
-```
-
-</details>
-
-<div id="Arguments"></div>
-
-#### Arguments
-
-<div id="user_id"></div>
-
-##### user_id
-
-[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
-
-<div id="Returns"></div>
-
-#### Returns
-
-<div id="ret1"></div>
-
-##### ret1
-
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanOptionalObject](#LazyBanOptionalObject)&gt;<div id="get_guild_bans"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_bans"></div>
 
 ### get_guild_bans
 
@@ -1752,7 +2517,41 @@ get_guild_bans: (self: DiscordExecutor, data: GetGuildBansOptions) -> promise.Lu
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanObjectList](#LazyBanObjectList)&gt;<div id="create_guild_ban"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanObjectList](#LazyBanObjectList)&gt;<div id="get_guild_ban"></div>
+
+### get_guild_ban
+
+Gets a guild ban for a user or nil if it does not exist
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Gets a guild ban for a user or nil if it does not exist
+get_guild_ban: (self: DiscordExecutor, user_id: discord.Snowflake) -> promise.LuaPromise<LazyBanOptionalObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="user_id"></div>
+
+##### user_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyBanOptionalObject](#LazyBanOptionalObject)&gt;<div id="create_guild_ban"></div>
 
 ### create_guild_ban
 
@@ -1786,6 +2585,40 @@ create_guild_ban: (self: DiscordExecutor, data: CreateGuildBanOptions) -> promis
 
 ##### ret1
 
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="remove_guild_ban"></div>
+
+### remove_guild_ban
+
+Removes a guild ban
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Removes a guild ban
+remove_guild_ban: (self: DiscordExecutor, data: RemoveGuildBanOptions) -> promise.LuaPromise<nil>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[RemoveGuildBanOptions](#RemoveGuildBanOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
 [promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="get_guild_roles"></div>
 
 ### get_guild_roles
@@ -1797,7 +2630,7 @@ Returns the guild roles of a guild
 
 ```luau
 --- Returns the guild roles of a guild
-get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise.LuaPromise<LazyRolesMap>
+get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise.LuaPromise<LazyRolesObject>
 ```
 
 </details>
@@ -1820,9 +2653,113 @@ get_guild_roles: (self: DiscordExecutor, guild_id: discord.Snowflake) -> promise
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyRolesMap](#LazyRolesMap)&gt;<div id="get_messages"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyRolesObject](#LazyRolesObject)&gt;<div id="get_guild_role"></div>
 
-### get_messages
+### get_guild_role
+
+Returns a guild role by ID
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Returns a guild role by ID
+get_guild_role: (self: DiscordExecutor, role_id: discord.Snowflake) -> promise.LuaPromise<LazyRoleObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="role_id"></div>
+
+##### role_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyRoleObject](#LazyRoleObject)&gt;<div id="create_guild_role"></div>
+
+### create_guild_role
+
+Creates a guild role
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Creates a guild role
+create_guild_role: (self: DiscordExecutor, data: CreateGuildRoleOptions) -> promise.LuaPromise<LazyRoleObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[CreateGuildRoleOptions](#CreateGuildRoleOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyRoleObject](#LazyRoleObject)&gt;<div id="modify_guild_role_positions"></div>
+
+### modify_guild_role_positions
+
+Modify guild role positions
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Modify guild role positions
+modify_guild_role_positions: (self: DiscordExecutor, data: ModifyRolePositionOptions) -> promise.LuaPromise<LazyRolesObject>
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[ModifyRolePositionOptions](#ModifyRolePositionOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyRolesObject](#LazyRolesObject)&gt;<div id="get_channel_messages"></div>
+
+### get_channel_messages
+
+Messages
 
 Gets messages from a channel
 
@@ -1830,8 +2767,9 @@ Gets messages from a channel
 <summary>Function Signature</summary>
 
 ```luau
+-- Messages
 --- Gets messages from a channel
-get_messages: (self: DiscordExecutor, data: GetMessagesOptions) -> promise.LuaPromise<LazyMessagesObject>
+get_channel_messages: (self: DiscordExecutor, data: GetMessagesOptions) -> promise.LuaPromise<LazyMessagesObject>
 ```
 
 </details>
@@ -1854,9 +2792,9 @@ get_messages: (self: DiscordExecutor, data: GetMessagesOptions) -> promise.LuaPr
 
 ##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyMessagesObject](#LazyMessagesObject)&gt;<div id="get_message"></div>
+[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LazyMessagesObject](#LazyMessagesObject)&gt;<div id="get_channel_message"></div>
 
-### get_message
+### get_channel_message
 
 Gets a message
 
@@ -1865,7 +2803,7 @@ Gets a message
 
 ```luau
 --- Gets a message
-get_message: (self: DiscordExecutor, data: GetMessageOptions) -> promise.LuaPromise<LazyMessageObject>
+get_channel_message: (self: DiscordExecutor, data: GetMessageOptions) -> promise.LuaPromise<LazyMessageObject>
 ```
 
 </details>
@@ -1926,12 +2864,15 @@ create_message: (self: DiscordExecutor, data: CreateMessageOptions) -> promise.L
 
 ### create_interaction_response
 
+Uncategorized (for now)
+
 Creates an interaction response
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
+-- Uncategorized (for now)
 --- Creates an interaction response
 create_interaction_response: (self: DiscordExecutor, data: CreateInteractionResponseOptions) -> promise.LuaPromise<nil>
 ```

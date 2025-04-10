@@ -465,8 +465,11 @@ impl<T: AssetManagerTrait + Clone + 'static> IsolateRequireController<T> {
     }
 
     /// Clears the require cache
+    ///
+    /// Also calls clear_cached_lua_values on the asset manager to clear its cache (if the assetmanager has special logic there)
     pub fn clear_require_cache(&self) {
         self.requires_cache.borrow_mut().clear();
+        self.isolate.asset_manager.clear_cached_lua_values();
     }
 }
 
@@ -524,7 +527,15 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
     }
 
     fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
-        self.requires_cache.borrow().get(path).cloned()
+        match self.requires_cache.borrow().get(path).cloned() {
+            Some(v) => Some(v),
+            None => {
+                match self.isolate.asset_manager.get_cached_lua_value(path) {
+                    Some(v) => Some(v),
+                    None => None,
+                }
+            },
+        }
     }
 
     fn cache(&self, path: String, contents: LuaMultiValue) {

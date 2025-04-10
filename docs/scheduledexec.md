@@ -172,10 +172,10 @@ type ScheduledExecExecutor = {
 	---
 	--- The ordering in which scheduled executions are triggered about a small time period is undefined.
 	--- It is recommended to use the ``task`` library for small time periods.
-	create: (self: ScheduledExecExecutor, data: CreateScheduledExecution) -> Promise.LuaPromise<nil>,
+	add: (self: ScheduledExecExecutor, data: CreateScheduledExecution) -> Promise.LuaPromise<nil>,
 
 	--- Deletes all scheduled execution with a given ID
-	delete: (self: ScheduledExecExecutor, id: string) -> Promise.LuaPromise<nil>
+	remove: (self: ScheduledExecExecutor, id: string) -> Promise.LuaPromise<nil>
 }
 ```
 
@@ -220,9 +220,9 @@ list: (self: ScheduledExecExecutor, id: string?) -> Promise.LuaPromise<Scheduled
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[ScheduledExecutionList](#ScheduledExecutionList)&gt;<div id="create"></div>
+[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[ScheduledExecutionList](#ScheduledExecutionList)&gt;<div id="add"></div>
 
-### create
+### add
 
 Creates a new scheduled execution
 
@@ -261,7 +261,7 @@ It is recommended to use the ``task`` library for small time periods.
 ---
 --- The ordering in which scheduled executions are triggered about a small time period is undefined.
 --- It is recommended to use the ``task`` library for small time periods.
-create: (self: ScheduledExecExecutor, data: CreateScheduledExecution) -> Promise.LuaPromise<nil>
+add: (self: ScheduledExecExecutor, data: CreateScheduledExecution) -> Promise.LuaPromise<nil>
 ```
 
 </details>
@@ -284,9 +284,9 @@ create: (self: ScheduledExecExecutor, data: CreateScheduledExecution) -> Promise
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="delete"></div>
+[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="remove"></div>
 
-### delete
+### remove
 
 Deletes all scheduled execution with a given ID
 
@@ -295,7 +295,7 @@ Deletes all scheduled execution with a given ID
 
 ```luau
 --- Deletes all scheduled execution with a given ID
-delete: (self: ScheduledExecExecutor, id: string) -> Promise.LuaPromise<nil>
+remove: (self: ScheduledExecExecutor, id: string) -> Promise.LuaPromise<nil>
 ```
 
 </details>
