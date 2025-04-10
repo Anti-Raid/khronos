@@ -37,7 +37,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
     }
 
     for word in replaced_input.split_whitespace() {
-        if word.is_empty() {
+        if word.is_empty() || ensure_safe::is_safe_word(&current_buf) {
             continue;
         }
 
