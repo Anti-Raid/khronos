@@ -41,6 +41,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
         }
 
         // Case: "remindme" / words made up of safe words
+        // TODO: Handle cases where the word is a combination of safe words in different non-first paths if this is even possible
         let mut current_buf = String::with_capacity(word.len());
         for c in word.chars() {
             if c.is_whitespace() || c == '-' || c == '_' {
