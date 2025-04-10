@@ -26,16 +26,37 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
         return Ok(());
     }
 
-    let replaced_input = input.replace("-", " ").replace("_", " ");
+    let replaced_input = input
+    .replace("-", " ")
+    .replace("_", " ")
+    .replace("!", "");
 
     if ensure_safe::is_safe_word(&replaced_input) {
         return Ok(());
     }
 
     for word in replaced_input.split_whitespace() {
-        if !ensure_safe::is_safe_word(word) {
-            return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
+        if word.is_empty() {
+            continue;
         }
+
+        // Case: "remindme" / words made up of safe words
+        let mut current_buf = String::with_capacity(word.len());
+        for c in word.chars() {
+            if c.is_whitespace() || c == '-' || c == '_' {
+                continue;
+            }
+    
+            current_buf.push(c);
+    
+            if ensure_safe::is_safe_word(&current_buf) {
+                current_buf.clear();
+            }
+        }
+    
+        if !current_buf.is_empty() {
+            return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
+        }    
     }
 
     Ok(())
@@ -433,5 +454,30 @@ mod tests {
             "too_long_name_that_exceeds_the_limit_of_thirty_two_characters"
         )
         .is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_validate_word_safe {
+    use super::*;
+
+    #[test]
+    fn test_validate_word_safe() {
+        assert!(validate_string_safe("f").is_err());
+        assert!(validate_string_safe("hello").is_ok());
+        assert!(validate_string_safe("hello world").is_ok());
+        assert!(validate_string_safe("hello-world").is_ok());
+        assert!(validate_string_safe("hello_world").is_ok());
+        assert!(validate_string_safe("hello-world!").is_ok());
+        assert!(validate_string_safe("hello_world!").is_ok());
+        assert!(validate_string_safe("hello world!").is_ok());
+        assert!(validate_string_safe("hello world! hello world!").is_ok());
+        assert!(validate_string_safe("hello world! hello-world! hello_world!")
+            .is_ok());
+
+        assert!(validate_string_safe("helloworld").is_ok());
+        assert!(validate_string_safe("f you").is_err());
+        assert!(validate_string_safe("remindme").is_ok());
+        assert!(validate_string_safe("remindf**k").is_err());
     }
 }
