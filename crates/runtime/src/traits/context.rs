@@ -22,7 +22,13 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns if the current context has a specific capability
     fn has_cap(&self, cap: &str) -> bool {
-        self.allowed_caps().contains(&cap.to_string())
+        for allowed_cap in self.allowed_caps() {
+            if allowed_cap == cap || allowed_cap == "*" {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Returns the guild ID of the current context, if any
