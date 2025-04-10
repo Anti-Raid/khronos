@@ -52,6 +52,7 @@ pub enum InnerColumnType {
     },
     Boolean {},
     Json {
+        kind: String, // e.g. templateref etc.
         max_bytes: Option<usize>,
     },
 }
@@ -75,6 +76,9 @@ pub struct Column {
 
     /// The type of the column
     pub column_type: ColumnType,
+
+    /// Whether or not the column is a primary key
+    pub primary_key: bool,
 
     /// Whether or not the column is nullable
     ///
@@ -119,9 +123,6 @@ pub struct Setting {
     /// The description of the option
     pub description: String,
 
-    /// The primary key of the table. Should be present in ID
-    pub primary_key: String,
-
     /// Title template, used for the title of the embed
     pub title_template: String,
 
@@ -131,40 +132,6 @@ pub struct Setting {
     /// The supported operations for this option
     pub supported_operations: SettingOperations,
 }
-
-/*impl<T: Clone> From<ar_settings::types::Setting<T>> for Setting {
-    fn from(setting: ar_settings::types::Setting<T>) -> Self {
-        let columns = setting
-            .columns
-            .into_iter()
-            .map(|column| Column {
-                id: column.id,
-                name: column.name,
-                description: column.description,
-                column_type: column.column_type,
-                nullable: column.nullable,
-                suggestions: ColumnSuggestion::None {},
-                secret: column.secret,
-                ignored_for: column.ignored_for,
-            })
-            .collect();
-
-        Setting {
-            id: setting.id,
-            name: setting.name,
-            description: setting.description,
-            primary_key: setting.primary_key,
-            title_template: setting.title_template,
-            columns,
-            supported_operations: SettingOperations {
-                view: setting.operations.view.is_some(),
-                create: setting.operations.create.is_some(),
-                update: setting.operations.update.is_some(),
-                delete: setting.operations.delete.is_some(),
-            },
-        }
-    }
-}*/
 
 #[derive(Clone, Debug, Default)]
 pub struct SettingOperations {

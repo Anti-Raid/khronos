@@ -58,6 +58,7 @@ pub enum InnerColumnType {
     },
     Boolean {},
     Json {
+        kind: String, // e.g. templateref etc.
         max_bytes: Option<usize>,
     },
 }
@@ -82,8 +83,8 @@ impl From<InnerColumnType> for crate::traits::ir::InnerColumnType {
                 crate::traits::ir::InnerColumnType::BitFlag { values }
             }
             InnerColumnType::Boolean {} => crate::traits::ir::InnerColumnType::Boolean {},
-            InnerColumnType::Json { max_bytes } => {
-                crate::traits::ir::InnerColumnType::Json { max_bytes }
+            InnerColumnType::Json { kind, max_bytes } => {
+                crate::traits::ir::InnerColumnType::Json { kind, max_bytes }
             }
         }
     }
@@ -109,8 +110,8 @@ impl From<crate::traits::ir::InnerColumnType> for InnerColumnType {
                 InnerColumnType::BitFlag { values }
             }
             crate::traits::ir::InnerColumnType::Boolean {} => InnerColumnType::Boolean {},
-            crate::traits::ir::InnerColumnType::Json { max_bytes } => {
-                InnerColumnType::Json { max_bytes }
+            crate::traits::ir::InnerColumnType::Json { kind, max_bytes } => {
+                InnerColumnType::Json { kind, max_bytes }
             }
         }
     }
@@ -159,6 +160,9 @@ pub struct Column {
     /// The type of the column
     pub column_type: ColumnType,
 
+    /// Whether or not the column is a primary key
+    pub primary_key: bool,
+
     /// Whether or not the column is nullable
     ///
     /// Note that the point where nullability is checked may vary but will occur after pre_checks are executed
@@ -183,6 +187,7 @@ impl From<Column> for crate::traits::ir::Column {
             name: v.name,
             description: v.description,
             column_type: v.column_type.into(),
+            primary_key: v.primary_key,
             nullable: v.nullable,
             suggestions: v.suggestions.into(),
             secret: v.secret,
@@ -198,6 +203,7 @@ impl From<crate::traits::ir::Column> for Column {
             name: v.name,
             description: v.description,
             column_type: v.column_type.into(),
+            primary_key: v.primary_key,
             nullable: v.nullable,
             suggestions: v.suggestions.into(),
             secret: v.secret,
@@ -254,9 +260,6 @@ pub struct Setting {
     /// The description of the option
     pub description: String,
 
-    /// The primary key of the table. Should be present in ID
-    pub primary_key: String,
-
     /// Title template, used for the title of the embed
     pub title_template: String,
 
@@ -273,7 +276,6 @@ impl From<Setting> for crate::traits::ir::Setting {
             id: v.id,
             name: v.name,
             description: v.description,
-            primary_key: v.primary_key,
             title_template: v.title_template,
             columns: v.columns.into_iter().map(|e| e.into()).collect(),
             supported_operations: v.supported_operations.into(),
@@ -287,7 +289,6 @@ impl From<crate::traits::ir::Setting> for Setting {
             id: v.id,
             name: v.name,
             description: v.description,
-            primary_key: v.primary_key,
             title_template: v.title_template,
             columns: v.columns.into_iter().map(|e| e.into()).collect(),
             supported_operations: v.supported_operations.into(),
