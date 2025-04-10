@@ -133,6 +133,8 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
 }
 
 /// Validates an embed, returning total number of characters used
+///
+/// NOTE: This function does not check for offensive words (as embeds are currently deemed safe)
 pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate::Error> {
     const EMBED_TITLE_LIMIT: usize = 256;
     const EMBED_DESCRIPTION_LIMIT: usize = 4096;
