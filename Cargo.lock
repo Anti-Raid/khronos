@@ -2036,6 +2036,7 @@ dependencies = [
  "hmac",
  "indexmap",
  "kittycat",
+ "linkify",
  "lockdowns",
  "log",
  "lz4",
@@ -2140,6 +2141,14 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "linkify"
+version = "0.10.0"
+source = "git+https://github.com/robinst/linkify#dba37933d54f8367e2a068f523f451473f64541c"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

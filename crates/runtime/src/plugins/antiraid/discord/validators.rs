@@ -1,4 +1,5 @@
 use std::sync::LazyLock;
+use linkify::{LinkFinder, LinkKind};
 
 use rustrict::{Censor, Type};
 
@@ -437,8 +438,46 @@ pub fn validate_name_option_chatinput(name: &str) -> Result<(), crate::Error> {
     }
 }
 
+#[allow(dead_code)]
+pub fn validate_links(input: &str) -> Result<(), crate::Error> {
+    let valid_link_urls = vec![
+        "https://discord.com",
+        "https://cdn.discordapp.com",
+        "https://media.discordapp.net",
+    ];
+
+    let mut finder = LinkFinder::new();
+    finder.kinds(&[LinkKind::Url]);
+    
+    // Check if the input contains any links
+    for link in finder.links(input) {
+        if !valid_link_urls.iter().any(|url| link.as_str().starts_with(url)) {
+            return Err(format!("Invalid link: {}", link.as_str()).into());
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
-mod tests {
+mod test_validate_links {
+    use super::*;
+
+    #[test]
+    fn test_validate_links() {
+        assert!(validate_links("Check this out: https://discord.com").is_ok());
+        assert!(validate_links("Check this out: https://cdn.discordapp.com").is_ok());
+        assert!(validate_links("Check this out: https://media.discordapp.net").is_ok());
+        assert!(validate_links("Check this out: https://example.com").is_err());
+        assert!(validate_links("Check this out: https://discord.com/some/path").is_ok());
+        assert!(validate_links("Check this out: https://cdn.discordapp.com/some/path").is_ok());
+        assert!(validate_links("Check this out: https://media.discordapp.net/some/path").is_ok());
+        assert!(validate_links("NSFW! https://tenor.com/abcdef hello").is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_chatinput {
     use super::*;
 
     /// Basic test to validate the `validate_name_option_chatinput` function
