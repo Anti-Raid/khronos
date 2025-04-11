@@ -16,6 +16,9 @@ pub trait AssetManager {
     /// 
     /// Can be used to clear the cache of ``get_cached_lua_value``
     fn clear_cached_lua_values(&self) {}        
+
+    /// (optional) Called when a lua value is to be cached
+    fn on_cache_lua_value(&self, _: &mlua::Lua, _: &str, _: &mlua::MultiValue) {}
 }
 
 /// All Into<AssetManager> implementations should be able to be used as an AssetManager

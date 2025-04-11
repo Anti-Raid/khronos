@@ -539,6 +539,7 @@ impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireControlle
     }
 
     fn cache(&self, path: String, contents: LuaMultiValue) {
+        self.isolate.asset_manager.on_cache_lua_value(&self.isolate.lua(), &path, &contents);
         self.requires_cache.borrow_mut().insert(path, contents);
     }
 
