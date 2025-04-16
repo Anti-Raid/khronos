@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild, EditRole
+    CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild, EditRole,
+    CreateInvite
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -146,6 +147,20 @@ pub struct EditChannelPermissionsOptions {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+pub struct CreateChannelInviteOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub data: CreateInvite,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteChannelPermissionOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub overwrite_id: serenity::all::TargetId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildOptions {
     pub data: EditGuild,
     pub reason: String,
@@ -233,6 +248,22 @@ pub struct AntiRaidCheckPermissionsResponse {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckChannelPermissionsOptions {
+    pub user_id: serenity::all::UserId,
+    pub channel_id: serenity::all::ChannelId,
+    pub needed_permissions: serenity::all::Permissions,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckChannelPermissionsResponse {
+    pub partial_guild: serenity::all::PartialGuild,
+    pub channel: serenity::all::GuildChannel,
+    pub member: serenity::all::Member,
+    pub permissions: serenity::all::Permissions
+}
+
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RemoveGuildBanOptions {
     pub user_id: serenity::all::UserId,
     pub reason: String,
@@ -270,4 +301,18 @@ impl PartialOrd<serenity::all::Role> for ModifyRolePosition {
             Some(self.position.cmp(&other.position))
         }
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetInviteOptions {
+    pub code: String,
+    pub with_counts: Option<bool>, // default to false
+    pub with_expiration: Option<bool>, // default to false
+    pub guild_scheduled_event_id: Option<serenity::all::ScheduledEventId>,    
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteInviteOptions {
+    pub code: String,
+    pub reason: String,
 }

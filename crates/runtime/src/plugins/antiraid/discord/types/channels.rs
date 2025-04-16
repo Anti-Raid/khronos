@@ -194,3 +194,23 @@ pub struct CreateForumTag {
     pub emoji_id: Option<EmojiId>,
     pub emoji_name: Option<String>,
 }
+
+/// [Discord docs](https://discord.com/developers/docs/resources/channel#create-channel-invite)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[must_use]
+pub struct CreateInvite {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_age: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_uses: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temporary: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unique: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_type: Option<InviteTargetType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_user_id: Option<UserId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_application_id: Option<ApplicationId>,
+}

@@ -506,6 +506,33 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to modify guild role positions: {}", e).into())
     }
 
+    // Invites
+
+    /// Gets an invite, this can be overrided to add stuff like caching invite codes etc
+    async fn get_invite(
+        &self, 
+        code: &str,
+        member_counts: bool,
+        expiration: bool,
+        event_id: Option<serenity::all::ScheduledEventId>,    
+    ) -> Result<serenity::all::Invite, crate::Error> {
+        self.serenity_http()
+            .get_invite(code, member_counts, expiration, event_id)
+            .await
+            .map_err(|e| format!("Failed to get invite: {}", e).into())
+    }
+
+    async fn delete_invite(
+        &self,
+        code: &str,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::Invite, crate::Error> {
+        self.serenity_http()
+            .delete_invite(code, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete invite: {}", e).into())
+    }
+
     // Messages
 
     async fn get_channel_messages(
@@ -542,6 +569,8 @@ pub trait DiscordProvider: 'static + Clone {
             .await
             .map_err(|e| format!("Failed to send message: {}", e).into())
     }
+
+    /// Uncategorized (for now)
 
     async fn create_interaction_response(
         &self,

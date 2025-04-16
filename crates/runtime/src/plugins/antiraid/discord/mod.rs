@@ -146,6 +146,39 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
 
         Ok((guild, target_member, member_perms))
     }
+
+    pub async fn check_channel_permissions(
+        &self,
+        user_id: serenity::all::UserId,
+        channel_id: serenity::all::ChannelId,
+        needed_permissions: serenity::all::Permissions,
+    ) -> LuaResult<(serenity::all::PartialGuild, serenity::all::Member, serenity::all::GuildChannel, serenity::all::Permissions)> {
+        let guild_channel = self.discord_provider.get_channel(channel_id).await
+        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+        let Some(member) = self.discord_provider.get_guild_member(user_id).await
+            .map_err(|e| LuaError::external(e.to_string()))?
+        else {
+            return Err(LuaError::runtime("Bot user not found in guild"));
+        };
+
+        let guild = self.discord_provider.get_guild().await
+        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+        let perms = guild
+        .user_permissions_in(&guild_channel, &member);
+
+        if !perms
+            .contains(needed_permissions)
+        {
+            return Err(LuaError::runtime(format!(
+                "User does not have the required permissions: {:?}: {}",
+                needed_permissions, user_id
+            )));
+        }
+
+        Ok((guild, member, guild_channel, perms))
+    }
 }
 
 impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
@@ -202,6 +235,30 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                         structs::AntiRaidCheckPermissionsResponse {
                             partial_guild,
                             member,
+                            permissions,
+                        }
+                    ))
+                })
+            ) 
+        });
+
+        methods.add_method("antiraid_check_channel_permissions", |
+            _, 
+            this,
+            data: LuaValue,
+        | {
+            Ok(
+                lua_promise!(this, data, |lua, this, data|, {
+                    let data = lua.from_value::<structs::AntiRaidCheckChannelPermissionsOptions>(data)?;
+                    let (partial_guild, member, channel, permissions) = this.check_channel_permissions(data.user_id, data.channel_id, data.needed_permissions)
+                        .await
+                        .map_err(LuaError::external)?;
+
+                    Ok(Lazy::new(
+                        structs::AntiRaidCheckChannelPermissionsResponse {
+                            partial_guild,
+                            member,
+                            channel,
                             permissions,
                         }
                     ))
@@ -333,6 +390,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this.check_action("edit_auto_moderation_rule".to_string())
                     .map_err(LuaError::external)?;
 
+                this.check_reason(&data.reason)
+                    .map_err(LuaError::external)?;
+    
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
@@ -342,9 +402,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .map_err(LuaError::external)?;
 
                 data.data.validate().map_err(LuaError::external)?;
-
-                this.check_reason(&data.reason)
-                .map_err(LuaError::external)?;
 
                 let rule = this
                     .discord_provider
@@ -364,15 +421,15 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this.check_action("delete_auto_moderation_rule".to_string())
                     .map_err(LuaError::external)?;
 
+                this.check_reason(&data.reason)
+                    .map_err(LuaError::external)?;
+
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
 
                 this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
                     .await
-                    .map_err(LuaError::external)?;
-
-                    this.check_reason(&data.reason)
                     .map_err(LuaError::external)?;
 
                 this
@@ -411,24 +468,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 this.check_action("edit_channel".to_string())
                     .map_err(LuaError::external)?;
 
-                let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                this.check_reason(&data.reason)
+                    .map_err(LuaError::external)?;    
 
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
 
-                let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                else {
-                    return Err(LuaError::runtime("Bot user not found in guild"));
-                };
-
-                let guild = this.discord_provider.get_guild().await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let perms = guild
-                .user_permissions_in(&guild_channel, &bot_member);
+                let (_partial_guild, _bot_member, guild_channel, perms) = this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::empty())
+                .await
+                .map_err(LuaError::external)?;
 
                 match guild_channel.kind {
                     serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
@@ -471,8 +520,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 if let Some(ref permission_overwrites) = data.data.permission_overwrites {
                     // Check for ManageRoles permission
-                    if !guild
-                        .user_permissions_in(&guild_channel, &bot_member)
+                    if !perms
                         .manage_roles()
                     {
                         return Err(LuaError::external(
@@ -513,9 +561,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     }
                 }
 
-                this.check_reason(&data.reason)
-                .map_err(LuaError::external)?;
-
                 let channel = this
                     .discord_provider
                     .edit_channel(data.channel_id, &data.data, Some(data.reason.as_str()))
@@ -527,35 +572,29 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_method("delete_channel", |_, this, channel_id: LuaValue| {
-            Ok(lua_promise!(this, channel_id, |lua, this, channel_id|, {
-                let data = lua.from_value::<structs::DeleteChannelOptions>(channel_id)?;
+        methods.add_method("delete_channel", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::DeleteChannelOptions>(data)?;
 
                 this.check_action("delete_channel".to_string())
                     .map_err(LuaError::external)?;
 
                 // Perform required checks
-                let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
 
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
 
-                let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                else {
-                    return Err(LuaError::runtime("Bot user not found in guild"));
-                };
-
-                let guild = this.discord_provider.get_guild().await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                let (_partial_guild, _bot_member, guild_channel, perms) = this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::empty())
+                .await
+                .map_err(LuaError::external)?;
 
                 match guild_channel.kind {
                     serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
                         // Check if the bot has permissions to manage threads
-                        if !guild
-                            .user_permissions_in(&guild_channel, &bot_member)
+                        if !perms
                             .manage_threads()
                         {
                             return Err(LuaError::external(
@@ -565,8 +604,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     },
                     _ => {
                         // Check if the bot has permissions to manage channels
-                        if !guild
-                            .user_permissions_in(&guild_channel, &bot_member)
+                        if !perms
                             .manage_channels()
                         {
                             return Err(LuaError::external(
@@ -575,9 +613,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                         }
                     }
                 }
-
-                this.check_reason(&data.reason)
-                    .map_err(LuaError::external)?;
 
                 let channel = this
                     .discord_provider
@@ -598,36 +633,20 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     .map_err(LuaError::external)?;
 
                 // Perform required checks
-                let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
 
                 let Some(bot_user) = this.context.current_user() else {
                     return Err(LuaError::runtime("Internal error: Current user not found"));
                 };
 
-                let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                else {
-                    return Err(LuaError::runtime("Bot user not found in guild"));
-                };
-
-                let guild = this.discord_provider.get_guild().await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let resolved = guild
-                .user_permissions_in(&guild_channel, &bot_member);
-
-                if !resolved
-                    .manage_roles()
-                {
-                    return Err(LuaError::external(
-                        "Bot does not have permission to manage roles",
-                    ));
-                }
+                let (_partial_guild, _bot_member, _guild_channel, perms) = this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::MANAGE_ROLES)
+                .await
+                .map_err(LuaError::external)?;
 
                 if let Some(allow_permissions) = data.allow.as_inner_ref() {
                     for perm in allow_permissions.iter() {
-                        if !resolved.contains(perm) {
+                        if !perms.contains(perm) {
                             return Err(LuaError::external(
                                 format!("Bot does not have permission to deny: {:?}", perm),
                             ));
@@ -637,16 +656,13 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 if let Some(deny_permissions) = data.deny.as_inner_ref() {
                     for perm in deny_permissions.iter() {
-                        if !resolved.contains(perm) {
+                        if !perms.contains(perm) {
                             return Err(LuaError::external(
                                 format!("Bot does not have permission to deny: {:?}", perm),
                             ));
                         }
                     }
                 }
-
-                this.check_reason(&data.reason)
-                .map_err(LuaError::external)?;
 
                 this
                     .discord_provider
@@ -662,6 +678,91 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     )
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
+            }))
+        });
+
+        methods.add_method("get_channel_invites", |_, this, channel_id: String| {
+            Ok(lua_promise!(this, channel_id, |_lua, this, channel_id|, {
+                let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                this.check_action("get_channel_invites".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                this.check_channel_permissions(bot_user.id, channel_id, serenity::all::Permissions::MANAGE_CHANNELS)
+                .await
+                .map_err(LuaError::external)?;
+
+                let invites = this
+                .discord_provider
+                .get_channel_invites(channel_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(invites))
+            }))
+        });
+
+        methods.add_method("create_channel_invite", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::CreateChannelInviteOptions>(data)?;
+
+                this.check_action("create_channel_invite".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
+
+                this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::CREATE_INSTANT_INVITE)
+                .await
+                .map_err(LuaError::external)?;
+
+                let invite = this
+                .discord_provider
+                .create_channel_invite(data.channel_id, &data.data, Some(data.reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(invite))
+            }))
+        });
+
+        methods.add_method("delete_channel_permission", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::DeleteChannelPermissionOptions>(data)?;
+
+                this.check_action("delete_channel_permission".to_string())
+                    .map_err(LuaError::external)?;
+
+                // Perform required checks
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };
+
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
+
+                this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_ROLES)
+                .await
+                .map_err(LuaError::external)?;
+
+                this
+                .discord_provider
+                .delete_channel_permission(data.channel_id, data.overwrite_id, Some(data.reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(())
             }))
@@ -1631,6 +1732,77 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 Ok(Lazy::new(roles))
             }))
+        });
+
+        // Invites
+        methods.add_method("get_invite", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetInviteOptions>(data)?;
+
+                this.check_action("get_invite".to_string())
+                    .map_err(LuaError::external)?;
+
+                let invite = this.discord_provider
+                    .get_invite(&data.code, data.with_counts.unwrap_or(false), data.with_expiration.unwrap_or(false), data.guild_scheduled_event_id)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(invite))
+            })) 
+        });
+
+        methods.add_method("delete_invite", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::DeleteInviteOptions>(data)?;
+
+                this.check_action("delete_invite".to_string())
+                    .map_err(LuaError::external)?;
+
+                this.check_reason(&data.reason)
+                .map_err(LuaError::external)?;
+
+                let Some(bot_user) = this.context.current_user() else {
+                    return Err(LuaError::runtime("Internal error: Current user not found"));
+                };    
+
+                // Call get_invite to find the channel id
+                let invite = this.discord_provider
+                    .get_invite(&data.code, false, false, None)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                if let Some(guild) = invite.guild {
+                    if guild.id != this.discord_provider.guild_id() {
+                        return Err(LuaError::external("Invite does not belong to the current guild"));
+                    }
+                }
+
+                let (partial_guild, bot_member, perms) = this.check_permissions(bot_user.id, serenity::all::Permissions::empty())
+                    .await
+                    .map_err(LuaError::external)?;    
+
+                let has_perms = perms.manage_guild();
+
+                if !has_perms {
+                    let channel = this.discord_provider.get_channel(invite.channel.id).await
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                    let channel_perms = partial_guild.user_permissions_in(&channel, &bot_member);
+
+                    if !channel_perms.manage_channels() {
+                        return Err(LuaError::external(
+                            "Bot does not have permission to manage channels (either Manage Server globally or Manage Channels on the channel level)",
+                        ));
+                    }
+                }
+
+                let invite = this.discord_provider
+                .delete_invite(&data.code, Some(data.reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(invite))
+            })) 
         });
 
         // Messages
