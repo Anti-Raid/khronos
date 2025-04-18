@@ -1,4 +1,4 @@
-pub use crate::plugins::antiraid::datastores::DataStoreImpl;
+pub use super::ir::DataStoreImpl;
 use std::rc::Rc;
 
 /// A data store provider.

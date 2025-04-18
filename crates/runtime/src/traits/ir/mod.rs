@@ -8,8 +8,11 @@ pub mod kv;
 pub mod settings_ir;
 /// Scheduled Exec IR
 pub mod scheduled_exec;
+/// DataStore IR
+pub mod datastores;
 
 pub use kv::*;
 pub use lockdowns::*;
 pub use settings_ir::*;
 pub use scheduled_exec::*;
+pub use datastores::*;
