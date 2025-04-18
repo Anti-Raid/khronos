@@ -1,7 +1,7 @@
 //! Provides the implementations for all Antiraid Event Preset Types
 
 use super::defaults::{
-    default_global_guild_id, default_global_member, default_global_unknown_string,
+    default_global_member, default_global_unknown_string,
     default_global_user, default_global_user_id, default_global_userinfo,
     default_moderation_end_correlation_id, default_moderation_start_correlation_id,
 };
@@ -12,8 +12,6 @@ use antiraid_types::ar_event::{
 };
 use antiraid_types::{
     ar_event::{AntiraidEvent, ModerationAction},
-    punishments::{Punishment, PunishmentState, PunishmentTarget},
-    stings::{Sting, StingState, StingTarget},
     userinfo::UserInfo,
 };
 use serde_json::{from_value, Value};
@@ -33,34 +31,6 @@ impl CreateEventFromPresetType for AntiraidEventPresetType {
         };
 
         match self {
-            Self::StingCreate => {
-                let data: StingPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::StingCreate(data.into_sting()))
-            }
-            Self::StingUpdate => {
-                let data: StingPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::StingUpdate(data.into_sting()))
-            }
-            Self::StingExpire => {
-                let data: StingPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::StingExpire(data.into_sting()))
-            }
-            Self::StingDelete => {
-                let data: StingPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::StingDelete(data.into_sting()))
-            }
-            Self::PunishmentCreate => {
-                let data: PunishmentPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::PunishmentCreate(data.into_punishment()))
-            }
-            Self::PunishmentDelete => {
-                let data: PunishmentPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::PunishmentDelete(data.into_punishment()))
-            }
-            Self::PunishmentExpire => {
-                let data: PunishmentPresetBaseInputData = from_value(input_data)?;
-                Ok(AntiraidEvent::PunishmentExpire(data.into_punishment()))
-            }
             Self::OnStartup => {
                 let data: Option<Vec<String>> = from_value(input_data)?;
                 Ok(AntiraidEvent::OnStartup(data.unwrap_or_default()))
@@ -100,130 +70,6 @@ impl CreateEventFromPresetType for AntiraidEventPresetType {
                     data.into_template_setting_execute_event_data(),
                 ))
             }
-        }
-    }
-}
-
-fn default_sting_target() -> StingTarget {
-    StingTarget::System
-}
-
-/// The base input data for a sting preset
-#[derive(serde::Deserialize)]
-struct StingPresetBaseInputData {
-    /// The ID of the sting
-    #[serde(default = "uuid::Uuid::new_v4")]
-    pub id: uuid::Uuid,
-    /// Src of the sting, this can be useful to store the source of the sting
-    pub src: Option<String>,
-    /// The number of stings
-    #[serde(default)]
-    pub stings: i32,
-    /// The reason for the stings (optional)
-    pub reason: Option<String>,
-    /// The reason the stings were voided
-    pub void_reason: Option<String>,
-    /// The guild ID the sting targets
-    #[serde(default = "default_global_guild_id")]
-    pub guild_id: serenity::all::GuildId,
-    /// The creator of the sting
-    #[serde(default = "default_sting_target")]
-    pub creator: StingTarget,
-    /// The target of the sting
-    #[serde(default = "default_sting_target")]
-    pub target: StingTarget,
-    /// The state of the sting
-    #[serde(default)]
-    pub state: StingState,
-    /// When the sting expires as a chrono duration
-    pub duration: Option<std::time::Duration>,
-    /// The data/metadata present within the sting, if any
-    pub sting_data: Option<serde_json::Value>,
-    /// When the sting was created
-    #[serde(default = "chrono::Utc::now")]
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    #[serde(default)]
-    /// The handle log encountered while handling the sting
-    pub handle_log: serde_json::Value,
-}
-
-impl StingPresetBaseInputData {
-    fn into_sting(self) -> Sting {
-        Sting {
-            id: self.id,
-            src: self.src,
-            stings: self.stings,
-            reason: self.reason,
-            void_reason: self.void_reason,
-            guild_id: self.guild_id,
-            creator: self.creator,
-            target: self.target,
-            state: self.state,
-            duration: self.duration,
-            sting_data: self.sting_data,
-            created_at: self.created_at,
-            handle_log: self.handle_log,
-        }
-    }
-}
-
-fn default_punishment_target() -> PunishmentTarget {
-    PunishmentTarget::System
-}
-
-/// The base input data for a punishment preset
-#[derive(serde::Deserialize)]
-pub struct PunishmentPresetBaseInputData {
-    /// The ID of the applied punishment
-    #[serde(default = "uuid::Uuid::new_v4")]
-    pub id: uuid::Uuid,
-    /// Src of the sting, this can be useful if a module wants to store the source of the sting
-    pub src: Option<String>,
-    /// The guild id of the applied punishment
-    #[serde(default = "default_global_guild_id")]
-    pub guild_id: serenity::all::GuildId,
-    /// The punishment string
-    #[serde(default = "default_global_unknown_string")]
-    pub punishment: String,
-    /// Creator of the punishment
-    #[serde(default = "default_punishment_target")]
-    pub creator: PunishmentTarget,
-    /// The target of the punishment
-    #[serde(default = "default_punishment_target")]
-    pub target: PunishmentTarget,
-    /// The handle log encountered while handling the punishment
-    #[serde(default)]
-    pub handle_log: serde_json::Value,
-    /// When the punishment was created
-    #[serde(default = "chrono::Utc::now")]
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// Duration of the punishment
-    pub duration: Option<std::time::Duration>,
-    /// The reason for the punishment
-    #[serde(default)]
-    pub reason: String,
-    /// The state of the sting
-    #[serde(default)]
-    pub state: PunishmentState,
-    /// Extra misc data
-    pub data: Option<serde_json::Value>,
-}
-
-impl PunishmentPresetBaseInputData {
-    fn into_punishment(self) -> Punishment {
-        Punishment {
-            id: self.id,
-            src: self.src,
-            guild_id: self.guild_id,
-            punishment: self.punishment,
-            creator: self.creator,
-            target: self.target,
-            handle_log: self.handle_log,
-            created_at: self.created_at,
-            duration: self.duration,
-            reason: self.reason,
-            state: self.state,
-            data: self.data,
         }
     }
 }
@@ -410,7 +256,7 @@ pub enum TemplateSettingExecuteEventDataActionPresetBaseInputData {
     },
     Delete {
         #[serde(default)]
-        primary_key: Value,
+        fields: indexmap::IndexMap<String, Value>,
     },
 }
 
@@ -422,8 +268,8 @@ impl TemplateSettingExecuteEventDataActionPresetBaseInputData {
             Self::View { filters } => TemplateSettingExecuteEventDataAction::View { filters },
             Self::Create { fields } => TemplateSettingExecuteEventDataAction::Create { fields },
             Self::Update { fields } => TemplateSettingExecuteEventDataAction::Update { fields },
-            Self::Delete { primary_key } => {
-                TemplateSettingExecuteEventDataAction::Delete { primary_key }
+            Self::Delete { fields } => {
+                TemplateSettingExecuteEventDataAction::Delete { fields }
             }
         }
     }

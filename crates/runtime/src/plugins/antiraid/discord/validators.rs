@@ -439,7 +439,7 @@ pub fn validate_name_option_chatinput(name: &str) -> Result<(), crate::Error> {
 }
 
 #[allow(dead_code)]
-pub fn validate_links(input: &str) -> Result<(), crate::Error> {
+pub fn validate_image_links(input: &str) -> Result<(), crate::Error> {
     let valid_link_urls = vec![
         "https://discord.com",
         "https://cdn.discordapp.com",
@@ -460,19 +460,19 @@ pub fn validate_links(input: &str) -> Result<(), crate::Error> {
 }
 
 #[cfg(test)]
-mod test_validate_links {
+mod test_validate_image_links {
     use super::*;
 
     #[test]
-    fn test_validate_links() {
-        assert!(validate_links("Check this out: https://discord.com").is_ok());
-        assert!(validate_links("Check this out: https://cdn.discordapp.com").is_ok());
-        assert!(validate_links("Check this out: https://media.discordapp.net").is_ok());
-        assert!(validate_links("Check this out: https://example.com").is_err());
-        assert!(validate_links("Check this out: https://discord.com/some/path").is_ok());
-        assert!(validate_links("Check this out: https://cdn.discordapp.com/some/path").is_ok());
-        assert!(validate_links("Check this out: https://media.discordapp.net/some/path").is_ok());
-        assert!(validate_links("NSFW! https://tenor.com/abcdef hello").is_err());
+    fn test_validate_image_links() {
+        assert!(validate_image_links("Check this out: https://discord.com").is_ok());
+        assert!(validate_image_links("Check this out: https://cdn.discordapp.com").is_ok());
+        assert!(validate_image_links("Check this out: https://media.discordapp.net").is_ok());
+        assert!(validate_image_links("Check this out: https://example.com").is_err());
+        assert!(validate_image_links("Check this out: https://discord.com/some/path").is_ok());
+        assert!(validate_image_links("Check this out: https://cdn.discordapp.com/some/path").is_ok());
+        assert!(validate_image_links("Check this out: https://media.discordapp.net/some/path").is_ok());
+        assert!(validate_image_links("NSFW! https://tenor.com/abcdef hello").is_err());
     }
 }
 

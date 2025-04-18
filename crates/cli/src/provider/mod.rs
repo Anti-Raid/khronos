@@ -1,5 +1,6 @@
 use moka::future::Cache;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use crate::cli::CliAuxOpts;
@@ -15,6 +16,7 @@ use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 use khronos_runtime::rt::RuntimeShareableData;
 use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
+use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::ir::ScheduledExecution;
 
 /// Internal short-lived channel cache
@@ -26,14 +28,30 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
     });
 
 #[derive(Clone)]
-pub struct CliLockdownDataStore {}
+pub struct CliLockdownDataStore {
+    file_storage_provider: Rc<dyn FileStorageProvider>,
+    http: Arc<serenity::all::Http>,
+    cache: Option<Arc<serenity::cache::Cache>>,
+}
 
 impl lockdowns::LockdownDataStore for CliLockdownDataStore {
     async fn get_guild_lockdown_settings(
         &self,
-        _guild_id: serenity::all::GuildId,
+        guild_id: serenity::all::GuildId,
     ) -> Result<lockdowns::GuildLockdownSettings, lockdowns::Error> {
-        todo!()
+        let Some(file_contents) = self
+            .file_storage_provider
+            .get_file(&["lockdown_settings".to_string()], &guild_id.to_string())
+            .await
+            .map_err(|e| format!("Failed to get file: {}", e))?
+        else {
+            return Ok(lockdowns::GuildLockdownSettings::default());
+        };
+
+        let record: lockdowns::GuildLockdownSettings = serde_json::from_slice(&file_contents.contents)
+            .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+        Ok(record)
     }
 
     async fn get_lockdowns(
@@ -61,24 +79,39 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
 
     async fn guild(
         &self,
-        _guild_id: serenity::all::GuildId,
+        guild_id: serenity::all::GuildId,
     ) -> Result<serenity::all::PartialGuild, lockdowns::Error> {
-        todo!()
+        {
+            if let Some(cache) = &self.cache {
+                if let Some(guild) = cache.guild(guild_id) {
+                    return Ok(guild.clone().into());
+                }
+            }
+        }
+
+        // Fetch from HTTP
+        self.http
+            .get_guild(guild_id)
+            .await
+            .map_err(|e| format!("Failed to fetch guild: {}", e).into())
     }
 
     async fn guild_channels(
         &self,
-        _guild_id: serenity::all::GuildId,
+        guild_id: serenity::all::GuildId,
     ) -> Result<Vec<serenity::all::GuildChannel>, lockdowns::Error> {
-        todo!()
+        // Fetch from HTTP
+        let channels = self.http.get_channels(guild_id).await?;
+
+        Ok(channels.into_iter().collect())
     }
 
     fn cache(&self) -> Option<&serenity::all::Cache> {
-        todo!()
+        self.cache.as_ref().map(|v| &**v)
     }
 
     fn http(&self) -> &serenity::all::Http {
-        todo!()
+        &self.http
     }
 }
 
@@ -119,8 +152,8 @@ pub struct CliKhronosContext {
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
     pub runtime_shareable_data: RuntimeShareableData,
-    pub http: Option<Rc<serenity::all::Http>>,
-    pub cache: Option<Rc<serenity::cache::Cache>>,
+    pub http: Option<Arc<serenity::all::Http>>,
+    pub cache: Option<Arc<serenity::cache::Cache>>,
     pub template_name: String,
 }
 
@@ -133,6 +166,7 @@ impl KhronosContext for CliKhronosContext {
     type UserInfoProvider = CliUserInfoProvider;
     type PageProvider = CliPageProvider;
     type ScheduledExecProvider = CliScheduledExecProvider;
+    type DataStoreProvider = CliDataStoreProvider;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -196,6 +230,31 @@ impl KhronosContext for CliKhronosContext {
         })
     }
 
+    fn datastore_provider(&self, scope: ExecutorScope) -> Option<Self::DataStoreProvider> {
+        let guild_id = match scope {
+            ExecutorScope::ThisGuild => {
+                if let Some(guild_id) = self.guild_id {
+                    guild_id
+                } else {
+                    default_global_guild_id()
+                }
+            }
+            ExecutorScope::OwnerGuild => {
+                if let Some(owner_guild_id) = self.owner_guild_id {
+                    owner_guild_id
+                } else if let Some(guild_id) = self.guild_id {
+                    guild_id
+                } else {
+                    default_global_guild_id()
+                }
+            }
+        };
+
+        Some(CliDataStoreProvider {
+            guild_id,
+        })
+    }
+
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider> {
         if let Some(http) = &self.http {
             let guild_id = match scope {
@@ -226,7 +285,11 @@ impl KhronosContext for CliKhronosContext {
         };
 
         Some(CliLockdownProvider {
-            _lockdown_data_store: CliLockdownDataStore {},
+            lockdown_data_store: CliLockdownDataStore {
+                file_storage_provider: self.file_storage_provider.clone(),
+                http: http.clone(),
+                cache: self.cache.clone(),
+            },
             http: http.clone(),
         })
     }
@@ -354,10 +417,32 @@ impl KVProvider for CliKVProvider {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
+pub struct CliDataStoreProvider {
+    pub guild_id: serenity::all::GuildId,
+}
+
+impl DataStoreProvider for CliDataStoreProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+
+    /// Returns a builtin data store given its name
+    fn get_builtin_data_store(&self, _name: &str) -> Option<Rc<dyn DataStoreImpl>> {
+        None // TODO
+    }
+
+    /// Returns all public builtin data stores
+    fn public_builtin_data_stores(&self) -> Vec<String> {
+        vec![] // TODO
+    }
+}
+
+#[derive(Clone)]
 pub struct CliDiscordProvider {
     guild_id: serenity::all::GuildId,
-    http: Rc<serenity::all::Http>,
-    cache: Option<Rc<serenity::cache::Cache>>,
+    http: Arc<serenity::all::Http>,
+    cache: Option<Arc<serenity::cache::Cache>>,
 }
 
 impl DiscordProvider for CliDiscordProvider {
@@ -499,8 +584,8 @@ impl DiscordProvider for CliDiscordProvider {
 
 #[derive(Clone)]
 pub struct CliLockdownProvider {
-    _lockdown_data_store: CliLockdownDataStore,
-    http: Rc<serenity::all::Http>,
+    lockdown_data_store: CliLockdownDataStore,
+    http: Arc<serenity::all::Http>,
 }
 
 impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
@@ -509,7 +594,7 @@ impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
     }
 
     fn lockdown_data_store(&self) -> &CliLockdownDataStore {
-        &self._lockdown_data_store
+        &self.lockdown_data_store
     }
 
     fn serenity_http(&self) -> &serenity::http::Http {

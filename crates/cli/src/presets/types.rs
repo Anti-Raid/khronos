@@ -5,27 +5,6 @@ use strum::{IntoStaticStr, VariantNames};
 #[derive(Debug, serde::Serialize, serde::Deserialize, IntoStaticStr, VariantNames, Clone, Copy)]
 #[must_use]
 pub enum AntiraidEventPresetType {
-    /// A sting create event. Dispatched when a sting is created
-    StingCreate,
-
-    /// A sting update event. Dispatched when a sting is updated
-    StingUpdate,
-
-    /// A sting expiry event. Dispatched when a sting expires
-    StingExpire,
-
-    /// A sting delete event. Dispatched when a sting is manually deleted
-    StingDelete,
-
-    /// A punishment create event. Dispatched when a punishment is created
-    PunishmentCreate,
-
-    /// A punishment expiration event. Dispatched when a punishment expires
-    PunishmentExpire,
-
-    /// A punishment delete event. Dispatched when a punishment is manually deleted
-    PunishmentDelete,
-
     /// An on startup event is fired when a set of templates are modified
     ///
     /// The inner Vec<String> is the list of templates modified/reloaded
@@ -65,13 +44,6 @@ impl std::str::FromStr for AntiraidEventPresetType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "stingcreate" | "sting.create" => Ok(Self::StingCreate),
-            "stingupdate" | "sting.update" => Ok(Self::StingUpdate),
-            "stingexpire" | "sting.expire" => Ok(Self::StingExpire),
-            "stingdelete" | "sting.delete" => Ok(Self::StingDelete),
-            "punishmentcreate" | "punishment.create" => Ok(Self::PunishmentCreate),
-            "punishmentexpire" | "punishment.expire" => Ok(Self::PunishmentExpire),
-            "punishmentdelete" | "punishment.delete" => Ok(Self::PunishmentDelete),
             "onstartup" | "on_startup" | "startup" | "start" | "init" => Ok(Self::OnStartup),
             "permissioncheckexecute" => Ok(Self::PermissionCheckExecute),
             "moderationstart" => Ok(Self::ModerationStart),

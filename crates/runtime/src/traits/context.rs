@@ -1,6 +1,7 @@
 use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
-    pageprovider::PageProvider, userinfoprovider::UserInfoProvider, scheduledexecprovider::ScheduledExecProvider
+    pageprovider::PageProvider, userinfoprovider::UserInfoProvider, scheduledexecprovider::ScheduledExecProvider,
+    datastoreprovider::DataStoreProvider
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -13,6 +14,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type UserInfoProvider: UserInfoProvider;
     type PageProvider: PageProvider;
     type ScheduledExecProvider: ScheduledExecProvider;
+    type DataStoreProvider: DataStoreProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -69,4 +71,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a ScheduledExec provider
     fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider>;
+
+    /// Returns a DataStore provider
+    fn datastore_provider(&self, scope: ExecutorScope) -> Option<Self::DataStoreProvider>;
 }

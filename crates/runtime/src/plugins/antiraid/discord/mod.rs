@@ -3,7 +3,7 @@ mod types;
 mod validators;
 
 use crate::lua_promise;
-use crate::primitives::create_userdata_iterator_with_fields;
+//use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::executorscope::ExecutorScope;
@@ -2096,47 +2096,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<DiscordActionExecutor<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    // Methods
-                    "get_audit_logs",
-                    "list_auto_moderation_rules",
-                    "get_auto_moderation_rule",
-                    "create_auto_moderation_rule",
-                    "edit_auto_moderation_rule",
-                    "delete_auto_moderation_rule",
-                    "get_channel",
-                    "edit_channel",
-                    "delete_channel",
-                    "edit_channel_permissions",
-                    "add_guild_member_role",
-                    "remove_guild_member_role",
-                    "remove_guild_member",
-                    "get_guild_bans",
-                    "get_guild_roles",
-                    "create_guild_ban",
-                    //"timeout", (Not yet stable)
-                    "get_messages",
-                    "get_message",
-                    "create_message",
-                    "create_interaction_response",
-                    "create_followup_message",
-                    "get_original_interaction_response",
-                    "get_guild_command",
-                    "get_guild_commands",
-                    "create_guild_command",
-                    "create_guild_commands",
-                ],
-            )
-        });
+        // TODO: Iter metamethod
     }
 }
 

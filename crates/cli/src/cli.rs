@@ -23,6 +23,7 @@ use rustyline::Editor;
 use std::cell::RefCell;
 use std::env::consts::OS;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 use tokio::fs;
@@ -165,7 +166,7 @@ pub struct Cli {
     pub config_file: Option<PathBuf>,
 
     /// The http client to use for discord operations
-    pub http: Option<Rc<serenity::all::Http>>,
+    pub http: Option<Arc<serenity::all::Http>>,
 
     /// The cached khronos runtime arguments
     pub cached_khronos_rt_args: Option<LuaMultiValue>,

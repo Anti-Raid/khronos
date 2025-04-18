@@ -14,6 +14,7 @@ use cli::{Cli, CliAuxOpts, CliEntrypointAction};
 use std::env::var;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
@@ -440,7 +441,7 @@ impl CliArgs {
                 http: self
                     .bot_token
                     .as_ref()
-                    .map(|token| Rc::new(serenity::all::Http::new(token))),
+                    .map(|token| Arc::new(serenity::all::Http::new(token))),
                 cached_khronos_rt_args: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
                 file_storage_backend: match self.file_storage_backend {

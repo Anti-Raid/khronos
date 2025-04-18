@@ -6,3 +6,4 @@ pub mod lockdownprovider;
 pub mod pageprovider;
 pub mod userinfoprovider;
 pub mod scheduledexecprovider;
+pub mod datastoreprovider;
