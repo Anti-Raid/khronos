@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
 use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use crate::traits::ir::Filters;
-use crate::TemplateContextRef;
+use crate::{plugins::antiraid::lazy::Lazy, TemplateContextRef};
 use crate::utils::executorscope::ExecutorScope;
 
 #[derive(Clone)]
@@ -43,10 +43,16 @@ impl<T: KhronosContext> DataStore<T> {
 impl<T: KhronosContext> LuaUserData for DataStore<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("name", |_, this| Ok(this.ds_impl.name()));
-        fields.add_field_method_get("table_name", |_, this| Ok(this.ds_impl.table_name()));
+        fields.add_field_method_get("table_name", |lua, this| lua.to_value_with(&this.ds_impl.table_name(), LUA_SERIALIZE_OPTIONS));
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("column_names", |lua, this, ()| {
+            Ok(
+                lua.to_value_with(&this.ds_impl.column_names(), LUA_SERIALIZE_OPTIONS)?
+            )
+        });
+
         methods.add_method("list", |_, this, ()| {
             Ok(
                 lua_promise!(this, |lua, this|, {
@@ -71,6 +77,17 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             *cached_data = Some(v.clone());
 
             Ok(v)
+        });
+
+        methods.add_method("filters_sql", |lua, this, filters: LuaValue| {
+            let filters: Filters = lua.from_value(filters)?;
+            let (sql, filter_fields) = this.ds_impl.filters_sql(filters);
+            Ok((sql, Lazy::new(filter_fields)))
+        });
+
+        methods.add_method("validate_data_against_columns", |lua, this, data: LuaValue| {
+            let validate_data_resp = this.ds_impl.validate_data_against_columns(lua, &data);
+            lua.to_value_with(&validate_data_resp, LUA_SERIALIZE_OPTIONS)
         });
 
         methods.add_method("get", |_, this, filters: LuaValue| {
@@ -130,8 +147,10 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                     "name",
                     "table_name",
                     // Methods
-                    "columns",
+                    "column_names",
                     "list",
+                    "columns",
+                    "filters_sql",
                     "get",
                     "insert",
                     "update",
