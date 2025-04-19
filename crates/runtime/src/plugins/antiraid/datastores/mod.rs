@@ -151,6 +151,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                     "list",
                     "columns",
                     "filters_sql",
+                    "validate_data_against_columns",
                     "get",
                     "insert",
                     "update",
