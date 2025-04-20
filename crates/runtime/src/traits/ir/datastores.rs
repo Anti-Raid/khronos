@@ -318,8 +318,7 @@ pub struct DataStoreColumn {
     pub nullable: bool,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", content = "value")]
+#[derive(Clone)]
 pub enum DataStoreValue {
     Text(String),
     Integer(i64),
@@ -328,14 +327,85 @@ pub enum DataStoreValue {
     Json(serde_json::Value),
     List(Vec<DataStoreValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
-    Interval(i64), // seconds
+    Interval(chrono::Duration),
     Null,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+impl IntoLua for DataStoreValue {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let mut stack = std::collections::VecDeque::new();
+        stack.push_back((self, None));
+
+        let root_table = lua.create_table()?;
+        loop {
+            let Some((el, parent)) = stack.pop_front() else {
+                break;
+            };
+
+            let (_typ, dsv) = match el {
+                DataStoreValue::Text(s) => ("Text", LuaValue::String(lua.create_string(&s)?)),
+                DataStoreValue::Integer(i) => ("Integer", LuaValue::Integer(i)),
+                DataStoreValue::Float(f) => ("Float", LuaValue::Number(f)),
+                DataStoreValue::Boolean(b) => ("Boolean", LuaValue::Boolean(b)),
+                DataStoreValue::Json(j) => ("Json", lua.to_value(&j)?),
+                DataStoreValue::List(l) => {
+                    let table = lua.create_table()?;
+                    for v in l.into_iter() {
+                        stack.push_front((v, Some(table.clone())));
+                    }
+                    ("List", LuaValue::Table(table))
+                }
+                DataStoreValue::Timestamptz(dt) => ("Timestamptz", crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt).into_lua(lua)?),
+                DataStoreValue::Interval(i) => ("Interval", crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua)?),
+                DataStoreValue::Null => ("Null", LuaValue::Nil),
+            };
+
+            //let tab = lua.create_table()?;
+            //tab.set("type", typ.to_string())?;
+            //tab.set("value", dsv)?;
+
+            match parent {
+                Some(parent) => {
+                    parent.set(parent.raw_len() + 1, dsv)?;
+                }
+                None => {
+                    root_table.set(root_table.raw_len() + 1, dsv)?;
+                }
+            }
+        }
+
+        Ok(LuaValue::Table(root_table))
+    }
+}
+
+#[derive(Clone)]
+/// A map of string to DataStoreValue
+pub struct DataStoreValueMap(pub HashMap<String, DataStoreValue>);
+
+impl IntoLua for DataStoreValueMap {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        for (k, v) in self.0.into_iter() {
+            let v = v.into_lua(lua)?;
+            table.set(k, v)?;
+        }
+        Ok(LuaValue::Table(table))
+    }
+}
+
+#[derive(Clone)]
 pub struct ValidateColumnsAgainstData {
     pub errors: Vec<String>,
-    pub parsed_data: HashMap<String, DataStoreValue>,
+    pub parsed_data: DataStoreValueMap,
+}
+
+impl IntoLua for ValidateColumnsAgainstData {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("errors", self.errors)?;
+        table.set("parsed_data", self.parsed_data)?;
+        Ok(LuaValue::Table(table))
+    }
 }
 
 #[async_trait(?Send)]
@@ -351,20 +421,25 @@ pub trait DataStoreImpl {
             .collect()
     }
 
+    /// Debug method to get a corresponding SQL string for the filters
+    ///
+    /// Note: there is no guarantee that the datastore will use this SQL string or
+    /// that the datastore will even be SQL based
     fn filters_sql(&self, filters: Filters) -> (String, Vec<serde_json::Value>) {
         filters.to_sql(&self.column_names())
     }
 
+    /// Validate the data against the columns returning the validated data
     fn validate_data_against_columns(&self, lua: &Lua, data: &LuaValue) -> ValidateColumnsAgainstData {
         validate_data_against_columns(&self.columns(), lua, data)
     }
 
-    async fn list(&self, lua: Lua) -> LuaResult<Vec<LuaValue>>;
-    async fn get(&self, lua: Lua, filters: Filters) -> LuaResult<LuaValue>;
-    async fn insert(&self, lua: Lua, data: LuaValue) -> LuaResult<LuaValue>;
-    async fn update(&self, lua: Lua, filters: Filters, data: LuaValue) -> LuaResult<LuaValue>;
-    async fn delete(&self, lua: Lua, filters: Filters) -> LuaResult<LuaValue>;
-    async fn count(&self, lua: Lua, filters: Filters) -> LuaResult<LuaValue>;
+    async fn list(&self) -> Result<Vec<DataStoreValueMap>, crate::Error>;
+    async fn get(&self, filters: Filters) -> Result<DataStoreValueMap, crate::Error>;
+    async fn insert(&self, data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error>;
+    async fn update(&self, filters: Filters, data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error>;
+    async fn delete(&self, filters: Filters) -> Result<(), crate::Error>;
+    async fn count(&self, filters: Filters) -> Result<i64, crate::Error>;
 }
 
 pub fn validate_data_against_columns(columns: &[DataStoreColumn], lua: &Lua, data: &LuaValue) -> ValidateColumnsAgainstData {
@@ -437,14 +512,14 @@ pub fn validate_data_against_columns(columns: &[DataStoreColumn], lua: &Lua, dat
                             return Err(format!("Column {} is not a valid number of seconds [interval type]", column.name));
                         };
 
-                        Ok(DataStoreValue::Interval(nsecs))
+                        Ok(DataStoreValue::Interval(chrono::Duration::seconds(nsecs)))
                     },
                     LuaValue::UserData(ud) => {
                         let Ok(delta) = ud.borrow::<crate::plugins::antiraid::datetime::TimeDelta>() else {
                             return Err(format!("Column {} is not a valid interval type", column.name));
                         };
 
-                        Ok(DataStoreValue::Interval(delta.timedelta.num_seconds()))
+                        Ok(DataStoreValue::Interval(delta.timedelta))
                     }
                     _ => {
                         return Err(format!("Column {} is not a valid interval type", column.name));
@@ -461,7 +536,7 @@ pub fn validate_data_against_columns(columns: &[DataStoreColumn], lua: &Lua, dat
         _ => {
             return ValidateColumnsAgainstData {
                 errors: vec!["Data is not a table".to_string()],
-                parsed_data: HashMap::new(),
+                parsed_data: DataStoreValueMap(HashMap::new()),
             };
         }
     };
@@ -534,7 +609,7 @@ pub fn validate_data_against_columns(columns: &[DataStoreColumn], lua: &Lua, dat
 
     ValidateColumnsAgainstData {
         errors,
-        parsed_data,
+        parsed_data: DataStoreValueMap(parsed_data),
     }
 }
 
@@ -569,27 +644,27 @@ impl DataStoreImpl for DummyDataStoreImpl {
         ]
     }
 
-    async fn list(&self, _lua: Lua) -> LuaResult<Vec<LuaValue>> {
+    async fn list(&self) -> Result<Vec<DataStoreValueMap>, crate::Error> {
         Ok(vec![])
     }
 
-    async fn get(&self, _lua: Lua, _filters: Filters) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Nil)
+    async fn get(&self, _filters: Filters) -> Result<DataStoreValueMap, crate::Error> {
+        Ok(DataStoreValueMap(HashMap::new()))
     }
 
-    async fn insert(&self, _lua: Lua, _data: LuaValue) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Nil)
+    async fn insert(&self, _data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error> {
+        Ok(DataStoreValueMap(HashMap::new()))
     }
 
-    async fn update(&self, _lua: Lua, _filters: Filters, _data: LuaValue) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Nil)
+    async fn update(&self, _filters: Filters, _data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error> {
+        Ok(DataStoreValueMap(HashMap::new()))
     }
 
-    async fn delete(&self, _lua: Lua, _filters: Filters) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Nil)
+    async fn delete(&self, _filters: Filters) -> Result<(), crate::Error> {
+        Ok(())
     }
 
-    async fn count(&self, _lua: Lua, _filters: Filters) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Nil)
+    async fn count(&self, _filters: Filters) -> Result<i64, crate::Error> {
+        Ok(0)
     }
 }

@@ -56,7 +56,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
         methods.add_method("list", |_, this, ()| {
             Ok(
                 lua_promise!(this, |lua, this|, {
-                    this.ds_impl.list(lua).await
+                    Ok(this.ds_impl.list().await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });
@@ -86,15 +86,15 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
         });
 
         methods.add_method("validate_data_against_columns", |lua, this, data: LuaValue| {
-            let validate_data_resp = this.ds_impl.validate_data_against_columns(lua, &data);
-            lua.to_value_with(&validate_data_resp, LUA_SERIALIZE_OPTIONS)
+            let validate_data_resp = this.ds_impl.validate_data_against_columns(&lua, &data);
+            Ok(validate_data_resp)
         });
 
         methods.add_method("get", |_, this, filters: LuaValue| {
             Ok(
                 lua_promise!(this, filters, |lua, this, filters|, {
                     let filters: Filters = lua.from_value(filters)?;
-                    this.ds_impl.get(lua, filters).await
+                    Ok(this.ds_impl.get(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });
@@ -102,7 +102,14 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
         methods.add_method("insert", |_, this, data: LuaValue| {
             Ok(
                 lua_promise!(this, data, |lua, this, data|, {
-                    this.ds_impl.insert(lua, data).await
+                    let data = this.ds_impl.validate_data_against_columns(&lua, &data);
+                    if !data.errors.is_empty() {
+                        return Err(LuaError::external(format!(
+                            "Data validation failed: {:?}",
+                            data.errors
+                        )));
+                    }
+                    Ok(this.ds_impl.insert(data.parsed_data).await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });
@@ -111,7 +118,16 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             Ok(
                 lua_promise!(this, filters, data, |lua, this, filters, data|, {
                     let filters: Filters = lua.from_value(filters)?;
-                    this.ds_impl.update(lua, filters, data).await
+
+                    let data = this.ds_impl.validate_data_against_columns(&lua, &data);
+                    if !data.errors.is_empty() {
+                        return Err(LuaError::external(format!(
+                            "Data validation failed: {:?}",
+                            data.errors
+                        )));
+                    }
+
+                    Ok(this.ds_impl.update(filters, data.parsed_data).await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });
@@ -120,7 +136,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             Ok(
                 lua_promise!(this, filters, |lua, this, filters|, {
                     let filters: Filters = lua.from_value(filters)?;
-                    this.ds_impl.delete(lua, filters).await
+                    Ok(this.ds_impl.delete(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });
@@ -129,7 +145,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             Ok(
                 lua_promise!(this, filters, |lua, this, filters|, {
                     let filters: Filters = lua.from_value(filters)?;
-                    this.ds_impl.count(lua, filters).await
+                    Ok(this.ds_impl.count(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
                 })
             ) 
         });

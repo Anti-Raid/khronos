@@ -11,6 +11,18 @@ pub struct TimeDelta {
     pub timedelta: chrono::TimeDelta,
 }
 
+impl TimeDelta {
+    pub fn new(td: chrono::TimeDelta) -> Self {
+        TimeDelta { timedelta: td }
+    }
+
+    pub fn from_secs(td: i64) -> Self {
+        TimeDelta {
+            timedelta: chrono::Duration::seconds(td),
+        }
+    }
+}
+
 impl LuaUserData for TimeDelta {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
@@ -116,6 +128,10 @@ where
     chrono_tz::Tz: From<Tz>,
     Tz::Offset: std::fmt::Display,
 {
+    pub fn new(dt: chrono::DateTime<Tz>) -> Self {
+        DateTime { dt }
+    }
+
     pub fn from_utc(dt: chrono::DateTime<chrono::Utc>) -> Self {
         DateTime {
             dt: dt.with_timezone(&Tz::from(chrono_tz::Tz::UTC)),
