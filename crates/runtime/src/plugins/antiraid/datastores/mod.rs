@@ -95,7 +95,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             };
 
             if let Some(method_impl) = this.ds_impl.get_method(key.clone()) {
-                let methods_cache = this.method_cache.try_borrow_mut().map_err(|_| LuaError::external("Failed to borrow method cache"))?;
+                let mut methods_cache = this.method_cache.try_borrow_mut().map_err(|_| LuaError::external("Failed to borrow method cache"))?;
                 let Some(cached_method) = methods_cache.get(&key) else {
                     let this_ref = this.clone();
                     let key_ref = key.clone();
@@ -244,7 +244,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
 
                     let method = LuaValue::Function(method);
 
-                    this.method_cache.borrow_mut().insert(key.to_string(), method.clone());
+                    methods_cache.insert(key.to_string(), method.clone());
                     return Ok(Some(method));
                 };
 
