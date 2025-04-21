@@ -1,6 +1,5 @@
 use mlua::prelude::*;
 use serenity::async_trait;
-use std::collections::HashMap;
 use std::{future::Future, pin::Pin};
 use std::rc::Rc;
 
@@ -326,15 +325,19 @@ pub enum DataStoreValue {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    Map(HashMap<String, DataStoreValue>),
+    Map(indexmap::IndexMap<String, DataStoreValue>),
     List(Vec<DataStoreValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     Null,
 }
 
-impl FromLua for DataStoreValue {
-    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+impl DataStoreValue {
+    fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
+        if depth > 10 {
+            return Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValue".to_string(), message: Some("Recursion limit exceeded".to_string()) });
+        }
+
         match value {
             LuaValue::String(s) => Ok(DataStoreValue::Text(s.to_string_lossy().to_string())),
             LuaValue::Integer(i) => Ok(DataStoreValue::Integer(i)),
@@ -344,10 +347,10 @@ impl FromLua for DataStoreValue {
             LuaValue::Table(table) => {
                 if table.raw_len() == 0 {
                     // Map
-                    let mut map = HashMap::new();
+                    let mut map = indexmap::IndexMap::new();
                     for pair in table.pairs::<String, LuaValue>() {
                         let (k, v) = pair?;
-                        let v = DataStoreValue::from_lua(v, lua)?;
+                        let v = DataStoreValue::from_lua_impl(v, lua, depth+1)?;
                         map.insert(k, v);
                     }
                     return Ok(DataStoreValue::Map(map));
@@ -356,7 +359,7 @@ impl FromLua for DataStoreValue {
                 let mut list = Vec::new();
                 for v in table.sequence_values::<LuaValue>() {
                     let v = v?;
-                    let v = DataStoreValue::from_lua(v, lua)?;
+                    let v = DataStoreValue::from_lua_impl(v, lua, depth+1)?;
                     list.push(v);
                 }
 
@@ -374,69 +377,55 @@ impl FromLua for DataStoreValue {
             _ => Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValue".to_string(), message: Some("Invalid type".to_string()) }),
         }
     }
+
+    fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
+        if depth > 10 {
+            return Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValue".to_string(), message: Some("Recursion limit exceeded".to_string()) });
+        }
+
+        match self {
+            DataStoreValue::Text(s) => Ok(LuaValue::String(lua.create_string(&s)?)),
+            DataStoreValue::Integer(i) => Ok(LuaValue::Integer(i)),
+            DataStoreValue::Float(f) => Ok(LuaValue::Number(f)),
+            DataStoreValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
+            DataStoreValue::Map(j) => {
+                let table = lua.create_table()?;
+                for (k, v) in j.into_iter() {
+                    let v = v.into_lua_impl(lua, depth+1)?;
+                    table.set(k, v)?;
+                }
+                Ok(LuaValue::Table(table))
+            }
+            DataStoreValue::List(l) => {
+                let table = lua.create_table()?;
+                for v in l.into_iter() {
+                    let v = v.into_lua_impl(lua, depth+1)?;
+                    table.set(table.raw_len() + 1, v)?;
+                }
+                Ok(LuaValue::Table(table))
+            }
+            DataStoreValue::Timestamptz(dt) => crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt).into_lua(lua),
+            DataStoreValue::Interval(i) => crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua),
+            DataStoreValue::Null => Ok(LuaValue::Nil),
+        }
+    }
 }
 
-pub enum IntoLuaParent {
-    Table(LuaTable),
-    TableKey((String, LuaTable)),
-    None,
+impl FromLua for DataStoreValue {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+        DataStoreValue::from_lua_impl(value, lua, 0)
+    }
 }
 
 impl IntoLua for DataStoreValue {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        let mut stack = std::collections::VecDeque::new();
-        stack.push_back((self, IntoLuaParent::None));
-
-        let root_table = lua.create_table()?;
-        loop {
-            let Some((el, parent)) = stack.pop_front() else {
-                break;
-            };
-
-            let (_typ, dsv) = match el {
-                DataStoreValue::Text(s) => ("Text", LuaValue::String(lua.create_string(&s)?)),
-                DataStoreValue::Integer(i) => ("Integer", LuaValue::Integer(i)),
-                DataStoreValue::Float(f) => ("Float", LuaValue::Number(f)),
-                DataStoreValue::Boolean(b) => ("Boolean", LuaValue::Boolean(b)),
-                DataStoreValue::Map(j) => {
-                    let table = lua.create_table()?;
-                    for (k, v) in j.into_iter() {
-                        stack.push_front((v, IntoLuaParent::TableKey((k, table.clone()))));
-                    }
-                    ("Map", LuaValue::Table(table))
-                }
-                DataStoreValue::List(l) => {
-                    let table = lua.create_table()?;
-                    for v in l.into_iter() {
-                        stack.push_front((v, IntoLuaParent::Table(table.clone())));
-                    }
-                    ("List", LuaValue::Table(table))
-                }
-                DataStoreValue::Timestamptz(dt) => ("Timestamptz", crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt).into_lua(lua)?),
-                DataStoreValue::Interval(i) => ("Interval", crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua)?),
-                DataStoreValue::Null => ("Null", LuaValue::Nil),
-            };
-
-            match parent {
-                IntoLuaParent::TableKey((k, parent)) => {
-                    parent.set(k, dsv)?;
-                }
-                IntoLuaParent::Table(parent) => {
-                    parent.set(parent.raw_len() + 1, dsv)?;
-                }
-                IntoLuaParent::None => {
-                    root_table.set(root_table.raw_len() + 1, dsv)?;
-                }
-            }
-        }
-
-        Ok(LuaValue::Table(root_table))
+        DataStoreValue::into_lua_impl(self, lua, 0)
     }
 }
 
 #[derive(Clone)]
 /// A map of string to DataStoreValue
-pub struct DataStoreValueMap(pub HashMap<String, DataStoreValue>);
+pub struct DataStoreValueMap(pub indexmap::IndexMap<String, DataStoreValue>);
 
 impl FromLua for DataStoreValueMap {
     fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
@@ -445,10 +434,10 @@ impl FromLua for DataStoreValueMap {
             _ => return Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValueMap".to_string(), message: Some("Expected a table".to_string()) }),
         };
 
-        let mut map = HashMap::new();
+        let mut map = indexmap::IndexMap::new();
         for pair in table.pairs::<String, LuaValue>() {
             let (k, v) = pair?;
-            let v = DataStoreValue::from_lua(v, lua)?;
+            let v = DataStoreValue::from_lua(v, lua)?; // SAFETY: this is guaranteed to halt after depth 10
             map.insert(k, v);
         }
 
@@ -460,7 +449,7 @@ impl IntoLua for DataStoreValueMap {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         for (k, v) in self.0.into_iter() {
-            let v = v.into_lua(lua)?;
+            let v = v.into_lua(lua)?; // SAFETY: this is guaranteed to halt after depth 10
             table.set(k, v)?;
         }
         Ok(LuaValue::Table(table))
@@ -469,7 +458,7 @@ impl IntoLua for DataStoreValueMap {
 
 impl DataStoreValueMap {
     pub fn new() -> Self {
-        DataStoreValueMap(HashMap::new())
+        DataStoreValueMap(indexmap::IndexMap::new())
     }
 
     pub fn from_value(value: DataStoreValue) -> Option<Self> {
