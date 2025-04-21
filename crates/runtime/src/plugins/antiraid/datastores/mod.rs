@@ -2,15 +2,12 @@ use super::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use crate::lua_promise;
 use std::rc::Rc;
-use crate::primitives::{
-    create_userdata_iterator_with_fields,
-    create_userdata_iterator_with_dyn_fields,
-};
+use crate::primitives::create_userdata_iterator_with_dyn_fields;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
-use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
-use crate::traits::ir::Filters;
+use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider, DataStoreMethod};
+use crate::traits::ir::{Filters, DataStoreValue, DataStoreValueMap};
 use crate::{plugins::antiraid::lazy::Lazy, TemplateContextRef};
 use crate::utils::executorscope::ExecutorScope;
 
@@ -18,6 +15,7 @@ use crate::utils::executorscope::ExecutorScope;
 pub struct DataStore<T: KhronosContext> {
     executor: DataStoreExecutor<T>,
     ds_impl: Rc<dyn DataStoreImpl>,
+    method_cache: Rc<RefCell<HashMap<String, LuaValue>>>,
     columns_cache: Rc<RefCell<Option<LuaValue>>>
 }
 
@@ -53,14 +51,6 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             )
         });
 
-        methods.add_method("list", |_, this, ()| {
-            Ok(
-                lua_promise!(this, |lua, this|, {
-                    Ok(this.ds_impl.list().await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
-            ) 
-        });
-
         methods.add_method("columns", |lua, this, ()| {
             // Check for cached serialized data
             let mut cached_data = this
@@ -90,64 +80,178 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             Ok(validate_data_resp)
         });
 
-        methods.add_method("get", |_, this, filters: LuaValue| {
+        methods.add_method("methods", |lua, this, _: ()| {
             Ok(
-                lua_promise!(this, filters, |lua, this, filters|, {
-                    let filters: Filters = lua.from_value(filters)?;
-                    Ok(this.ds_impl.get(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
+                lua.to_value_with(&this.ds_impl.methods(), LUA_SERIALIZE_OPTIONS)?
             ) 
         });
 
-        methods.add_method("insert", |_, this, data: LuaValue| {
-            Ok(
-                lua_promise!(this, data, |lua, this, data|, {
-                    let data = this.ds_impl.validate_data_against_columns(&lua, &data);
-                    if !data.errors.is_empty() {
-                        return Err(LuaError::external(format!(
-                            "Data validation failed: {:?}",
-                            data.errors
-                        )));
-                    }
-                    Ok(this.ds_impl.insert(data.parsed_data).await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
-            ) 
-        });
+        methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
+            let key = match key {
+                LuaValue::String(key) => key.to_string_lossy(),
+                _ => {
+                    return Ok(None);
+                }
+            };
 
-        methods.add_method("update", |_, this, (filters, data): (LuaValue, LuaValue)| {
-            Ok(
-                lua_promise!(this, filters, data, |lua, this, filters, data|, {
-                    let filters: Filters = lua.from_value(filters)?;
+            if let Some(method_impl) = this.ds_impl.get_method(key.clone()) {
+                let methods_cache = this.method_cache.try_borrow_mut().map_err(|_| LuaError::external("Failed to borrow method cache"))?;
+                let Some(cached_method) = methods_cache.get(&key) else {
+                    let this_ref = this.clone();
+                    let key_ref = key.clone();
+                    let method = lua.create_function(
+                        move |_lua, data: LuaMultiValue| {
+                            let method_impl = method_impl.clone();
+                            match method_impl {
+                                DataStoreMethod::NoArgs(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, func, |_lua, this_ref, key_ref, func|, {
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)().await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::Filters(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("Filters not provided"));
+                                        };
 
-                    let data = this.ds_impl.validate_data_against_columns(&lua, &data);
-                    if !data.errors.is_empty() {
-                        return Err(LuaError::external(format!(
-                            "Data validation failed: {:?}",
-                            data.errors
-                        )));
-                    }
+                                        let filters: Filters = lua.from_value(value)?;
 
-                    Ok(this.ds_impl.update(filters, data.parsed_data).await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
-            ) 
-        });
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(filters).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::Value(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValue not provided"));
+                                        };
 
-        methods.add_method("delete", |_, this, filters: LuaValue| {
-            Ok(
-                lua_promise!(this, filters, |lua, this, filters|, {
-                    let filters: Filters = lua.from_value(filters)?;
-                    Ok(this.ds_impl.delete(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
-            ) 
-        });
+                                        let value = DataStoreValue::from_lua(value, &lua)?;
 
-        methods.add_method("count", |_, this, filters: LuaValue| {
-            Ok(
-                lua_promise!(this, filters, |lua, this, filters|, {
-                    let filters: Filters = lua.from_value(filters)?;
-                    Ok(this.ds_impl.count(filters).await.map_err(|e| LuaError::external(e.to_string()))?)
-                })
-            ) 
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(value).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::Map(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValueMap not provided"));
+                                        };
+
+                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
+
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(map).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::FiltersAndValue(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("Filters and DataStoreValue not provided"));
+                                        };
+
+                                        let filters: Filters = lua.from_value(value)?;
+
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValue not provided"));
+                                        };
+
+                                        let value = DataStoreValue::from_lua(value, &lua)?;
+
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(filters, value).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::FiltersAndMap(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("Filters and DataStoreValueMap not provided"));
+                                        };
+
+                                        let filters: Filters = lua.from_value(value)?;
+
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValueMap not provided"));
+                                        };
+
+                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
+
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(filters, map).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::ValueAndMap(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValue and DataStoreValueMap not provided"));
+                                        };
+
+                                        let ds_value = DataStoreValue::from_lua(value, &lua)?;
+
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValueMap not provided"));
+                                        };
+
+                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
+
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(ds_value, map).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                                DataStoreMethod::FiltersAndValueAndMap(func) => {
+                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
+                                        let mut data = data;
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("Filters and DataStoreValue and DataStoreValueMap not provided"));
+                                        };
+
+                                        let filters: Filters = lua.from_value(value)?;
+
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValue not provided"));
+                                        };
+
+                                        let ds_value = DataStoreValue::from_lua(value, &lua)?;
+
+                                        let Some(value) = data.pop_front() else {
+                                            return Err(LuaError::external("DataStoreValueMap not provided"));
+                                        };
+
+                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
+
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (func)(filters, ds_value, map).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }))
+                                },
+                            }
+                        },
+                    )?;
+
+                    let method = LuaValue::Function(method);
+
+                    this.method_cache.borrow_mut().insert(key.to_string(), method.clone());
+                    return Ok(Some(method));
+                };
+
+                return Ok(Some(cached_method.clone()));
+            }
+
+            Ok(None)
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
@@ -155,25 +259,27 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                 return Err(mlua::Error::external("Invalid userdata type"));
             }
 
-            create_userdata_iterator_with_fields(
+            let mut base = vec![
+                // Fields
+                "name".to_string(),
+                "table_name".to_string(),
+                // Methods
+                "column_names".to_string(),
+                "list".to_string(),
+                "columns".to_string(),
+                "filters_sql".to_string(),
+                "validate_data_against_columns".to_string(),
+                "methods".to_string(),
+            ];
+
+            if let Ok(ds) = ud.borrow::<DataStore<T>>() {
+                base.extend(ds.ds_impl.methods());
+            }
+
+            create_userdata_iterator_with_dyn_fields(
                 lua,
                 ud,
-                [
-                    // Fields
-                    "name",
-                    "table_name",
-                    // Methods
-                    "column_names",
-                    "list",
-                    "columns",
-                    "filters_sql",
-                    "validate_data_against_columns",
-                    "get",
-                    "insert",
-                    "update",
-                    "delete",
-                    "count",
-                ],
+                base,
             )
         });
     }
@@ -242,6 +348,7 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
             let ds = DataStore {
                 executor: this.clone(),
                 ds_impl,
+                method_cache: Rc::new(RefCell::new(HashMap::new())),
                 columns_cache: Rc::new(RefCell::new(None))
             };
 

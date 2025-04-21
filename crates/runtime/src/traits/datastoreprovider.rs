@@ -1,4 +1,4 @@
-pub use super::ir::DataStoreImpl;
+pub use super::ir::{DataStoreImpl, DataStoreMethod};
 use std::rc::Rc;
 
 /// A data store provider.

@@ -1,6 +1,8 @@
 use mlua::prelude::*;
 use serenity::async_trait;
 use std::collections::HashMap;
+use std::{future::Future, pin::Pin};
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SafeString {
@@ -324,17 +326,66 @@ pub enum DataStoreValue {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    Json(serde_json::Value),
+    Map(HashMap<String, DataStoreValue>),
     List(Vec<DataStoreValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     Null,
 }
 
+impl FromLua for DataStoreValue {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::String(s) => Ok(DataStoreValue::Text(s.to_string_lossy().to_string())),
+            LuaValue::Integer(i) => Ok(DataStoreValue::Integer(i)),
+            LuaValue::Number(f) => Ok(DataStoreValue::Float(f)),
+            LuaValue::Boolean(b) => Ok(DataStoreValue::Boolean(b)),
+            LuaValue::Nil => Ok(DataStoreValue::Null),
+            LuaValue::Table(table) => {
+                if table.raw_len() == 0 {
+                    // Map
+                    let mut map = HashMap::new();
+                    for pair in table.pairs::<String, LuaValue>() {
+                        let (k, v) = pair?;
+                        let v = DataStoreValue::from_lua(v, lua)?;
+                        map.insert(k, v);
+                    }
+                    return Ok(DataStoreValue::Map(map));
+                }
+                // Check if the table is a list
+                let mut list = Vec::new();
+                for v in table.sequence_values::<LuaValue>() {
+                    let v = v?;
+                    let v = DataStoreValue::from_lua(v, lua)?;
+                    list.push(v);
+                }
+
+                Ok(DataStoreValue::List(list))
+            }
+            LuaValue::UserData(ud) => {
+                if let Ok(dt) = ud.borrow::<crate::plugins::antiraid::datetime::DateTime<chrono_tz::Tz>>() {
+                    return Ok(DataStoreValue::Timestamptz(dt.dt.with_timezone(&chrono::Utc)));
+                }
+                if let Ok(delta) = ud.borrow::<crate::plugins::antiraid::datetime::TimeDelta>() {
+                    return Ok(DataStoreValue::Interval(delta.timedelta));
+                }
+                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta".to_string(), message: Some("Invalid UserData type. Only DateTime and TimeDelta is supported at this time".to_string()) });
+            }
+            _ => Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValue".to_string(), message: Some("Invalid type".to_string()) }),
+        }
+    }
+}
+
+pub enum IntoLuaParent {
+    Table(LuaTable),
+    TableKey((String, LuaTable)),
+    None,
+}
+
 impl IntoLua for DataStoreValue {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let mut stack = std::collections::VecDeque::new();
-        stack.push_back((self, None));
+        stack.push_back((self, IntoLuaParent::None));
 
         let root_table = lua.create_table()?;
         loop {
@@ -347,11 +398,17 @@ impl IntoLua for DataStoreValue {
                 DataStoreValue::Integer(i) => ("Integer", LuaValue::Integer(i)),
                 DataStoreValue::Float(f) => ("Float", LuaValue::Number(f)),
                 DataStoreValue::Boolean(b) => ("Boolean", LuaValue::Boolean(b)),
-                DataStoreValue::Json(j) => ("Json", lua.to_value(&j)?),
+                DataStoreValue::Map(j) => {
+                    let table = lua.create_table()?;
+                    for (k, v) in j.into_iter() {
+                        stack.push_front((v, IntoLuaParent::TableKey((k, table.clone()))));
+                    }
+                    ("Map", LuaValue::Table(table))
+                }
                 DataStoreValue::List(l) => {
                     let table = lua.create_table()?;
                     for v in l.into_iter() {
-                        stack.push_front((v, Some(table.clone())));
+                        stack.push_front((v, IntoLuaParent::Table(table.clone())));
                     }
                     ("List", LuaValue::Table(table))
                 }
@@ -360,15 +417,14 @@ impl IntoLua for DataStoreValue {
                 DataStoreValue::Null => ("Null", LuaValue::Nil),
             };
 
-            //let tab = lua.create_table()?;
-            //tab.set("type", typ.to_string())?;
-            //tab.set("value", dsv)?;
-
             match parent {
-                Some(parent) => {
+                IntoLuaParent::TableKey((k, parent)) => {
+                    parent.set(k, dsv)?;
+                }
+                IntoLuaParent::Table(parent) => {
                     parent.set(parent.raw_len() + 1, dsv)?;
                 }
-                None => {
+                IntoLuaParent::None => {
                     root_table.set(root_table.raw_len() + 1, dsv)?;
                 }
             }
@@ -382,6 +438,24 @@ impl IntoLua for DataStoreValue {
 /// A map of string to DataStoreValue
 pub struct DataStoreValueMap(pub HashMap<String, DataStoreValue>);
 
+impl FromLua for DataStoreValueMap {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+        let table = match value {
+            LuaValue::Table(table) => table,
+            _ => return Err(LuaError::FromLuaConversionError { from: "any", to: "DataStoreValueMap".to_string(), message: Some("Expected a table".to_string()) }),
+        };
+
+        let mut map = HashMap::new();
+        for pair in table.pairs::<String, LuaValue>() {
+            let (k, v) = pair?;
+            let v = DataStoreValue::from_lua(v, lua)?;
+            map.insert(k, v);
+        }
+
+        Ok(DataStoreValueMap(map))
+    }
+}
+
 impl IntoLua for DataStoreValueMap {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
@@ -390,6 +464,151 @@ impl IntoLua for DataStoreValueMap {
             table.set(k, v)?;
         }
         Ok(LuaValue::Table(table))
+    }
+}
+
+impl DataStoreValueMap {
+    pub fn new() -> Self {
+        DataStoreValueMap(HashMap::new())
+    }
+
+    pub fn from_value(value: DataStoreValue) -> Option<Self> {
+        match value {
+            DataStoreValue::Map(map) => Some(DataStoreValueMap(map)),
+            _ => None,
+        }
+    }
+
+    pub fn validate(&self, columns: &[DataStoreColumn]) -> Vec<String> {
+        fn validate_inner(errors: &mut Vec<String>, column: &DataStoreColumn, data: &DataStoreValue) {
+            match column.column_type {
+                DataStoreColumnType::Text => {
+                    match data {
+                        DataStoreValue::Text(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not a string", column.name));
+                        }
+                    }
+                }
+                DataStoreColumnType::Integer => {
+                    match data {
+                        DataStoreValue::Integer(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not an integer", column.name));
+                        }
+                    }
+                }
+                DataStoreColumnType::Float => {
+                    match data {
+                        DataStoreValue::Float(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not a float", column.name));
+                        }
+                    }
+                }
+                DataStoreColumnType::Boolean => {
+                    match data {
+                        DataStoreValue::Boolean(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not a boolean", column.name));
+                        }
+                    }
+                }
+                DataStoreColumnType::Json => {
+                    match data {
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {} // JSON is valid if it's not null
+                    }
+                }
+                DataStoreColumnType::Timestamptz => {
+                    match data {
+                        DataStoreValue::Timestamptz(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not a timestamp", column.name));
+                        }
+                    }
+                }
+                DataStoreColumnType::Interval => {
+                    match data {
+                        DataStoreValue::Interval(_) => return,
+                        DataStoreValue::Null => {
+                            if column.nullable {
+                                return;
+                            }
+                            errors.push(format!("Column {} is not nullable", column.name));
+                        },
+                        _ => {
+                            errors.push(format!("Column {} is not an interval", column.name));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut errors = Vec::new();
+        for column in columns.iter() {
+            let Some(v) = self.0.get(&column.name.to_string()) else {
+                if !column.nullable {
+                    errors.push(format!("Column {} is not nullable", column.name));
+                }
+                continue;
+            };
+
+            match column.type_modifier {
+                DataStoreTypeModifier::Scalar => {
+                    validate_inner(&mut errors, column, v);
+                }
+                DataStoreTypeModifier::Array => {
+                    match v {
+                        DataStoreValue::List(l) => {
+                            for item in l.iter() {
+                                validate_inner(&mut errors, column, item);
+                            }
+                        }
+                        _ => {
+                            errors.push(format!("Column {} is not an array", column.name));
+                        }
+                    }
+                }
+            }
+        }
+
+        errors
     }
 }
 
@@ -406,6 +625,20 @@ impl IntoLua for ValidateColumnsAgainstData {
         table.set("parsed_data", self.parsed_data)?;
         Ok(LuaValue::Table(table))
     }
+}
+
+pub type DataStoreMethodResult = Pin<Box<dyn Future<Output = Result<DataStoreValue, crate::Error>>>>;
+
+#[derive(Clone)]
+pub enum DataStoreMethod {
+    NoArgs(Rc<dyn Fn() -> DataStoreMethodResult>),
+    Filters(Rc<dyn Fn(Filters) -> DataStoreMethodResult>),
+    Value(Rc<dyn Fn(DataStoreValue) -> DataStoreMethodResult>),
+    Map(Rc<dyn Fn(DataStoreValueMap) -> DataStoreMethodResult>),
+    FiltersAndValue(Rc<dyn Fn(Filters, DataStoreValue) -> DataStoreMethodResult>),
+    FiltersAndMap(Rc<dyn Fn(Filters, DataStoreValueMap) -> DataStoreMethodResult>),
+    ValueAndMap(Rc<dyn Fn(DataStoreValue, DataStoreValueMap) -> DataStoreMethodResult>),
+    FiltersAndValueAndMap(Rc<dyn Fn(Filters, DataStoreValue, DataStoreValueMap) -> DataStoreMethodResult>),
 }
 
 #[async_trait(?Send)]
@@ -434,182 +667,27 @@ pub trait DataStoreImpl {
         validate_data_against_columns(&self.columns(), lua, data)
     }
 
-    async fn list(&self) -> Result<Vec<DataStoreValueMap>, crate::Error>;
-    async fn get(&self, filters: Filters) -> Result<DataStoreValueMap, crate::Error>;
-    async fn insert(&self, data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error>;
-    async fn update(&self, filters: Filters, data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error>;
-    async fn delete(&self, filters: Filters) -> Result<(), crate::Error>;
-    async fn count(&self, filters: Filters) -> Result<i64, crate::Error>;
+    /// Returns a list of methods
+    fn methods(&self) -> Vec<String>;
+
+    /// Gets a method
+    fn get_method(&self, key: String) -> Option<DataStoreMethod>;
 }
 
 pub fn validate_data_against_columns(columns: &[DataStoreColumn], lua: &Lua, data: &LuaValue) -> ValidateColumnsAgainstData {
-    fn parse_column(lua: &Lua, column: &DataStoreColumn, v: LuaValue) -> Result<DataStoreValue, String> {
-        match column.column_type {
-            DataStoreColumnType::Text => {
-                let Some(s) = v.as_string_lossy() else {
-                    return Err(format!("Column {} is not a string", column.name));
-                };
-                
-                Ok(DataStoreValue::Text(s))
-            }
-            DataStoreColumnType::Integer => {
-                let Some(v) = v.as_i64() else {
-                    return Err(format!("Column {} is not an integer", column.name));
-                };
-                
-                Ok(DataStoreValue::Integer(v))
-            }
-            DataStoreColumnType::Float => {
-                let Some(v) = v.as_f64() else {
-                    return Err(format!("Column {} is not a float", column.name));
-                };
-                
-                Ok(DataStoreValue::Float(v))
-            }
-            DataStoreColumnType::Boolean => {
-                let Some(v) = v.as_boolean() else {
-                    return Err(format!("Column {} is not a boolean", column.name));
-                };
-                Ok(DataStoreValue::Boolean(v))
-            }
-            DataStoreColumnType::Json => {
-                let Ok(v) = lua.from_value::<serde_json::Value>(v) else {
-                    return Err(format!("Column {} is not a valid JSON", column.name));
-                };
-                
-                Ok(DataStoreValue::Json(v))
-            }
-            DataStoreColumnType::Timestamptz => {
-                match v {
-                    LuaValue::String(ref s) => {
-                        let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s.to_string_lossy()) else {
-                            return Err(format!("Column {} is not a valid UTC DateTime string", column.name));
-                        };
-
-                        let dt = dt.with_timezone(&chrono::Utc);
-
-                        Ok(DataStoreValue::Timestamptz(dt))
-                    },
-                    LuaValue::UserData(ud) => {
-                        let Ok(dt) = ud.borrow::<crate::plugins::antiraid::datetime::DateTime<chrono_tz::Tz>>() else {
-                            return Err(format!("Column {} is not a valid UTC DateTime object", column.name));
-                        };
-
-                        let dt: chrono::DateTime<chrono::Utc> = dt.dt.with_timezone(&chrono::Utc);
-
-                        Ok(DataStoreValue::Timestamptz(dt))
-                    }
-                    _ => {
-                        Err(format!("Column {} is not a timestamp", column.name))
-                    }
-                }
-            }
-            DataStoreColumnType::Interval => {
-                match v {
-                    LuaValue::String(ref s) => {
-                        // Parse string to number of seconds
-                        let Ok(nsecs) = s.to_string_lossy().parse::<i64>() else {
-                            return Err(format!("Column {} is not a valid number of seconds [interval type]", column.name));
-                        };
-
-                        Ok(DataStoreValue::Interval(chrono::Duration::seconds(nsecs)))
-                    },
-                    LuaValue::UserData(ud) => {
-                        let Ok(delta) = ud.borrow::<crate::plugins::antiraid::datetime::TimeDelta>() else {
-                            return Err(format!("Column {} is not a valid interval type", column.name));
-                        };
-
-                        Ok(DataStoreValue::Interval(delta.timedelta))
-                    }
-                    _ => {
-                        return Err(format!("Column {} is not a valid interval type", column.name));
-                    }
-                }
-            }
-        }
-    }
-
-    let data = match data {
-        LuaValue::Table(ref table) => {
-            table       
-        }
-        _ => {
+    let parsed_data = match DataStoreValueMap::from_lua(data.clone(), lua) {
+        Ok(parsed_data) => parsed_data,
+        Err(e) => {
             return ValidateColumnsAgainstData {
-                errors: vec!["Data is not a table".to_string()],
-                parsed_data: DataStoreValueMap(HashMap::new()),
+                errors: vec![format!("Failed to parse data: {}", e)],
+                parsed_data: DataStoreValueMap::new(),
             };
         }
     };
 
-    let mut errors = Vec::new();
-    let mut parsed_data = HashMap::new();
-
-    for column in columns.iter() {
-        let v = match data.get::<LuaValue>(column.name.to_string()) {
-            Ok(v) => v,
-            Err(e) => {
-                if column.nullable {
-                    errors.push(format!("Error getting column {}: {}", column.name, e));
-                    continue;
-                } else {
-                    errors.push(format!("Column {} is not nullable and received error: {}", column.name, e));
-                    continue;
-                }
-            }
-        };
-
-        if v.is_nil() || v.is_null() {
-            if !column.nullable {
-                errors.push(format!("Column {} is not nullable", column.name));
-            }
-
-            continue;
-        }
-
-        match column.type_modifier {
-            DataStoreTypeModifier::Scalar => {
-                match parse_column(lua, column, v) {
-                    Ok(parsed_value) => {
-                        parsed_data.insert(column.name.to_string(), parsed_value);
-                    }
-                    Err(e) => {
-                        errors.push(e);
-                    }
-                }        
-            }
-            DataStoreTypeModifier::Array => {
-                let Some(v) = v.as_table() else {
-                    errors.push(format!("Column {} is not an array", column.name));
-                    continue;
-                };
-                let mut parsed_array = Vec::new();
-                for v in v.sequence_values::<LuaValue>() {
-                    let v = match v {
-                        Ok(v) => v,
-                        Err(e) => {
-                            errors.push(format!("Error getting array value for column {}: {}", column.name, e));
-                            continue;
-                        }
-                    };
-
-                    match parse_column(lua, column, v) {
-                        Ok(parsed_value) => {
-                            parsed_array.push(parsed_value);
-                        }
-                        Err(e) => {
-                            errors.push(e);
-                        }
-                    };
-                }
-
-                parsed_data.insert(column.name.to_string(), DataStoreValue::List(parsed_array));
-            }
-        }
-    }
-
     ValidateColumnsAgainstData {
-        errors,
-        parsed_data: DataStoreValueMap(parsed_data),
+        errors: parsed_data.validate(columns),
+        parsed_data,
     }
 }
 
@@ -644,27 +722,17 @@ impl DataStoreImpl for DummyDataStoreImpl {
         ]
     }
 
-    async fn list(&self) -> Result<Vec<DataStoreValueMap>, crate::Error> {
-        Ok(vec![])
+    fn methods(&self) -> Vec<String> {
+        vec!["returnValue".to_string()]
     }
 
-    async fn get(&self, _filters: Filters) -> Result<DataStoreValueMap, crate::Error> {
-        Ok(DataStoreValueMap(HashMap::new()))
-    }
-
-    async fn insert(&self, _data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error> {
-        Ok(DataStoreValueMap(HashMap::new()))
-    }
-
-    async fn update(&self, _filters: Filters, _data: DataStoreValueMap) -> Result<DataStoreValueMap, crate::Error> {
-        Ok(DataStoreValueMap(HashMap::new()))
-    }
-
-    async fn delete(&self, _filters: Filters) -> Result<(), crate::Error> {
-        Ok(())
-    }
-
-    async fn count(&self, _filters: Filters) -> Result<i64, crate::Error> {
-        Ok(0)
+    fn get_method(&self, key: String) -> Option<DataStoreMethod> {
+        if key == "returnValue" {
+            Some(DataStoreMethod::Value(Rc::new(|v| {
+                Box::pin(async { Ok(v) })
+            })))
+        } else {
+            None
+        }
     }
 }
