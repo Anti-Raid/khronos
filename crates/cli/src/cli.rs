@@ -281,6 +281,7 @@ impl Cli {
         aux_opts: CliAuxOpts,
         ext_state: Rc<RefCell<CliExtensionState>>,
     ) -> LuaSetupResult {
+        let time_now = std::time::Instant::now();
         let runtime = KhronosRuntime::new(
             ThreadLimiter::new(1000000),
             RuntimeCreateOpts {
@@ -293,6 +294,7 @@ impl Cli {
             None::<fn(&Lua, LuaValue) -> Result<(), mlua::Error>>,
         )
         .expect("Failed to create runtime");
+        log::debug!("Lua VM created in {:?}", time_now.elapsed());
 
         if let Some(max_threads) = aux_opts.max_threads {
             runtime.set_max_threads(max_threads)

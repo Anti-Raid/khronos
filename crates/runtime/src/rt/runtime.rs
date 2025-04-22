@@ -100,7 +100,7 @@ impl KhronosRuntime {
         let scheduler = Scheduler::new(TaskManager::new(
             lua.clone(),
             Rc::new(sched_feedback),
-            Duration::from_millis(1),
+            Duration::from_micros(500),
         ));
 
         scheduler.attach();
