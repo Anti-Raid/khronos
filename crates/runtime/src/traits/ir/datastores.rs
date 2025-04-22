@@ -373,8 +373,22 @@ impl IntoLua for ValidateColumnsAgainstData {
     }
 }
 
-pub type DataStoreMethodResult = Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>;
-pub type DataStoreMethod = Rc<dyn Fn(Vec<KhronosValue>) -> DataStoreMethodResult>;
+#[derive(Clone)]
+pub enum DataStoreMethod {
+    Async(Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>),
+    Sync(Rc<dyn Fn(Vec<KhronosValue>) -> Result<KhronosValue, crate::Error>>),
+}
+
+impl From<Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>> for DataStoreMethod {
+    fn from(f: Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>) -> Self {
+        DataStoreMethod::Async(f)
+    }
+}
+impl From<Rc<dyn Fn(Vec<KhronosValue>) -> Result<KhronosValue, crate::Error>>> for DataStoreMethod {
+    fn from(f: Rc<dyn Fn(Vec<KhronosValue>) -> Result<KhronosValue, crate::Error>>) -> Self {
+        DataStoreMethod::Sync(f)
+    }
+}
 
 #[async_trait(?Send)]
 pub trait DataStoreImpl {
@@ -570,13 +584,31 @@ impl DataStoreImpl for CopyDataStore {
     }
 
     fn methods(&self) -> Vec<String> {
-        vec!["copy".to_string()]
+        vec!["copy".to_string(), "copySync".to_string()]
     }
 
     fn get_method(&self, key: String) -> Option<DataStoreMethod> {
         if key == "copy" {
-            Some(Rc::new(|v| {
-                Box::pin(async { 
+            Some(
+                DataStoreMethod::Async(Rc::new(|v| {
+                    Box::pin(async { 
+                        let mut v = v;
+                        if v.len() == 0 {
+                            return Ok(KhronosValue::Null);
+                        } else if v.len() == 1 {
+                            let Some(v) = v.pop() else {
+                                return Ok(KhronosValue::Null);
+                            };
+                            return Ok(v);
+                        } else {
+                            return Ok(KhronosValue::List(v));
+                        }
+                    })
+                }))
+            )
+        } else if key == "copySync" {
+            Some(
+                DataStoreMethod::Sync(Rc::new(|v| {
                     let mut v = v;
                     if v.len() == 0 {
                         return Ok(KhronosValue::Null);
@@ -588,8 +620,8 @@ impl DataStoreImpl for CopyDataStore {
                     } else {
                         return Ok(KhronosValue::List(v));
                     }
-                })
-            }))
+                }))
+            )
         } else {
             None
         }

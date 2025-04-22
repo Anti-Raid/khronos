@@ -6,7 +6,7 @@ use crate::primitives::create_userdata_iterator_with_dyn_fields;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
-use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
+use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider, DataStoreMethod};
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContextRef;
 use crate::utils::executorscope::ExecutorScope;
@@ -67,19 +67,33 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                     let this_ref = this.clone();
                     let key_ref = key.clone();
                     let method = lua.create_function(
-                        move |_lua, data: LuaMultiValue| {
-                            let method_impl = method_impl.clone();
+                        move |lua, data: LuaMultiValue| {
+                            match &method_impl {
+                                DataStoreMethod::Async(method_impl) => {
+                                    let method_impl = method_impl.clone();
 
-                            Ok(lua_promise!(this_ref, key_ref, method_impl, data, |lua, this_ref, key_ref, method_impl, data|, {
-                                let mut args = Vec::with_capacity(data.len());
-                                for value in data {
-                                    args.push(KhronosValue::from_lua(value, &lua)?);
+                                    Ok(lua_promise!(this_ref, key_ref, method_impl, data, |lua, this_ref, key_ref, method_impl, data|, {
+                                        let mut args = Vec::with_capacity(data.len());
+                                        for value in data {
+                                            args.push(KhronosValue::from_lua(value, &lua)?);
+                                        }
+        
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (method_impl)(args).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    }).into_lua(lua)?)        
                                 }
-
-                                this_ref.check_action(key_ref.clone())?;
-                                let result = (method_impl)(args).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                Ok(result)
-                            }))
+                                DataStoreMethod::Sync(method_impl) => {
+                                    let mut args = Vec::with_capacity(data.len());
+                                    for value in data {
+                                        args.push(KhronosValue::from_lua(value, &lua)?);
+                                    }
+    
+                                    this_ref.check_action(key_ref.clone())?;
+                                    let result = (method_impl)(args).map_err(|e| LuaError::external(e.to_string()))?;
+                                    Ok(result.into_lua(lua)?)
+                                }
+                            }
                         },
                     )?;
 
