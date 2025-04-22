@@ -200,6 +200,18 @@ struct CliArgs {
     #[clap(long)]
     file_storage_base_path: Option<PathBuf>,
 
+    /// Whether or not to use env vars at all
+    ///
+    /// This may be slower performance wise and is hence disabled by default
+    #[clap(long, default_value = "false")]
+    use_env_vars: bool,
+
+    /// Whether or not to use a custom print function or use standard AntiRaid print
+    ///
+    /// Environment variable: `USE_CUSTOM_PRINT`
+    #[clap(long, default_value = "true")]
+    use_custom_print: bool,
+
     /// The path to a config file containing e.g.
     /// the bot token etc
     ///
@@ -347,6 +359,12 @@ impl CliArgs {
             );
         }
 
+        if let Ok(use_custom_print) = src.var("USE_CUSTOM_PRINT") {
+            self.use_custom_print = use_custom_print
+                .parse()
+                .expect("Failed to parse use custom print");
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -356,7 +374,9 @@ impl CliArgs {
 
     /// Parses/updates the config from environment variables as well as config file
     pub async fn finalize(mut self) -> (Cli, CliEntrypointAction) {
-        self.update_from_env_vars(EnvVarEnvSource {});
+        if self.use_env_vars {
+            self.update_from_env_vars(EnvVarEnvSource {});
+        }
 
         while let Some(ref config_file) = self.config_file {
             let contents = fs::read_to_string(config_file)
@@ -380,6 +400,7 @@ impl CliArgs {
             disable_test_funcs: self.disable_test_funcs,
             disable_scheduler_lib: self.disable_scheduler_lib,
             disable_task_lib: self.disable_task_lib,
+            use_custom_print: self.use_custom_print,
             experiments: {
                 if let Some(experiments) = self.experiments {
                     experiments

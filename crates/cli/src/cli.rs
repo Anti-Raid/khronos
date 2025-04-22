@@ -68,6 +68,7 @@ pub enum FileStorageBackend {
 
 pub struct LuaSetupResult {
     pub main_isolate: KhronosIsolate<FileAssetManager>,
+    pub benckark_instant: std::time::Instant,
 }
 
 impl std::fmt::Debug for LuaSetupResult {
@@ -86,6 +87,7 @@ pub struct CliAuxOpts {
     pub disable_test_funcs: bool,
     pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
+    pub use_custom_print: bool,
     pub experiments: Vec<String>,
     pub max_threads: Option<i64>,
 }
@@ -324,33 +326,40 @@ impl Cli {
                 .expect("Failed to set _OS global");
         }
 
-        // Ensure print is global as everything basically relies on print
-        runtime
-            .lua()
-            .globals()
-            .raw_set(
-                "print",
-                runtime
-                    .lua()
-                    .create_function(|_lua, values: LuaMultiValue| {
-                        if !values.is_empty() {
-                            println!(
-                                "{}",
-                                values
-                                    .iter()
-                                    .map(|value| format!("{:#?}", value))
-                                    .collect::<Vec<_>>()
-                                    .join("\t")
-                            );
-                        } else {
-                            println!("nil");
-                        }
+        if aux_opts.use_custom_print {
+            // Ensure print is global as everything basically relies on print
+            runtime
+                .lua()
+                .globals()
+                .raw_set(
+                    "print",
+                    runtime
+                        .lua()
+                        .create_function(|_lua, values: LuaMultiValue| {
+                            if !values.is_empty() {
+                                println!(
+                                    "{}",
+                                    values
+                                        .iter()
+                                        .map(|value| {
+                                            match value {
+                                                LuaValue::String(s) => format!("{}", s.display()),
+                                                _ => format!("{:#?}", value)
+                                            }
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .join("\t")
+                                );
+                            } else {
+                                println!("nil");
+                            }
 
-                        Ok(())
-                    })
-                    .expect("Failed to set print global"),
-            )
-            .expect("Failed to set print global");
+                            Ok(())
+                        })
+                        .expect("Failed to set print global"),
+                )
+                .expect("Failed to set print global");
+        }
 
         runtime
             .lua()
@@ -376,7 +385,7 @@ impl Cli {
             .raw_set("print", LuaValue::Nil)
             .expect("Failed to set print global");
 
-        LuaSetupResult { main_isolate }
+        LuaSetupResult { main_isolate, benckark_instant: time_now }
     }
 
     fn setup_cli_specific_table(
@@ -401,6 +410,7 @@ impl Cli {
     }
 
     pub async fn entrypoint(&mut self, action: CliEntrypointAction) {
+        log::debug!("Entrypoint: At time instant: {:?}", self.setup_data.benckark_instant.elapsed());
         match action {
             CliEntrypointAction::RunScripts { scripts } => {
                 if self.verbose {
@@ -454,7 +464,12 @@ impl Cli {
                             "{}",
                             values
                                 .iter()
-                                .map(|value| format!("{:#?}", value))
+                                .map(|value| {
+                                    match value {
+                                        LuaValue::String(s) => format!("\"{}\"", s.display()),
+                                        _ => format!("{:#?}", value)
+                                    }
+                                })
                                 .collect::<Vec<_>>()
                                 .join("\t")
                         );
@@ -508,7 +523,12 @@ impl Cli {
                                         "{}",
                                         values
                                             .iter()
-                                            .map(|value| format!("{:#?}", value))
+                                            .map(|value| {
+                                                match value {
+                                                    LuaValue::String(s) => format!("\"{}\"", s.display()),
+                                                    _ => format!("{:#?}", value)
+                                                }
+                                            })
                                             .collect::<Vec<_>>()
                                             .join("\t")
                                     );
@@ -566,7 +586,12 @@ impl Cli {
                             "{}",
                             values
                                 .iter()
-                                .map(|value| format!("{:#?}", value))
+                                .map(|value| {
+                                    match value {
+                                        LuaValue::String(s) => format!("\"{}\"", s.display()),
+                                        _ => format!("{:#?}", value)
+                                    }
+                                })
                                 .collect::<Vec<_>>()
                                 .join("\t")
                         );
