@@ -2,64 +2,25 @@ use super::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use crate::lua_promise;
 use std::rc::Rc;
-use crate::primitives::{create_userdata_iterator_with_fields, create_userdata_iterator_with_dyn_fields};
+use crate::primitives::create_userdata_iterator_with_dyn_fields;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
 use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
-use crate::traits::ir::DataStoreValue;
+use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContextRef;
 use crate::utils::executorscope::ExecutorScope;
-
-/// For use in e.g. Filters etc.
-#[derive(Clone)]
-pub struct NamedDataStoreType {
-    pub name: String,
-    pub data: LuaValue,
-}
-
-impl NamedDataStoreType {
-    pub fn new(name: String, data: LuaValue) -> Self {
-        Self { name, data }
-    }
-}
-
-impl LuaUserData for NamedDataStoreType {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
-        fields.add_field_method_get("data", |lua, this| lua.to_value_with(&this.data, LUA_SERIALIZE_OPTIONS));
-    }
-
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<NamedDataStoreType>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "name",
-                    "data",
-                ]
-            )
-        });
-    }
-}
 
 #[derive(Clone)]
 pub struct DataStore<T: KhronosContext> {
     executor: DataStoreExecutor<T>,
     ds_impl: Rc<dyn DataStoreImpl>,
     method_cache: Rc<RefCell<HashMap<String, LuaValue>>>,
-    columns_cache: Rc<RefCell<Option<LuaValue>>>
 }
 
 impl<T: KhronosContext> DataStore<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if self.ds_impl.needs_caps() {
+        if self.ds_impl.need_caps(&action) {
             if !self.executor.context.has_cap(&format!("datastore:{}", self.ds_impl.name())) && !self.executor.context.has_cap(&format!("datastore:{}:{}", self.ds_impl.name(), action)) {
                 return Err(LuaError::runtime(format!(
                     "Datastore action is not allowed in this template context: data store: {}, action: {}",
@@ -81,48 +42,10 @@ impl<T: KhronosContext> DataStore<T> {
 impl<T: KhronosContext> LuaUserData for DataStore<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("name", |_, this| Ok(this.ds_impl.name()));
-        fields.add_field_method_get("table_name", |lua, this| lua.to_value_with(&this.ds_impl.table_name(), LUA_SERIALIZE_OPTIONS));
-        fields.add_field_method_get("needs_caps", |_, this| Ok(this.ds_impl.needs_caps()));
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("column_names", |lua, this, ()| {
-            Ok(
-                lua.to_value_with(&this.ds_impl.column_names(), LUA_SERIALIZE_OPTIONS)?
-            )
-        });
-
-        methods.add_method("columns", |lua, this, ()| {
-            // Check for cached serialized data
-            let mut cached_data = this
-                .columns_cache
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_data.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let v = lua.to_value_with(&this.ds_impl.columns(), LUA_SERIALIZE_OPTIONS)?;
-
-            *cached_data = Some(v.clone());
-
-            Ok(v)
-        });
-
-        methods.add_method("filters_sql", |lua, this, filters: LuaValue| {
-            let dsv = DataStoreValue::from_lua(filters, lua)?;
-            let DataStoreValue::Filters(filters) = dsv else {
-                return Err(LuaError::external("A NamedDataStoreType with a name=Filters is required to create a filter"));
-            };
-            let (sql, filter_fields) = this.ds_impl.filters_sql(filters);
-            Ok((sql, filter_fields))
-        });
-
-        methods.add_method("validate_data_against_columns", |lua, this, data: LuaValue| {
-            let validate_data_resp = this.ds_impl.validate_data_against_columns(&lua, &data);
-            Ok(validate_data_resp)
-        });
+        methods.add_method("need_caps", |_, this, op: String| Ok(this.ds_impl.need_caps(&op)));
 
         methods.add_method("methods", |lua, this, _: ()| {
             Ok(
@@ -150,7 +73,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                             Ok(lua_promise!(this_ref, key_ref, method_impl, data, |lua, this_ref, key_ref, method_impl, data|, {
                                 let mut args = Vec::with_capacity(data.len());
                                 for value in data {
-                                    args.push(DataStoreValue::from_lua(value, &lua)?);
+                                    args.push(KhronosValue::from_lua(value, &lua)?);
                                 }
 
                                 this_ref.check_action(key_ref.clone())?;
@@ -180,14 +103,8 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
             let mut base = vec![
                 // Fields
                 "name".to_string(),
-                "table_name".to_string(),
-                "needs_caps".to_string(),
                 // Methods
-                "column_names".to_string(),
-                "list".to_string(),
-                "columns".to_string(),
-                "filters_sql".to_string(),
-                "validate_data_against_columns".to_string(),
+                "needed_caps".to_string(),
                 "methods".to_string(),
             ];
 
@@ -268,7 +185,6 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
                 executor: this.clone(),
                 ds_impl,
                 method_cache: Rc::new(RefCell::new(HashMap::new())),
-                columns_cache: Rc::new(RefCell::new(None))
             };
 
             Ok(Some(ds))
@@ -317,20 +233,6 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                 };
 
                 Ok(executor)
-            },
-        )?,
-    )?;
-
-    module.set(
-        "wraptype",
-        lua.create_function(
-            |_lua, (name, data): (String, LuaValue)| {
-                let named_datastore = NamedDataStoreType {
-                    name,
-                    data,
-                };
-
-                Ok(named_datastore)
             },
         )?,
     )?;

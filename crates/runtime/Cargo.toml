@@ -27,7 +27,7 @@ lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}
-chrono-tz = "0.10"
+chrono-tz = { version = "0.10", features = ["serde"]}
 chrono_lc = "0.1"
 thiserror = "1.0"
 self_cell = "1"

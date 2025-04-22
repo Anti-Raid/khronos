@@ -9,3 +9,4 @@ pub mod require;
 pub mod serenity_backports;
 pub mod serenity_utils;
 pub mod threadlimitmw;
+pub mod khronos_value;
