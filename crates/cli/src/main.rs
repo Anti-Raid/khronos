@@ -209,7 +209,7 @@ struct CliArgs {
     /// Whether or not to use a custom print function or use standard AntiRaid print
     ///
     /// Environment variable: `USE_CUSTOM_PRINT`
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value = "false")]
     use_custom_print: bool,
 
     /// The path to a config file containing e.g.

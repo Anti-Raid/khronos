@@ -283,6 +283,8 @@ impl Cli {
         aux_opts: CliAuxOpts,
         ext_state: Rc<RefCell<CliExtensionState>>,
     ) -> LuaSetupResult {
+        log::debug!("UseCustomPrint: {}", aux_opts.use_custom_print);
+
         let time_now = std::time::Instant::now();
         let runtime = KhronosRuntime::new(
             ThreadLimiter::new(1000000),
@@ -326,12 +328,13 @@ impl Cli {
                 .expect("Failed to set _OS global");
         }
 
-        if aux_opts.use_custom_print {
+        if !aux_opts.use_custom_print {
             // Ensure print is global as everything basically relies on print
+            log::debug!("Setting print global");
             runtime
                 .lua()
                 .globals()
-                .raw_set(
+                .set(
                     "print",
                     runtime
                         .lua()
@@ -379,11 +382,22 @@ impl Cli {
         })
         .expect("Failed to create main isolate");
 
-        // Disable print in the main isolate so it points to the global one
-        main_isolate
+        if !aux_opts.use_custom_print {
+            // Disable print in the main isolate so it points to the global one
+            log::debug!("Disabling print in main isolate");
+            main_isolate
             .global_table()
             .raw_set("print", LuaValue::Nil)
-            .expect("Failed to set print global");
+            .expect("Failed to set print global");       
+            
+            assert_eq!(
+                main_isolate
+                    .global_table()
+                    .raw_get::<LuaValue>("print")
+                    .expect("Failed to set print global to null"),
+                LuaValue::Nil
+            );
+        }
 
         LuaSetupResult { main_isolate, benckark_instant: time_now }
     }
