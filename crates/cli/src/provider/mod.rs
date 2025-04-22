@@ -429,8 +429,8 @@ impl DataStoreProvider for CliDataStoreProvider {
 
     /// Returns a builtin data store given its name
     fn get_builtin_data_store(&self, name: &str) -> Option<Rc<dyn DataStoreImpl>> {
-        if name == "DummyStoreImpl" {
-            return Some(Rc::new(khronos_runtime::traits::ir::DummyDataStoreImpl {}))
+        if name == "CopyDataStore" {
+            return Some(Rc::new(khronos_runtime::traits::ir::CopyDataStore {}))
         }
 
         None
@@ -438,7 +438,7 @@ impl DataStoreProvider for CliDataStoreProvider {
 
     /// Returns all public builtin data stores
     fn public_builtin_data_stores(&self) -> Vec<String> {
-        vec!["DummyStoreImpl".to_string()] // TODO
+        vec!["CopyDataStore".to_string()] // TODO
     }
 }
 

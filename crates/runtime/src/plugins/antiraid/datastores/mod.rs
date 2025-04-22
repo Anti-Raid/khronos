@@ -2,14 +2,52 @@ use super::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use crate::lua_promise;
 use std::rc::Rc;
-use crate::primitives::create_userdata_iterator_with_dyn_fields;
+use crate::primitives::{create_userdata_iterator_with_fields, create_userdata_iterator_with_dyn_fields};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
-use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider, DataStoreMethod};
-use crate::traits::ir::{Filters, DataStoreValue, DataStoreValueMap};
-use crate::{plugins::antiraid::lazy::Lazy, TemplateContextRef};
+use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
+use crate::traits::ir::DataStoreValue;
+use crate::TemplateContextRef;
 use crate::utils::executorscope::ExecutorScope;
+
+/// For use in e.g. Filters etc.
+#[derive(Clone)]
+pub struct NamedDataStoreType {
+    pub name: String,
+    pub data: LuaValue,
+}
+
+impl NamedDataStoreType {
+    pub fn new(name: String, data: LuaValue) -> Self {
+        Self { name, data }
+    }
+}
+
+impl LuaUserData for NamedDataStoreType {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
+        fields.add_field_method_get("data", |lua, this| lua.to_value_with(&this.data, LUA_SERIALIZE_OPTIONS));
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<NamedDataStoreType>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "name",
+                    "data",
+                ]
+            )
+        });
+    }
+}
 
 #[derive(Clone)]
 pub struct DataStore<T: KhronosContext> {
@@ -21,12 +59,14 @@ pub struct DataStore<T: KhronosContext> {
 
 impl<T: KhronosContext> DataStore<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.executor.context.has_cap(&format!("datastore:{}", self.ds_impl.name())) && !self.executor.context.has_cap(&format!("datastore:{}:{}", self.ds_impl.name(), action)) {
-            return Err(LuaError::runtime(format!(
-                "Datastore action is not allowed in this template context: data store: {}, action: {}",
-                self.ds_impl.name(),
-                action
-            )));
+        if self.ds_impl.needs_caps() {
+            if !self.executor.context.has_cap(&format!("datastore:{}", self.ds_impl.name())) && !self.executor.context.has_cap(&format!("datastore:{}:{}", self.ds_impl.name(), action)) {
+                return Err(LuaError::runtime(format!(
+                    "Datastore action is not allowed in this template context: data store: {}, action: {}",
+                    self.ds_impl.name(),
+                    action
+                )));
+            }    
         }
 
         self.executor
@@ -42,6 +82,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("name", |_, this| Ok(this.ds_impl.name()));
         fields.add_field_method_get("table_name", |lua, this| lua.to_value_with(&this.ds_impl.table_name(), LUA_SERIALIZE_OPTIONS));
+        fields.add_field_method_get("needs_caps", |_, this| Ok(this.ds_impl.needs_caps()));
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
@@ -70,9 +111,12 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
         });
 
         methods.add_method("filters_sql", |lua, this, filters: LuaValue| {
-            let filters: Filters = lua.from_value(filters)?;
+            let dsv = DataStoreValue::from_lua(filters, lua)?;
+            let DataStoreValue::Filters(filters) = dsv else {
+                return Err(LuaError::external("A NamedDataStoreType with a name=Filters is required to create a filter"));
+            };
             let (sql, filter_fields) = this.ds_impl.filters_sql(filters);
-            Ok((sql, Lazy::new(filter_fields)))
+            Ok((sql, filter_fields))
         });
 
         methods.add_method("validate_data_against_columns", |lua, this, data: LuaValue| {
@@ -102,143 +146,17 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                     let method = lua.create_function(
                         move |_lua, data: LuaMultiValue| {
                             let method_impl = method_impl.clone();
-                            match method_impl {
-                                DataStoreMethod::NoArgs(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, func, |_lua, this_ref, key_ref, func|, {
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)().await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::Filters(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("Filters not provided"));
-                                        };
 
-                                        let filters: Filters = lua.from_value(value)?;
+                            Ok(lua_promise!(this_ref, key_ref, method_impl, data, |lua, this_ref, key_ref, method_impl, data|, {
+                                let mut args = Vec::with_capacity(data.len());
+                                for value in data {
+                                    args.push(DataStoreValue::from_lua(value, &lua)?);
+                                }
 
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(filters).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::Value(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValue not provided"));
-                                        };
-
-                                        let value = DataStoreValue::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(value).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::Map(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValueMap not provided"));
-                                        };
-
-                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(map).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::FiltersAndValue(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("Filters and DataStoreValue not provided"));
-                                        };
-
-                                        let filters: Filters = lua.from_value(value)?;
-
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValue not provided"));
-                                        };
-
-                                        let value = DataStoreValue::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(filters, value).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::FiltersAndMap(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("Filters and DataStoreValueMap not provided"));
-                                        };
-
-                                        let filters: Filters = lua.from_value(value)?;
-
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValueMap not provided"));
-                                        };
-
-                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(filters, map).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::ValueAndMap(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValue and DataStoreValueMap not provided"));
-                                        };
-
-                                        let ds_value = DataStoreValue::from_lua(value, &lua)?;
-
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValueMap not provided"));
-                                        };
-
-                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(ds_value, map).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                                DataStoreMethod::FiltersAndValueAndMap(func) => {
-                                    Ok(lua_promise!(this_ref, key_ref, data, func, |lua, this_ref, key_ref, data, func|, {
-                                        let mut data = data;
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("Filters and DataStoreValue and DataStoreValueMap not provided"));
-                                        };
-
-                                        let filters: Filters = lua.from_value(value)?;
-
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValue not provided"));
-                                        };
-
-                                        let ds_value = DataStoreValue::from_lua(value, &lua)?;
-
-                                        let Some(value) = data.pop_front() else {
-                                            return Err(LuaError::external("DataStoreValueMap not provided"));
-                                        };
-
-                                        let map = DataStoreValueMap::from_lua(value, &lua)?;
-
-                                        this_ref.check_action(key_ref.clone())?;
-                                        let result = (func)(filters, ds_value, map).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result)
-                                    }))
-                                },
-                            }
+                                this_ref.check_action(key_ref.clone())?;
+                                let result = (method_impl)(args).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                Ok(result)
+                            }))
                         },
                     )?;
 
@@ -263,6 +181,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                 // Fields
                 "name".to_string(),
                 "table_name".to_string(),
+                "needs_caps".to_string(),
                 // Methods
                 "column_names".to_string(),
                 "list".to_string(),
@@ -398,6 +317,20 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                 };
 
                 Ok(executor)
+            },
+        )?,
+    )?;
+
+    module.set(
+        "wraptype",
+        lua.create_function(
+            |_lua, (name, data): (String, LuaValue)| {
+                let named_datastore = NamedDataStoreType {
+                    name,
+                    data,
+                };
+
+                Ok(named_datastore)
             },
         )?,
     )?;

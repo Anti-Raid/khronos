@@ -1,5 +1,9 @@
 local evt,ctx=...
-p=require"@antiraid/promise"
-a=require"@antiraid/datastores"
-b=a.new(ctx)
-return p.yield(b.DummyStoreImpl.returnValue({1,2,3}))
+local p=require"@antiraid/promise"
+local a=require"@antiraid/datastores"
+local dt=require"@antiraid/datetime"
+local b=a.new(ctx)
+print(p.yield(b.CopyDataStore.copy({1,2,3})))
+print(tostring(p.yield(b.CopyDataStore.copy(dt.new("IST")))))
+print(p.yield(b.CopyDataStore.copy(dt.UTC:now())))
+print(p.yield(b.CopyDataStore.copy("multi", "value")))

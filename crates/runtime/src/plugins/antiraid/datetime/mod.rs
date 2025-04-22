@@ -279,6 +279,12 @@ pub struct Timezone {
     pub tz: chrono_tz::Tz,
 }
 
+impl Timezone {
+    pub fn new(tz: chrono_tz::Tz) -> Self {
+        Timezone { tz }
+    }
+}
+
 impl LuaUserData for Timezone {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {

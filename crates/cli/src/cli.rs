@@ -266,6 +266,8 @@ impl Cli {
             }
         };
 
+        log::debug!("Spawning script: {}", code);
+
         let result = self
             .setup_data
             .main_isolate
