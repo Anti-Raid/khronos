@@ -10,6 +10,7 @@ pub enum KhronosValue {
     UnsignedInteger(u64),
     Float(f64),
     Boolean(bool),
+    Vector((f32, f32, f32)), // Luau vector
     Map(indexmap::IndexMap<String, KhronosValue>),
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
@@ -228,6 +229,39 @@ impl TryFrom<KhronosValue> for bool {
         }
     }
 }
+
+impl From<(f32, f32)> for KhronosValue {
+    fn from(value: (f32, f32)) -> Self {
+        KhronosValue::Vector((value.0, value.1, 0.0))
+    }
+}
+
+impl TryFrom<KhronosValue> for (f32, f32) {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::Vector(v) => Ok((v.0, v.1)),
+            _ => Err("KhronosValue is not a vector".into()),
+        }
+    }
+}
+
+impl From<(f32, f32, f32)> for KhronosValue {
+    fn from(value: (f32, f32, f32)) -> Self {
+        KhronosValue::Vector(value)
+    }
+}
+
+impl TryFrom<KhronosValue> for (f32, f32, f32) {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::Vector(v) => Ok(v),
+            _ => Err("KhronosValue is not a vector".into()),
+        }
+    }
+}
+
 impl From<chrono::DateTime<chrono::Utc>> for KhronosValue {
     fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
         KhronosValue::Timestamptz(value)
@@ -411,6 +445,7 @@ impl KhronosValue {
             KhronosValue::UnsignedInteger(_) => "unsigned_integer",
             KhronosValue::Float(_) => "float",
             KhronosValue::Boolean(_) => "boolean",
+            KhronosValue::Vector(_) => "vector",
             KhronosValue::Map(_) => "map",
             KhronosValue::List(_) => "list",
             KhronosValue::Timestamptz(_) => "timestamptz",
@@ -455,6 +490,13 @@ impl KhronosValue {
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             KhronosValue::Boolean(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_vector(&self) -> Option<(f32, f32, f32)> {
+        match self {
+            KhronosValue::Vector(v) => Some(*v),
             _ => None,
         }
     }
@@ -504,6 +546,7 @@ impl KhronosValue {
             LuaValue::Integer(i) => Ok(KhronosValue::Integer(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
             LuaValue::Boolean(b) => Ok(KhronosValue::Boolean(b)),
+            LuaValue::Vector(v) => Ok(KhronosValue::Vector((v.x(), v.y(), v.z()))),
             LuaValue::Nil => Ok(KhronosValue::Null),
             LuaValue::Table(table) => {
                 if table.raw_len() == 0 {
@@ -569,6 +612,7 @@ impl KhronosValue {
             KhronosValue::UnsignedInteger(i) => crate::plugins::antiraid::typesext::U64(i).into_lua(lua), // An UnsignedInteger can only be created through explicit U64 parse
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
+            KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
             KhronosValue::Map(j) => {
                 let table = lua.create_table()?;
                 for (k, v) in j.into_iter() {
@@ -603,6 +647,18 @@ impl KhronosValue {
             KhronosValue::UnsignedInteger(i) => serde_json::Value::Number(serde_json::Number::from(i)),
             KhronosValue::Float(f) => serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap()),
             KhronosValue::Boolean(b) => serde_json::Value::Bool(b),
+            KhronosValue::Vector(v) => {
+                if !preserve_types {
+                    serde_json::to_value(v)
+                        .map_err(|e| format!("Failed to serialize Vector: {}", e))?
+                } else {
+                    serde_json::json!({
+                        KHRONOS_VALUE_TYPE_KEY: "vector",
+                        "value": serde_json::to_value(v)
+                        .map_err(|e| format!("Failed to serialize Vector: {}", e))?
+                    })
+                }
+            }
             KhronosValue::Map(m) => {
                 let mut map = serde_json::Map::new();
                 for (k, v) in m.into_iter() {
@@ -681,6 +737,10 @@ impl KhronosValue {
                 if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
                     if let Some(khronos_value_type) = khronos_value_type.as_str() {
                         match khronos_value_type {
+                            "vector" => {
+                                let value = m.get("value").ok_or("Missing value field")?;
+                                return Ok(KhronosValue::Vector(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize Vector: {}", e))?));
+                            }
                             "timestamptz" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Timestamptz(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize DateTime: {}", e))?));
@@ -729,6 +789,7 @@ impl KhronosValue {
             KhronosValue::UnsignedInteger(i) => visitor.visit_unsigned_integer(*i),
             KhronosValue::Float(f) => visitor.visit_float(*f),
             KhronosValue::Boolean(b) => visitor.visit_boolean(*b),
+            KhronosValue::Vector(v) => visitor.visit_vector(*v),
             KhronosValue::Map(m) => {
                 visitor.visit_map(m)?;  
                 for (k, v) in m {
@@ -771,6 +832,9 @@ pub trait KhronosValueVisitor {
         Ok(())
     }
     fn visit_boolean(&mut self, _value: bool) -> Result<(), crate::Error> {
+        Ok(())
+    }
+    fn visit_vector(&mut self, _value: (f32, f32, f32)) -> Result<(), crate::Error> {
         Ok(())
     }
     fn visit_map(&mut self, _value: &indexmap::IndexMap<String, KhronosValue>) -> Result<(), crate::Error> {
@@ -832,6 +896,14 @@ impl Serialize for KhronosValue {
         match self {
             KhronosValue::Null => serializer.serialize_unit(),
             KhronosValue::Boolean(b) => serializer.serialize_bool(*b),
+            KhronosValue::Vector(v) => {
+                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "vector")?;
+                map.serialize_entry("value", v)?;
+                map.end()
+            }
             KhronosValue::Integer(i) => serializer.serialize_i64(*i),
             KhronosValue::UnsignedInteger(i) => serializer.serialize_u64(*i),
             KhronosValue::Float(f) => serializer.serialize_f64(*f),
