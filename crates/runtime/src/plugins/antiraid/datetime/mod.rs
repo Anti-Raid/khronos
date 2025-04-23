@@ -235,6 +235,8 @@ where
     }
 
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "DateTime".to_string());
+
         fields.add_field_method_get("year", |_, this| Ok(this.dt.year()));
         fields.add_field_method_get("month", |_, this| Ok(this.dt.month()));
         fields.add_field_method_get("day", |_, this| Ok(this.dt.day()));
@@ -286,6 +288,11 @@ impl Timezone {
 }
 
 impl LuaUserData for Timezone {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "Timezone".to_string());
+        fields.add_field_method_get("name", |_, this| Ok(this.tz.name()));
+    }
+
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
             Ok(this.tz.to_string())
@@ -475,6 +482,7 @@ impl LuaUserData for Timezone {
                 ud,
                 [
                     // Fields
+                    "name",
                     // Methods
                     "fromString",
                     "utcToTz",
