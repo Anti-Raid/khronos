@@ -163,6 +163,23 @@ impl TryFrom<KhronosValue> for u64 {
         }
     }
 }
+
+impl From<usize> for KhronosValue {
+    fn from(value: usize) -> Self {
+        KhronosValue::UnsignedInteger(value as u64)
+    }
+}
+
+impl TryFrom<KhronosValue> for usize {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::UnsignedInteger(i) => i.try_into().map_err(|_| "KhronosValue is not a usize".into()),
+            _ => Err("KhronosValue is not a usize".into()),
+        }
+    }
+}
+
 impl From<f32> for KhronosValue {
     fn from(value: f32) -> Self {
         KhronosValue::Float(value.into())
