@@ -1,5 +1,5 @@
 use mlua::prelude::*;
-
+use rand::Rng;
 use crate::primitives::create_userdata_iterator_with_fields;
 
 /// Syntactically:
@@ -801,6 +801,25 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     module.set("bitu64", bitu64(lua)?)?;
+
+    module.set(
+        "randstring",
+        lua.create_function(|lua, length: i32| {
+            if length <= 0 || length > 255 {
+                return Err(LuaError::external("Length must be greater than 0 and less than 256"));
+            }
+
+            let mut rng = rand::thread_rng();
+            let chars: Vec<char> = (0..length)
+                .map(|_| {
+                    let c = rng.gen_range(0..=255) as u8;
+                    char::from(c)
+                })
+                .collect();
+
+            Ok(lua.create_string(&chars.iter().collect::<String>())?)
+        })?,
+    )?;
 
     module.set_readonly(true); // Block any attempt to modify this table
 
