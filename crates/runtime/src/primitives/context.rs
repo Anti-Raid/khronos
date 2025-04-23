@@ -1,5 +1,5 @@
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-
+use crate::utils::executorscope::ExecutorScope;
 use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 use std::cell::RefCell;
@@ -14,6 +14,9 @@ pub struct TemplateContext<T: KhronosContext> {
 
     /// The cached serialized value of the current user
     current_discord_user: RefCell<Option<LuaValue>>,
+
+    /// Cached datastore. Internally used for the datastore plugin
+    pub(crate) cached_datastore: RefCell<Vec<(ExecutorScope, LuaValue)>>,
 }
 
 impl<T: KhronosContext> TemplateContext<T> {
@@ -22,6 +25,7 @@ impl<T: KhronosContext> TemplateContext<T> {
             context,
             cached_data: RefCell::default(),
             current_discord_user: RefCell::default(),
+            cached_datastore: RefCell::default(),
         }
     }
 

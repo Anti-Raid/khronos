@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ExecutorScope {
     #[default]
     /// The originating guild

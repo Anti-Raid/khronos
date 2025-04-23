@@ -239,8 +239,18 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     module.set(
         "new",
         lua.create_function(
-            |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
+            |lua, (token, scope): (TemplateContextRef<T>, Option<String>)| {
                 let scope = ExecutorScope::scope_str(scope)?;
+
+                let mut cached_datastores = token.cached_datastore.try_borrow_mut()
+                    .map_err(|_| LuaError::external("Failed to borrow cached datastores"))?;
+                
+                for (ex_scope, ds) in cached_datastores.iter() {
+                    if ex_scope == &scope {
+                        return Ok(ds.clone());
+                    }
+                }
+
                 let Some(datastore_provider) = token.context.datastore_provider(scope) else {
                     return Err(LuaError::external(
                         "The datastore plugin is not supported in this context",
@@ -251,7 +261,15 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                     context: token.context.clone(),
                     datastore_provider,
                     known_datastores: Rc::new(RefCell::new(HashMap::new())),
-                };
+                }.into_lua(lua)?;
+
+                // Cache the datastore executor
+                cached_datastores.push(
+                    (
+                        scope.clone(),
+                        executor.clone(),
+                    )
+                );
 
                 Ok(executor)
             },
