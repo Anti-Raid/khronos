@@ -401,6 +401,53 @@ impl TryFrom<KhronosValue> for std::collections::HashMap<String, KhronosValue> {
     }
 }
 
+/// Simple struct to allow for embedding a serde-able type that can be converted to/from a KhronosValue using TryFrom
+pub struct SerdeBlob<T: Serialize + for<'de> Deserialize<'de>>(T);
+
+impl<T: Serialize + for<'de> Deserialize<'de>> std::ops::Deref for SerdeBlob<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Serialize + for<'de> Deserialize<'de>> std::ops::DerefMut for SerdeBlob<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T: Serialize + for<'de> Deserialize<'de>> SerdeBlob<T> {
+    pub fn new(value: T) -> Self {
+        SerdeBlob(value)
+    }
+
+    pub fn take(self) -> T {
+        self.0
+    }
+}
+
+impl<T: Serialize + for<'de> Deserialize<'de>> TryFrom<SerdeBlob<T>> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: SerdeBlob<T>) -> Result<Self, Self::Error> {
+        let value = serde_json::to_value(value.0)?;
+        let value = KhronosValue::from_serde_json_value(value, 0)?;
+        Ok(value)
+    }
+}
+
+impl<T: Serialize + for<'de> Deserialize<'de>> TryFrom<KhronosValue> for SerdeBlob<T> {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        let serde_json_value = value.into_serde_json_value(0, false)?;
+        let value = T::deserialize(serde_json_value).map_err(|e| {
+            crate::Error::from(format!("Failed to deserialize SerdeBlob: {}", e))
+        })?;
+        Ok(SerdeBlob(value))
+    }
+}
+
 /// Macro to cheaply create a KhronosValue
 ///
 /// value!(1, 2, 3) will create a KhronosValue::List(vec![
