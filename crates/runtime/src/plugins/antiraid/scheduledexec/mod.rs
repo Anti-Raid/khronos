@@ -1,8 +1,7 @@
 mod types;
 
 use mlua::prelude::*;
-
-use crate::plugins::antiraid::lazy::Lazy;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::lua_promise;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
@@ -39,7 +38,7 @@ impl<T: KhronosContext> LuaUserData for ScheduledExecExecutor<T> {
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("list", |_, this, (id,): (Option<String>,)| {
-            Ok(lua_promise!(this, id, |_lua, this, id|, {
+            Ok(lua_promise!(this, id, |lua, this, id|, {
                 this.check_action("list".to_string())?;
 
                 let execs = this.scheduled_exec_provider.list(id).await
@@ -53,7 +52,7 @@ impl<T: KhronosContext> LuaUserData for ScheduledExecExecutor<T> {
                 })
                 .collect::<Vec<_>>();
 
-                Ok(Lazy::new(execs))
+                lua.to_value_with(&execs, LUA_SERIALIZE_OPTIONS)
             }))
         });
 
