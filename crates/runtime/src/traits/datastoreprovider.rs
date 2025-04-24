@@ -7,7 +7,7 @@ pub trait DataStoreProvider: 'static + Clone {
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
     ///
     /// This should return an error if ratelimited
-    fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
+    fn attempt_action(&self, datastore: &str, bucket: &str) -> Result<(), crate::Error>;
 
     /// Returns a builtin data store given its name
     fn get_builtin_data_store(&self, name: &str) -> Option<Rc<dyn DataStoreImpl>>;

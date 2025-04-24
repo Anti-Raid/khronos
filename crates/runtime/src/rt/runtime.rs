@@ -74,12 +74,13 @@ impl KhronosRuntime {
     pub fn new<
         SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
-        ThreadEventCallbackFunc: Fn(&Lua, LuaValue) -> Result<(), mlua::Error> + 'static,
+        ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mlua::Error> + 'static,
+        ThreadDestructionCallbackFunc: Fn() -> () + 'static, 
     >(
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
-        on_thread_event_callback: Option<ThreadEventCallbackFunc>,
+        on_thread_event_callback: Option<(ThreadCreationCallbackFunc, ThreadDestructionCallbackFunc)>,
     ) -> Result<Self, LuaError> {
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
@@ -160,23 +161,9 @@ impl KhronosRuntime {
         let max_threads_ref = max_threads.clone();
 
         if let Some(on_thread_event_callback) = on_thread_event_callback {
-            lua.set_thread_event_callback(move |lua, value| {
-                let new = match value {
-                    LuaValue::Thread(_) => {
-                        let new = current_threads_ref.get() + 1;
-                        current_threads_ref.set(new);
-                        new
-                    }
-                    _ => {
-                        let mut new = current_threads_ref.get() - 1;
-                        // Ensure we don't go negative
-                        if new < 0 {
-                            new = 0;
-                        }
-                        current_threads_ref.set(new);
-                        new
-                    }
-                };
+            lua.set_thread_creation_callback(move |lua, thread| {
+                let new = current_threads_ref.get() + 1;
+                current_threads_ref.set(new);
 
                 log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
@@ -190,26 +177,28 @@ impl KhronosRuntime {
                 }
 
                 // Call the user provided callback
-                on_thread_event_callback(lua, value)
+                on_thread_event_callback.0(lua, thread)?;
+
+                Ok(())
+            });
+
+            let current_threads_ref = current_threads.clone();
+
+            lua.set_thread_collection_callback(move |_| {
+                let mut new = current_threads_ref.get() - 1;
+                // Ensure we don't go negative
+                if new < 0 {
+                    new = 0;
+                }
+                current_threads_ref.set(new);
+
+                // Call the user provided callback
+                on_thread_event_callback.1();
             });
         } else {
-            lua.set_thread_event_callback(move |_lua, value| {
-                let new = match value {
-                    LuaValue::Thread(_) => {
-                        let new = current_threads_ref.get() + 1;
-                        current_threads_ref.set(new);
-                        new
-                    }
-                    _ => {
-                        let mut new = current_threads_ref.get() - 1;
-                        // Ensure we don't go negative
-                        if new < 0 {
-                            new = 0;
-                        }
-                        current_threads_ref.set(new);
-                        new
-                    }
-                };
+            lua.set_thread_creation_callback(move |_lua, _thread| {
+                let new = current_threads_ref.get() + 1;
+                current_threads_ref.set(new);
 
                 log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
@@ -223,6 +212,17 @@ impl KhronosRuntime {
                 }
 
                 Ok(())
+            });
+
+            let current_threads_ref = current_threads.clone();
+
+            lua.set_thread_collection_callback(move |_| {
+                let mut new = current_threads_ref.get() - 1;
+                // Ensure we don't go negative
+                if new < 0 {
+                    new = 0;
+                }
+                current_threads_ref.set(new);
             });
         }
 

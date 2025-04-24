@@ -423,7 +423,7 @@ pub struct CliDataStoreProvider {
 }
 
 impl DataStoreProvider for CliDataStoreProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+    fn attempt_action(&self, _method: &str, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
 

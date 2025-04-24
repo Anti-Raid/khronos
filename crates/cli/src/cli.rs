@@ -295,7 +295,7 @@ impl Cli {
             Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
                 Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
             }),
-            None::<fn(&Lua, LuaValue) -> Result<(), mlua::Error>>,
+            None::<(fn(&Lua, LuaThread) -> Result<(), mlua::Error>, fn() -> ())>,
         )
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());

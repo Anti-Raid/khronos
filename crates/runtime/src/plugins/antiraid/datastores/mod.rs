@@ -32,7 +32,7 @@ impl<T: KhronosContext> DataStore<T> {
 
         self.executor
             .datastore_provider
-            .attempt_action(&action)
+            .attempt_action(&self.ds_impl.name(), &action)
             .map_err(|e| LuaError::external(e.to_string()))?;
 
         Ok(())
