@@ -822,11 +822,12 @@ impl KhronosValue {
         })
     }
 
-    /// Note: this is not the best performance-wise. In general, consider using `visit` to parse a KhronosValue to a struct etc.
-    pub fn into_value<T: serde::Serialize>(self) -> Result<serde_json::Value, crate::Error> {
+    /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
+    pub fn into_value<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
         let value = self.into_serde_json_value(0, true)?;
-        Ok(serde_json::to_value(value)
-            .map_err(|e| format!("Failed to serialize KhronosValue: {}", e))?)
+        Ok(T::deserialize(&value).map_err(|e| {
+            crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
+        })?)
     }
 
     pub fn visit<T: KhronosValueVisitor>(&self, visitor: &mut T) -> Result<(), crate::Error> {
