@@ -48,7 +48,7 @@ impl From<ReplTaskWaitMode> for cli::ReplTaskWaitMode {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 struct CliArgs {
     #[arg(name = "path")]
     /// The path to the script to run
@@ -211,6 +211,10 @@ struct CliArgs {
     /// Environment variable: `USE_CUSTOM_PRINT`
     #[clap(long, default_value = "false")]
     use_custom_print: bool,
+
+    /// Spawn test. This is a debug flag only
+    #[clap(long, default_value = "false")]
+    spawn_test: bool,
 
     /// The path to a config file containing e.g.
     /// the bot token etc
@@ -581,6 +585,39 @@ fn main() {
     env_logger::init();
 
     let cli_args = CliArgs::parse();
+
+    if cli_args.spawn_test {
+        let TOTAL_THREADS_TO_SPAWN = 1000;
+        let mut threads = Vec::new();
+        for i in 0..TOTAL_THREADS_TO_SPAWN {
+            println!("Thread {} spawned", i);
+
+            let cli_args_ref = cli_args.clone();
+            let th = std::thread::spawn(move || {
+                // Create tokio runtime and use spawn_local
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .worker_threads(10)
+                    .build()
+                    .unwrap();
+
+                let local = tokio::task::LocalSet::new();
+
+                local.block_on(&rt, async {
+                    let (mut cli, entrypoint_action) = cli_args_ref.finalize().await;
+
+                    cli.entrypoint(entrypoint_action).await;
+                });
+            });
+
+            threads.push(th);
+        }
+
+        for th in threads {
+            th.join().unwrap();
+        }
+        println!("All threads spawned");
+    }
 
     // Create tokio runtime and use spawn_local
     let rt = tokio::runtime::Builder::new_current_thread()
