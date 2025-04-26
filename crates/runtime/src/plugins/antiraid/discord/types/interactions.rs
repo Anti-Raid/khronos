@@ -276,3 +276,20 @@ pub struct CreateInteractionResponseFollowup {
     pub poll: Option<CreatePoll>,
     pub attachments: Option<CreateMessageAttachment>,
 }
+
+/// A builder to specify the fields to edit in an existing [`Webhook`]'s message.
+///
+/// [Discord docs](https://discord.com/developers/docs/resources/webhook#edit-webhook-message)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct EditWebhookMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embeds: Option<Vec<CreateEmbed>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_mentions: Option<CreateAllowedMentions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<Vec<ActionRow>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<CreateMessageAttachment>,
+}

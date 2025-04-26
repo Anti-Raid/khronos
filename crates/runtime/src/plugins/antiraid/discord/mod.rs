@@ -1983,29 +1983,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }))
         });
 
-        methods.add_method("create_followup_message", |_, this, data: LuaValue| {
-            Ok(lua_promise!(this, data, |lua, this, data|, {
-                let data = lua.from_value::<structs::CreateFollowupMessageOptions>(data)?;
-
-                this.check_action("create_followup_message".to_string())
-                    .map_err(LuaError::external)?;
-
-                let files = if let Some(ref attachments) = data.data.attachments {
-                    attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
-                } else {
-                    Vec::new()
-                };
-
-
-                this.discord_provider
-                    .create_followup_message(&data.interaction_token, &data.data, files)
-                    .await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                Ok(())
-            }))
-        });
-
         methods.add_method(
             "get_original_interaction_response",
             |_, this, interaction_token: String| {
@@ -2025,6 +2002,124 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             },
         );
 
+        methods.add_method("edit_original_interaction_response", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::EditInteractionResponseOptions>(data)?;
+
+                this.check_action("edit_original_interaction_response".to_string())
+                    .map_err(LuaError::external)?;
+
+                let files = if let Some(ref attachments) = data.data.attachments {
+                    attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+                } else {
+                    Vec::new()
+                };
+
+
+                let msg = this.discord_provider
+                    .edit_original_interaction_response(&data.interaction_token, &data.data, files)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        methods.add_method("delete_original_interaction_response", |_, this, interaction_token: String| {
+            Ok(lua_promise!(this, interaction_token, |_lua, this, interaction_token|, {
+                this.check_action("delete_original_interaction_response".to_string())
+                    .map_err(LuaError::external)?;
+
+                this.discord_provider
+                    .delete_original_interaction_response(&interaction_token)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
+            }))
+        });
+
+        methods.add_method("get_followup_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::GetFollowupMessageOptions>(data)?;
+
+                this.check_action("get_followup_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                let msg = this.discord_provider
+                    .get_followup_message(&data.interaction_token, data.message_id)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        methods.add_method("create_followup_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::CreateFollowupMessageOptions>(data)?;
+
+                this.check_action("create_followup_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                let files = if let Some(ref attachments) = data.data.attachments {
+                    attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+                } else {
+                    Vec::new()
+                };
+
+
+                let msg = this.discord_provider
+                    .create_followup_message(&data.interaction_token, &data.data, files)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        methods.add_method("edit_followup_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::EditFollowupMessageOptions>(data)?;
+
+                this.check_action("edit_followup_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                let files = if let Some(ref attachments) = data.data.attachments {
+                    attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+                } else {
+                    Vec::new()
+                };
+
+
+                let msg = this.discord_provider
+                    .edit_followup_message(&data.interaction_token, data.message_id, &data.data, files)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(Lazy::new(msg))
+            }))
+        });
+
+        methods.add_method("delete_followup_message", |_, this, data: LuaValue| {
+            Ok(lua_promise!(this, data, |lua, this, data|, {
+                let data = lua.from_value::<structs::DeleteFollowupMessageOptions>(data)?;
+
+                this.check_action("delete_followup_message".to_string())
+                    .map_err(LuaError::external)?;
+
+                this.discord_provider
+                    .delete_followup_message(&data.interaction_token, data.message_id)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
+            }))
+        });
+
+        // Uncategorized
+
+        // Should be documented
         methods.add_method("get_guild_command", |_, this, cmd_id: String| {
             Ok(lua_promise!(this, cmd_id, |_lua, this, cmd_id|, {
                 let command_id: serenity::all::CommandId = cmd_id.parse().map_err(|e| {

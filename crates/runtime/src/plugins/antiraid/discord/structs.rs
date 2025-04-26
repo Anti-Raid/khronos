@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use super::types::{
     CreateAutoModRule, CreateCommand, CreateInteractionResponse, CreateInteractionResponseFollowup,
     CreateMessage, EditAutoModRule, CreateChannel, EditChannel, EditMember, EditGuild, EditRole,
-    CreateInvite
+    CreateInvite, EditWebhookMessage,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -87,9 +87,34 @@ pub struct CreateInteractionResponseOptions {
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct EditInteractionResponseOptions {
+    pub interaction_token: String,
+    pub data: EditWebhookMessage,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct GetFollowupMessageOptions {
+    pub interaction_token: String,
+    pub message_id: serenity::all::MessageId,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateFollowupMessageOptions {
     pub interaction_token: String,
-    pub data: CreateInteractionResponseFollowup,
+    pub data: CreateInteractionResponseFollowup, 
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct EditFollowupMessageOptions {
+    pub interaction_token: String,
+    pub message_id: serenity::all::MessageId,
+    pub data: EditWebhookMessage,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct DeleteFollowupMessageOptions {
+    pub interaction_token: String,
+    pub message_id: serenity::all::MessageId,
 }
 
 /// In Luau { type: "After" | "Around" | "Before", id: MessageId }
@@ -316,3 +341,4 @@ pub struct DeleteInviteOptions {
     pub code: String,
     pub reason: String,
 }
+

@@ -570,7 +570,7 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to send message: {}", e).into())
     }
 
-    /// Uncategorized (for now)
+    // Interactions
 
     async fn create_interaction_response(
         &self,
@@ -585,6 +585,50 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to create interaction response: {}", e).into())
     }
 
+    async fn get_original_interaction_response(
+        &self,
+        interaction_token: &str,
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        self.serenity_http()
+            .get_original_interaction_response(interaction_token)
+            .await
+            .map_err(|e| format!("Failed to get original interaction response: {}", e).into())
+    }
+
+    // https://discord.com/developers/docs/interactions/receiving-and-responding#edit-original-interaction-response
+    async fn edit_original_interaction_response(
+        &self,
+        interaction_token: &str,
+        map: impl serde::Serialize,
+        new_files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        self.serenity_http()
+            .edit_original_interaction_response(interaction_token, &map, new_files)
+            .await
+            .map_err(|e| format!("Failed to edit original interaction response: {}", e).into())
+    }
+
+    async fn delete_original_interaction_response(
+        &self,
+        interaction_token: &str,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_original_interaction_response(interaction_token)
+            .await
+            .map_err(|e| format!("Failed to delete original interaction response: {}", e).into())
+    }
+
+    async fn get_followup_message(
+        &self,
+        interaction_token: &str,
+        message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        self.serenity_http()
+            .get_followup_message(interaction_token, message_id)
+            .await
+            .map_err(|e| format!("Failed to get interaction followup: {}", e).into())
+    }
+
     async fn create_followup_message(
         &self,
         interaction_token: &str,
@@ -597,15 +641,31 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to create interaction followup: {}", e).into())
     }
 
-    async fn get_original_interaction_response(
+    async fn edit_followup_message(
         &self,
         interaction_token: &str,
-    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        message_id: serenity::all::MessageId,
+        map: impl serde::Serialize,
+        new_files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<serenity::all::Message, crate::Error> {
         self.serenity_http()
-            .get_original_interaction_response(interaction_token)
+            .edit_followup_message(interaction_token, message_id, &map, new_files)
             .await
-            .map_err(|e| format!("Failed to get original interaction response: {}", e).into())
+            .map_err(|e| format!("Failed to edit interaction followup: {}", e).into())
     }
+
+    async fn delete_followup_message(
+        &self,
+        interaction_token: &str,
+        message_id: serenity::all::MessageId,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_followup_message(interaction_token, message_id)
+            .await
+            .map_err(|e| format!("Failed to delete interaction followup: {}", e).into())
+    }
+
+    // Uncategorized (for now)
 
     async fn get_guild_commands(
         &self,
