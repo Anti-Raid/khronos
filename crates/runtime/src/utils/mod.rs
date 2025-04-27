@@ -1,12 +1,11 @@
-pub mod assets;
 pub mod ensure_safe;
 pub mod executorscope;
 pub mod pluginholder;
 pub mod prelude;
 pub mod proxyglobal;
 pub mod ratelimits;
-pub mod require;
 pub mod serenity_backports;
 pub mod serenity_utils;
 pub mod threadlimitmw;
 pub mod khronos_value;
+pub mod require_v2;

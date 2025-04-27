@@ -6,27 +6,26 @@ use std::rc::Rc;
 
 use super::isolate::KhronosIsolate;
 use super::runtime::{KhronosRuntime, OnBrokenFunc};
-use crate::utils::assets::AssetManager as AssetManagerTrait;
 
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
 ///
 /// Like isolates, these are also cheap to clone
 #[derive(Clone)]
-pub struct KhronosRuntimeManager<T: AssetManagerTrait + Clone + 'static> {
+pub struct KhronosRuntimeManager {
     /// The runtime itself
     rt: KhronosRuntime,
 
     /// A map of name to sub-isolate
-    sub_isolates: Rc<RefCell<std::collections::HashMap<String, KhronosIsolate<T>>>>,
+    sub_isolates: Rc<RefCell<std::collections::HashMap<String, KhronosIsolate>>>,
 
     /// The main isolate (if any)
-    main_isolate: Rc<RefCell<Option<KhronosIsolate<T>>>>,
+    main_isolate: Rc<RefCell<Option<KhronosIsolate>>>,
 
     /// A function to be called if the runtime is marked as broken
     on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
 }
 
-impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
+impl KhronosRuntimeManager {
     /// Creates a new runtime manager
     pub fn new(rt: KhronosRuntime) -> Self {
         if rt.has_on_broken() {
@@ -58,7 +57,7 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
     }
 
     /// Sets the main isolate
-    pub fn set_main_isolate(&self, isolate: KhronosIsolate<T>) {
+    pub fn set_main_isolate(&self, isolate: KhronosIsolate) {
         self.main_isolate.borrow_mut().replace(isolate);
     }
 
@@ -68,22 +67,22 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
     }
 
     /// Returns the main isolate (if any)
-    pub fn main_isolate(&self) -> Option<KhronosIsolate<T>> {
+    pub fn main_isolate(&self) -> Option<KhronosIsolate> {
         self.main_isolate.borrow().clone()
     }
 
     /// Returns a sub-isolate by name
-    pub fn get_sub_isolate(&self, name: &str) -> Option<KhronosIsolate<T>> {
+    pub fn get_sub_isolate(&self, name: &str) -> Option<KhronosIsolate> {
         self.sub_isolates.borrow().get(name).cloned()
     }
 
     /// Adds a sub-isolate by name
-    pub fn add_sub_isolate(&self, name: String, isolate: KhronosIsolate<T>) {
+    pub fn add_sub_isolate(&self, name: String, isolate: KhronosIsolate) {
         self.sub_isolates.borrow_mut().insert(name, isolate);
     }
 
     /// Removes a sub-isolate by name
-    pub fn remove_sub_isolate(&self, name: &str) -> Option<KhronosIsolate<T>> {
+    pub fn remove_sub_isolate(&self, name: &str) -> Option<KhronosIsolate> {
         self.sub_isolates.borrow_mut().remove(name)
     }
 
@@ -93,7 +92,7 @@ impl<T: AssetManagerTrait + Clone + 'static> KhronosRuntimeManager<T> {
     }
 
     /// Returns the hashmap of sub-isolates
-    pub fn sub_isolates(&self) -> std::collections::HashMap<String, KhronosIsolate<T>> {
+    pub fn sub_isolates(&self) -> std::collections::HashMap<String, KhronosIsolate> {
         self.sub_isolates.borrow().clone()
     }
 
