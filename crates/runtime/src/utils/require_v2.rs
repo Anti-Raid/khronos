@@ -133,9 +133,9 @@ impl AssetRequirer {
     fn is_file(&self, path: &Path) -> VfsResult<bool> {
         let path = Self::path_fix(path);
 
-        println!("Checking if {:#?} is a file", path);
+        log::trace!("Checking if {:#?} is a file", path);
         if !self.fs.exists(&path)? {
-            println!("File {:#?} does not exist", path);
+            log::trace!("File {:#?} does not exist", path);
             return Ok(false);
         }
 
@@ -155,18 +155,18 @@ impl AssetRequirer {
     fn is_dir(&self, path: &Path) -> VfsResult<bool> {
         let path = Self::path_fix(path);
 
-        println!("Checking if {:#?} is a directory", path);
+        log::trace!("Checking if {:#?} is a directory", path);
         if path.is_empty() || path == "/" {
             return Ok(true);
         }
 
         if !self.fs.exists(&path)? {
-            println!("Directory {:#?} does not exist", path);
+            log::trace!("Directory {:#?} does not exist", path);
             return Ok(false);
         }
 
         let metadata = self.fs.0.metadata(&path)?;
-        println!("Metadata: {:#?}", metadata);
+        log::trace!("Metadata: {:#?}", metadata);
         Ok(metadata.file_type == VfsFileType::Directory)
     }
     
@@ -200,7 +200,7 @@ impl AssetRequirer {
     }
 
     fn find_suffix(&self, path: &Path) -> Result<String, NavigateError> {
-        println!("Finding module path for {:#?}", path);
+        log::trace!("Finding module path for {:#?}", path);
         let mut found = false;
         let mut suffix = "".to_string();
 
@@ -212,7 +212,7 @@ impl AssetRequirer {
             } else {
                 path.with_extension(format!("{current_ext}.{ext}"))
             };
-            eprintln!("Checking {:#?}", candidate);
+            // log::trace!("Checking {:#?}", candidate);
             if self.is_file(&candidate).map_err(|_| NavigateError::NotFound)? {
                 if found {
                     return Err(NavigateError::Ambiguous);
@@ -255,7 +255,7 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn reset(&self, chunk_name: &str) -> Result<(), NavigateError> {
-        println!("Reset called with {chunk_name}");
+        log::trace!("Reset called with {chunk_name}");
 
         if chunk_name == "=repl" {
             self.abs_path.replace(PathBuf::from("/repl.luau"));
@@ -268,14 +268,14 @@ impl LuaRequire for AssetRequirer {
         let path = Self::normalize_path(chunk_name.as_ref());
 
         if path.is_absolute() {
-            println!("Resetting to absolute path {:#?}", path);
+            log::trace!("Resetting to absolute path {:#?}", path);
             let suffix = self.find_suffix(&path)?;
             self.abs_path.replace(path.clone());
             self.rel_path.replace(path);
             self.suffix.replace(suffix);
         } else {
             // Relative path
-            println!("Resetting to relative path {:#?}", path);
+            log::trace!("Resetting to relative path {:#?}", path);
             let cwd = PathBuf::from("/"); // TODO: Do we need anything special here?
             let abs_path = Self::normalize_path(&cwd.join(&path));
             let suffix = self.find_suffix(&abs_path)?;
@@ -284,13 +284,13 @@ impl LuaRequire for AssetRequirer {
             self.suffix.replace(suffix);
         }
 
-        eprintln!("Resetting to {:#?}", self.abs_path.borrow());
+        // log::trace!("Resetting to {:#?}", self.abs_path.borrow());
 
         Ok(())
     }
 
     fn jump_to_alias(&self, path: &str) -> Result<(), NavigateError> {
-        eprintln!("Jumping to alias {path}");
+        // log::trace!("Jumping to alias {path}");
         
         let path = Self::normalize_path(path.as_ref());
         let suffix = self.find_suffix(&path)?;
@@ -303,17 +303,17 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn to_parent(&self) -> Result<(), NavigateError> {
-        println!("Jumping to parent of {:#?}", self.abs_path.borrow());
+        log::trace!("Jumping to parent of {:#?}", self.abs_path.borrow());
         let mut abs_path = self.abs_path.borrow().clone();
         if abs_path.to_string_lossy().is_empty() || abs_path.to_string_lossy() == "." || abs_path.to_string_lossy() == "/" {
-            println!("No parent found for {:#?}", abs_path);
+            log::trace!("No parent found for {:#?}", abs_path);
             return Err(NavigateError::NotFound);
         }
         if !abs_path.pop() {
-            println!("No parent found for {:#?}", abs_path);
+            log::trace!("No parent found for {:#?}", abs_path);
             return Err(NavigateError::NotFound);
         }
-        println!("Parent is now {:#?}", abs_path);
+        log::trace!("Parent is now {:#?}", abs_path);
         let mut rel_parent = self.rel_path.borrow().clone();
         rel_parent.pop();
         let suffix = self.find_suffix(&abs_path)?;
@@ -326,11 +326,11 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn to_child(&self, name: &str) -> Result<(), NavigateError> {
-        eprintln!("Jumping to child {:#?} with name {}", self.abs_path.borrow(), name);
+        // log::trace!("Jumping to child {:#?} with name {}", self.abs_path.borrow(), name);
         let abs_path = self.abs_path.borrow().join(name);
         let rel_path = self.rel_path.borrow().join(name);
         let suffix = self.find_suffix(&abs_path)?;
-        eprintln!("Found suffix {:#?}", suffix);
+        // log::trace!("Found suffix {:#?}", suffix);
 
         self.abs_path.replace(abs_path);
         self.rel_path.replace(rel_path);
@@ -342,7 +342,7 @@ impl LuaRequire for AssetRequirer {
     fn is_module_present(&self) -> bool {
         let suffix = self.suffix.borrow();
         let module_path = PathBuf::from(self.abs_path.borrow().to_string_lossy().to_string() + &*suffix);
-        eprintln!("Checking module exists {:#?}", module_path);
+        // log::trace!("Checking module exists {:#?}", module_path);
         self.is_file(&module_path)
             .unwrap_or(false)
     }
@@ -350,7 +350,7 @@ impl LuaRequire for AssetRequirer {
     fn contents(&self) -> IoResult<Vec<u8>> {
         let suffix = self.suffix.borrow();
         let module_path = PathBuf::from(self.abs_path.borrow().to_string_lossy().to_string() + &*suffix);
-        eprintln!("Loading contents for {:#?}", module_path);
+        // log::trace!("Loading contents for {:#?}", module_path);
         self.get_file(module_path.as_ref())
     }
 
@@ -371,6 +371,7 @@ impl LuaRequire for AssetRequirer {
             cache_key.extend_from_slice(self.cache_prefix.borrow().as_bytes());
             cache_key.push(b'@');
             cache_key.extend_from_slice(&hash);
+            log::trace!("Cache key: {:#?}", String::from_utf8_lossy(&cache_key));
             return cache_key;
         }
 
@@ -383,7 +384,7 @@ impl LuaRequire for AssetRequirer {
         cache_key.push(b'@');
         cache_key.extend_from_slice(self.abs_path.borrow().display().to_string().as_bytes());
         cache_key.extend_from_slice(self.suffix.borrow().as_bytes());
-        println!("Cache key: {:#?}", String::from_utf8_lossy(&cache_key));
+        log::trace!("Cache key: {:#?}", String::from_utf8_lossy(&cache_key));
         cache_key
     }
 
@@ -400,12 +401,11 @@ impl LuaRequire for AssetRequirer {
     // Loads the module and returns the result (function or table).
     // For now, we don't support yielding in require'd modules due to luau require limitations.
     fn load(&self, lua: &Lua, _path: &str, chunk_name: &str, content: &[u8]) -> LuaResult<LuaValue> {
-        println!("Loading module {:#?} with contents {}", chunk_name, String::from_utf8_lossy(content));
-        let func /* lv */ = lua.load(content)
+        log::trace!("Loading module {:#?}", chunk_name);
+        let func = lua.load(content)
         .set_name(chunk_name)
         .set_environment(self.global_table.clone())
         .into_function()?;
-        //.call(())?;
 
         let th = lua.create_thread(func)?;
 
@@ -413,10 +413,8 @@ impl LuaRequire for AssetRequirer {
 
         let status = th.status();
         if status != mlua::ThreadStatus::Finished && status != mlua::ThreadStatus::Error {
-            return Err(mlua::Error::RuntimeError("module can not yield".into()));
+            return Err(mlua::Error::runtime(format!("module '{}' attempted to yield within a require", chunk_name)));
         }
-
-        println!("Loaded module {:#?}", lv);
 
         Ok(lv)
     }
@@ -544,7 +542,7 @@ mod require_test {
                         let mut current_path = VfsPath::new(fs.clone());
                         for folder in folder_part {
                             current_path = current_path.join(folder).expect("Failed to join path");
-                            eprintln!("Creating folder {:#?}", current_path.as_str());
+                            // log::trace!("Creating folder {:#?}", current_path.as_str());
                             current_path.create_dir_all().unwrap();
                         }
                     }
@@ -609,5 +607,67 @@ mod require_test {
         };
 
         assert_eq!(l, 1);
+    }
+
+    #[test]
+    fn test_sythivo_a() {
+        let main_luau = r#"
+local foo = require("./foo/module")
+
+assert(type(foo) == "function")
+local res = foo();
+assert(type(res) == "table")
+print(res.resolved);
+return res.resolved
+        "#;
+
+        let foo_module_luau = r#"
+return function()
+  return require("./test")
+end
+        "#;
+
+        let foo_test_luau = r#"
+return {
+  resolved = true
+}
+        "#;
+
+        let lua = mlua::Lua::new();
+
+        let c = super::FilesystemWrapper::new(
+            vfs::MemoryFS::new(),
+        );
+
+        c.create_dir("/foo").expect("Failed to create foo dir");
+        c.create_file("/foo/module.luau").unwrap().write_all(foo_module_luau.as_bytes()).unwrap();
+        c.create_file("/foo/test.luau").unwrap().write_all(foo_test_luau.as_bytes()).unwrap();
+        c.create_file("/main.luau").unwrap().write_all(main_luau.as_bytes()).unwrap();
+
+        let c = AssetRequirer::new(
+            c,
+            "styhivo_abc".to_string(),
+            lua.globals(),
+        );
+
+        lua.globals()
+        .set(
+            "require",
+            lua.create_require_function(c).unwrap(),
+        ) 
+        .unwrap();
+
+        let func = lua.load(main_luau).set_name("/main.luau").into_function().unwrap();
+        let th = lua.create_thread(func).unwrap();
+        
+        let l: bool = match th.resume(()) {
+            Ok(v) => v,
+            Err(e) => {
+                println!("Error: {e}");
+                panic!("Failed to load test");
+            }
+        };
+
+        assert_eq!(l, true);
     }
 }
