@@ -34,66 +34,9 @@ impl FilesystemWrapper {
     }
 }
 
-impl FileSystem for FilesystemWrapper {
-    fn read_dir(&self, path: &str) -> VfsResult<Box<dyn Iterator<Item = String> + Send>> {
-        self.0.read_dir(&path)
-    }
-
-    fn create_dir(&self, path: &str) -> VfsResult<()> {
-        self.0.create_dir(path)
-    }
-
-    fn open_file(&self, path: &str) -> VfsResult<Box<dyn SeekAndRead + Send>> {
-        self.0.open_file(&path)
-    }
-
-    fn create_file(&self, path: &str) -> VfsResult<Box<dyn SeekAndWrite + Send>> {
-        self.0.create_file(path)
-    }
-
-    fn append_file(&self, path: &str) -> VfsResult<Box<dyn SeekAndWrite + Send>> {
-        self.0.append_file(path)
-    }
-
-    fn metadata(&self, path: &str) -> VfsResult<VfsMetadata> {
-        self.0.metadata(&path)
-    }
-
-        fn set_creation_time(&self, path: &str, time: SystemTime) -> VfsResult<()> {
-        self.0.set_creation_time(path, time)
-    }
-
-    fn set_modification_time(&self, _path: &str, _time: SystemTime) -> VfsResult<()> {
-        self.0.set_modification_time(_path, _time)
-    }
-
-    fn set_access_time(&self, _path: &str, _time: SystemTime) -> VfsResult<()> {
-        self.0.set_access_time(_path, _time)
-    }
-
-    fn exists(&self, path: &str) -> VfsResult<bool> {
-        self.0.exists(&path)
-    }
-
-    fn remove_dir(&self, path: &str) -> VfsResult<()> {
-        self.0.remove_dir(path)
-    }
-
-    fn remove_file(&self, path: &str) -> VfsResult<()> {
-        self.0.remove_file(path)
-    }
-
-    fn copy_file(&self, _src: &str, _dest: &str) -> VfsResult<()> {
-        self.0.copy_file(_src, _dest)
-    }
-
-    fn move_file(&self, _src: &str, _dest: &str) -> VfsResult<()> {
-        self.0.move_file(_src, _dest)
-    }
-
-    fn move_dir(&self, _src: &str, _dest: &str) -> VfsResult<()> {
-        self.0.move_dir(_src, _dest)
-    }
+impl std::ops::Deref for FilesystemWrapper {
+    type Target = dyn FileSystem + Send + Sync;
+    fn deref(&self) -> &Self::Target { &*self.0 }
 }
 
 #[derive(Clone)]

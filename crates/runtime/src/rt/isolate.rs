@@ -94,9 +94,9 @@ pub struct KhronosIsolate {
 }
 
 impl KhronosIsolate {
-    pub fn new_isolate<T: vfs::FileSystem + 'static>(
+    pub fn new_isolate(
         inner: KhronosRuntime,
-        asset_manager: T,
+        asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
         if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -104,17 +104,16 @@ impl KhronosIsolate {
             ));
         }
 
-        let am = FilesystemWrapper::new(asset_manager);
-        let mut isolate = Self::new(inner, am, false)?;
+        let mut isolate = Self::new(inner, asset_manager, false)?;
 
         isolate.inner_mut().sandbox()?; // Sandbox the runtime
 
         Ok(isolate)
     }
 
-    pub fn new_subisolate<T: vfs::FileSystem + 'static>(
+    pub fn new_subisolate(
         inner: KhronosRuntime,
-        asset_manager: T,
+        asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
         if !inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -122,8 +121,7 @@ impl KhronosIsolate {
             ));
         }
 
-        let am = FilesystemWrapper::new(asset_manager);
-        Self::new(inner, am, true)
+        Self::new(inner, asset_manager, true)
     }
 
     /// Helper method to make the core isolate

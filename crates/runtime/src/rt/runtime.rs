@@ -369,11 +369,17 @@ impl KhronosRuntime {
         &self.store_table
     }
 
+    /// Loads plugins to be exposed to all isolates
     pub fn load_plugins(&self, plugins: PluginSet) -> LuaResult<()> {
         for (name, plugin) in plugins.into_iter() {
             let table = (plugin.0)(&self.lua)?;
             self.lua.register_module(&name, table)?;
         }
         Ok(())
+    }
+
+    /// Returns the require cache table
+    pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
+        self.lua.named_registry_value::<LuaTable>("_MODULES")
     }
 }
