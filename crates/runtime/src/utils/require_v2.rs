@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::path::{Component, Path, PathBuf};
 use std::collections::VecDeque;
 use mlua::NavigateError;
@@ -14,15 +14,15 @@ use std::time::SystemTime;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct FilesystemWrapper(pub Arc<dyn FileSystem + Send + Sync>);
+pub struct FilesystemWrapper(pub Rc<dyn FileSystem>);
 
 impl FilesystemWrapper {
     pub fn new<T: vfs::FileSystem>(fs: T) -> Self {
-        Self(Arc::new(fs))
-    }
+        Self(Rc::new(fs))
+    }   
 
     pub fn read_file(&self, path: &str) -> VfsResult<Vec<u8>> {
-        let mut file = self.0.open_file(path)?;
+        let mut file = self.open_file(path)?;
         let mut contents = Vec::new();
         file.read_to_end(&mut contents)?;
         Ok(contents)
@@ -38,6 +38,7 @@ impl std::ops::Deref for FilesystemWrapper {
     type Target = dyn FileSystem + Send + Sync;
     fn deref(&self) -> &Self::Target { &*self.0 }
 }
+
 
 #[derive(Clone)]
 pub struct AssetRequirer {
