@@ -138,11 +138,7 @@ impl KhronosIsolate {
         let controller = AssetRequirer::new(
             asset_manager.clone(),
             id.clone(),
-            if is_subisolate {
-                global_table.clone()
-            } else {
-                inner.lua().globals()
-            },
+            global_table.clone()
         );
 
         if is_subisolate {

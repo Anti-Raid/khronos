@@ -9,3 +9,4 @@ pub mod serenity_utils;
 pub mod threadlimitmw;
 pub mod khronos_value;
 pub mod require_v2;
+pub mod memoryvfs;
