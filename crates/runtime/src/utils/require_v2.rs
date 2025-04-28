@@ -14,11 +14,11 @@ use std::time::SystemTime;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct FilesystemWrapper(pub Arc<Box<dyn FileSystem + Send + Sync>>);
+pub struct FilesystemWrapper(pub Arc<dyn FileSystem + Send + Sync>);
 
 impl FilesystemWrapper {
     pub fn new<T: vfs::FileSystem>(fs: T) -> Self {
-        Self(Arc::new(Box::new(fs)))
+        Self(Arc::new(fs))
     }
 
     pub fn read_file(&self, path: &str) -> VfsResult<Vec<u8>> {
