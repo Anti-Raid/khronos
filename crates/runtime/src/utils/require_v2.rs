@@ -59,7 +59,7 @@ impl FileSystem for FilesystemWrapper {
         self.0.metadata(&path)
     }
 
-    fn set_creation_time(&self, path: &str, time: SystemTime) -> VfsResult<()> {
+        fn set_creation_time(&self, path: &str, time: SystemTime) -> VfsResult<()> {
         self.0.set_creation_time(path, time)
     }
 
@@ -83,7 +83,7 @@ impl FileSystem for FilesystemWrapper {
         self.0.remove_file(path)
     }
 
-    fn copy_file(&self, _src: &str, _dest: &str) -> VfsResult<()> { 
+    fn copy_file(&self, _src: &str, _dest: &str) -> VfsResult<()> {
         self.0.copy_file(_src, _dest)
     }
 
@@ -524,34 +524,7 @@ mod require_test {
         let lua = mlua::Lua::new();
 
         let c = AssetRequirer::new(
-            {
-                let fs = super::FilesystemWrapper::new(vfs::MemoryFS::new());
-                for (path_s, content) in tree {
-                    let path = path_s.split('/').collect::<Vec<_>>();
-                    if path.len() >= 2 {
-                        // Folder part is everything except the last part
-                        let mut folder_part = Vec::with_capacity(path.len() - 1);
-                        let plen = path.len();
-                        for (i, part) in path.into_iter().enumerate() {
-                            if i == plen - 1 {
-                                break;
-                            }
-                            folder_part.push(part);
-                        }
-
-                        let mut current_path = VfsPath::new(fs.clone());
-                        for folder in folder_part {
-                            current_path = current_path.join(folder).expect("Failed to join path");
-                            // log::trace!("Creating folder {:#?}", current_path.as_str());
-                            current_path.create_dir_all().unwrap();
-                        }
-                    }
-                    let path_s = format!("/{}", path_s);
-                    fs.create_file(&path_s).expect(&format!("Failed to create file {path_s}")).write_all(content.as_bytes()).expect(&format!("Failed to write to {path_s}"));
-                }
-                
-                fs
-            },
+            crate::utils::memoryvfs::create_vfs_from_map(tree).expect("Failed to make vfs"),
             "test".to_string(),
             lua.globals(),
         );
