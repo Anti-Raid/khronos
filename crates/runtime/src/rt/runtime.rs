@@ -379,7 +379,14 @@ impl KhronosRuntime {
     }
 
     /// Returns the require cache table
+    #[inline]
     pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
-        self.lua.named_registry_value::<LuaTable>("_MODULES")
+        crate::utils::require_v2::get_require_cache(&self.lua)
+    }
+
+    /// Clears the require cache table
+    #[inline]
+    pub fn clear_require_cache(&self) -> LuaResult<()> {
+        crate::utils::require_v2::clear_require_cache(&self.lua)
     }
 }

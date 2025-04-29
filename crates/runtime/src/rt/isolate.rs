@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use crate::utils::require_v2::AssetRequirer;
 use rand::distributions::DistString;
@@ -17,6 +17,7 @@ use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use rand::distributions::Alphanumeric;
+use std::time::SystemTime;
 
 /// A bytecode cacher for Luau scripts
 ///
@@ -71,6 +72,9 @@ impl BytecodeCache {
 pub struct KhronosIsolate {
     /// The inner khronos context for the isolate
     inner: KhronosRuntime,
+
+    /// Last stored filesystem reset
+    prev_stored_fs_last_reset: Cell<Option<SystemTime>>,
 
     /// Isolate id
     id: String,
@@ -153,6 +157,7 @@ impl KhronosIsolate {
 
         Ok(Self {
             id,
+            prev_stored_fs_last_reset: Cell::new(None),
             asset_manager,
             asset_requirer: controller,
             inner,
@@ -287,6 +292,31 @@ impl KhronosIsolate {
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
+        // Check if we need to do a full cache reset
+        match self.asset_manager.fs_last_reset() {
+            Ok(st) => {
+                if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
+                    if st > prev_stored_fs_last_reset {
+                        log::debug!("Resetting cache due to filesystem change");
+                        self.prev_stored_fs_last_reset.set(Some(st));
+                        self.inner.clear_require_cache().map_err(LuaError::external)?;
+                    }
+                } else {
+                    self.prev_stored_fs_last_reset.set(Some(st));           
+                }
+            },
+            Err(e) => {
+                match e.kind() {
+                    vfs::error::VfsErrorKind::NotSupported => {}, // Do nothing
+                    _ => {
+                        return Err(LuaError::external(
+                            format!("Failed to get filesystem last reset: {}", e),
+                        ));
+                    }
+                }
+            }
+        };
+
         let thread = {
             let mut cache = self.bytecode_cache.inner().borrow_mut();
             let bytecode = if let Some(bytecode) = cache.get(cache_key) {

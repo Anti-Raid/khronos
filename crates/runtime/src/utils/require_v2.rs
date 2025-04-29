@@ -9,6 +9,18 @@ use vfs::{FileSystem, VfsResult};
 use vfs::path::VfsFileType;
 use std::fmt::Debug;
 
+/// Returns the require cache table
+#[inline]
+pub fn get_require_cache(lua: &Lua) -> LuaResult<LuaTable> {
+    lua.named_registry_value::<LuaTable>("_MODULES")
+}
+
+/// Returns the require cache table
+#[inline]
+pub fn clear_require_cache(lua: &Lua) -> LuaResult<()> {
+    lua.set_named_registry_value("_MODULES", lua.create_table()?)
+}
+
 #[derive(Debug, Clone)]
 pub struct FilesystemWrapper(pub Rc<dyn FileSystem>);
 
@@ -40,6 +52,8 @@ pub struct AssetRequirer {
     cache_prefix: Rc<RefCell<String>>,
     fs: FilesystemWrapper,
     global_table: LuaTable,
+
+    // Path navigation
     abs_path: Rc<RefCell<PathBuf>>,
     rel_path: Rc<RefCell<PathBuf>>,
     suffix: Rc<RefCell<String>>,
