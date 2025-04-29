@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub struct Plugin(fn(&Lua) -> LuaResult<LuaTable>);
+pub struct Plugin(pub fn(&Lua) -> LuaResult<LuaTable>);
 
 impl From<fn(&Lua) -> LuaResult<LuaTable>> for Plugin {
     fn from(func: fn(&Lua) -> LuaResult<LuaTable>) -> Self {
@@ -78,6 +78,11 @@ impl PluginSet {
     /// Iterator over plugins
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Plugin)> {
         self.plugins.iter()
+    }
+
+    /// Into-iterator over plugins
+    pub fn into_iter(self) -> impl Iterator<Item = (String, Plugin)> {
+        self.plugins.into_iter()
     }
 
     /// Requires a plugin by name.

@@ -29,6 +29,7 @@ hyper = "1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tower = "0.5"
 termcolor = "1"
+vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }

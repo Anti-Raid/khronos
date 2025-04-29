@@ -24,6 +24,7 @@ mlua = { git = "https://github.com/Anti-Raid/mlua", features = ["luau", "seriali
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
+vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"]}

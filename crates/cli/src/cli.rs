@@ -12,7 +12,6 @@ use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
-use khronos_runtime::utils::assets::FileAssetManager;
 use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::utils::threadlimitmw::ThreadLimiter;
 use khronos_runtime::TemplateContext;
@@ -67,7 +66,7 @@ pub enum FileStorageBackend {
 }
 
 pub struct LuaSetupResult {
-    pub main_isolate: KhronosIsolate<FileAssetManager>,
+    pub main_isolate: KhronosIsolate,
     pub benckark_instant: std::time::Instant,
 }
 
@@ -373,13 +372,23 @@ impl Cli {
             )
             .expect("Failed to set cli global");
 
-        let file_asset_manager = FileAssetManager::new(PathBuf::from("/"));
+        let current_dir = std::env::current_dir().expect("Failed to get current dir");
 
-        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager.clone(), {
-            let mut pset = PluginSet::new();
-            pset.add_default_plugins::<CliKhronosContext>();
-            pset
-        })
+        println!("Current dir: {:?}", current_dir);
+
+        let file_asset_manager = {
+            let fs = khronos_runtime::utils::require_v2::FilesystemWrapper::new(
+                vfs::PhysicalFS::new(current_dir)
+            );
+    
+            fs
+        };
+
+        let mut pset = PluginSet::new();
+        pset.add_default_plugins::<CliKhronosContext>();
+        runtime.load_plugins(pset).expect("Failed to add plugins");
+
+        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
         .expect("Failed to create main isolate");
 
         if !aux_opts.use_custom_print {
@@ -463,7 +472,7 @@ impl Cli {
                     };
 
                     let values = match self
-                        .spawn_script(&name, &format!(".{}", path.display()), &contents)
+                        .spawn_script(&name, &format!("{}", path.display()), &contents)
                         .await
                     {
                         Ok(values) => values,
@@ -528,7 +537,7 @@ impl Cli {
                             Err(_) => return,
                         }
 
-                        match self.try_spawn_as("repl", &line).await {
+                        match self.try_spawn_as("=repl", &line).await {
                             Ok(values) => {
                                 editor.add_history_entry(line).unwrap();
 

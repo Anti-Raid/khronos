@@ -92,11 +92,11 @@ task.spawn(function()
     local ok, err = pcall(pyield, router:serve())
 
     if not ok then
-        cli.ext.print("Failed to start server: " .. tostring(err))
+        print("Failed to start server: " .. tostring(err))
     end
 end)
 
-cli.ext.print("Server started on " .. tostring(router.bind_addr))
+print("Server started on " .. tostring(router.bind_addr))
 
 while true do 
     task.wait(1)

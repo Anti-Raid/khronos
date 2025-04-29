@@ -5,6 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use crate::utils::pluginholder::PluginSet;
 
 use crate::utils::prelude::disable_harmful;
 use mlua::prelude::*;
@@ -366,5 +367,26 @@ impl KhronosRuntime {
     /// Returns the store table for the runtime
     pub fn store_table(&self) -> &LuaTable {
         &self.store_table
+    }
+
+    /// Loads plugins to be exposed to all isolates
+    pub fn load_plugins(&self, plugins: PluginSet) -> LuaResult<()> {
+        for (name, plugin) in plugins.into_iter() {
+            let table = (plugin.0)(&self.lua)?;
+            self.lua.register_module(&name, table)?;
+        }
+        Ok(())
+    }
+
+    /// Returns the require cache table
+    #[inline]
+    pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
+        crate::utils::require_v2::get_require_cache(&self.lua)
+    }
+
+    /// Clears the require cache table
+    #[inline]
+    pub fn clear_require_cache(&self) -> LuaResult<()> {
+        crate::utils::require_v2::clear_require_cache(&self.lua)
     }
 }

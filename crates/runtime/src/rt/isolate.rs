@@ -1,22 +1,23 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
 use std::borrow::Cow;
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use crate::utils::require_v2::AssetRequirer;
+use rand::distributions::DistString;
 
 use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
-use crate::utils::assets::AssetManager as AssetManagerTrait;
-use crate::utils::pluginholder::PluginSet;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
-use crate::utils::require::{create_require_function, RequireController};
 use crate::TemplateContext;
+use crate::utils::require_v2::FilesystemWrapper;
 
 use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
 use mlua_scheduler_ext::traits::IntoLuaThread;
+use rand::distributions::Alphanumeric;
+use std::time::SystemTime;
 
 /// A bytecode cacher for Luau scripts
 ///
@@ -68,15 +69,21 @@ impl BytecodeCache {
 /// Note: it is considered unsafe to store an Isolate in any Lua userdata
 /// due to the potential possibility of mlua bugs occurring
 #[derive(Clone)]
-pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone + 'static> {
+pub struct KhronosIsolate {
     /// The inner khronos context for the isolate
     inner: KhronosRuntime,
 
-    /// The plugin set for the isolate
-    plugin_set: Rc<PluginSet>,
+    /// Last stored filesystem reset
+    prev_stored_fs_last_reset: Cell<Option<SystemTime>>,
+
+    /// Isolate id
+    id: String,
 
     /// The asset manager for the isolate
-    asset_manager: Rc<AssetManager>,
+    asset_manager: FilesystemWrapper,
+
+    /// The asset requirer for the isolate
+    asset_requirer: AssetRequirer,
 
     /// The internal bytecode cache for the isolate
     ///
@@ -86,16 +93,12 @@ pub struct KhronosIsolate<AssetManager: AssetManagerTrait + Clone + 'static> {
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
-
-    /// A handle to this isolates require controller
-    require: Option<Rc<IsolateRequireController<AssetManager>>>,
 }
 
-impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetManager> {
+impl KhronosIsolate {
     pub fn new_isolate(
         inner: KhronosRuntime,
-        asset_manager: AssetManager,
-        plugin_set: PluginSet,
+        asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
         if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -103,13 +106,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
             ));
         }
 
-        let (mut isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
-        isolate.lua().globals().set(
-            "require",
-            create_require_function(isolate.lua(), controller_ref)?,
-        )?;
-
-        setup_prelude(isolate.lua(), isolate.global_table.clone())?;
+        let mut isolate = Self::new(inner, asset_manager, false)?;
 
         isolate.inner_mut().sandbox()?; // Sandbox the runtime
 
@@ -118,8 +115,7 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
 
     pub fn new_subisolate(
         inner: KhronosRuntime,
-        asset_manager: AssetManager,
-        plugin_set: PluginSet,
+        asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
         if !inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -127,55 +123,54 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
             ));
         }
 
-        let (isolate, controller_ref) = Self::new(inner, asset_manager, plugin_set)?;
-
-        isolate.global_table.set(
-            "require",
-            create_require_function(isolate.lua(), controller_ref)?,
-        )?;
-
-        setup_prelude(isolate.lua(), isolate.global_table.clone())?;
-
-        Ok(isolate)
+        Self::new(inner, asset_manager, true)
     }
 
-    /// Helper method to make the core isolate without any specialization
+    /// Helper method to make the core isolate
     fn new(
         inner: KhronosRuntime,
-        asset_manager: AssetManager,
-        plugin_set: PluginSet,
-    ) -> Result<(Self, Rc<IsolateRequireController<AssetManager>>), LuaError> {
+        asset_manager: FilesystemWrapper,
+        is_subisolate: bool,
+    ) -> Result<Self, LuaError> {
+        let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let global_table = proxy_global(inner.lua())?;
 
-        let plugin_set = Rc::new(plugin_set);
+        let controller = AssetRequirer::new(
+            asset_manager.clone(),
+            id.clone(),
+            global_table.clone()
+        );
 
-        let mut isolate = Self {
+        if is_subisolate {
+            global_table.set(
+                "require",
+                inner.lua().create_require_function(controller.clone())?,
+            )?;
+        } else {
+            inner.lua().globals().set(
+                "require",
+                inner.lua().create_require_function(controller.clone())?,
+            )?;
+        }
+
+        setup_prelude(inner.lua(), global_table.clone())?;
+
+        Ok(Self {
+            id,
+            prev_stored_fs_last_reset: Cell::new(None),
+            asset_manager,
+            asset_requirer: controller,
             inner,
-            plugin_set,
-            asset_manager: Rc::new(asset_manager),
-            global_table: global_table.clone(),
+            global_table,
             bytecode_cache: Rc::new(BytecodeCache::new()),
-            require: None,
-        };
-
-        let controller = Rc::new(IsolateRequireController::new(isolate.clone()));
-        isolate.require = Some(controller.clone());
-
-        // Convert plugin set to builtins table
-
-        Ok((isolate, controller))
+        })
     }
 
-    /// Returns the asset manager for the isolate
+    /// Returns the asset manager for the isolate. Note that the asset manager cannot be changed
+    /// after the isolate is created
     #[inline]
-    pub fn asset_manager(&self) -> &AssetManager {
+    pub fn asset_manager(&self) -> &FilesystemWrapper {
         &self.asset_manager
-    }
-
-    /// Sets a new asset manager for the isolate
-    #[inline]
-    pub fn set_asset_manager(&mut self, asset_manager: AssetManager) {
-        self.asset_manager = Rc::new(asset_manager);
     }
 
     /// Returns the lua vm for the isolate
@@ -194,14 +189,6 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
     #[inline]
     pub fn inner_mut(&mut self) -> &mut KhronosRuntime {
         &mut self.inner
-    }
-
-    /// Returns the plugin set for the isolate
-    ///
-    /// This is a reference to the Rc'd plugin set, not a clone
-    #[inline]
-    pub fn plugin_set(&self) -> &PluginSet {
-        &self.plugin_set
     }
 
     /// Returns the global table for the isolate
@@ -223,16 +210,16 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         self.bytecode_cache = cache;
     }
 
-    /// Returns the require controller for the isolate
-    pub fn require(&self) -> Option<&IsolateRequireController<AssetManager>> {
-        self.require.as_ref().map(|r| r.as_ref())
+    /// Returns the asset requirer for the isolate
+    #[inline]
+    pub fn asset_requirer(&self) -> &AssetRequirer {
+        &self.asset_requirer
     }
 
-    /// Clears the require cache for the isolate
-    pub fn clear_require_cache(&self) {
-        if let Some(controller) = self.require() {
-            controller.clear_require_cache();
-        }
+    /// Returns the id of the isolate
+    #[inline]
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     /// Creates a runtime shareable data object
@@ -286,7 +273,9 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         let code = self.asset_manager.get_file(path).map_err(|e| {
             LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
         })?;
-        self.spawn_script(cache_key, path, code.as_ref(), args)
+        let code = String::from_utf8(code)
+            .map_err(|e| LuaError::RuntimeError(format!("Failed to decode asset '{}': {}", path, e)))?;
+        self.spawn_script(cache_key, path, &code, args)
             .await
     }
 
@@ -303,6 +292,31 @@ impl<AssetManager: AssetManagerTrait + Clone + 'static> KhronosIsolate<AssetMana
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
+        // Check if we need to do a full cache reset
+        match self.asset_manager.fs_last_reset() {
+            Ok(st) => {
+                if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
+                    if st > prev_stored_fs_last_reset {
+                        log::debug!("Resetting cache due to filesystem change");
+                        self.prev_stored_fs_last_reset.set(Some(st));
+                        self.inner.clear_require_cache().map_err(LuaError::external)?;
+                    }
+                } else {
+                    self.prev_stored_fs_last_reset.set(Some(st));           
+                }
+            },
+            Err(e) => {
+                match e.kind() {
+                    vfs::error::VfsErrorKind::NotSupported => {}, // Do nothing
+                    _ => {
+                        return Err(LuaError::external(
+                            format!("Failed to get filesystem last reset: {}", e),
+                        ));
+                    }
+                }
+            }
+        };
+
         let thread = {
             let mut cache = self.bytecode_cache.inner().borrow_mut();
             let bytecode = if let Some(bytecode) = cache.get(cache_key) {
@@ -390,9 +404,9 @@ impl SpawnResult {
         }
     }
 
-    pub fn into_serde_json_value<AssetManager: AssetManagerTrait + Clone>(
+    pub fn into_serde_json_value(
         self,
-        isolate: &KhronosIsolate<AssetManager>,
+        isolate: &KhronosIsolate,
     ) -> LuaResult<serde_json::Value> {
         let Some(values) = self.result else {
             return Ok(serde_json::Value::Null);
@@ -437,114 +451,6 @@ impl SpawnResult {
                 Ok(serde_json::Value::Array(arr))
             }
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct IsolateRequireController<T: AssetManagerTrait + Clone + 'static> {
-    isolate: KhronosIsolate<T>,
-    requires_cache: RefCell<HashMap<String, LuaMultiValue>>,
-}
-
-impl<T: AssetManagerTrait + Clone + 'static> IsolateRequireController<T> {
-    pub fn new(isolate: KhronosIsolate<T>) -> Self {
-        Self {
-            isolate,
-            requires_cache: RefCell::new(HashMap::new()),
-        }
-    }
-
-    /// Returns the inner isolate
-    pub fn inner(&self) -> &KhronosIsolate<T> {
-        &self.isolate
-    }
-
-    /// Returns the require cache
-    pub fn requires_cache(&self) -> &RefCell<std::collections::HashMap<String, LuaMultiValue>> {
-        &self.requires_cache
-    }
-
-    /// Clears the require cache
-    ///
-    /// Also calls clear_cached_lua_values on the asset manager to clear its cache (if the assetmanager has special logic there)
-    pub fn clear_require_cache(&self) {
-        self.requires_cache.borrow_mut().clear();
-        self.isolate.asset_manager.clear_cached_lua_values();
-    }
-}
-
-impl<T: AssetManagerTrait + Clone> RequireController for IsolateRequireController<T> {
-    fn get_builtins(&self) -> Option<LuaResult<LuaTable>> {
-        let tab = match self.isolate.lua().create_table() {
-            Ok(tab) => tab,
-            Err(e) => return Some(Err(e)),
-        };
-
-        for (name, plugin) in self.isolate.plugin_set.iter() {
-            match tab.set(name.clone(), *plugin) {
-                Ok(_) => {}
-                Err(e) => {
-                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                    if let LuaError::MemoryError(_) = e {
-                        // Mark VM as broken
-                        self.isolate.inner().mark_broken(true)
-                    }
-
-                    return Some(Err(e));
-                }
-            }
-        }
-
-        Some(Ok(tab))
-    }
-
-    fn get_builtin(&self, builtin: &str) -> Option<LuaResult<LuaMultiValue>> {
-        if let Ok(table) = self.isolate.lua().globals().get::<LuaTable>(builtin) {
-            return Some(table.into_lua_multi(self.isolate.lua()));
-        }
-
-        let tab = self
-            .isolate
-            .plugin_set
-            .load_plugin(self.isolate.lua(), builtin)?;
-
-        match tab {
-            Ok(table) => Some(table.into_lua_multi(self.isolate.lua())),
-            Err(e) => {
-                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                if let LuaError::MemoryError(_) = e {
-                    // Mark VM as broken
-                    self.isolate.inner().mark_broken(true)
-                }
-
-                None
-            }
-        }
-    }
-
-    fn get_file(&self, path: &str) -> Result<impl AsRef<String>, crate::Error> {
-        self.isolate.asset_manager.get_file(path)
-    }
-
-    fn get_cached(&self, path: &str) -> Option<LuaMultiValue> {
-        match self.requires_cache.borrow().get(path).cloned() {
-            Some(v) => Some(v),
-            None => {
-                match self.isolate.asset_manager.get_cached_lua_value(&self.isolate.lua(), path) {
-                    Some(v) => Some(v),
-                    None => None,
-                }
-            },
-        }
-    }
-
-    fn cache(&self, path: String, contents: LuaMultiValue) {
-        self.isolate.asset_manager.on_cache_lua_value(&self.isolate.lua(), &path, &contents);
-        self.requires_cache.borrow_mut().insert(path, contents);
-    }
-
-    fn global_table(&self) -> LuaTable {
-        self.isolate.global_table().clone()
     }
 }
 
