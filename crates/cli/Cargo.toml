@@ -29,6 +29,7 @@ hyper = "1"
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tower = "0.5"
 termcolor = "1"
+vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }
@@ -38,7 +39,6 @@ mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
-vfs = "0.12.1"
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"

@@ -2,14 +2,12 @@
 
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use crate::utils::require_v2::AssetRequirer;
 use rand::distributions::DistString;
 
 use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
-use crate::utils::pluginholder::PluginSet;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
 use crate::TemplateContext;

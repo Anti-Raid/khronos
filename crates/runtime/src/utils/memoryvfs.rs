@@ -1,4 +1,3 @@
-use vfs::{VfsPath, FileSystem};
 use crate::utils::require_v2::FilesystemWrapper;
 use std::collections::HashSet;
 

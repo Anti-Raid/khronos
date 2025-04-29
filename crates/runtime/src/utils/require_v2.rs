@@ -1,17 +1,13 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::path::{Component, Path, PathBuf};
 use std::collections::VecDeque;
 use mlua::NavigateError;
-use mlua::prelude::{Lua, LuaRequire, LuaTable, LuaValue, LuaResult, LuaFunction};
+use mlua::prelude::{Lua, LuaRequire, LuaTable, LuaValue, LuaResult};
 use std::io::Result as IoResult;
-use sha2::{Sha256, Digest};
-use std::rc::Rc;
-use vfs::error::VfsErrorKind;
-use vfs::{FileSystem, VfsError, VfsResult, SeekAndRead, SeekAndWrite, VfsMetadata, VfsPath};
+use vfs::{FileSystem, VfsResult};
 use vfs::path::VfsFileType;
 use std::fmt::Debug;
-use std::time::SystemTime;
-use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct FilesystemWrapper(pub Rc<dyn FileSystem>);
@@ -22,10 +18,7 @@ impl FilesystemWrapper {
     }   
 
     pub fn read_file(&self, path: &str) -> VfsResult<Vec<u8>> {
-        let mut file = self.open_file(path)?;
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents)?;
-        Ok(contents)
+        self.read_to_bytes(path)
     }
 
     // Alias to read_file
@@ -35,10 +28,12 @@ impl FilesystemWrapper {
 }
 
 impl std::ops::Deref for FilesystemWrapper {
-    type Target = dyn FileSystem + Send + Sync;
-    fn deref(&self) -> &Self::Target { &*self.0 }
-}
+    type Target = dyn FileSystem;
 
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
 
 #[derive(Clone)]
 pub struct AssetRequirer {
@@ -303,23 +298,6 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn cache_key(&self) -> Vec<u8> {
-        // Try fetching the file itself to hash it directly
-        if let Ok(contents) = self.contents() {
-            // Take the sha256 hash of the contents
-            let mut hasher = Sha256::new();
-            hasher.update(contents);
-            let hash = hasher.finalize();
-            let mut cache_key = Vec::with_capacity(
-                self.cache_prefix.borrow().len() + 1 + hash.len(),
-            );
-            cache_key.extend_from_slice(self.cache_prefix.borrow().as_bytes());
-            cache_key.push(b'@');
-            cache_key.extend_from_slice(&hash);
-            log::trace!("Cache key: {:#?}", String::from_utf8_lossy(&cache_key));
-            return cache_key;
-        }
-
-        // Otherwise, use the module path
         let cache_prefix = self.cache_prefix.borrow();
         let mut cache_key = Vec::with_capacity(
             cache_prefix.len() + 1 + self.abs_path.borrow().display().to_string().len() + self.suffix.borrow().len(),
@@ -367,15 +345,7 @@ impl LuaRequire for AssetRequirer {
 /// Test the require function
 #[cfg(test)]
 mod require_test {
-    use mlua_scheduler::TaskManager;
-    use mlua_scheduler_ext::feedbacks::ThreadTracker;
-    use tokio::task::LocalSet;
-    use mlua::IntoLua;
-
     use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use std::time::Duration;
 
     fn create_luaurc_with_aliases(aliases: indexmap::IndexMap<String, String>) -> String {
         serde_json::to_string(&serde_json::json!({
