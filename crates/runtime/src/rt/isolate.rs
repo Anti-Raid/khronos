@@ -297,6 +297,7 @@ impl KhronosIsolate {
         match self.asset_manager.fs_last_reset() {
             Ok(st) => {
                 if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
+                    log::info!("Prev stored fs last reset: {:?}, last_reset: {:?}", prev_stored_fs_last_reset, st);
                     if st > prev_stored_fs_last_reset {
                         log::debug!("Resetting cache due to filesystem change");
                         self.prev_stored_fs_last_reset.set(Some(st));
