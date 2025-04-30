@@ -294,6 +294,7 @@ impl KhronosIsolate {
     ) -> LuaResult<SpawnResult> {
         // Check if we need to do a full cache reset
         log::debug!("Checking for cache reset");
+        log::info!("Prev stored fs last reset: {:?}", prev_stored_fs_last_reset);
         match self.asset_manager.fs_last_reset() {
             Ok(st) => {
                 if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
