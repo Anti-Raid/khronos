@@ -335,7 +335,7 @@ impl KVProvider for CliKVProvider {
             return Ok(None);
         };
 
-        let record: serde_json::Value = serde_json::from_slice(&file_contents.contents)
+        let record: khronos_runtime::utils::khronos_value::KhronosValue = serde_json::from_slice(&file_contents.contents)
             .map_err(|e| format!("Failed to parse record: {}", e))?;
 
         Ok(Some(khronos_runtime::traits::ir::KvRecord {
@@ -349,7 +349,7 @@ impl KVProvider for CliKVProvider {
     async fn set(
         &self,
         key: String,
-        value: serde_json::Value,
+        value: khronos_runtime::utils::khronos_value::KhronosValue,
     ) -> Result<(), khronos_runtime::Error> {
         let value = serde_json::to_string(&value)
             .map_err(|e| format!("Failed to serialize value: {}", e))?;
@@ -388,7 +388,7 @@ impl KVProvider for CliKVProvider {
 
         let mut records = Vec::new();
         for record in entries {
-            let value: serde_json::Value = serde_json::from_slice(&record.contents)
+            let value: khronos_runtime::utils::khronos_value::KhronosValue = serde_json::from_slice(&record.contents)
                 .map_err(|e| format!("Failed to parse record: {}", e))?;
 
             records.push(khronos_runtime::traits::ir::KvRecord {
