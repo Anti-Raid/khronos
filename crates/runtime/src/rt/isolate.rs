@@ -293,13 +293,13 @@ impl KhronosIsolate {
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
         // Check if we need to do a full cache reset
-        log::debug!("Checking for cache reset");
+        log::trace!("Checking for cache reset");
         match self.asset_manager.fs_last_reset() {
             Ok(st) => {
                 if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
-                    log::info!("Prev stored fs last reset: {:?}, last_reset: {:?}", prev_stored_fs_last_reset, st);
+                    log::trace!("Prev stored fs last reset: {:?}, last_reset: {:?}", prev_stored_fs_last_reset, st);
                     if st > prev_stored_fs_last_reset {
-                        log::debug!("Resetting cache due to filesystem change");
+                        log::trace!("Resetting cache due to filesystem change");
                         self.prev_stored_fs_last_reset.set(Some(st));
                         self.inner.clear_require_cache().map_err(LuaError::external)?;
                     }
@@ -310,7 +310,7 @@ impl KhronosIsolate {
             Err(e) => {
                 match e.kind() {
                     vfs::error::VfsErrorKind::NotSupported => {
-                        log::debug!("Filesystem does not support last reset");
+                        log::trace!("Filesystem does not support last reset");
                     }, // Do nothing
                     _ => {
                         return Err(LuaError::external(
