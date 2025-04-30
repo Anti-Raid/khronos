@@ -307,7 +307,9 @@ impl KhronosIsolate {
             },
             Err(e) => {
                 match e.kind() {
-                    vfs::error::VfsErrorKind::NotSupported => {}, // Do nothing
+                    vfs::error::VfsErrorKind::NotSupported => {
+                        log::debug!("Filesystem does not support last reset");
+                    }, // Do nothing
                     _ => {
                         return Err(LuaError::external(
                             format!("Failed to get filesystem last reset: {}", e),
