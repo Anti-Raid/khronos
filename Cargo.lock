@@ -4822,7 +4822,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vfs"
 version = "0.12.1"
-source = "git+https://github.com/Anti-Raid/rust-vfs#6a020b3219667b8b8d4b92c94a1b795fb384ac84"
+source = "git+https://github.com/Anti-Raid/rust-vfs#608f349c7016650adee2cbe0e0db87a5396572d0"
 dependencies = [
  "filetime",
 ]
