@@ -74,7 +74,7 @@ pub struct KhronosIsolate {
     inner: KhronosRuntime,
 
     /// Last stored filesystem reset
-    prev_stored_fs_last_reset: Cell<Option<SystemTime>>,
+    prev_stored_fs_last_reset: Rc<Cell<Option<SystemTime>>>,
 
     /// Isolate id
     id: String,
