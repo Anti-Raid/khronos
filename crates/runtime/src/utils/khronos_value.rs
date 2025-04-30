@@ -709,6 +709,9 @@ impl KhronosValue {
             KhronosValue::Map(m) => {
                 let mut map = serde_json::Map::new();
                 for (k, v) in m.into_iter() {
+                    if k == KHRONOS_VALUE_TYPE_KEY {
+                        return Err(format!("Cannot use reserved key `{}` in map", KHRONOS_VALUE_TYPE_KEY).into());
+                    }
                     map.insert(k, v.into_serde_json_value(depth + 1, preserve_types)?);
                 }
                 serde_json::Value::Object(map)

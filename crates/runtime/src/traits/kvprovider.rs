@@ -1,4 +1,5 @@
 use super::ir::KvRecord;
+use crate::utils::khronos_value::KhronosValue;
 
 /// A key-value provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -24,7 +25,7 @@ pub trait KVProvider: 'static + Clone {
     async fn get(&self, key: String) -> Result<Option<KvRecord>, crate::Error>;
 
     /// Set a record in the key-value store.
-    async fn set(&self, key: String, value: serde_json::Value) -> Result<(), crate::Error>;
+    async fn set(&self, key: String, value: KhronosValue) -> Result<(), crate::Error>;
 
     /// Delete a record from the key-value store.
     async fn delete(&self, key: String) -> Result<(), crate::Error>;

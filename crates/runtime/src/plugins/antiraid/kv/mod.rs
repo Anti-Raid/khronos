@@ -1,12 +1,10 @@
-mod types;
-
-use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
 use crate::TemplateContextRef;
 use mlua::prelude::*;
-use serde::{Deserialize, Serialize};
+use crate::utils::khronos_value::KhronosValue;
+use crate::to_struct;
 
 use crate::lua_promise;
 use crate::utils::executorscope::ExecutorScope;
@@ -20,21 +18,45 @@ pub struct KvExecutor<T: KhronosContext> {
     kv_provider: T::KVProvider,
 }
 
-/// Represents a full record complete with metadata
-#[derive(Serialize, Deserialize)]
-pub struct KvRecord {
-    pub key: String,
-    pub value: serde_json::Value,
-    pub exists: bool,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+to_struct!(
+    /// Represents a full record complete with metadata
+    pub struct KvRecord {
+        pub key: String,
+        pub value: KhronosValue,
+        pub exists: bool,
+        pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+        pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    }
+);
+
+impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
+    fn from(record: crate::traits::ir::kv::KvRecord) -> Self {
+        KvRecord {
+            key: record.key,
+            exists: true,
+            value: record.value,
+            created_at: record.created_at,
+            last_updated_at: record.last_updated_at,
+        }
+    }
+}
+
+impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
+    fn from(record: KvRecord) -> Self {
+        crate::traits::ir::kv::KvRecord {
+            key: record.key,
+            value: record.value,
+            created_at: record.created_at,
+            last_updated_at: record.last_updated_at,
+        }
+    }
 }
 
 impl KvRecord {
     fn default() -> KvRecord {
         KvRecord {
             key: "".to_string(),
-            value: serde_json::Value::Null,
+            value: KhronosValue::Null,
             exists: false,
             created_at: None,
             last_updated_at: None,
@@ -148,7 +170,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         });
 
         methods.add_method("find", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |lua, this, key|, {
+            Ok(lua_promise!(this, key, |_lua, this, key|, {
                 this.check("find".to_string(), key.clone())
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -166,9 +188,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     })
                     .collect::<Vec<KvRecord>>();
 
-                let records: LuaValue = lua.to_value_with(&records, LUA_SERIALIZE_OPTIONS)?;
-
-                Ok(records)
+                Ok::<KhronosValue, LuaError>(records.into())
             }))
         });
 
@@ -184,7 +204,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         });
 
         methods.add_method("get", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |lua, this, key|, {
+            Ok(lua_promise!(this, key, |_lua, this, key|, {
                 log::info!("Starting get operation");
 
                 this.check("get".to_string(), key.clone())
@@ -200,8 +220,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 match record {
                     // Return None and true if record was found but value is null
                     Some(rec) => {
-                        let value: LuaValue = lua.to_value_with(&rec.value, LUA_SERIALIZE_OPTIONS)?;
-                        Ok((Some(value), true))
+                        Ok((Some(rec.value), true))
                     },
                     // Return None and 0 if record was not found
                     None => Ok((None, false)),
@@ -210,7 +229,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         });
 
         methods.add_method("getrecord", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |lua, this, key|, {
+            Ok(lua_promise!(this, key, |_lua, this, key|, {
                 this.check("get".to_string(), key.clone())
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -228,8 +247,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     None => KvRecord::default(),
                 };
 
-                let record: LuaValue = lua.to_value_with(&record, LUA_SERIALIZE_OPTIONS)?;
-                Ok(record)
+                Ok::<KhronosValue, LuaError>(record.into())
             }))
         });
 
@@ -250,7 +268,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 this.check("set".to_string(), key.clone())
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                this.kv_provider.set(key, lua.from_value(value)?).await
+                let value = KhronosValue::from_lua(value, &lua)?;
+
+                this.kv_provider.set(key, value).await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
                 Ok(())
             }))
