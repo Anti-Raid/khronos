@@ -338,20 +338,10 @@ impl LuaRequire for AssetRequirer {
     // For now, we don't support yielding in require'd modules due to luau require limitations.
     fn load(&self, lua: &Lua, _path: &str, chunk_name: &str, content: &[u8]) -> LuaResult<LuaValue> {
         log::trace!("Loading module {:#?}", chunk_name);
-        let func = lua.load(content)
+        let lv = lua.load(content)
         .set_name(chunk_name)
         .set_environment(self.global_table.clone())
-        .into_function()?;
-
-        let th = lua.create_thread(func)?;
-
-        let lv = th.resume(())?;
-
-        let status = th.status();
-        if status != mlua::ThreadStatus::Finished && status != mlua::ThreadStatus::Error {
-            return Err(mlua::Error::runtime(format!("module '{}' attempted to yield within a require", chunk_name)));
-        }
-
+        .call(())?;
         Ok(lv)
     }
 }
