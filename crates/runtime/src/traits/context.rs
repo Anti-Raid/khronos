@@ -50,9 +50,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// Returns the current Discord user, if any
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
-    /// Returns the runtime shareable data for the current context
-    fn runtime_shareable_data(&self) -> crate::rt::RuntimeShareableData;
-
     /// Returns a key-value provider with the given scope
     fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider>;
 

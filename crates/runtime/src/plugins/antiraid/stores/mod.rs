@@ -1,14 +1,16 @@
-use crate::{traits::context::KhronosContext, TemplateContextRef};
+use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 
 pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
+    let store = lua.app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>().ok_or(
+        mlua::Error::RuntimeError("No runtime global table found".to_string()),
+    )?;
+
     module.set(
         "store",
-        lua.create_function(|_, token: TemplateContextRef<T>| {
-            Ok(token.context.runtime_shareable_data().store_table.clone())
-        })?,
+        store.0.clone(),
     )?;
 
     module.set_readonly(true); // Block any attempt to modify this table

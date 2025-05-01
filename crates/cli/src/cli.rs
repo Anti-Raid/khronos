@@ -227,7 +227,6 @@ impl Cli {
             allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
-            runtime_shareable_data: self.setup_data.main_isolate.runtime_shareable_data(),
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),

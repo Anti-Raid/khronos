@@ -13,6 +13,8 @@ use mlua_scheduler::TaskManager;
 use mlua_scheduler_ext::feedbacks::{ChainFeedback, ThreadTracker};
 use mlua_scheduler_ext::Scheduler;
 
+pub struct RuntimeGlobalTable(pub LuaTable);
+
 /// A function to be called when the Khronos runtime is marked as broken
 pub type OnBrokenFunc = Box<dyn Fn(&Lua)>;
 
@@ -227,8 +229,14 @@ impl KhronosRuntime {
             });
         }
 
+        let store_table = lua.create_table()?;
+        lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()))
+        .ok_or(
+            mlua::Error::RuntimeError("Failed to set runtime global table".to_string()),
+        )?;
+
         Ok(Self {
-            store_table: lua.create_table()?,
+            store_table,
             lua,
             compiler,
             scheduler,
