@@ -93,6 +93,7 @@ impl LuaUserData for TimeDelta {
                     "hours",
                     "days",
                     "weeks",
+                    "as_secs",
                     // Methods
                     "offset_string",
                 ],
@@ -110,6 +111,9 @@ impl LuaUserData for TimeDelta {
         fields.add_field_method_get("hours", |_, this| Ok(this.timedelta.num_hours()));
         fields.add_field_method_get("days", |_, this| Ok(this.timedelta.num_days()));
         fields.add_field_method_get("weeks", |_, this| Ok(this.timedelta.num_weeks()));
+
+        fields.add_field_method_get("as_secs", |_, this| Ok(this.timedelta.as_seconds_f64()));
+
     }
 }
 
