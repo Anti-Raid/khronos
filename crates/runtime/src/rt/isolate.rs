@@ -222,14 +222,6 @@ impl KhronosIsolate {
         &self.id
     }
 
-    /// Creates a runtime shareable data object
-    pub fn runtime_shareable_data(&self) -> RuntimeShareableData {
-        RuntimeShareableData {
-            global_table: self.global_table.clone(),
-            store_table: self.inner.store_table().clone(),
-        }
-    }
-
     pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
         &self,
         context: TemplateContext<K>,
@@ -456,14 +448,4 @@ impl SpawnResult {
             }
         }
     }
-}
-
-/// Workaround to a mlua bug where storing a mlua::Lua in a userdata
-/// leads to a segfault when the userdata is dropped
-#[derive(Clone)]
-pub struct RuntimeShareableData {
-    /// Global table
-    pub global_table: LuaTable,
-    /// Store table
-    pub store_table: LuaTable,
 }

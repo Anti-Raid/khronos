@@ -14,7 +14,6 @@ use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
-use khronos_runtime::rt::RuntimeShareableData;
 use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::ir::ScheduledExecution;
@@ -151,7 +150,6 @@ pub struct CliKhronosContext {
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
-    pub runtime_shareable_data: RuntimeShareableData,
     pub http: Option<Arc<serenity::all::Http>>,
     pub cache: Option<Arc<serenity::cache::Cache>>,
     pub template_name: String,
@@ -196,11 +194,6 @@ impl KhronosContext for CliKhronosContext {
 
     fn current_user(&self) -> Option<serenity::all::CurrentUser> {
         self.cache.as_ref().map(|c| c.current_user().clone())
-    }
-
-    /// Returns the runtime shareable data
-    fn runtime_shareable_data(&self) -> khronos_runtime::rt::RuntimeShareableData {
-        self.runtime_shareable_data.clone()
     }
 
     fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider> {
