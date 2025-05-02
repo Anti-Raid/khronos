@@ -133,27 +133,36 @@ impl KhronosIsolate {
         is_subisolate: bool,
     ) -> Result<Self, LuaError> {
         let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        let global_table = proxy_global(inner.lua())?;
 
-        let controller = AssetRequirer::new(
-            asset_manager.clone(),
-            id.clone(),
-            global_table.clone()
-        );
+        let (controller, global_table) = {
+            let Some(ref lua) = *inner.lua() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };  
+            
+            let global_table = proxy_global(lua)?;
 
-        if is_subisolate {
-            global_table.set(
-                "require",
-                inner.lua().create_require_function(controller.clone())?,
-            )?;
-        } else {
-            inner.lua().globals().set(
-                "require",
-                inner.lua().create_require_function(controller.clone())?,
-            )?;
-        }
-
-        setup_prelude(inner.lua(), global_table.clone())?;
+            let controller = AssetRequirer::new(
+                asset_manager.clone(),
+                id.clone(),
+                global_table.clone()
+            );
+    
+            if is_subisolate {
+                global_table.set(
+                    "require",
+                    lua.create_require_function(controller.clone())?,
+                )?;
+            } else {
+                lua.globals().set(
+                    "require",
+                    lua.create_require_function(controller.clone())?,
+                )?;
+            }
+    
+            setup_prelude(lua, global_table.clone())?;
+            
+            (controller, global_table)
+        };
 
         Ok(Self {
             id,
@@ -171,12 +180,6 @@ impl KhronosIsolate {
     #[inline]
     pub fn asset_manager(&self) -> &FilesystemWrapper {
         &self.asset_manager
-    }
-
-    /// Returns the lua vm for the isolate
-    #[inline]
-    pub fn lua(&self) -> &Lua {
-        self.inner.lua()
     }
 
     /// Returns the inner khronos runtime for the isolate
@@ -227,7 +230,11 @@ impl KhronosIsolate {
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<LuaMultiValue, LuaError> {
-        match (event, context).into_lua_multi(self.inner.lua()) {
+        let Some(ref lua) = *self.inner.lua() else {
+            return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+        };
+
+        match (event, context).into_lua_multi(lua) {
             Ok(f) => Ok(f),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -286,6 +293,7 @@ impl KhronosIsolate {
     ) -> LuaResult<SpawnResult> {
         // Check if we need to do a full cache reset
         log::trace!("Checking for cache reset");
+
         match self.asset_manager.fs_last_reset() {
             Ok(st) => {
                 if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
@@ -314,6 +322,13 @@ impl KhronosIsolate {
         };
 
         let thread = {
+            let Some(ref lua) = *self.inner.lua() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };    
+
+            println!("Is VM Owned: {}", lua.is_owned());
+            println!("VM Strong Count: {}", lua.strong_count());    
+
             let mut cache = self.bytecode_cache.inner().borrow_mut();
             let bytecode = if let Some(bytecode) = cache.get(cache_key) {
                 Cow::Borrowed(bytecode)
@@ -326,8 +341,6 @@ impl KhronosIsolate {
 
             //let bytecode = self.lua.load(script).set_name(name)?.dump()?;
             //cache.insert(name.to_string(), bytecode.clone());
-
-            let lua = self.inner.lua();
 
             match lua
                 .load(&**bytecode)
@@ -389,7 +402,7 @@ pub struct SpawnResult {
 }
 
 impl SpawnResult {
-    pub fn new(result: Option<LuaMultiValue>) -> Self {
+    pub(crate) fn new(result: Option<LuaMultiValue>) -> Self {
         Self { result }
     }
 
@@ -408,12 +421,16 @@ impl SpawnResult {
             return Ok(serde_json::Value::Null);
         };
 
+        let Some(ref lua) = *isolate.inner().lua() else {
+            return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+        };
+
         match values.len() {
             0 => Ok(serde_json::Value::Null),
             1 => {
                 let value = values.into_iter().next().unwrap();
 
-                match isolate.lua().from_value::<serde_json::Value>(value) {
+                match lua.from_value::<serde_json::Value>(value) {
                     Ok(v) => Ok(v),
                     Err(e) => {
                         // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -430,7 +447,7 @@ impl SpawnResult {
                 let mut arr = Vec::with_capacity(values.len());
 
                 for v in values {
-                    match isolate.lua().from_value::<serde_json::Value>(v) {
+                    match lua.from_value::<serde_json::Value>(v) {
                         Ok(v) => arr.push(v),
                         Err(e) => {
                             // Mark memory error'd VMs as broken automatically to avoid user grief/pain

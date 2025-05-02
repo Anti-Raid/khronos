@@ -303,7 +303,7 @@ impl Cli {
         }
 
         // Test related functions, not available outside of script runner
-        if !aux_opts.disable_test_funcs {
+        /*if !aux_opts.disable_test_funcs {
             runtime
                 .lua()
                 .globals()
@@ -324,52 +324,27 @@ impl Cli {
                         .expect("Failed to create async function"),
                 )
                 .expect("Failed to set _OS global");
-        }
+        }*/
 
         if !aux_opts.use_custom_print {
             // Ensure print is global as everything basically relies on print
             log::debug!("Setting print global");
-            runtime
-                .lua()
-                .globals()
-                .set(
-                    "print",
-                    runtime
-                        .lua()
-                        .create_function(|_lua, values: LuaMultiValue| {
-                            if !values.is_empty() {
-                                println!(
-                                    "{}",
-                                    values
-                                        .iter()
-                                        .map(|value| {
-                                            match value {
-                                                LuaValue::String(s) => format!("{}", s.display()),
-                                                _ => format!("{:#?}", value)
-                                            }
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\t")
-                                );
-                            } else {
-                                println!("nil");
-                            }
-
-                            Ok(())
-                        })
-                        .expect("Failed to set print global"),
-                )
-                .expect("Failed to set print global");
+            runtime.use_stdout_print().expect("Failed to set custom print");
         }
 
-        runtime
-            .lua()
-            .globals()
-            .set(
-                "cli",
-                Self::setup_cli_specific_table(ext_state.clone(), runtime.lua(), &aux_opts),
-            )
-            .expect("Failed to set cli global");
+        {
+            let Some(ref lua) = *runtime.lua() else {
+                panic!("Lua is not available");
+            };
+    
+            lua
+                .globals()
+                .set(
+                    "cli",
+                    Self::setup_cli_specific_table(ext_state.clone(), lua, &aux_opts),
+                )
+                .expect("Failed to set cli global");    
+        }            
 
         let current_dir = std::env::current_dir().expect("Failed to get current dir");
 
@@ -515,7 +490,7 @@ impl Cli {
                     Editor::new().expect("Failed to create editor");
 
                 editor.set_helper(Some(repl_completer::LuaStatementCompleter {
-                    lua: self.setup_data.main_isolate.lua().clone(),
+                    runtime: self.setup_data.main_isolate.inner().clone(),
                     global_tab: self.setup_data.main_isolate.global_table().clone(),
                 }));
 

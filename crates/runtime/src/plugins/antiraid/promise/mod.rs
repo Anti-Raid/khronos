@@ -8,26 +8,29 @@ pub type LuaPromiseFut = Pin<Box<dyn Future<Output = LuaResult<LuaMultiValue>>>>
 ///
 /// LuaPromise's are not run at all until ``promise.yield`` is called
 /// in Lua code
+///
+/// Note that a promise cannot be called multiple times. Attempting to do
+/// will return an error
 pub struct LuaPromise {
-    pub inner: Box<dyn Fn(Lua) -> LuaPromiseFut>, // Box the stream to ensure its pinned,
+    pub inner: Box<dyn FnOnce(Lua) -> LuaPromiseFut>, // Box the stream to ensure its pinned,
 }
 
 impl LuaPromise {
     #[allow(dead_code)]
-    pub fn new(fut: Box<dyn Fn(Lua) -> LuaPromiseFut>) -> Self {
+    pub fn new(fut: Box<dyn FnOnce(Lua) -> LuaPromiseFut>) -> Self {
         Self { inner: fut }
     }
 
     pub fn new_generic<
         T: Future<Output = LuaResult<R>> + 'static,
-        U: Fn(&Lua) -> T + Clone + 'static,
+        U: FnOnce(&Lua) -> T + 'static,
         R: IntoLuaMulti + 'static,
     >(
         func: U,
     ) -> Self {
         Self {
             inner: Box::new(move |lua| {
-                let func_ref = func.clone();
+                let func_ref = func;
                 Box::pin(async move {
                     let fut = async move {
                         let fut = (func_ref)(&lua);
@@ -52,31 +55,22 @@ macro_rules! lua_promise {
     ($($arg:ident),* $(,)?, |$lua:ident, $($args:ident),*|, $code:block) => {
         {
             use $crate::plugins::antiraid::promise::LuaPromise;
-            // let arg1 = arg1.clone();
-            // let arg2 = arg2.clone();
             $(
                 let $arg = $arg.clone();
             )*
-
-            LuaPromise::new_generic(move |$lua| {
-                // let arg1 = arg1.clone();
-                // let arg2 = arg2.clone();
-                // ...
-                $(
-                    let $arg = $arg.clone();
-                )*
-                let $lua = $lua.clone();
-
-                async move {
-                    $(
-                        let $args = $args.clone();
-                    )*
-
-                    let $lua = $lua.clone();
-
-                    $code
-                }
-            })
+            LuaPromise {
+                inner: Box::new(
+                    move |$lua| Box::pin(async move {
+                        let resp = async {
+                            $code
+                        }.await;
+                        match resp {
+                            Ok(val) => val.into_lua_multi(&$lua),
+                            Err(e) => Err(e),
+                        }
+                    })
+                )
+            }
         }
     };
 }
@@ -90,8 +84,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "yield",
-        lua.create_scheduler_async_function(|lua, promise: LuaPromiseRef| async move {
-            let fut = (promise.inner)(lua);
+        lua.create_scheduler_async_function(|lua, promise: LuaAnyUserData| async move {
+            let ud_owned = promise.take::<LuaPromise>()?;
+            let fut = (ud_owned.inner)(lua);
             fut.await
         })?,
     )?;
@@ -146,7 +141,7 @@ mod tests {
             lua.set_app_data(thread_tracker.clone());
 
             let task_mgr = mlua_scheduler::taskmgr::TaskManager::new(
-                lua.clone(),
+                &lua,
                 std::rc::Rc::new(mlua_scheduler_ext::feedbacks::ChainFeedback::new(
                     thread_tracker,
                     TaskPrintError {},

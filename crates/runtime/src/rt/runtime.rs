@@ -31,11 +31,12 @@ pub struct KhronosRuntimeInterruptData {
     pub last_execution_time: Option<Instant>,
 }
 
-#[derive(Clone)]
 /// A struct representing the inner VMs and structures used by Khronos.
+#[derive(
+    Clone)]
 pub struct KhronosRuntime {
     /// The lua vm itself
-    lua: Lua,
+    lua: Rc<RefCell<Option<Lua>>>,
 
     /// The lua compiler itself
     compiler: mlua::Compiler,
@@ -102,12 +103,12 @@ impl KhronosRuntime {
         let sched_feedback = ChainFeedback::new(tt, sched_feedback);
 
         let scheduler = Scheduler::new(TaskManager::new(
-            lua.clone(),
+            &lua,
             Rc::new(sched_feedback),
             Duration::from_micros(500),
         ));
 
-        scheduler.attach();
+        scheduler.attach()?;
 
         let scheduler_lib = mlua_scheduler::userdata::scheduler_lib(&lua)?;
 
@@ -234,7 +235,7 @@ impl KhronosRuntime {
 
         Ok(Self {
             store_table,
-            lua,
+            lua: Rc::new(RefCell::new(Some(lua))),
             compiler,
             scheduler,
             sandboxed: false,
@@ -248,8 +249,12 @@ impl KhronosRuntime {
     }
 
     /// Returns the lua vm
-    pub fn lua(&self) -> &Lua {
-        &self.lua
+    ///
+    /// The use of this function is *highly* discouraged. Do *not* hold the returned value across await points
+    /// as it is internally a RefCell
+    //#[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
+    pub fn lua(&self) -> std::cell::Ref<Option<Lua>> {
+        self.lua.borrow()
     }
 
     /// Returns the lua compiler being used
@@ -259,7 +264,10 @@ impl KhronosRuntime {
 
     /// Sets the lua compiler being used on both the lua vm and the runtime
     pub fn set_compiler(&mut self, compiler: mlua::Compiler) {
-        self.lua.set_compiler(compiler.clone());
+        let Some(ref lua) = *self.lua.borrow() else {
+            return;
+        };
+        lua.set_compiler(compiler.clone());
         self.compiler = compiler;
     }
 
@@ -297,13 +305,17 @@ impl KhronosRuntime {
 
     /// Sets the runtime to be broken
     pub fn mark_broken(&self, broken: bool) {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return;
+        };
+
         self.broken.set(broken);
 
         // Call the on_broken callback if the runtime is marked as broken
         // to ensure anything that needs to be cleaned up is cleaned up
         if broken {
             if let Some(ref on_broken) = *self.on_broken.borrow() {
-                on_broken(&self.lua);
+                on_broken(&lua);
             }
         }
     }
@@ -327,8 +339,12 @@ impl KhronosRuntime {
             return Ok(());
         }
 
-        self.lua.sandbox(true)?;
-        self.lua.globals().set_readonly(true);
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        lua.sandbox(true)?;
+        lua.globals().set_readonly(true);
         self.sandboxed = true;
         Ok(())
     }
@@ -341,8 +357,12 @@ impl KhronosRuntime {
             return Ok(());
         }
 
-        self.lua.sandbox(false)?;
-        self.lua.globals().set_readonly(false);
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        lua.sandbox(false)?;
+        lua.globals().set_readonly(false);
         self.sandboxed = false;
         Ok(())
     }
@@ -376,9 +396,13 @@ impl KhronosRuntime {
 
     /// Loads plugins to be exposed to all isolates
     pub fn load_plugins(&self, plugins: PluginSet) -> LuaResult<()> {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
         for (name, plugin) in plugins.into_iter() {
-            let table = (plugin.0)(&self.lua)?;
-            self.lua.register_module(&name, table)?;
+            let table = (plugin.0)(&lua)?;
+            lua.register_module(&name, table)?;
         }
         Ok(())
     }
@@ -386,12 +410,71 @@ impl KhronosRuntime {
     /// Returns the require cache table
     #[inline]
     pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
-        crate::utils::require_v2::get_require_cache(&self.lua)
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+        crate::utils::require_v2::get_require_cache(lua)
     }
 
     /// Clears the require cache table
     #[inline]
     pub fn clear_require_cache(&self) -> LuaResult<()> {
-        crate::utils::require_v2::clear_require_cache(&self.lua)
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+        crate::utils::require_v2::clear_require_cache(lua)
+    }
+
+    /// Sets the print function to use stdout
+    pub fn use_stdout_print(&self) -> LuaResult<()> {
+        // Ensure print is global as everything basically relies on print
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        log::debug!("Setting print global");
+        lua
+            .globals()
+            .set(
+                "print",
+                lua
+                    .create_function(|_lua, values: LuaMultiValue| {
+                        if !values.is_empty() {
+                            println!(
+                                "{}",
+                                values
+                                    .iter()
+                                    .map(|value| {
+                                        match value {
+                                            LuaValue::String(s) => format!("{}", s.display()),
+                                            _ => format!("{:#?}", value)
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\t")
+                            );
+                        } else {
+                            println!("nil");
+                        }
+
+                        Ok(())
+                    })?,
+            )?;
+        Ok(())
+    }
+
+    pub fn close(&self) -> Result<(), crate::Error> {
+        if let Some(ref lua) = *self.lua.borrow_mut() {
+            // Ensure strong_count == 1
+            if lua.strong_count() > 1 {
+                return Err("Internal error: strong count of Lua VM is > 1".into());
+            }
+        } else {
+            return Ok(()); // Lua VM is already closed
+        }
+
+        *self.lua.borrow_mut() = None; // Drop the Lua VM
+        
+        Ok(())
     }
 }

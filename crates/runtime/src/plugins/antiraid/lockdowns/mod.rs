@@ -266,7 +266,7 @@ mod lockdown_test {
             lua.set_app_data(thread_tracker.clone());
 
             let task_mgr = mlua_scheduler::taskmgr::TaskManager::new(
-                lua.clone(),
+                &lua,
                 std::rc::Rc::new(mlua_scheduler_ext::feedbacks::ChainFeedback::new(
                     thread_tracker,
                     TaskPrintError {},

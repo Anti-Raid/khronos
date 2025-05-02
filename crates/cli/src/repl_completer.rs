@@ -6,7 +6,7 @@ use rustyline::{
 
 /// Based on https://github.com/luau-lang/luau/blob/master/CLI/src/Repl.cpp#L538
 pub struct LuaStatementCompleter {
-    pub lua: Lua,
+    pub runtime: khronos_runtime::rt::KhronosRuntime,
     pub global_tab: LuaTable,
 }
 
@@ -192,11 +192,15 @@ impl LuaStatementCompleter {
         }
 
         if current_value == LuaValue::Table(self.global_tab.clone()) {
+            let Some(ref lua) = *self.runtime.lua() else {
+                panic!("Lua runtime is not initialized");
+            };
+
             // Add the real global table to the list of tables to search
-            tabs.push(LuaValue::Table(self.lua.globals()));
+            tabs.push(LuaValue::Table(lua.globals()));
 
             if let Some(mt) =
-                Self::value_metamethod(&LuaValue::Table(self.lua.globals()), "__index")
+                Self::value_metamethod(&LuaValue::Table(lua.globals()), "__index")
             {
                 tabs.push(LuaValue::Table(mt));
             }

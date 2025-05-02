@@ -646,5 +646,12 @@ fn main() {
                 break;
             }
         }
+
+        println!("Closing Lua state");
+        cli.setup_data
+            .main_isolate
+            .inner()
+            .close()
+            .expect("Failed to close Lua state");
     });
 }
