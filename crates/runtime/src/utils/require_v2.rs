@@ -333,7 +333,7 @@ impl LuaRequire for AssetRequirer {
 
     // Loads the module and returns the result (function or table).
     // For now, we don't support yielding in require'd modules due to luau require limitations.
-    fn load(&self, lua: &Lua, path: &str, _chunk_name: &str, _content: &[u8]) -> LuaResult<LuaValue> {
+    fn load(&self, lua: &Lua, _path: &str, chunk_name: &str, _content: &[u8]) -> LuaResult<LuaValue> {
         log::trace!("Loading module {:#?}", chunk_name);
 
         let content = {
