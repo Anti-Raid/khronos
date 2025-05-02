@@ -301,10 +301,7 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn contents(&self) -> IoResult<Vec<u8>> {
-        let suffix = self.suffix.borrow();
-        let module_path = PathBuf::from(self.abs_path.borrow().to_string_lossy().to_string() + &*suffix);
-        // log::trace!("Loading contents for {:#?}", module_path);
-        self.get_file(module_path.as_ref())
+        Ok(Vec::with_capacity(0)) // We load in load directly to avoid luau copy
     }
 
     fn chunk_name(&self) -> String {
@@ -336,9 +333,20 @@ impl LuaRequire for AssetRequirer {
 
     // Loads the module and returns the result (function or table).
     // For now, we don't support yielding in require'd modules due to luau require limitations.
-    fn load(&self, lua: &Lua, _path: &str, chunk_name: &str, content: &[u8]) -> LuaResult<LuaValue> {
+    fn load(&self, lua: &Lua, path: &str, _chunk_name: &str, _content: &[u8]) -> LuaResult<LuaValue> {
         log::trace!("Loading module {:#?}", chunk_name);
+
+        let content = {
+            let suffix = self.suffix.borrow();
+            let module_path = PathBuf::from(self.abs_path.borrow().to_string_lossy().to_string() + &*suffix);
+    
+            let content = self.get_file(&module_path).map_err(|e| mlua::Error::external(format!("Failed to fetch contents: {:?}", e)))?; 
+            
+            content
+        };
+
         let lv = lua.load(content)
+        .set_mode(mlua::ChunkMode::Text)
         .set_name(chunk_name)
         .set_environment(self.global_table.clone())
         .call(())?;

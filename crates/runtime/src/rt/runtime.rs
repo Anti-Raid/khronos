@@ -230,10 +230,7 @@ impl KhronosRuntime {
         }
 
         let store_table = lua.create_table()?;
-        lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()))
-        .ok_or(
-            mlua::Error::RuntimeError("Failed to set runtime global table".to_string()),
-        )?;
+        lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()));
 
         Ok(Self {
             store_table,
