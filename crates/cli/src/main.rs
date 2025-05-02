@@ -192,6 +192,12 @@ struct CliArgs {
     #[clap(long)]
     max_threads: Option<i64>,
 
+    /// Sets a limit on the memory usage of the runtime
+    ///
+    /// Environment variable: `MEMORY_LIMIT`
+    #[clap(long)]
+    memory_limit: Option<usize>,
+
     /// The base path to use for file storage
     ///
     /// If unset, See the rules from https://docs.rs/dirs/latest/dirs/fn.data_dir.html
@@ -363,6 +369,14 @@ impl CliArgs {
             );
         }
 
+        if let Ok(memory_limit) = src.var("MEMORY_LIMIT") {
+            self.memory_limit = Some(
+                memory_limit
+                    .parse::<usize>()
+                    .expect("Failed to parse memory limit"),
+            );
+        }
+
         if let Ok(use_custom_print) = src.var("USE_CUSTOM_PRINT") {
             self.use_custom_print = use_custom_print
                 .parse()
@@ -416,6 +430,7 @@ impl CliArgs {
                 }
             },
             max_threads: self.max_threads,
+            memory_limit: self.memory_limit,
         };
 
         let entrypoint_action = {

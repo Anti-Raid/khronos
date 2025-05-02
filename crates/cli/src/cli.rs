@@ -89,6 +89,7 @@ pub struct CliAuxOpts {
     pub use_custom_print: bool,
     pub experiments: Vec<String>,
     pub max_threads: Option<i64>,
+    pub memory_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -300,6 +301,10 @@ impl Cli {
 
         if let Some(max_threads) = aux_opts.max_threads {
             runtime.set_max_threads(max_threads)
+        }
+
+        if let Some(memory_limit) = aux_opts.memory_limit {
+            runtime.set_memory_limit(memory_limit).expect("Failed to set memory limit");
         }
 
         // Test related functions, not available outside of script runner

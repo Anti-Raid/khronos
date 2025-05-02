@@ -412,6 +412,27 @@ impl KhronosRuntime {
         self.current_threads.get()
     }
 
+    /// Returns the current memory usage of the runtime
+    ///
+    /// Returns `0` if the lua vm is not valid
+    pub fn memory_usage(&self) -> usize {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return 0;
+        };
+        lua.used_memory()
+    }
+
+    /// Sets a memory limit for the runtime
+    ///
+    /// The memory limit is set in bytes and will be enforced by the lua vm itself
+    /// (e.g. using mlua)
+    pub fn set_memory_limit(&self, limit: usize) -> Result<usize, LuaError> {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+        lua.set_memory_limit(limit)
+    }
+
     /// Returns the store table for the runtime
     pub fn store_table(&self) -> &LuaTable {
         &self.store_table
