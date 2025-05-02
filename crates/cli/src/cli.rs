@@ -370,12 +370,14 @@ impl Cli {
             log::debug!("Disabling print in main isolate");
             main_isolate
             .global_table()
+            .expect("Failed to get global table")
             .raw_set("print", LuaValue::Nil)
             .expect("Failed to set print global");       
             
             assert_eq!(
                 main_isolate
                     .global_table()
+                    .expect("Failed to get global table")
                     .raw_get::<LuaValue>("print")
                     .expect("Failed to set print global to null"),
                 LuaValue::Nil
@@ -491,7 +493,7 @@ impl Cli {
 
                 editor.set_helper(Some(repl_completer::LuaStatementCompleter {
                     runtime: self.setup_data.main_isolate.inner().clone(),
-                    global_tab: self.setup_data.main_isolate.global_table().clone(),
+                    global_tab: self.setup_data.main_isolate.global_table().expect("Failed to get global table").clone(),
                 }));
 
                 loop {

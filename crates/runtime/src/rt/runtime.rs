@@ -13,10 +13,21 @@ use mlua_scheduler::TaskManager;
 use mlua_scheduler_ext::feedbacks::{ChainFeedback, ThreadTracker};
 use mlua_scheduler_ext::Scheduler;
 
+/// A wrapper around the Lua vm that cannot be cloned
+pub struct KhronosLuaRef<'a>(&'a Lua);
+
+impl std::ops::Deref for KhronosLuaRef<'_> {
+    type Target = Lua;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
 pub struct RuntimeGlobalTable(pub LuaTable);
 
 /// A function to be called when the Khronos runtime is marked as broken
-pub type OnBrokenFunc = Box<dyn Fn(&Lua)>;
+pub type OnBrokenFunc = Box<dyn Fn()>;
 
 /// Auxillary options for the creation of a Khronos runtime
 #[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize, Default)]
@@ -36,7 +47,9 @@ pub struct KhronosRuntimeInterruptData {
     Clone)]
 pub struct KhronosRuntime {
     /// The lua vm itself
-    lua: Rc<RefCell<Option<Lua>>>,
+    ///
+    /// Should not be publicly exposed. Instead, use create_custom_global or DataStore's
+    pub(super) lua: Rc<RefCell<Option<Lua>>>,
 
     /// The lua compiler itself
     compiler: mlua::Compiler,
@@ -252,7 +265,7 @@ impl KhronosRuntime {
     ///
     /// The use of this function is *highly* discouraged. Do *not* hold the returned value across await points
     /// as it is internally a RefCell
-    //#[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
+    #[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
     pub fn lua(&self) -> std::cell::Ref<Option<Lua>> {
         self.lua.borrow()
     }
@@ -303,21 +316,31 @@ impl KhronosRuntime {
         &self.opts
     }
 
-    /// Sets the runtime to be broken
-    pub fn mark_broken(&self, broken: bool) {
-        let Some(ref lua) = *self.lua.borrow() else {
-            return;
+    /// Sets the runtime to be broken. This will also attempt to close the lua vm but
+    /// will still call the on_broken callback if it is set regardless of return of close
+    ///
+    /// It is a logic error to call this function while holding a reference to the lua vm
+    pub fn mark_broken(&self, broken: bool) -> Result<(), crate::Error> {
+        let mut stat = Ok(());
+        match self.close() {
+            Ok(_) => {}
+            Err(e) => {
+                self.broken.set(true); // Ensure runtime is still at least marked as broken
+                stat = Err(e); // Set return value to the error
+            }
         };
 
-        self.broken.set(broken);
-
         // Call the on_broken callback if the runtime is marked as broken
-        // to ensure anything that needs to be cleaned up is cleaned up
+        //
+        // This must be called regardless of if close failed or not to ensure at least
+        // other handles are closed
         if broken {
             if let Some(ref on_broken) = *self.on_broken.borrow() {
-                on_broken(&lua);
+                on_broken();
             }
         }
+
+        stat
     }
 
     /// Returns if a on_broken callback is set
@@ -463,6 +486,27 @@ impl KhronosRuntime {
         Ok(())
     }
 
+    pub fn set_custom_global<
+        F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mlua::MaybeSend + 'static,
+        A: FromLuaMulti,
+        R: IntoLuaMulti,        
+    >(&self, name: &str, func: F) -> LuaResult<()> {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        lua.globals().set(
+            name,
+            lua.create_function(move |lua, args: A| {
+                (func)(KhronosLuaRef(lua), args)
+            })?,
+        )?;
+        Ok(())
+    }
+
+    /// Closes the lua vm and marks the runtime as broken
+    ///
+    /// This is similar to ``mark_broken`` but will not call any callbacks
     pub fn close(&self) -> Result<(), crate::Error> {
         if let Some(ref lua) = *self.lua.borrow_mut() {
             // Ensure strong_count == 1
@@ -474,7 +518,12 @@ impl KhronosRuntime {
         }
 
         *self.lua.borrow_mut() = None; // Drop the Lua VM
+        self.broken.set(true); // Mark the runtime as broken if it is closed
         
         Ok(())
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.lua.borrow().is_none()
     }
 }

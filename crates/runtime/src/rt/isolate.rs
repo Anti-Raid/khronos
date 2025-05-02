@@ -135,7 +135,7 @@ impl KhronosIsolate {
         let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
         let (controller, global_table) = {
-            let Some(ref lua) = *inner.lua() else {
+            let Some(ref lua) = *inner.lua.borrow_mut() else {
                 return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
             };  
             
@@ -195,9 +195,14 @@ impl KhronosIsolate {
     }
 
     /// Returns the global table for the isolate
+    ///
+    /// Returns `None` if the runtime is closed
     #[inline]
-    pub fn global_table(&self) -> &LuaTable {
-        &self.global_table
+    pub fn global_table(&self) -> Option<&LuaTable> {
+        if self.inner.is_closed() {
+            return None;
+        }
+        Some(&self.global_table)
     }
 
     /// Returns the bytecode cache for the isolate
@@ -225,12 +230,15 @@ impl KhronosIsolate {
         &self.id
     }
 
+    /// Converts a context and event into a LuaMultiValue
+    ///
+    /// It is a logic error to use the LuaMultiValue if close() has been called on the main runtime
     pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
         &self,
         context: TemplateContext<K>,
         event: Event,
     ) -> Result<LuaMultiValue, LuaError> {
-        let Some(ref lua) = *self.inner.lua() else {
+        let Some(ref lua) = *self.inner.lua.borrow_mut() else {
             return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
         };
 
@@ -240,15 +248,17 @@ impl KhronosIsolate {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                 if let LuaError::MemoryError(_) = e {
                     // Mark VM as broken
-                    self.inner.mark_broken(true)
+                    self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
                 }
 
                 Err(e)
             }
-        }
+        } 
+        // Lua should be dropped here
     }
 
     /// Runs a script from the asset manager
+    ///
     /// with the given KhronosContext and Event primitives
     pub async fn spawn_asset<K: KhronosContextTrait>(
         &self,
@@ -263,7 +273,7 @@ impl KhronosIsolate {
     }
 
     /// Runs a script from the asset manager
-    pub async fn spawn_asset_with_args(
+    pub(super) async fn spawn_asset_with_args(
         &self,
         cache_key: &str,
         path: &str,
@@ -322,7 +332,7 @@ impl KhronosIsolate {
         };
 
         let thread = {
-            let Some(ref lua) = *self.inner.lua() else {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
             };    
 
@@ -354,7 +364,7 @@ impl KhronosIsolate {
                     // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                     if let LuaError::MemoryError(_) = e {
                         // Mark VM as broken
-                        self.inner.mark_broken(true)
+                        self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
                     }
 
                     return Err(e);
@@ -379,7 +389,7 @@ impl KhronosIsolate {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                 if let LuaError::MemoryError(_) = e {
                     // Mark VM as broken
-                    self.inner.mark_broken(true)
+                    self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
                 }
 
                 return Err(e);
@@ -388,6 +398,10 @@ impl KhronosIsolate {
         };
 
         Ok(SpawnResult::new(res))
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.inner.is_closed()
     }
 }
 
@@ -421,22 +435,26 @@ impl SpawnResult {
             return Ok(serde_json::Value::Null);
         };
 
-        let Some(ref lua) = *isolate.inner().lua() else {
-            return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
-        };
-
         match values.len() {
             0 => Ok(serde_json::Value::Null),
             1 => {
                 let value = values.into_iter().next().unwrap();
 
-                match lua.from_value::<serde_json::Value>(value) {
+                let result_value = {
+                    let Some(ref lua) = *isolate.inner().lua.borrow() else {
+                        return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+                    };
+                    
+                    lua.from_value::<serde_json::Value>(value) 
+                }; // Lua should be dropped here
+
+                match result_value {
                     Ok(v) => Ok(v),
                     Err(e) => {
                         // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                         if let LuaError::MemoryError(_) = e {
                             // Mark VM as broken
-                            isolate.inner().mark_broken(true)
+                            isolate.inner().mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
                         }
 
                         Err(e)
@@ -447,13 +465,21 @@ impl SpawnResult {
                 let mut arr = Vec::with_capacity(values.len());
 
                 for v in values {
-                    match lua.from_value::<serde_json::Value>(v) {
+                    let result_value = {
+                        let Some(ref lua) = *isolate.inner().lua.borrow() else {
+                            return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+                        };
+
+                        lua.from_value::<serde_json::Value>(v)
+                    }; // Lua should be dropped here
+
+                    match result_value {
                         Ok(v) => arr.push(v),
                         Err(e) => {
                             // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                             if let LuaError::MemoryError(_) = e {
                                 // Mark VM as broken
-                                isolate.inner().mark_broken(true)
+                                isolate.inner().mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
                             }
 
                             return Err(e);

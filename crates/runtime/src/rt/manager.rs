@@ -42,7 +42,7 @@ impl KhronosRuntimeManager {
         let m_ref = m.clone();
 
         // Ensure to clear out the isolates when the runtime is broken
-        rt.set_on_broken(Box::new(move |_lua| {
+        rt.set_on_broken(Box::new(move || {
             m_ref.main_isolate.borrow_mut().take();
             m_ref.clear_sub_isolates();
 
@@ -50,7 +50,7 @@ impl KhronosRuntimeManager {
                 return;
             };
 
-            on_broken(_lua);
+            on_broken();
         }));
 
         m
