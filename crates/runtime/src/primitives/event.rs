@@ -1,8 +1,6 @@
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
-use std::{cell::RefCell, sync::Arc};
-
-use super::create_userdata_iterator_with_fields;
+use std::sync::Arc;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct InnerEvent {
@@ -57,8 +55,6 @@ impl CreateEvent {
 pub struct Event {
     /// The inner data of the object
     inner: Arc<InnerEvent>,
-    /// The cached serialized value of the event data
-    cached_data: RefCell<Option<LuaValue>>,
 }
 
 impl Event {
@@ -66,66 +62,18 @@ impl Event {
     pub fn from_create_event(ce: &CreateEvent) -> Self {
         Self {
             inner: ce.inner.clone(),
-            cached_data: RefCell::new(None),
         }
-    }
-
-    fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
-        // Check for cached serialized data
-        let mut cached_data = self
-            .cached_data
-            .try_borrow_mut()
-            .map_err(|e| LuaError::external(e.to_string()))?;
-
-        if let Some(v) = cached_data.as_ref() {
-            return Ok(v.clone());
-        }
-
-        let v = lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?;
-
-        *cached_data = Some(v.clone());
-
-        Ok(v)
     }
 }
 
-impl LuaUserData for Event {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("base_name", |lua, this| {
-            let base_name = lua.to_value_with(&this.inner.base_name, LUA_SERIALIZE_OPTIONS)?;
-            Ok(base_name)
-        });
-        fields.add_field_method_get("name", |lua, this| {
-            let name = lua.to_value_with(&this.inner.name, LUA_SERIALIZE_OPTIONS)?;
-            Ok(name)
-        });
-        fields.add_field_method_get("data", |lua, this| {
-            let data = this.get_cached_data(lua)?;
-            Ok(data)
-        });
-        fields.add_field_method_get("author", |lua, this| {
-            let author = lua.to_value_with(&this.inner.author, LUA_SERIALIZE_OPTIONS)?;
-            Ok(author)
-        });
-    }
-
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Event>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "base_name",
-                    "name",
-                    "data",
-                    "author",
-                ],
-            )
-        });
+impl IntoLua for Event {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let tab = lua.create_table()?;
+        tab.set("base_name", self.inner.base_name.clone())?;
+        tab.set("name", self.inner.name.clone())?;
+        tab.set("data", lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?)?;
+        tab.set("author", self.inner.author.clone())?;
+        tab.set_readonly(true);
+        Ok(LuaValue::Table(tab))
     }
 }
