@@ -244,7 +244,9 @@ impl KhronosIsolate {
                     .await;
 
                     match res {
-                        Ok(_) => {},
+                        Ok(_) => {
+                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        },
                         Err(e) => {
                             // spawn_script already handles memory errors, so lets just 
                             // call the error handler
