@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use crate::utils::require_v2::AssetRequirer;
 use rand::distributions::DistString;
@@ -17,7 +17,6 @@ use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use rand::distributions::Alphanumeric;
-use std::time::SystemTime;
 
 /// A bytecode cacher for Luau scripts
 ///
@@ -72,9 +71,6 @@ impl BytecodeCache {
 pub struct KhronosIsolate {
     /// The inner khronos context for the isolate
     inner: KhronosRuntime,
-
-    /// Last stored filesystem reset
-    prev_stored_fs_last_reset: Rc<Cell<Option<SystemTime>>>,
 
     /// Isolate id
     id: String,
@@ -132,6 +128,7 @@ impl KhronosIsolate {
         asset_manager: FilesystemWrapper,
         is_subisolate: bool,
     ) -> Result<Self, LuaError> {
+        log::debug!("Creating new isolate");
         let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
         let (controller, global_table) = {
@@ -166,7 +163,6 @@ impl KhronosIsolate {
 
         Ok(Self {
             id,
-            prev_stored_fs_last_reset: Rc::new(Cell::new(None)),
             asset_manager,
             asset_requirer: controller,
             inner,
@@ -301,36 +297,6 @@ impl KhronosIsolate {
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
-        // Check if we need to do a full cache reset
-        log::trace!("Checking for cache reset");
-
-        match self.asset_manager.fs_last_reset() {
-            Ok(st) => {
-                if let Some(prev_stored_fs_last_reset) = self.prev_stored_fs_last_reset.get() {
-                    log::trace!("Prev stored fs last reset: {:?}, last_reset: {:?}", prev_stored_fs_last_reset, st);
-                    if st > prev_stored_fs_last_reset {
-                        log::trace!("Resetting cache due to filesystem change");
-                        self.prev_stored_fs_last_reset.set(Some(st));
-                        self.inner.clear_require_cache().map_err(LuaError::external)?;
-                    }
-                } else {
-                    self.prev_stored_fs_last_reset.set(Some(st));           
-                }
-            },
-            Err(e) => {
-                match e.kind() {
-                    vfs::error::VfsErrorKind::NotSupported => {
-                        log::trace!("Filesystem does not support last reset");
-                    }, // Do nothing
-                    _ => {
-                        return Err(LuaError::external(
-                            format!("Failed to get filesystem last reset: {}", e),
-                        ));
-                    }
-                }
-            }
-        };
-
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));

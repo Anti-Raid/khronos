@@ -43,8 +43,7 @@ pub struct KhronosRuntimeInterruptData {
 }
 
 /// A struct representing the inner VMs and structures used by Khronos.
-#[derive(
-    Clone)]
+#[derive(Clone)]
 pub struct KhronosRuntime {
     /// The lua vm itself
     ///
