@@ -347,6 +347,16 @@ impl KhronosIsolate {
             .scheduler()
             .spawn_thread_and_wait("Exec", thread, args)
             .await?;
+        
+        // Do a GC
+        {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };    
+
+            lua.gc_collect()?;
+            lua.gc_collect()?; // Twice to ensure we get all the garbage
+        }
 
         // Now unwrap it
         let res = match res {
