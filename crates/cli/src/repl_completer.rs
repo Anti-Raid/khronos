@@ -192,18 +192,24 @@ impl LuaStatementCompleter {
         }
 
         if current_value == LuaValue::Table(self.global_tab.clone()) {
-            let Some(ref lua) = *self.runtime.lua() else {
-                panic!("Lua runtime is not initialized");
-            };
+            let to_add_vec = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
 
-            // Add the real global table to the list of tables to search
-            tabs.push(LuaValue::Table(lua.globals()));
+            let to_add_vec_ref = to_add_vec.clone();
+            let _ = self.runtime.exec_lua(move |lua| {
+                let mut to_add = to_add_vec_ref.borrow_mut();
+                // Add the real global table to the list of tables to search
+                to_add.push(LuaValue::Table(lua.globals()));
 
-            if let Some(mt) =
+                if let Some(mt) =
                 Self::value_metamethod(&LuaValue::Table(lua.globals()), "__index")
-            {
-                tabs.push(LuaValue::Table(mt));
-            }
+                {
+                    to_add.push(LuaValue::Table(mt));
+                }
+
+                Ok(())
+            });
+
+            tabs.extend(to_add_vec.borrow().iter().cloned());
         }
 
         for current_table in tabs {

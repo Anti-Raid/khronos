@@ -1,5 +1,5 @@
 local pyield = require"@antiraid/promise".yield
-local evt,ctx = ...
+local ctx = ...
 local kv = require"@antiraid/kv"
 local memusage = require"@antiraid/interop".memusage
 local ds = require"@antiraid/datastores"

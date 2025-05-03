@@ -506,7 +506,21 @@ impl KhronosRuntime {
         Ok(())
     }
 
-    pub fn set_custom_global<
+    /// Executes a function in the lua vm.
+    ///
+    /// The given lua vm is wrapped in a KhronosLuaRef to try and block cloning
+    pub fn exec_lua<
+        F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mlua::MaybeSend + 'static,
+    >(&self, func: F) -> LuaResult<()> {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        (func)(KhronosLuaRef(lua))
+    }
+
+    /// Sets a custom global function
+    pub fn set_custom_global_function<
         F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mlua::MaybeSend + 'static,
         A: FromLuaMulti,
         R: IntoLuaMulti,        

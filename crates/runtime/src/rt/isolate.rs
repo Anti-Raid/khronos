@@ -1,12 +1,8 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::rc::Rc;
 use crate::utils::require_v2::AssetRequirer;
 use rand::distributions::DistString;
 
-use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
@@ -17,40 +13,6 @@ use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use rand::distributions::Alphanumeric;
-
-/// A bytecode cacher for Luau scripts
-///
-/// Note that it is assumed for BytecodeCache to be uniquely made per runtime instance
-/// and that the bytecode is not shared between runtimes
-pub struct BytecodeCache(RefCell<std::collections::HashMap<String, Rc<Vec<u8>>>>);
-
-impl Default for BytecodeCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BytecodeCache {
-    /// Create a new bytecode cache
-    pub fn new() -> Self {
-        BytecodeCache(RefCell::new(std::collections::HashMap::new()))
-    }
-
-    /// Returns the inner cache
-    pub fn inner(&self) -> &RefCell<std::collections::HashMap<String, Rc<Vec<u8>>>> {
-        &self.0
-    }
-
-    /// Clear the bytecode cache
-    pub fn clear_bytecode_cache(&self) {
-        self.inner().borrow_mut().clear();
-    }
-
-    /// Removes a script from the bytecode cache by name
-    pub fn remove_bytecode_cache(&self, name: &str) {
-        self.inner().borrow_mut().remove(name);
-    }
-}
 
 /// A struct representing a Khronos isolate
 ///
@@ -80,12 +42,6 @@ pub struct KhronosIsolate {
 
     /// The asset requirer for the isolate
     asset_requirer: AssetRequirer,
-
-    /// The internal bytecode cache for the isolate
-    ///
-    /// Users should AVOID using this directly. It is used internally by the isolate to cache
-    /// repeatedly used scripts in bytecode form to avoid unneeded recompilation.
-    bytecode_cache: Rc<BytecodeCache>,
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
@@ -167,7 +123,6 @@ impl KhronosIsolate {
             asset_requirer: controller,
             inner,
             global_table,
-            bytecode_cache: Rc::new(BytecodeCache::new()),
         })
     }
 
@@ -201,19 +156,6 @@ impl KhronosIsolate {
         Some(&self.global_table)
     }
 
-    /// Returns the bytecode cache for the isolate
-    ///
-    /// Note that due to the Rc, it is not possible to access the BytecodeCache in mutable form
-    /// and nor is this useful (as the cache has no mutable methods)
-    pub fn bytecode_cache(&self) -> &BytecodeCache {
-        &self.bytecode_cache
-    }
-
-    /// Sets a new bytecode cache for the isolate
-    pub fn set_bytecode_cache(&mut self, cache: Rc<BytecodeCache>) {
-        self.bytecode_cache = cache;
-    }
-
     /// Returns the asset requirer for the isolate
     #[inline]
     pub fn asset_requirer(&self) -> &AssetRequirer {
@@ -226,75 +168,101 @@ impl KhronosIsolate {
         &self.id
     }
 
-    /// Converts a context and event into a LuaMultiValue
-    ///
-    /// It is a logic error to use the LuaMultiValue if close() has been called on the main runtime
-    pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
+    /// Runs a script. If code is `None`, it will load the script from the asset manager
+    /// using the path provided
+    pub async fn spawn<K: KhronosContextTrait>(
         &self,
+        path: &str,
+        code: Option<String>,
         context: TemplateContext<K>,
-        event: Event,
-    ) -> Result<LuaMultiValue, LuaError> {
-        let Some(ref lua) = *self.inner.lua.borrow_mut() else {
-            return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+    ) -> Result<SpawnResult, LuaError> {
+        let code = match code {
+            Some(code) => code.into_bytes(),
+            None => self.asset_manager.get_file(path).map_err(|e| {
+                LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
+            })?,
         };
 
-        match (event, context).into_lua_multi(lua) {
-            Ok(f) => Ok(f),
-            Err(e) => {
-                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                if let LuaError::MemoryError(_) = e {
-                    // Mark VM as broken
-                    self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
-                }
+        let compiler = self.inner.compiler();
+        let bytecode = compiler.compile(code)?;
 
-                Err(e)
-            }
-        } 
-        // Lua should be dropped here
-    }
+        let args = {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };
 
-    /// Runs a script from the asset manager
-    ///
-    /// with the given KhronosContext and Event primitives
-    pub async fn spawn_asset<K: KhronosContextTrait>(
-        &self,
-        cache_key: &str,
-        path: &str,
-        context: TemplateContext<K>,
-        event: Event,
-    ) -> Result<SpawnResult, LuaError> {
-        let args = self.context_event_to_lua_multi(context, event)?;
+            context.into_lua_multi(lua)?
+        };
 
-        self.spawn_asset_with_args(cache_key, path, args).await
-    }
-
-    /// Runs a script from the asset manager
-    pub(super) async fn spawn_asset_with_args(
-        &self,
-        cache_key: &str,
-        path: &str,
-        args: LuaMultiValue,
-    ) -> Result<SpawnResult, LuaError> {
-        let code = self.asset_manager.get_file(path).map_err(|e| {
-            LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
-        })?;
-        let code = String::from_utf8(code)
-            .map_err(|e| LuaError::RuntimeError(format!("Failed to decode asset '{}': {}", path, e)))?;
-        self.spawn_script(cache_key, path, &code, args)
+        self.spawn_script(path, &bytecode, args)
             .await
     }
 
-    /// Runs a script, returning the result as a LuaMultiValue
+    /// Runs a script from the asset manager in a loop, restarting the script after 
+    /// spawn_thread_and_wait exits prematurely
     ///
-    /// Note that the bytecode is cached by-name. Use KhronosRuntimeInner::remove_bytecode_cache
-    /// to remove a script from the cache.
+    /// The spawn_loop will exit when runtime is closed automatically
+    pub async fn spawn_loop<
+        K: KhronosContextTrait,
+        OnError: (Fn(&KhronosIsolate, LuaError) -> OnErrorRet) + 'static,
+        OnErrorRet: std::future::Future<Output = Result<(), crate::Error>>,
+    >(
+        &self,
+        path: String,
+        code: Option<String>,
+        context: TemplateContext<K>,
+        on_error: OnError,
+    ) -> Result<tokio::task::JoinHandle<Result<(), crate::Error>>, LuaError> {
+        let code = match code {
+            Some(code) => code.into_bytes(),
+            None => self.asset_manager.get_file(&path).map_err(|e| {
+                LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
+            })?,
+        };
+
+        let compiler = self.inner.compiler();
+        let bytecode = compiler.compile(code)?;
+        
+        let args = {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };
+
+            context.into_lua_multi(lua)?
+        };
+
+        let self_ref = self.clone();
+        Ok(tokio::task::spawn_local(
+            async move {
+                loop {
+                    // Ensure Lua is not closed
+                    if self_ref.inner.is_closed() {
+                        return Ok(());
+                    }
+
+                    let res = self_ref.spawn_script(&path, &bytecode, args.clone())
+                    .await;
+
+                    match res {
+                        Ok(_) => {},
+                        Err(e) => {
+                            // spawn_script already handles memory errors, so lets just 
+                            // call the error handler
+                            (on_error)(&self_ref, e).await?;
+                        }
+                    };
+                }        
+            }
+        ))
+    }
+
+    /// Runs a script, returning the result as a SpawnResult
     ///
     /// Note 2: You probably want spawn_asset or spawn_asset_with_args instead of this
-    pub async fn spawn_script(
+    async fn spawn_script(
         &self,
-        cache_key: &str,
         name: &str,
-        code: &str,
+        bytecode: &[u8],
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
         let thread = {
@@ -302,24 +270,11 @@ impl KhronosIsolate {
                 return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
             };    
 
-            println!("Is VM Owned: {}", lua.is_owned());
-            println!("VM Strong Count: {}", lua.strong_count());    
-
-            let mut cache = self.bytecode_cache.inner().borrow_mut();
-            let bytecode = if let Some(bytecode) = cache.get(cache_key) {
-                Cow::Borrowed(bytecode)
-            } else {
-                let compiler = self.inner.compiler();
-                let bytecode = Rc::new(compiler.compile(code)?);
-                cache.insert(cache_key.to_string(), bytecode.clone());
-                Cow::Owned(bytecode)
-            };
-
-            //let bytecode = self.lua.load(script).set_name(name)?.dump()?;
-            //cache.insert(name.to_string(), bytecode.clone());
+            //println!("Is VM Owned: {}", lua.is_owned());
+            //println!("VM Strong Count: {}", lua.strong_count());    
 
             match lua
-                .load(&**bytecode)
+                .load(bytecode)
                 .set_name(name)
                 .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
                 .set_environment(self.global_table.clone())
@@ -396,6 +351,7 @@ impl SpawnResult {
         Self { result }
     }
 
+    /// Note: It is a logic error to call this if the runtime is closed
     pub fn into_multi_value(self) -> LuaMultiValue {
         match self.result {
             Some(res) => res,

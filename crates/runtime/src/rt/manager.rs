@@ -96,17 +96,6 @@ impl KhronosRuntimeManager {
         self.sub_isolates.borrow().clone()
     }
 
-    /// Clears the bytecode cache of all isolates
-    pub fn clear_bytecode_cache(&self) {
-        for (_, isolate) in self.sub_isolates.borrow().iter() {
-            isolate.bytecode_cache().clear_bytecode_cache();
-        }
-
-        if let Some(ref main_isolate) = *self.main_isolate.borrow() {
-            main_isolate.bytecode_cache().clear_bytecode_cache();
-        }
-    }
-
     /// Returns if a on_broken callback is set
     pub fn has_on_broken(&self) -> bool {
         self.on_broken.borrow().is_some()
