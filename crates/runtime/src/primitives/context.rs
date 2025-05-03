@@ -3,6 +3,8 @@ use crate::utils::executorscope::ExecutorScope;
 use crate::traits::context::KhronosContext;
 use mlua::prelude::*;
 use std::cell::RefCell;
+use crate::lua_promise;
+use crate::traits::eventprovider::EventProvider;
 
 use super::create_userdata_iterator_with_fields;
 
@@ -113,6 +115,17 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(this.context.has_cap(&cap))
         });
 
+        methods.add_method("nextevent", |_, this, _: LuaValue| {
+            let event_provider = this.context.event_provider();
+            Ok(
+                lua_promise!(event_provider, |lua, event_provider|, {
+                    event_provider.recv_next_event()
+                        .await
+                        .map_err(|e| LuaError::external(e.to_string()))
+                })
+            ) 
+        });
+
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<TemplateContext<T>>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
@@ -130,6 +143,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
                     "current_user",
                     // Methods
                     "has_cap",
+                    "nextevent",
                 ],
             )
         });

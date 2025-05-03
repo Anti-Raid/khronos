@@ -17,6 +17,7 @@ use khronos_runtime::utils::executorscope::ExecutorScope;
 use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::ir::ScheduledExecution;
+use khronos_runtime::traits::eventprovider::EventProvider;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -153,6 +154,8 @@ pub struct CliKhronosContext {
     pub http: Option<Arc<serenity::all::Http>>,
     pub cache: Option<Arc<serenity::cache::Cache>>,
     pub template_name: String,
+    pub event_sender: flume::Sender<khronos_runtime::primitives::event::Event>,
+    pub event_provider: CliEventProvider,
 }
 
 impl KhronosContext for CliKhronosContext {
@@ -165,6 +168,7 @@ impl KhronosContext for CliKhronosContext {
     type PageProvider = CliPageProvider;
     type ScheduledExecProvider = CliScheduledExecProvider;
     type DataStoreProvider = CliDataStoreProvider;
+    type EventProvider = CliEventProvider;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -194,6 +198,10 @@ impl KhronosContext for CliKhronosContext {
 
     fn current_user(&self) -> Option<serenity::all::CurrentUser> {
         self.cache.as_ref().map(|c| c.current_user().clone())
+    }
+
+    fn event_provider(&self) -> Self::EventProvider {
+        self.event_provider.clone()
     }
 
     fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider> {
@@ -636,5 +644,17 @@ impl PageProvider for CliPageProvider {
 
     async fn delete_page(&self) -> Result<(), khronos_runtime::Error> {
         todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct CliEventProvider {
+    pub event: flume::Receiver<khronos_runtime::primitives::event::Event>,
+}
+
+impl EventProvider for CliEventProvider {
+    async fn recv_next_event(&self) -> Result<khronos_runtime::primitives::event::Event, khronos_runtime::Error> {
+        self.event.recv_async().await
+        .map_err(|e| format!("Failed to receive event: {}", e).into())
     }
 }

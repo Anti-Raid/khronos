@@ -68,6 +68,7 @@ pub enum FileStorageBackend {
 pub struct LuaSetupResult {
     pub main_isolate: KhronosIsolate,
     pub benckark_instant: std::time::Instant,
+    pub flume_channel: (flume::Sender<khronos_runtime::primitives::event::Event>, flume::Receiver<khronos_runtime::primitives::event::Event>),
 }
 
 impl std::fmt::Debug for LuaSetupResult {
@@ -222,6 +223,10 @@ impl Cli {
             serde_json::Value::Null
         };
 
+        let event_provider = provider::CliEventProvider {
+            event: self.setup_data.flume_channel.1.clone(),
+        };
+
         provider::CliKhronosContext {
             data: context_data,
             aux_opts: self.aux_opts.clone(),
@@ -231,7 +236,9 @@ impl Cli {
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
-            template_name: self.template_name.clone()
+            template_name: self.template_name.clone(),
+            event_sender: self.setup_data.flume_channel.0.clone(),
+            event_provider,
         }
     }
 
@@ -253,13 +260,16 @@ impl Cli {
             None => {
                 let context = self.create_khronos_context();
 
+                let evt = self.create_event();
+                self.setup_data.flume_channel.0.send(evt.clone()).expect("Failed to send next event");
+
                 let template_context: TemplateContext<provider::CliKhronosContext> =
                     TemplateContext::new(context);
-
+                
                 let args = self
                     .setup_data
                     .main_isolate
-                    .context_event_to_lua_multi(template_context, self.create_event())?;
+                    .context_event_to_lua_multi(template_context, evt)?;
 
                 self.cached_khronos_rt_args = Some(args.clone());
 
@@ -367,6 +377,21 @@ impl Cli {
         pset.add_default_plugins::<CliKhronosContext>();
         runtime.load_plugins(pset).expect("Failed to add plugins");
 
+        let flume_channel = flume::unbounded();
+
+        let sender_ref = flume_channel.0.clone();
+        
+        runtime
+        .set_custom_global("pushevent", move |lua, event: LuaValue| {
+            let ce = lua.from_value::<khronos_runtime::primitives::event::CreateEvent>(event)?;
+
+            let event = khronos_runtime::primitives::event::Event::from_create_event(&ce);
+            sender_ref.send(event).expect("Failed to send event");
+
+            Ok(())
+        })
+        .expect("Failed to set pushevent global");
+
         let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
         .expect("Failed to create main isolate");
 
@@ -389,7 +414,7 @@ impl Cli {
             );
         }
 
-        LuaSetupResult { main_isolate, benckark_instant: time_now }
+        LuaSetupResult { main_isolate, benckark_instant: time_now, flume_channel }
     }
 
     fn setup_cli_specific_table(

@@ -1,4 +1,5 @@
 pub mod context;
+pub mod eventprovider;
 pub mod discordprovider;
 pub mod ir;
 pub mod kvprovider;

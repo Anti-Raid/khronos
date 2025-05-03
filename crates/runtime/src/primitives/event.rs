@@ -52,6 +52,7 @@ impl CreateEvent {
 }
 
 /// An `Event` is an object that can be passed to provide data to a Lua script.
+#[derive(Clone)]
 pub struct Event {
     /// The inner data of the object
     inner: Arc<InnerEvent>,
