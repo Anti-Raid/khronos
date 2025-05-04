@@ -13,6 +13,8 @@ use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
 use mlua_scheduler_ext::traits::IntoLuaThread;
 use rand::distributions::Alphanumeric;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// A struct representing a Khronos isolate
 ///
@@ -45,6 +47,9 @@ pub struct KhronosIsolate {
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
+
+    /// A handle to the last spawned thread
+    last_thread: Rc<RefCell<Option<LuaThread>>>,
 }
 
 impl KhronosIsolate {
@@ -123,6 +128,7 @@ impl KhronosIsolate {
             asset_requirer: controller,
             inner,
             global_table,
+            last_thread: Rc::new(RefCell::new(None)),
         })
     }
 
@@ -168,6 +174,14 @@ impl KhronosIsolate {
         &self.id
     }
 
+    /// Returns the status of the last spawned thread
+    pub fn last_thread_status(&self) -> Option<LuaThreadStatus> {
+        self.last_thread
+            .borrow()
+            .as_ref()
+            .map(|t| t.status())
+    }
+
     /// Runs a script. If code is `None`, it will load the script from the asset manager
     /// using the path provided
     pub async fn spawn<K: KhronosContextTrait>(
@@ -196,66 +210,6 @@ impl KhronosIsolate {
 
         self.spawn_script(path, &bytecode, args)
             .await
-    }
-
-    /// Runs a script from the asset manager in a loop, restarting the script after 
-    /// spawn_thread_and_wait exits prematurely
-    ///
-    /// The spawn_loop will exit when runtime is closed automatically
-    pub async fn spawn_loop<
-        K: KhronosContextTrait,
-        OnError: (Fn(&KhronosIsolate, LuaError) -> OnErrorRet) + 'static,
-        OnErrorRet: std::future::Future<Output = Result<(), crate::Error>>,
-    >(
-        &self,
-        path: String,
-        code: Option<String>,
-        context: TemplateContext<K>,
-        on_error: OnError,
-    ) -> Result<tokio::task::JoinHandle<Result<(), crate::Error>>, LuaError> {
-        let code = match code {
-            Some(code) => code.into_bytes(),
-            None => self.asset_manager.get_file(&path).map_err(|e| {
-                LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
-            })?,
-        };
-
-        let compiler = self.inner.compiler();
-        let bytecode = compiler.compile(code)?;
-        
-        let args = {
-            let Some(ref lua) = *self.inner.lua.borrow() else {
-                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
-            };
-
-            context.into_lua_multi(lua)?
-        };
-
-        let self_ref = self.clone();
-        Ok(tokio::task::spawn_local(
-            async move {
-                loop {
-                    // Ensure Lua is not closed
-                    if self_ref.inner.is_closed() {
-                        return Ok(());
-                    }
-
-                    let res = self_ref.spawn_script(&path, &bytecode, args.clone())
-                    .await;
-
-                    match res {
-                        Ok(_) => {
-                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        },
-                        Err(e) => {
-                            // spawn_script already handles memory errors, so lets just 
-                            // call the error handler
-                            (on_error)(&self_ref, e).await?;
-                        }
-                    };
-                }        
-            }
-        ))
     }
 
     /// Runs a script, returning the result as a SpawnResult
