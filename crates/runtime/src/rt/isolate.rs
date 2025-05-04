@@ -57,6 +57,7 @@ impl KhronosIsolate {
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
+        log::debug!("[Isolate] Creating new isolate");
         if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
                 "Khronos runtime must not sandboxed before creating an isolate".to_string(),
@@ -74,6 +75,7 @@ impl KhronosIsolate {
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
     ) -> Result<Self, LuaError> {
+        log::debug!("[Isolate] Creating new subisolate");
         if !inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
                 "Khronos runtime must be sandboxed before creating an subisolate".to_string(),
@@ -89,7 +91,7 @@ impl KhronosIsolate {
         asset_manager: FilesystemWrapper,
         is_subisolate: bool,
     ) -> Result<Self, LuaError> {
-        log::debug!("Creating new isolate");
+        log::debug!("[Isolate] Creating new isolate");
         let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
         let (controller, global_table) = {
@@ -136,18 +138,21 @@ impl KhronosIsolate {
     /// after the isolate is created
     #[inline]
     pub fn asset_manager(&self) -> &FilesystemWrapper {
+        log::debug!("[Isolate] Getting asset manager");
         &self.asset_manager
     }
 
     /// Returns the inner khronos runtime for the isolate
     #[inline]
     pub fn inner(&self) -> &KhronosRuntime {
+        log::debug!("[Isolate] Getting inner runtime");
         &self.inner
     }
 
     /// Returns the inner khronos runtime for the isolate in mutable form
     #[inline]
     pub fn inner_mut(&mut self) -> &mut KhronosRuntime {
+        log::debug!("[Isolate] Getting inner runtime");
         &mut self.inner
     }
 
@@ -156,6 +161,7 @@ impl KhronosIsolate {
     /// Returns `None` if the runtime is closed
     #[inline]
     pub fn global_table(&self) -> Option<&LuaTable> {
+        log::debug!("[Isolate] Getting global table");
         if self.inner.is_closed() {
             return None;
         }
@@ -165,17 +171,20 @@ impl KhronosIsolate {
     /// Returns the asset requirer for the isolate
     #[inline]
     pub fn asset_requirer(&self) -> &AssetRequirer {
+        log::debug!("[Isolate] Getting asset requirer");
         &self.asset_requirer
     }
 
     /// Returns the id of the isolate
     #[inline]
     pub fn id(&self) -> &str {
+        log::debug!("[Isolate] Getting isolate id");
         &self.id
     }
 
     /// Returns the status of the last spawned thread
     pub fn last_thread_status(&self) -> Option<LuaThreadStatus> {
+        log::debug!("[Isolate] Getting last thread status");
         self.last_thread
             .borrow()
             .as_ref()
@@ -190,6 +199,7 @@ impl KhronosIsolate {
         code: Option<String>,
         context: TemplateContext<K>,
     ) -> Result<SpawnResult, LuaError> {
+        log::debug!("[Isolate] Spawning script {}", path);
         let code = match code {
             Some(code) => code.into_bytes(),
             None => self.asset_manager.get_file(path).map_err(|e| {
@@ -219,6 +229,7 @@ impl KhronosIsolate {
         code: Option<String>,
         context: TemplateContext<K>,
     ) -> Result<SpawnResult, LuaError> {
+        log::debug!("[Isolate] Resuming script {}", path);
         let code = match code {
             Some(code) => code.into_bytes(),
             None => self.asset_manager.get_file(path).map_err(|e| {
@@ -249,6 +260,7 @@ impl KhronosIsolate {
         bytecode: &[u8],
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
+        log::debug!("[Isolate] Resuming script {}", name);
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError("SpawnThread: Lua instance is no longer valid".to_string()));
@@ -287,7 +299,7 @@ impl KhronosIsolate {
         self.inner
             .update_last_execution_time(std::time::Instant::now());
 
-        let res = thread.resume(args);
+        thread.resume(args)?;
         
         // Do a GC
         {
@@ -301,21 +313,7 @@ impl KhronosIsolate {
             lua.gc_collect()?; // Twice to ensure we get all the garbage
         }
 
-        // Now unwrap it
-        let res = match res {
-            Ok(res) => Some(res),
-            Err(e) => {
-                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                if let LuaError::MemoryError(_) = e {
-                    // Mark VM as broken
-                    self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
-                }
-
-                return Err(e);
-            }
-        };
-
-        Ok(SpawnResult::new(res))
+        Ok(SpawnResult::new(None))
     }
 
     /// Runs a script on a thread
@@ -327,6 +325,7 @@ impl KhronosIsolate {
         bytecode: &[u8],
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
+        log::debug!("[Isolate] Spawning script {}", name);
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError("SpawnThread: Lua instance is no longer valid".to_string()));
