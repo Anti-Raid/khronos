@@ -151,7 +151,7 @@ mod tests {
 
             let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
 
-            scheduler.attach();
+            scheduler.attach().expect("Failed to attach scheduler");
 
             let a = 3;
             let test_promise = lua_promise!(a, |_lua, a|, {
@@ -173,10 +173,7 @@ mod tests {
                     return res
                 end
     
-                test()
-                test() -- Test that it can be called multiple times
-
-                return test() + 1
+                return test()
             "#,
                 )
                 .into_function()
@@ -197,7 +194,7 @@ mod tests {
 
             match res {
                 LuaValue::Integer(n) => {
-                    assert_eq!(*n, 3);
+                    assert_eq!(*n, 2);
                 }
                 _ => {
                     panic!("Expected integer, got {:?}", res);

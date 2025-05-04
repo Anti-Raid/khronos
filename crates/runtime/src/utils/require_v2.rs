@@ -333,7 +333,7 @@ impl LuaRequire for AssetRequirer {
 
     // Loads the module and returns the result (function or table).
     // For now, we don't support yielding in require'd modules due to luau require limitations.
-    fn load(&self, lua: &Lua, _path: &str, chunk_name: &str, _content: &[u8]) -> LuaResult<LuaValue> {
+    fn loader(&self, lua: &Lua, _path: &str, chunk_name: &str, _content: &[u8]) -> LuaResult<mlua::Function> {
         log::trace!("Loading module {:#?}", chunk_name);
 
         let content = {
@@ -349,7 +349,8 @@ impl LuaRequire for AssetRequirer {
         .set_mode(mlua::ChunkMode::Text)
         .set_name(chunk_name)
         .set_environment(self.global_table.clone())
-        .call(())?;
+        .into_function()?;
+
         Ok(lv)
     }
 }

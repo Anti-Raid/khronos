@@ -299,7 +299,7 @@ impl KhronosIsolate {
         self.inner
             .update_last_execution_time(std::time::Instant::now());
 
-        thread.resume(args)?;
+        thread.resume::<()>(args)?;
         
         // Do a GC
         {

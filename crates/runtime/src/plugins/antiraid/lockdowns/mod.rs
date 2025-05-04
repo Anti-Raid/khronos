@@ -276,7 +276,7 @@ mod lockdown_test {
 
             let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
 
-            scheduler.attach();
+            scheduler.attach().expect("Failed to attach scheduler");
 
             let scheduler_lib = mlua_scheduler::userdata::scheduler_lib(&lua)
                 .expect("Failed to create scheduler lib");
