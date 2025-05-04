@@ -208,14 +208,42 @@ impl KhronosIsolate {
             context.into_lua_multi(lua)?
         };
 
-        self.spawn_script(path, &bytecode, args)
-            .await
+        self.spawn_script(path, &bytecode, args).await
+    }
+
+    /// Runs a script. If code is `None`, it will load the script from the asset manager
+    /// using the path provided
+    pub fn resume<K: KhronosContextTrait>(
+        &self,
+        path: &str,
+        code: Option<String>,
+        context: TemplateContext<K>,
+    ) -> Result<SpawnResult, LuaError> {
+        let code = match code {
+            Some(code) => code.into_bytes(),
+            None => self.asset_manager.get_file(path).map_err(|e| {
+                LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
+            })?,
+        };
+
+        let compiler = self.inner.compiler();
+        let bytecode = compiler.compile(code)?;
+
+        let args = {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+            };
+
+            context.into_lua_multi(lua)?
+        };
+
+        self.resume_script(path, &bytecode, args)
     }
 
     /// Runs a script, returning the result as a SpawnResult
     ///
     /// Note 2: You probably want spawn_asset or spawn_asset_with_args instead of this
-    async fn spawn_script(
+    fn resume_script(
         &self,
         name: &str,
         bytecode: &[u8],
@@ -223,13 +251,13 @@ impl KhronosIsolate {
     ) -> LuaResult<SpawnResult> {
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
-                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+                return Err(LuaError::RuntimeError("SpawnThread: Lua instance is no longer valid".to_string()));
             };    
 
             //println!("Is VM Owned: {}", lua.is_owned());
             //println!("VM Strong Count: {}", lua.strong_count());    
 
-            match lua
+            let thread = match lua
                 .load(bytecode)
                 .set_name(name)
                 .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
@@ -246,7 +274,91 @@ impl KhronosIsolate {
 
                     return Err(e);
                 }
+            };
+
+            self.last_thread
+                .borrow_mut()
+                .replace(thread.clone());
+
+            thread
+        };
+
+        // Update last_execution_time
+        self.inner
+            .update_last_execution_time(std::time::Instant::now());
+
+        let res = thread.resume(args);
+        
+        // Do a GC
+        {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Ok(SpawnResult {
+                    result: None, // VM closed
+                });
+            };    
+
+            lua.gc_collect()?;
+            lua.gc_collect()?; // Twice to ensure we get all the garbage
+        }
+
+        // Now unwrap it
+        let res = match res {
+            Ok(res) => Some(res),
+            Err(e) => {
+                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                if let LuaError::MemoryError(_) = e {
+                    // Mark VM as broken
+                    self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
+                }
+
+                return Err(e);
             }
+        };
+
+        Ok(SpawnResult::new(res))
+    }
+
+    /// Runs a script on a thread
+    ///
+    /// Note 2: You probably want spawn_asset or spawn_asset_with_args instead of this
+    async fn spawn_script(
+        &self,
+        name: &str,
+        bytecode: &[u8],
+        args: LuaMultiValue,
+    ) -> LuaResult<SpawnResult> {
+        let thread = {
+            let Some(ref lua) = *self.inner.lua.borrow() else {
+                return Err(LuaError::RuntimeError("SpawnThread: Lua instance is no longer valid".to_string()));
+            };    
+
+            //println!("Is VM Owned: {}", lua.is_owned());
+            //println!("VM Strong Count: {}", lua.strong_count());    
+
+            let thread = match lua
+                .load(bytecode)
+                .set_name(name)
+                .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
+                .set_environment(self.global_table.clone())
+                .into_lua_thread(lua)
+            {
+                Ok(f) => f,
+                Err(e) => {
+                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                    if let LuaError::MemoryError(_) = e {
+                        // Mark VM as broken
+                        self.inner.mark_broken(true).map_err(|e| LuaError::external(e.to_string()))?;
+                    }
+
+                    return Err(e);
+                }
+            };
+
+            self.last_thread
+                .borrow_mut()
+                .replace(thread.clone());
+
+            thread
         };
 
         // Update last_execution_time
@@ -262,7 +374,9 @@ impl KhronosIsolate {
         // Do a GC
         {
             let Some(ref lua) = *self.inner.lua.borrow() else {
-                return Err(LuaError::RuntimeError("Lua instance is no longer valid".to_string()));
+                return Ok(SpawnResult {
+                    result: None, // VM closed
+                });
             };    
 
             lua.gc_collect()?;
