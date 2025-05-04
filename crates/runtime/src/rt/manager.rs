@@ -8,15 +8,6 @@ use super::isolate::KhronosIsolate;
 use super::runtime::{KhronosRuntime, OnBrokenFunc};
 use crate::primitives::event::Event;
 
-#[derive(Clone)]
-pub struct IsolateData {
-    /// The isolate itself
-    pub isolate: KhronosIsolate,
-
-    /// The flume channel to send events via event provider
-    pub event_channel: (flume::Sender<Event>, flume::Receiver<Event>),
-}
-
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
 ///
 /// Like isolates, these are also cheap to clone
@@ -26,10 +17,10 @@ pub struct KhronosRuntimeManager {
     rt: KhronosRuntime,
 
     /// A map of name to sub-isolate
-    sub_isolates: Rc<RefCell<std::collections::HashMap<String, IsolateData>>>,
+    sub_isolates: Rc<RefCell<std::collections::HashMap<String, KhronosIsolate>>>,
 
     /// The main isolate (if any)
-    main_isolate: Rc<RefCell<Option<IsolateData>>>,
+    main_isolate: Rc<RefCell<Option<KhronosIsolate>>>,
 
     /// A function to be called if the runtime is marked as broken
     on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
@@ -67,7 +58,7 @@ impl KhronosRuntimeManager {
     }
 
     /// Sets the main isolate
-    pub fn set_main_isolate(&self, isolate: IsolateData) {
+    pub fn set_main_isolate(&self, isolate: KhronosIsolate) {
         self.main_isolate.borrow_mut().replace(isolate);
     }
 
@@ -77,22 +68,22 @@ impl KhronosRuntimeManager {
     }
 
     /// Returns the main isolate (if any)
-    pub fn main_isolate(&self) -> Option<IsolateData> {
+    pub fn main_isolate(&self) -> Option<KhronosIsolate> {
         self.main_isolate.borrow().clone()
     }
 
     /// Returns a sub-isolate by name
-    pub fn get_sub_isolate(&self, name: &str) -> Option<IsolateData> {
+    pub fn get_sub_isolate(&self, name: &str) -> Option<KhronosIsolate> {
         self.sub_isolates.borrow().get(name).cloned()
     }
 
     /// Adds a sub-isolate by name
-    pub fn add_sub_isolate(&self, name: String, isolate: IsolateData) {
+    pub fn add_sub_isolate(&self, name: String, isolate: KhronosIsolate) {
         self.sub_isolates.borrow_mut().insert(name, isolate);
     }
 
     /// Removes a sub-isolate by name
-    pub fn remove_sub_isolate(&self, name: &str) -> Option<IsolateData> {
+    pub fn remove_sub_isolate(&self, name: &str) -> Option<KhronosIsolate> {
         self.sub_isolates.borrow_mut().remove(name)
     }
 
@@ -102,7 +93,7 @@ impl KhronosRuntimeManager {
     }
 
     /// Returns the hashmap of sub-isolates
-    pub fn sub_isolates(&self) -> std::collections::HashMap<String, IsolateData> {
+    pub fn sub_isolates(&self) -> std::collections::HashMap<String, KhronosIsolate> {
         self.sub_isolates.borrow().clone()
     }
 

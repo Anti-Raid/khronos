@@ -1,7 +1,7 @@
 use super::{
     discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
     pageprovider::PageProvider, userinfoprovider::UserInfoProvider, scheduledexecprovider::ScheduledExecProvider,
-    datastoreprovider::DataStoreProvider, eventprovider::EventProvider,
+    datastoreprovider::DataStoreProvider
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -15,7 +15,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type PageProvider: PageProvider;
     type ScheduledExecProvider: ScheduledExecProvider;
     type DataStoreProvider: DataStoreProvider;
-    type EventProvider: EventProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -50,9 +49,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns the current Discord user, if any
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
-
-    /// Returns the event provider. All contexts must have an event provider
-    fn event_provider(&self) -> Self::EventProvider;
 
     /// Returns a key-value provider with the given scope
     fn kv_provider(&self, scope: ExecutorScope, kv_scope: &str) -> Option<Self::KVProvider>;

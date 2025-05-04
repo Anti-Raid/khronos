@@ -16,9 +16,11 @@ use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::utils::threadlimitmw::ThreadLimiter;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
+use mlua_scheduler::LuaSchedulerAsync;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
+use std::env::consts::OS;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::str::FromStr;
@@ -66,7 +68,6 @@ pub enum FileStorageBackend {
 pub struct LuaSetupResult {
     pub main_isolate: KhronosIsolate,
     pub benckark_instant: std::time::Instant,
-    pub flume_channel: (flume::Sender<khronos_runtime::primitives::event::Event>, flume::Receiver<khronos_runtime::primitives::event::Event>),
 }
 
 impl std::fmt::Debug for LuaSetupResult {
@@ -221,10 +222,6 @@ impl Cli {
             serde_json::Value::Null
         };
 
-        let event_provider = provider::CliEventProvider {
-            event: self.setup_data.flume_channel.1.clone(),
-        };
-
         provider::CliKhronosContext {
             data: context_data,
             aux_opts: self.aux_opts.clone(),
@@ -234,9 +231,7 @@ impl Cli {
             http: self.http.clone(),
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
-            template_name: self.template_name.clone(),
-            event_sender: self.setup_data.flume_channel.0.clone(),
-            event_provider,
+            template_name: self.template_name.clone()
         }
     }
 
@@ -249,23 +244,35 @@ impl Cli {
 
     pub async fn spawn_script(
         &mut self,
+        cache_key: &str,
         name: &str,
-        code: String,
+        code: &str,
     ) -> LuaResult<LuaMultiValue> {
-        let context = self.create_khronos_context();
+        let args = match &self.cached_khronos_rt_args {
+            Some(context) => context.clone(),
+            None => {
+                let context = self.create_khronos_context();
 
-        let evt = self.create_event();
-        self.setup_data.flume_channel.0.send(evt).expect("Failed to send next event");
+                let template_context: TemplateContext<provider::CliKhronosContext> =
+                    TemplateContext::new(context);
 
-        let template_context: TemplateContext<provider::CliKhronosContext> =
-            TemplateContext::new(context);
+                let args = self
+                    .setup_data
+                    .main_isolate
+                    .context_event_to_lua_multi(template_context, self.create_event())?;
+
+                self.cached_khronos_rt_args = Some(args.clone());
+
+                args
+            }
+        };
 
         log::debug!("Spawning script: {}", code);
 
         let result = self
             .setup_data
             .main_isolate
-            .spawn(name, Some(code), template_context)
+            .spawn_script(cache_key, name, code, args)
             .await?;
 
         Ok(result.into_multi_value())
@@ -300,6 +307,30 @@ impl Cli {
             runtime.set_memory_limit(memory_limit).expect("Failed to set memory limit");
         }
 
+        // Test related functions, not available outside of script runner
+        /*if !aux_opts.disable_test_funcs {
+            runtime
+                .lua()
+                .globals()
+                .set("_OS", OS.to_lowercase())
+                .expect("Failed to set _OS global");
+
+            runtime
+                .lua()
+                .globals()
+                .set(
+                    "_TEST_ASYNC_WORK",
+                    runtime
+                        .lua()
+                        .create_scheduler_async_function(|lua, n: u64| async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(n)).await;
+                            lua.create_table()
+                        })
+                        .expect("Failed to create async function"),
+                )
+                .expect("Failed to set _OS global");
+        }*/
+
         if !aux_opts.use_custom_print {
             // Ensure print is global as everything basically relies on print
             log::debug!("Setting print global");
@@ -307,18 +338,17 @@ impl Cli {
         }
 
         {
-            let aux_opts = aux_opts.clone();
-            runtime.exec_lua(move |lua| {
-                lua
+            let Some(ref lua) = *runtime.lua() else {
+                panic!("Lua is not available");
+            };
+    
+            lua
                 .globals()
                 .set(
                     "cli",
-                    Self::setup_cli_specific_table(ext_state.clone(), &lua, &aux_opts),
-                )?;
-                
-                Ok(())
-            })
-            .expect("Failed to set cli table");     
+                    Self::setup_cli_specific_table(ext_state.clone(), lua, &aux_opts),
+                )
+                .expect("Failed to set cli global");    
         }            
 
         let current_dir = std::env::current_dir().expect("Failed to get current dir");
@@ -336,24 +366,6 @@ impl Cli {
         let mut pset = PluginSet::new();
         pset.add_default_plugins::<CliKhronosContext>();
         runtime.load_plugins(pset).expect("Failed to add plugins");
-
-        let flume_channel = flume::unbounded();
-
-        let sender_ref = flume_channel.0.clone();
-        
-        // Test related functions, not available outside of script runner
-        if !aux_opts.disable_test_funcs {
-            runtime
-            .set_custom_global_function("pushevent", move |lua, event: LuaValue| {
-                let ce = lua.from_value::<khronos_runtime::primitives::event::CreateEvent>(event)?;
-
-                let event = khronos_runtime::primitives::event::Event::from_create_event(&ce);
-                sender_ref.send(event).expect("Failed to send event");
-
-                Ok(())
-            })
-            .expect("Failed to set pushevent global");
-        }
 
         let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
         .expect("Failed to create main isolate");
@@ -377,7 +389,7 @@ impl Cli {
             );
         }
 
-        LuaSetupResult { main_isolate, benckark_instant: time_now, flume_channel }
+        LuaSetupResult { main_isolate, benckark_instant: time_now }
     }
 
     fn setup_cli_specific_table(
@@ -428,6 +440,10 @@ impl Cli {
 
                     let path = &path;
 
+                    let name = match fs::canonicalize(path).await {
+                        Ok(p) => p.to_string_lossy().to_string(),
+                        Err(_) => path.to_string_lossy().to_string(),
+                    };
                     let contents = match fs::read_to_string(&path).await {
                         Ok(c) => c,
                         Err(e) => {
@@ -437,7 +453,7 @@ impl Cli {
                     };
 
                     let values = match self
-                        .spawn_script(&format!("{}", path.display()), contents)
+                        .spawn_script(&name, &format!("{}", path.display()), &contents)
                         .await
                     {
                         Ok(values) => values,
@@ -502,7 +518,7 @@ impl Cli {
                             Err(_) => return,
                         }
 
-                        match self.try_spawn_as("=repl", line.clone()).await {
+                        match self.try_spawn_as("=repl", &line).await {
                             Ok(values) => {
                                 editor.add_history_entry(line).unwrap();
 
@@ -567,7 +583,7 @@ impl Cli {
             CliEntrypointAction::InlineScript {
                 script,
                 task_wait_mode,
-            } => match self.try_spawn_as("repl", script).await {
+            } => match self.try_spawn_as("repl", &script).await {
                 Ok(values) => {
                     if !values.is_empty() {
                         println!(
@@ -612,13 +628,13 @@ impl Cli {
     /// and then as a statement.
     ///
     /// Used internally for the REPL
-    async fn try_spawn_as(&mut self, name: &str, code: String) -> LuaResult<LuaMultiValue> {
+    async fn try_spawn_as(&mut self, name: &str, code: &str) -> LuaResult<LuaMultiValue> {
         let ret_code = format!("return {}", code);
-        match self.spawn_script(name, ret_code).await {
+        match self.spawn_script(&ret_code, name, &ret_code).await {
             Ok(result) => return Ok(result),
             Err(LuaError::SyntaxError { .. }) => {}
             Err(e) => return Err(e),
         }
-        self.spawn_script(name, code).await
+        self.spawn_script(code, name, code).await
     }
 }

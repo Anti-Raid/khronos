@@ -1,7 +1,7 @@
 local memusage=require"@antiraid/interop".memusage
 local promise = require"@antiraid/promise"
 local kv = require"@antiraid/kv"
-local ctx = ...
+local _evt, ctx = ...
 local count = 0
 for i = 1,100 do 
 	promise.yield(kv.new(ctx):set("test"..i, i))
