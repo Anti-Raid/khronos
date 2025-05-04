@@ -98,6 +98,7 @@ impl KhronosRuntime {
         on_interrupt: Option<OnInterruptFunc>,
         on_thread_event_callback: Option<(ThreadCreationCallbackFunc, ThreadDestructionCallbackFunc)>,
     ) -> Result<Self, LuaError> {
+        log::debug!("Creating new Khronos runtime");
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
             LuaOptions::new().catch_rust_panics(true),
@@ -266,16 +267,19 @@ impl KhronosRuntime {
     /// as it is internally a RefCell
     #[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
     pub fn lua(&self) -> std::cell::Ref<Option<Lua>> {
+        log::debug!("Getting lua vm");
         self.lua.borrow()
     }
 
     /// Returns the lua compiler being used
     pub fn compiler(&self) -> &mlua::Compiler {
+        log::debug!("Getting lua compiler");
         &self.compiler
     }
 
     /// Sets the lua compiler being used on both the lua vm and the runtime
     pub fn set_compiler(&mut self, compiler: mlua::Compiler) {
+        log::debug!("Setting lua compiler");
         let Some(ref lua) = *self.lua.borrow() else {
             return;
         };
@@ -285,6 +289,7 @@ impl KhronosRuntime {
 
     /// Returns the scheduler
     pub fn scheduler(&self) -> &Scheduler {
+        log::debug!("Getting scheduler");
         &self.scheduler
     }
 
@@ -292,26 +297,31 @@ impl KhronosRuntime {
     ///
     /// This may be None if the VM has not executed a script yet
     pub fn last_execution_time(&self) -> Option<Instant> {
+        log::debug!("Getting last execution time");
         self.last_execution_time.get()
     }
 
     /// Updates the last execution time
     pub fn update_last_execution_time(&self, time: Instant) {
+        log::debug!("Updating last execution time");
         self.last_execution_time.set(Some(time));
     }
 
     /// Returns whether the runtime is broken or not
     pub fn is_broken(&self) -> bool {
+        log::debug!("Getting if runtime is broken");
         self.broken.get()
     }
 
     /// Returns if the runtime is sandboxed or not
     pub fn is_sandboxed(&self) -> bool {
+        log::debug!("Getting if runtime is sandboxed");
         self.sandboxed
     }
 
     /// Returns the runtime creation options
     pub fn opts(&self) -> &RuntimeCreateOpts {
+        log::debug!("Getting runtime creation options");
         &self.opts
     }
 
@@ -320,6 +330,7 @@ impl KhronosRuntime {
     ///
     /// It is a logic error to call this function while holding a reference to the lua vm
     pub fn mark_broken(&self, broken: bool) -> Result<(), crate::Error> {
+        log::debug!("Marking runtime as broken");
         let mut stat = Ok(());
         match self.close() {
             Ok(_) => {}
@@ -344,11 +355,13 @@ impl KhronosRuntime {
 
     /// Returns if a on_broken callback is set
     pub fn has_on_broken(&self) -> bool {
+        log::debug!("Getting if on_broken callback is set");
         self.on_broken.borrow().is_some()
     }
 
     /// Registers a callback to be called when the runtime is marked as broken
     pub fn set_on_broken(&self, callback: OnBrokenFunc) {
+        log::debug!("Setting on_broken callback");
         self.on_broken.borrow_mut().replace(callback);
     }
 
@@ -357,6 +370,7 @@ impl KhronosRuntime {
     /// Note that Isolates cannot be created if the runtime is sandboxed
     /// and that Subisolates cannot be created if the runtime is not sandboxed
     pub fn sandbox(&mut self) -> Result<(), LuaError> {
+        log::debug!("Sandboxing runtime");
         if self.sandboxed {
             return Ok(());
         }
@@ -375,6 +389,7 @@ impl KhronosRuntime {
     ///
     /// DANGER: This should not be run after isolates have been created
     pub fn unsandbox(&mut self) -> Result<(), LuaError> {
+        log::debug!("Unsandboxing runtime");
         if !self.sandboxed {
             return Ok(());
         }
@@ -391,11 +406,13 @@ impl KhronosRuntime {
 
     /// Returns the maximum number of threads allowed in the runtime
     pub fn max_threads(&self) -> i64 {
+        log::debug!("Getting max threads");
         self.max_threads.get()
     }
 
     /// Sets the maximum number of threads allowed in the runtime
     pub fn set_max_threads(&self, max_threads: i64) {
+        log::debug!("Setting max threads to {}", max_threads);
         // Ensure we don't set a negative value
         if max_threads < 0 {
             self.max_threads.set(0);
@@ -408,6 +425,7 @@ impl KhronosRuntime {
     ///
     /// The current number of threads is immutable and cannot be directly modified by the user.
     pub fn current_threads(&self) -> i64 {
+        log::debug!("Getting current threads");
         self.current_threads.get()
     }
 
@@ -415,6 +433,7 @@ impl KhronosRuntime {
     ///
     /// Returns `0` if the lua vm is not valid
     pub fn memory_usage(&self) -> usize {
+        log::debug!("Getting memory usage");
         let Some(ref lua) = *self.lua.borrow() else {
             return 0;
         };
@@ -426,6 +445,7 @@ impl KhronosRuntime {
     /// The memory limit is set in bytes and will be enforced by the lua vm itself
     /// (e.g. using mlua)
     pub fn set_memory_limit(&self, limit: usize) -> Result<usize, LuaError> {
+        log::debug!("Setting memory limit to {}", limit);
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
@@ -434,11 +454,13 @@ impl KhronosRuntime {
 
     /// Returns the store table for the runtime
     pub fn store_table(&self) -> &LuaTable {
+        log::debug!("Getting store table");
         &self.store_table
     }
 
     /// Loads plugins to be exposed to all isolates
     pub fn load_plugins(&self, plugins: PluginSet) -> LuaResult<()> {
+        log::debug!("Loading plugins");
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
@@ -453,6 +475,7 @@ impl KhronosRuntime {
     /// Returns the require cache table
     #[inline]
     pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
+        log::debug!("Getting require cache");
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
@@ -462,6 +485,7 @@ impl KhronosRuntime {
     /// Clears the require cache table
     #[inline]
     pub fn clear_require_cache(&self) -> LuaResult<()> {
+        log::debug!("Clearing require cache");
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
