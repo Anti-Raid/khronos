@@ -200,8 +200,7 @@ impl LuaStatementCompleter {
                 // Add the real global table to the list of tables to search
                 to_add.push(LuaValue::Table(lua.globals()));
 
-                if let Some(mt) =
-                Self::value_metamethod(&LuaValue::Table(lua.globals()), "__index")
+                if let Some(mt) = Self::value_metamethod(&LuaValue::Table(lua.globals()), "__index")
                 {
                     to_add.push(LuaValue::Table(mt));
                 }

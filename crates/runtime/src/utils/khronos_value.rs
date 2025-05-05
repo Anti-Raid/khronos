@@ -1,5 +1,5 @@
 use mlua::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
@@ -61,7 +61,9 @@ impl TryFrom<KhronosValue> for i8 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::Integer(i) => i.try_into().map_err(|_| "KhronosValue is not an i8".into()),
+            KhronosValue::Integer(i) => {
+                i.try_into().map_err(|_| "KhronosValue is not an i8".into())
+            }
             _ => Err("KhronosValue is not an i8".into()),
         }
     }
@@ -75,7 +77,9 @@ impl TryFrom<KhronosValue> for i16 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::Integer(i) => i.try_into().map_err(|_| "KhronosValue is not an i16".into()),
+            KhronosValue::Integer(i) => i
+                .try_into()
+                .map_err(|_| "KhronosValue is not an i16".into()),
             _ => Err("KhronosValue is not an i16".into()),
         }
     }
@@ -89,7 +93,9 @@ impl TryFrom<KhronosValue> for i32 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::Integer(i) => i.try_into().map_err(|_| "KhronosValue is not an i32".into()),
+            KhronosValue::Integer(i) => i
+                .try_into()
+                .map_err(|_| "KhronosValue is not an i32".into()),
             _ => Err("KhronosValue is not an i32".into()),
         }
     }
@@ -117,7 +123,9 @@ impl TryFrom<KhronosValue> for u8 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::UnsignedInteger(i) => i.try_into().map_err(|_| "KhronosValue is not a u8".into()),
+            KhronosValue::UnsignedInteger(i) => {
+                i.try_into().map_err(|_| "KhronosValue is not a u8".into())
+            }
             _ => Err("KhronosValue is not a u8".into()),
         }
     }
@@ -131,7 +139,9 @@ impl TryFrom<KhronosValue> for u16 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::UnsignedInteger(i) => i.try_into().map_err(|_| "KhronosValue is not a u16".into()),
+            KhronosValue::UnsignedInteger(i) => {
+                i.try_into().map_err(|_| "KhronosValue is not a u16".into())
+            }
             _ => Err("KhronosValue is not a u16".into()),
         }
     }
@@ -145,7 +155,9 @@ impl TryFrom<KhronosValue> for u32 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::UnsignedInteger(i) => i.try_into().map_err(|_| "KhronosValue is not a u32".into()),
+            KhronosValue::UnsignedInteger(i) => {
+                i.try_into().map_err(|_| "KhronosValue is not a u32".into())
+            }
             _ => Err("KhronosValue is not a u32".into()),
         }
     }
@@ -175,7 +187,9 @@ impl TryFrom<KhronosValue> for usize {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::UnsignedInteger(i) => i.try_into().map_err(|_| "KhronosValue is not a usize".into()),
+            KhronosValue::UnsignedInteger(i) => i
+                .try_into()
+                .map_err(|_| "KhronosValue is not a usize".into()),
             _ => Err("KhronosValue is not a usize".into()),
         }
     }
@@ -196,7 +210,7 @@ impl TryFrom<KhronosValue> for f32 {
                 }
 
                 return Ok(f as f32);
-            },
+            }
             _ => Err("KhronosValue is not a f32".into()),
         }
     }
@@ -381,7 +395,10 @@ where
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::Map(m) => m.into_iter().map(|(k, v)| Ok((k, T::try_from(v)?))).collect(),
+            KhronosValue::Map(m) => m
+                .into_iter()
+                .map(|(k, v)| Ok((k, T::try_from(v)?)))
+                .collect(),
             _ => Err("KhronosValue is not a map".into()),
         }
     }
@@ -441,9 +458,8 @@ impl<T: Serialize + for<'de> Deserialize<'de>> TryFrom<KhronosValue> for SerdeBl
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         let serde_json_value = value.into_serde_json_value(0, false)?;
-        let value = T::deserialize(serde_json_value).map_err(|e| {
-            crate::Error::from(format!("Failed to deserialize SerdeBlob: {}", e))
-        })?;
+        let value = T::deserialize(serde_json_value)
+            .map_err(|e| crate::Error::from(format!("Failed to deserialize SerdeBlob: {}", e)))?;
         Ok(SerdeBlob(value))
     }
 }
@@ -585,7 +601,11 @@ impl KhronosValue {
 
     fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
         if depth > 10 {
-            return Err(LuaError::FromLuaConversionError { from: "any", to: "KhronosValue".to_string(), message: Some("Recursion limit exceeded".to_string()) });
+            return Err(LuaError::FromLuaConversionError {
+                from: "any",
+                to: "KhronosValue".to_string(),
+                message: Some("Recursion limit exceeded".to_string()),
+            });
         }
 
         match value {
@@ -601,7 +621,7 @@ impl KhronosValue {
                     let mut map = indexmap::IndexMap::new();
                     for pair in table.pairs::<String, LuaValue>() {
                         let (k, v) = pair?;
-                        let v = KhronosValue::from_lua_impl(v, lua, depth+1)?;
+                        let v = KhronosValue::from_lua_impl(v, lua, depth + 1)?;
                         map.insert(k, v);
                     }
                     return Ok(KhronosValue::Map(map));
@@ -610,14 +630,16 @@ impl KhronosValue {
                 let mut list = Vec::new();
                 for v in table.sequence_values::<LuaValue>() {
                     let v = v?;
-                    let v = KhronosValue::from_lua_impl(v, lua, depth+1)?;
+                    let v = KhronosValue::from_lua_impl(v, lua, depth + 1)?;
                     list.push(v);
                 }
 
                 Ok(KhronosValue::List(list))
             }
             LuaValue::UserData(ud) => {
-                if let Ok(dt) = ud.borrow::<crate::plugins::antiraid::datetime::DateTime<chrono_tz::Tz>>() {
+                if let Ok(dt) =
+                    ud.borrow::<crate::plugins::antiraid::datetime::DateTime<chrono_tz::Tz>>()
+                {
                     return Ok(KhronosValue::Timestamptz(dt.dt.with_timezone(&chrono::Utc)));
                 }
                 if let Ok(delta) = ud.borrow::<crate::plugins::antiraid::datetime::TimeDelta>() {
@@ -635,13 +657,21 @@ impl KhronosValue {
 
                 return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
             }
-            _ => Err(LuaError::FromLuaConversionError { from: "any", to: "KhronosValue".to_string(), message: Some("Invalid type".to_string()) }),
+            _ => Err(LuaError::FromLuaConversionError {
+                from: "any",
+                to: "KhronosValue".to_string(),
+                message: Some("Invalid type".to_string()),
+            }),
         }
     }
 
     fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
         if depth > 10 {
-            return Err(LuaError::FromLuaConversionError { from: "any", to: "KhronosValue".to_string(), message: Some("Recursion limit exceeded".to_string()) });
+            return Err(LuaError::FromLuaConversionError {
+                from: "any",
+                to: "KhronosValue".to_string(),
+                message: Some("Recursion limit exceeded".to_string()),
+            });
         }
 
         match self {
@@ -655,15 +685,17 @@ impl KhronosValue {
                 } else {
                     Ok(LuaValue::Integer(i))
                 }
-            },
-            KhronosValue::UnsignedInteger(i) => crate::plugins::antiraid::typesext::U64(i).into_lua(lua), // An UnsignedInteger can only be created through explicit U64 parse
+            }
+            KhronosValue::UnsignedInteger(i) => {
+                crate::plugins::antiraid::typesext::U64(i).into_lua(lua)
+            } // An UnsignedInteger can only be created through explicit U64 parse
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
             KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
             KhronosValue::Map(j) => {
                 let table = lua.create_table()?;
                 for (k, v) in j.into_iter() {
-                    let v = v.into_lua_impl(lua, depth+1)?;
+                    let v = v.into_lua_impl(lua, depth + 1)?;
                     table.set(k, v)?;
                 }
                 Ok(LuaValue::Table(table))
@@ -671,19 +703,30 @@ impl KhronosValue {
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.into_iter() {
-                    let v = v.into_lua_impl(lua, depth+1)?;
+                    let v = v.into_lua_impl(lua, depth + 1)?;
                     table.set(table.raw_len() + 1, v)?;
                 }
                 Ok(LuaValue::Table(table))
             }
-            KhronosValue::Timestamptz(dt) => crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt).into_lua(lua),
-            KhronosValue::Interval(i) => crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua),
-            KhronosValue::TimeZone(tz) => crate::plugins::antiraid::datetime::Timezone::new(tz).into_lua(lua),
+            KhronosValue::Timestamptz(dt) => {
+                crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt)
+                    .into_lua(lua)
+            }
+            KhronosValue::Interval(i) => {
+                crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua)
+            }
+            KhronosValue::TimeZone(tz) => {
+                crate::plugins::antiraid::datetime::Timezone::new(tz).into_lua(lua)
+            }
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
 
-    pub fn into_serde_json_value(self, depth: usize, preserve_types: bool) -> Result<serde_json::Value, crate::Error> {
+    pub fn into_serde_json_value(
+        self,
+        depth: usize,
+        preserve_types: bool,
+    ) -> Result<serde_json::Value, crate::Error> {
         if depth > 10 {
             return Err("Recursion limit exceeded".into());
         }
@@ -691,8 +734,12 @@ impl KhronosValue {
         Ok(match self {
             KhronosValue::Text(s) => serde_json::Value::String(s),
             KhronosValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(i)),
-            KhronosValue::UnsignedInteger(i) => serde_json::Value::Number(serde_json::Number::from(i)),
-            KhronosValue::Float(f) => serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap()),
+            KhronosValue::UnsignedInteger(i) => {
+                serde_json::Value::Number(serde_json::Number::from(i))
+            }
+            KhronosValue::Float(f) => {
+                serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap())
+            }
             KhronosValue::Boolean(b) => serde_json::Value::Bool(b),
             KhronosValue::Vector(v) => {
                 if !preserve_types {
@@ -710,7 +757,11 @@ impl KhronosValue {
                 let mut map = serde_json::Map::new();
                 for (k, v) in m.into_iter() {
                     if k == KHRONOS_VALUE_TYPE_KEY {
-                        return Err(format!("Cannot use reserved key `{}` in map", KHRONOS_VALUE_TYPE_KEY).into());
+                        return Err(format!(
+                            "Cannot use reserved key `{}` in map",
+                            KHRONOS_VALUE_TYPE_KEY
+                        )
+                        .into());
                     }
                     map.insert(k, v.into_serde_json_value(depth + 1, preserve_types)?);
                 }
@@ -735,7 +786,7 @@ impl KhronosValue {
                         .map_err(|e| format!("Failed to serialize DateTime: {}", e))?
                     })
                 }
-            },
+            }
             KhronosValue::Interval(i) => {
                 if !preserve_types {
                     serde_json::to_value(i)
@@ -747,7 +798,7 @@ impl KhronosValue {
                         .map_err(|e| format!("Failed to serialize Interval: {}", e))?
                     })
                 }
-            },
+            }
             KhronosValue::TimeZone(tz) => {
                 if !preserve_types {
                     serde_json::to_value(tz)
@@ -759,12 +810,15 @@ impl KhronosValue {
                         .map_err(|e| format!("Failed to serialize TimeZone: {}", e))?
                     })
                 }
-            },
+            }
             KhronosValue::Null => serde_json::Value::Null,
         })
     }
 
-    pub fn from_serde_json_value(value: serde_json::Value, depth: usize) -> Result<Self, crate::Error> {
+    pub fn from_serde_json_value(
+        value: serde_json::Value,
+        depth: usize,
+    ) -> Result<Self, crate::Error> {
         if depth > 10 {
             return Err("Recursion limit exceeded".into());
         }
@@ -789,19 +843,35 @@ impl KhronosValue {
                         match khronos_value_type {
                             "vector" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Vector(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize Vector: {}", e))?));
+                                return Ok(KhronosValue::Vector(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!("Failed to deserialize Vector: {}", e)
+                                    })?,
+                                ));
                             }
                             "timestamptz" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Timestamptz(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize DateTime: {}", e))?));
+                                return Ok(KhronosValue::Timestamptz(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!("Failed to deserialize DateTime: {}", e)
+                                    })?,
+                                ));
                             }
                             "interval" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Interval(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize Interval: {}", e))?));
+                                return Ok(KhronosValue::Interval(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!("Failed to deserialize Interval: {}", e)
+                                    })?,
+                                ));
                             }
                             "timezone" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::TimeZone(serde_json::from_value(value.clone()).map_err(|e| format!("Failed to deserialize TimeZone: {}", e))?));
+                                return Ok(KhronosValue::TimeZone(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!("Failed to deserialize TimeZone: {}", e)
+                                    })?,
+                                ));
                             }
                             _ => {}
                         }
@@ -842,14 +912,14 @@ impl KhronosValue {
             KhronosValue::Boolean(b) => visitor.visit_boolean(*b),
             KhronosValue::Vector(v) => visitor.visit_vector(*v),
             KhronosValue::Map(m) => {
-                visitor.visit_map(m)?;  
+                visitor.visit_map(m)?;
                 for (k, v) in m {
                     visitor.visit_map_entry(k, v)?;
                     v.visit(visitor)?;
                     visitor.visit_map_entry_end(k, v)?;
                 }
                 visitor.visit_map_end(m)
-            },
+            }
             KhronosValue::List(l) => {
                 visitor.visit_list(l)?;
                 for v in l {
@@ -858,7 +928,7 @@ impl KhronosValue {
                     visitor.visit_list_entry_end(v)?;
                 }
                 visitor.visit_list_end(l)
-            },
+            }
             KhronosValue::Timestamptz(dt) => visitor.visit_timestamptz(dt),
             KhronosValue::Interval(i) => visitor.visit_interval(i),
             KhronosValue::TimeZone(tz) => visitor.visit_timezone(tz),
@@ -888,16 +958,26 @@ pub trait KhronosValueVisitor {
     fn visit_vector(&mut self, _value: (f32, f32, f32)) -> Result<(), crate::Error> {
         Ok(())
     }
-    fn visit_map(&mut self, _value: &indexmap::IndexMap<String, KhronosValue>) -> Result<(), crate::Error> {
+    fn visit_map(
+        &mut self,
+        _value: &indexmap::IndexMap<String, KhronosValue>,
+    ) -> Result<(), crate::Error> {
         Ok(())
     }
     fn visit_map_entry(&mut self, _key: &str, _value: &KhronosValue) -> Result<(), crate::Error> {
         Ok(())
     }
-    fn visit_map_entry_end(&mut self, _key: &str, _value: &KhronosValue) -> Result<(), crate::Error> {
+    fn visit_map_entry_end(
+        &mut self,
+        _key: &str,
+        _value: &KhronosValue,
+    ) -> Result<(), crate::Error> {
         Ok(())
     }
-    fn visit_map_end(&mut self, _value: &indexmap::IndexMap<String, KhronosValue>) -> Result<(), crate::Error> {
+    fn visit_map_end(
+        &mut self,
+        _value: &indexmap::IndexMap<String, KhronosValue>,
+    ) -> Result<(), crate::Error> {
         Ok(())
     }
     fn visit_list(&mut self, _value: &Vec<KhronosValue>) -> Result<(), crate::Error> {
@@ -912,7 +992,10 @@ pub trait KhronosValueVisitor {
     fn visit_list_end(&mut self, _value: &Vec<KhronosValue>) -> Result<(), crate::Error> {
         Ok(())
     }
-    fn visit_timestamptz(&mut self, _value: &chrono::DateTime<chrono::Utc>) -> Result<(), crate::Error> {
+    fn visit_timestamptz(
+        &mut self,
+        _value: &chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), crate::Error> {
         Ok(())
     }
     fn visit_interval(&mut self, _value: &chrono::Duration) -> Result<(), crate::Error> {
@@ -1119,10 +1202,9 @@ macro_rules! to_struct {
                 )*
                 $crate::utils::khronos_value::KhronosValue::Map(map) // Assuming KhronosValue is in the crate root
             }
-        }       
+        }
     };
 }
-
 
 #[cfg(test)]
 mod test_value_macro {
@@ -1147,14 +1229,17 @@ mod test_value_macro {
         assert_eq!(v.as_string().unwrap(), "hello");
         let v2 = value!(1 => kv);
         assert_eq!(v2.as_map().unwrap().len(), 1);
-        assert_eq!(v2.as_map().unwrap()[&"1".to_string()].as_string().unwrap(), "hello");
+        assert_eq!(
+            v2.as_map().unwrap()[&"1".to_string()].as_string().unwrap(),
+            "hello"
+        );
     }
 }
 
 #[cfg(test)]
 mod test_to_struct {
-    use serde::Serialize;
     use serde::Deserialize;
+    use serde::Serialize;
 
     to_struct!(
         #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

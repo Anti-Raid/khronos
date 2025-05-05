@@ -2,10 +2,10 @@
 
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
+use crate::utils::pluginholder::PluginSet;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use crate::utils::pluginholder::PluginSet;
 
 use crate::utils::prelude::disable_harmful;
 use mlua::prelude::*;
@@ -91,12 +91,15 @@ impl KhronosRuntime {
         SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mlua::Error> + 'static,
-        ThreadDestructionCallbackFunc: Fn() -> () + 'static, 
+        ThreadDestructionCallbackFunc: Fn() -> () + 'static,
     >(
         sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
-        on_thread_event_callback: Option<(ThreadCreationCallbackFunc, ThreadDestructionCallbackFunc)>,
+        on_thread_event_callback: Option<(
+            ThreadCreationCallbackFunc,
+            ThreadDestructionCallbackFunc,
+        )>,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new Khronos runtime");
         let lua = Lua::new_with(
@@ -500,42 +503,40 @@ impl KhronosRuntime {
         };
 
         log::debug!("Setting print global");
-        lua
-            .globals()
-            .set(
-                "print",
-                lua
-                    .create_function(|_lua, values: LuaMultiValue| {
-                        if !values.is_empty() {
-                            println!(
-                                "{}",
-                                values
-                                    .iter()
-                                    .map(|value| {
-                                        match value {
-                                            LuaValue::String(s) => format!("{}", s.display()),
-                                            _ => format!("{:#?}", value)
-                                        }
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join("\t")
-                            );
-                        } else {
-                            println!("nil");
-                        }
+        lua.globals().set(
+            "print",
+            lua.create_function(|_lua, values: LuaMultiValue| {
+                if !values.is_empty() {
+                    println!(
+                        "{}",
+                        values
+                            .iter()
+                            .map(|value| {
+                                match value {
+                                    LuaValue::String(s) => format!("{}", s.display()),
+                                    _ => format!("{:#?}", value),
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\t")
+                    );
+                } else {
+                    println!("nil");
+                }
 
-                        Ok(())
-                    })?,
-            )?;
+                Ok(())
+            })?,
+        )?;
         Ok(())
     }
 
     /// Executes a function in the lua vm.
     ///
     /// The given lua vm is wrapped in a KhronosLuaRef to try and block cloning
-    pub fn exec_lua<
-        F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mlua::MaybeSend + 'static,
-    >(&self, func: F) -> LuaResult<()> {
+    pub fn exec_lua<F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mlua::MaybeSend + 'static>(
+        &self,
+        func: F,
+    ) -> LuaResult<()> {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
@@ -547,17 +548,19 @@ impl KhronosRuntime {
     pub fn set_custom_global_function<
         F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mlua::MaybeSend + 'static,
         A: FromLuaMulti,
-        R: IntoLuaMulti,        
-    >(&self, name: &str, func: F) -> LuaResult<()> {
+        R: IntoLuaMulti,
+    >(
+        &self,
+        name: &str,
+        func: F,
+    ) -> LuaResult<()> {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
 
         lua.globals().set(
             name,
-            lua.create_function(move |lua, args: A| {
-                (func)(KhronosLuaRef(lua), args)
-            })?,
+            lua.create_function(move |lua, args: A| (func)(KhronosLuaRef(lua), args))?,
         )?;
         Ok(())
     }
@@ -572,15 +575,14 @@ impl KhronosRuntime {
             // Ensure strong_count == 1
             if lua.strong_count() > 1 {
                 log::warn!("Lua VM is still in use and may not be closed immediately");
-            } 
+            }
         } else {
             return Ok(()); // Lua VM is already closed
-        }    
-
+        }
 
         *self.lua.borrow_mut() = None; // Drop the Lua VM
         self.broken.set(true); // Mark the runtime as broken if it is closed
-        
+
         Ok(())
     }
 

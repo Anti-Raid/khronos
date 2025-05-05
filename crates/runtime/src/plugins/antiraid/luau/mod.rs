@@ -1,6 +1,6 @@
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
-use crate::{lua_promise, TemplateContextRef};
+use crate::{plugins::antiraid::promise::UserDataLuaPromise, TemplateContextRef};
 use mlua::prelude::*;
 
 #[derive(Clone)]
@@ -42,7 +42,7 @@ impl<T: KhronosContext> Chunk<T> {
 
         if let Some(env) = &self.environment {
             chunk = chunk.set_environment(env.clone());
-            } else {
+        } else {
             chunk = chunk.set_environment(lua.globals());
         }
 
@@ -97,28 +97,26 @@ impl<T: KhronosContext> LuaUserData for Chunk<T> {
             Ok(res)
         });
 
-        methods.add_method("call_async", |_, this, args: LuaMultiValue| {
-            Ok(lua_promise!(this, args, |lua, this, args|, {
-                this.check_action("eval.call_async".to_string())?;
+        methods.add_promise_method("call_async", async move |lua, this, args: LuaMultiValue| {
+            this.check_action("eval.call_async".to_string())?;
 
-                let func = this.setup_chunk(&lua)?
-                .into_function()?;
+            let func = this.setup_chunk(&lua)?
+            .into_function()?;
 
 
-                let th = lua.create_thread(func)?;
+            let th = lua.create_thread(func)?;
 
-                let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
-                let output = scheduler
-                    .spawn_thread_and_wait("Eval", th, args)
-                    .await?;
+            let scheduler = mlua_scheduler_ext::Scheduler::get(&lua);
+            let output = scheduler
+                .spawn_thread_and_wait("Eval", th, args)
+                .await?;
 
-                match output {
-                    Some(result) => result,
-                    None => {
-                        Ok(LuaMultiValue::new())
-                    }
+            match output {
+                Some(result) => result,
+                None => {
+                    Ok(LuaMultiValue::new())
                 }
-            }))
+            }
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

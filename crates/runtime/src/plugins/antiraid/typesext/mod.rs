@@ -1,6 +1,6 @@
+use crate::primitives::create_userdata_iterator_with_fields;
 use mlua::prelude::*;
 use rand::distributions::{Alphanumeric, DistString};
-use crate::primitives::create_userdata_iterator_with_fields;
 
 /// Syntactically:
 ///
@@ -325,7 +325,7 @@ impl FromLua for I64 {
                             to: "I64".to_string(),
                             message: Some("UserData must be a U64".to_string()),
                         })?;
-                    
+
                     if u64t.0 > i64::MAX as u64 {
                         return Err(LuaError::FromLuaConversionError {
                             from: "UserData",
@@ -806,7 +806,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         "randstring",
         lua.create_function(|_lua, length: usize| {
             if length <= 0 || length > 255 {
-                return Err(LuaError::external("Length must be greater than 0 and less than 256"));
+                return Err(LuaError::external(
+                    "Length must be greater than 0 and less than 256",
+                ));
             }
 
             Ok(Alphanumeric.sample_string(&mut rand::thread_rng(), length))
@@ -824,26 +826,29 @@ mod tests {
 
     #[test]
     fn test_multi_option() {
-        
         let lua = mlua::Lua::new();
 
-        lua.globals().set("testmo", lua.create_function(
-            |lua, data: LuaValue| {
-                let v = lua.from_value::<super::MultiOption<u64>>(data)?;
+        lua.globals()
+            .set(
+                "testmo",
+                lua.create_function(|lua, data: LuaValue| {
+                    let v = lua.from_value::<super::MultiOption<u64>>(data)?;
 
-                #[derive(serde::Serialize)]
-                pub struct Dummy {
-                    #[serde(skip_serializing_if = "super::MultiOption::should_not_serialize")]
-                    a: super::MultiOption<u64>,
-                }
+                    #[derive(serde::Serialize)]
+                    pub struct Dummy {
+                        #[serde(skip_serializing_if = "super::MultiOption::should_not_serialize")]
+                        a: super::MultiOption<u64>,
+                    }
 
-                let d = Dummy { a: v.clone() };
+                    let d = Dummy { a: v.clone() };
 
-                println!("{:?}, serde: {:?}", v, serde_json::to_string(&d).unwrap());
+                    println!("{:?}, serde: {:?}", v, serde_json::to_string(&d).unwrap());
 
-                Ok(())
-            }
-        ).unwrap()).unwrap();
+                    Ok(())
+                })
+                .unwrap(),
+            )
+            .unwrap();
 
         lua.load(
             r#"
@@ -853,7 +858,8 @@ mod tests {
             testmo({})
             print("Actual unpassed")
             testmo(nil)
-        "#)
+        "#,
+        )
         .exec()
         .unwrap();
     }

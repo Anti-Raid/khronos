@@ -10,10 +10,10 @@ pub mod luau;
 pub mod pages;
 pub mod permissions;
 pub mod promise;
+pub mod scheduledexec;
 pub mod stores;
 pub mod typesext;
 pub mod userinfo;
-pub mod scheduledexec;
 
 use mlua::prelude::*;
 

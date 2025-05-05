@@ -21,29 +21,33 @@ impl LuaPromise {
         Self { inner: fut }
     }
 
-    pub fn new_generic<
-        T: Future<Output = LuaResult<R>> + 'static,
-        U: FnOnce(&Lua) -> T + 'static,
-        R: IntoLuaMulti + 'static,
-    >(
-        func: U,
-    ) -> Self {
-        Self {
-            inner: Box::new(move |lua| {
-                let func_ref = func;
-                Box::pin(async move {
-                    let fut = async move {
-                        let fut = (func_ref)(&lua);
-                        match fut.await {
-                            Ok(val) => val.into_lua_multi(&lua),
-                            Err(e) => Err(e),
-                        }
-                    };
+    /// Creates a new function that returns a LuaPromise
+    pub fn new_function<A, F, FR>(lua: &Lua, func: F) -> LuaResult<LuaFunction>
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+    {
+        // We need userdata to be explicitly borrowed in the promise due to rust things but we
+        // can otherwise just use raw mlua arg conversion code directly
+        lua.create_function(
+            move |_lua, args: LuaMultiValue| {
+                let func = func.clone();
 
-                    fut.await
+                Ok(LuaPromise {
+                    inner: Box::new(move |lua| {
+                        Box::pin(async move {
+                            let args = A::from_lua_multi(args, &lua)?;
+                            let ret = (func)(&lua, args).await?;
+                            Ok(ret.into_lua_multi(&lua)?)
+                        })
+                    }),
                 })
-            }),
-        }
+            },
+        )
     }
 }
 
@@ -51,6 +55,7 @@ impl LuaPromise {
 /// }) -> LuaPromise
 /// Clones all arguments and the lua instance
 #[macro_export]
+#[deprecated(note = "Use either LuaPromise::new_function or add_promise_method/add_promise_method_mut instead")]
 macro_rules! lua_promise {
     ($($arg:ident),* $(,)?, |$lua:ident, $($args:ident),*|, $code:block) => {
         {
@@ -75,9 +80,153 @@ macro_rules! lua_promise {
     };
 }
 
+/// A UserDataLuaPromise makes it easier to create promises
+/// with minimal cloning
+pub trait UserDataLuaPromise<T> {
+    fn add_promise_function<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static;
+
+    fn add_promise_method<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, LuaUserDataRef<T>, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static;
+
+    fn add_promise_method_mut<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, LuaUserDataRefMut<T>, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static;
+}
+
+impl<I, T> UserDataLuaPromise<T> for I
+where
+    I: LuaUserDataMethods<T>,
+{
+    fn add_promise_function<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static,
+    {
+        // We need userdata to be explicitly borrowed in the promise due to rust things but we
+        // can otherwise just use raw mlua arg conversion code directly
+        self.add_function(
+            name,
+            move |_lua, args: LuaMultiValue| {
+                let func = func.clone();
+
+                Ok(LuaPromise {
+                    inner: Box::new(move |lua| {
+                        Box::pin(async move {
+                            let args = A::from_lua_multi(args, &lua)?;
+                            let ret = (func)(&lua, args).await?;
+                            Ok(ret.into_lua_multi(&lua)?)
+                        })
+                    }),
+                })
+            },
+        );
+    }
+
+    fn add_promise_method<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, LuaUserDataRef<T>, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static,
+    {
+        // We need userdata to be explicitly borrowed in the promise due to rust things but we
+        // can otherwise just use raw mlua arg conversion code directly
+        self.add_function(
+            name,
+            move |_lua, (this, args): (LuaAnyUserData, LuaMultiValue)| {
+                let func = func.clone();
+
+                Ok(LuaPromise {
+                    inner: Box::new(move |lua| {
+                        Box::pin(async move {
+                            let this = this.borrow::<T>()?;
+                            let args = A::from_lua_multi(args, &lua)?;
+                            let ret = (func)(&lua, this, args).await?;
+                            Ok(ret.into_lua_multi(&lua)?)
+                        })
+                    }),
+                })
+            },
+        );
+    }
+
+    fn add_promise_method_mut<A, F, FR>(&mut self, name: &str, func: F)
+    where
+        A: FromLuaMulti + mlua::MaybeSend + 'static,
+        F: AsyncFnOnce(&Lua, LuaUserDataRefMut<T>, A) -> LuaResult<FR>
+            + mlua::MaybeSend
+            + Clone
+            + 'static,
+        FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
+        T: LuaUserData + 'static,
+    {
+        // We need userdata to be explicitly borrowed in the promise due to rust things but we
+        // can otherwise just use raw mlua arg conversion code directly
+        self.add_function(
+            name,
+            move |_lua, (this, args): (LuaAnyUserData, LuaMultiValue)| {
+                let func = func.clone();
+
+                Ok(LuaPromise {
+                    inner: Box::new(move |lua| {
+                        Box::pin(async move {
+                            let this = this.borrow_mut::<T>()?;
+                            let args = A::from_lua_multi(args, &lua)?;
+                            let ret = (func)(&lua, this, args).await?;
+                            Ok(ret.into_lua_multi(&lua)?)
+                        })
+                    }),
+                })
+            },
+        );
+    }
+}
+
 pub type LuaPromiseRef = LuaUserDataRefMut<LuaPromise>;
 
 impl LuaUserData for LuaPromise {}
+
+struct TestLuaPromise {
+    n: i32,
+}
+
+impl LuaUserData for TestLuaPromise {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_promise_method_mut("incby", async move |_lua, mut this, n: i32| {
+            this.n += n;
+            Ok(this.n)
+        });
+    }
+}
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
@@ -153,22 +302,17 @@ mod tests {
 
             scheduler.attach().expect("Failed to attach scheduler");
 
-            let a = 3;
-            let test_promise = lua_promise!(a, |_lua, a|, {
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-                Ok(-1 + a)
-            });
-
+            let test_promise = TestLuaPromise { n: 0 };
             let args = (module, test_promise).into_lua_multi(&lua).unwrap();
 
             let f = lua
                 .load(
                     r#"
                 local promise, test_promise = ...
-                print(test_promise)
+                print(test_promise:incby(1))
     
                 local function test()
-                    local res = promise.yield(test_promise)
+                    local res = promise.yield(test_promise:incby(2))
                     assert(res == 2)
                     return res
                 end

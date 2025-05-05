@@ -1,17 +1,15 @@
 use crate::primitives::create_userdata_iterator_with_fields;
+use crate::to_struct;
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
+use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContextRef;
 use mlua::prelude::*;
-use crate::utils::khronos_value::KhronosValue;
-use crate::to_struct;
-
-use crate::lua_promise;
+use crate::plugins::antiraid::promise::UserDataLuaPromise;
 use crate::utils::executorscope::ExecutorScope;
 
 /// An kv executor is used to execute key-value ops from Lua
 /// templates
-#[derive(Clone)]
 pub struct KvExecutor<T: KhronosContext> {
     context: T,
     kv_scope: String,
@@ -66,9 +64,8 @@ impl KvRecord {
 
 impl<T: KhronosContext> KvExecutor<T> {
     pub fn check_list_scopes(&self) -> Result<(), crate::Error> {
-        if !self
-            .context
-            .has_cap("kv.meta:list_scopes") // KV:* means all KV operations are allowed
+        if !self.context.has_cap("kv.meta:list_scopes")
+        // KV:* means all KV operations are allowed
         {
             return Err(
                 "The kv.meta:list_scopes capability is required to list scopes in this template context"
@@ -82,7 +79,8 @@ impl<T: KhronosContext> KvExecutor<T> {
     pub fn check_keys(&self) -> Result<(), crate::Error> {
         if !self
             .context
-            .has_cap(&format!("kv.meta:{}:keys", self.kv_scope)) // kv:{scope}:meta:list_keys means that the action can be performed on any key
+            .has_cap(&format!("kv.meta:{}:keys", self.kv_scope))
+        // kv:{scope}:meta:list_keys means that the action can be performed on any key
         {
             return Err(
                 format!(
@@ -114,8 +112,7 @@ impl<T: KhronosContext> KvExecutor<T> {
         {
             return Err(format!(
                 "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
-                action, key,
-                self.kv_scope
+                action, key, self.kv_scope
             )
             .into());
         }
@@ -157,135 +154,119 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("KvExecutor"));
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));
 
-        methods.add_method("list_scopes", |_, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                this.check_list_scopes()
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+        methods.add_promise_method("list_scopes", async move |_, this, _g: ()| {
+            this.check_list_scopes()
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let scopes = this.kv_provider.list_scopes().await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                Ok(scopes)
-            }))
-        });
-
-        methods.add_method("find", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |_lua, this, key|, {
-                this.check("find".to_string(), key.clone())
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let records = this.kv_provider.find(key).await
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                    .into_iter()
-                    .map(|k| {
-                        KvRecord {
-                            key: k.key,
-                            value: k.value,
-                            exists: true,
-                            created_at: k.created_at,
-                            last_updated_at: k.last_updated_at,
-                        }
-                    })
-                    .collect::<Vec<KvRecord>>();
-
-                Ok::<KhronosValue, LuaError>(records.into())
-            }))
-        });
-
-        methods.add_method("exists", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |_lua, this, key|, {
-                this.check("exists".to_string(), key.clone())
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let exists = this.kv_provider.exists(key).await
+            let scopes = this.kv_provider.list_scopes().await
                 .map_err(|e| LuaError::external(e.to_string()))?;
-                Ok(exists)
-            }))
+
+            Ok(scopes)
         });
 
-        methods.add_method("get", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |_lua, this, key|, {
-                log::info!("Starting get operation");
+        methods.add_promise_method("find", async move |_, this, key: String| {
+            this.check("find".to_string(), key.clone())
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                this.check("get".to_string(), key.clone())
-                .map_err(|e| {
-                    LuaError::runtime(e.to_string())
-                })?;
-
-                log::info!("Getting key: {}", key);
-
-                let record = this.kv_provider.get(key).await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                match record {
-                    // Return None and true if record was found but value is null
-                    Some(rec) => {
-                        Ok((Some(rec.value), true))
-                    },
-                    // Return None and 0 if record was not found
-                    None => Ok((None, false)),
-                }
-            }))
-        });
-
-        methods.add_method("getrecord", |_, this, key: String| {
-            Ok(lua_promise!(this, key, |_lua, this, key|, {
-                this.check("get".to_string(), key.clone())
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let record = this.kv_provider.get(key).await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                let record = match record {
-                    Some(rec) => KvRecord {
-                        key: rec.key,
-                        value: rec.value,
+            let records = this.kv_provider.find(key).await
+                .map_err(|e| LuaError::external(e.to_string()))?
+                .into_iter()
+                .map(|k| {
+                    KvRecord {
+                        key: k.key,
+                        value: k.value,
                         exists: true,
-                        created_at: rec.created_at,
-                        last_updated_at: rec.last_updated_at,
-                    },
-                    None => KvRecord::default(),
-                };
+                        created_at: k.created_at,
+                        last_updated_at: k.last_updated_at,
+                    }
+                })
+                .collect::<Vec<KvRecord>>();
 
-                Ok::<KhronosValue, LuaError>(record.into())
-            }))
+            Ok::<KhronosValue, LuaError>(records.into())
         });
 
-        methods.add_method("keys", |_, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                this.check_keys()
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+        methods.add_promise_method("exists", async move |_, this, key: String| {
+            this.check("exists".to_string(), key.clone())
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let keys = this.kv_provider.keys().await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                Ok(keys)
-            }))
+            let exists = this.kv_provider.exists(key).await
+            .map_err(|e| LuaError::external(e.to_string()))?;
+            Ok(exists)
         });
 
-        methods.add_method("set", |_, this, (key, value): (String, LuaValue)| {
-            Ok(lua_promise!(this, key, value, |lua, this, key, value|, {
-                this.check("set".to_string(), key.clone())
+        methods.add_promise_method("get", async move |_, this, key: String| {
+            log::info!("Starting get operation");
+
+            this.check("get".to_string(), key.clone())
+            .map_err(|e| {
+                LuaError::runtime(e.to_string())
+            })?;
+
+            log::info!("Getting key: {}", key);
+
+            let record = this.kv_provider.get(key).await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            match record {
+                // Return None and true if record was found but value is null
+                Some(rec) => {
+                    Ok((Some(rec.value), true))
+                },
+                // Return None and 0 if record was not found
+                None => Ok((None, false)),
+            }
+        });
+
+        methods.add_promise_method("getrecord", async move |_, this, key: String| {
+            this.check("get".to_string(), key.clone())
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let record = this.kv_provider.get(key).await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let record = match record {
+                Some(rec) => KvRecord {
+                    key: rec.key,
+                    value: rec.value,
+                    exists: true,
+                    created_at: rec.created_at,
+                    last_updated_at: rec.last_updated_at,
+                },
+                None => KvRecord::default(),
+            };
+
+            Ok::<KhronosValue, LuaError>(record.into())
+        });
+
+        methods.add_promise_method("keys", async move |_, this, _g: ()| {
+            this.check_keys()
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let keys = this.kv_provider.keys().await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(keys)
+        });
+
+        methods.add_promise_method("set", async move |lua, this, (key, value): (String, LuaValue)| {
+            this.check("set".to_string(), key.clone())
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let value = KhronosValue::from_lua(value, &lua)?;
+
+            this.kv_provider.set(key, value).await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+            Ok(())
+        });
+
+        methods.add_promise_method("delete", async move |_, this, key: String| {
+            this.check("delete".to_string(), key.clone())
+            .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            this.kv_provider.delete(key).await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let value = KhronosValue::from_lua(value, &lua)?;
-
-                this.kv_provider.set(key, value).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-                Ok(())
-            }))
-        });
-
-        methods.add_method("delete", |_lua, this, key: String| {
-            Ok(lua_promise!(this, key, |_lua, this, key|, {
-                this.check("delete".to_string(), key.clone())
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                this.kv_provider.delete(key).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                Ok(())
-            }))
+            Ok(())
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

@@ -1,7 +1,7 @@
 use super::{
-    discordprovider::DiscordProvider, kvprovider::KVProvider, lockdownprovider::LockdownProvider,
-    pageprovider::PageProvider, userinfoprovider::UserInfoProvider, scheduledexecprovider::ScheduledExecProvider,
-    datastoreprovider::DataStoreProvider
+    datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
+    lockdownprovider::LockdownProvider, pageprovider::PageProvider,
+    scheduledexecprovider::ScheduledExecProvider, userinfoprovider::UserInfoProvider,
 };
 use crate::utils::executorscope::ExecutorScope;
 

@@ -158,7 +158,7 @@ struct CliArgs {
     owner_guild_id: Option<serenity::all::GuildId>,
 
     /// Template name. Defaults to 'main'
-    /// 
+    ///
     /// Environment variable: `TEMPLATE_NAME`
     #[clap(long, default_value = "main")]
     template_name: String,

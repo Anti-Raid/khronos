@@ -6,7 +6,7 @@ use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::pageprovider::PageProvider;
 use crate::utils::executorscope::ExecutorScope;
-use crate::{lua_promise, TemplateContextRef};
+use crate::{plugins::antiraid::promise::UserDataLuaPromise, TemplateContextRef};
 use mlua::prelude::*;
 use settings_ir::Setting;
 
@@ -54,60 +54,54 @@ impl<T: KhronosContext> PageExecutor<T> {
 
 impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("get", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |lua, this, _g|, {
-                this.check_action("get".to_string())?;
+        methods.add_promise_method("get", async move |lua, this, _g: ()| {
+            this.check_action("get".to_string())?;
 
-                let page = match this.page_provider.get_page().await {
-                    Some(page) => page,
-                    None => {
-                        return Ok(LuaValue::Nil);
-                    }
-                };
+            let page = match this.page_provider.get_page().await {
+                Some(page) => page,
+                None => {
+                    return Ok(LuaValue::Nil);
+                }
+            };
 
-                let page = Page {
-                    title: page.title,
-                    description: page.description,
-                    settings: page.settings.into_iter().map(|e| e.into()).collect(),
-                };
+            let page = Page {
+                title: page.title,
+                description: page.description,
+                settings: page.settings.into_iter().map(|e| e.into()).collect(),
+            };
 
-                let page = lua.to_value_with(&page, LUA_SERIALIZE_OPTIONS)?;
+            let page = lua.to_value_with(&page, LUA_SERIALIZE_OPTIONS)?;
 
-                Ok(page)
-            }))
+            Ok(page)
         });
 
-        methods.add_method("save", |_lua, this, page: LuaValue| {
-            Ok(lua_promise!(this, page, |lua, this, page|, {
-                this.check_action("save".to_string())?;
+        methods.add_promise_method("save", async move |lua, this, page: LuaValue| {
+            this.check_action("save".to_string())?;
 
-                let page: Page = lua.from_value(page)?;
+            let page: Page = lua.from_value(page)?;
 
-                page.validate()?;
+            page.validate()?;
 
-                // Convert to khronos PageProviderPage raw struct IR
-                let page = crate::traits::ir::Page {
-                    title: page.title,
-                    description: page.description,
-                    settings: page.settings.into_iter().map(|e| e.into()).collect(),
-                };
+            // Convert to khronos PageProviderPage raw struct IR
+            let page = crate::traits::ir::Page {
+                title: page.title,
+                description: page.description,
+                settings: page.settings.into_iter().map(|e| e.into()).collect(),
+            };
 
-                this.page_provider.set_page(page).await
-                .map_err(|e| LuaError::external(e.to_string()))?;
+            this.page_provider.set_page(page).await
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
-                Ok(())
-            }))
+            Ok(())
         });
 
-        methods.add_method("delete", |_, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                this.check_action("delete".to_string())?;
+        methods.add_promise_method("delete", async move |_, this, _g: ()| {
+            this.check_action("delete".to_string())?;
 
-                this.page_provider.delete_page().await
-                .map_err(|e| LuaError::external(e.to_string()))?;
+            this.page_provider.delete_page().await
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
-                Ok(())
-            }))
+            Ok(())
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

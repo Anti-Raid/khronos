@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use super::typesext::I64;
+use std::str::FromStr;
 
 use chrono::{Datelike, TimeZone, Timelike};
 use chrono_tz::OffsetComponents;
@@ -113,7 +113,6 @@ impl LuaUserData for TimeDelta {
         fields.add_field_method_get("weeks", |_, this| Ok(this.timedelta.num_weeks()));
 
         fields.add_field_method_get("as_secs", |_, this| Ok(this.timedelta.as_seconds_f64()));
-
     }
 }
 
@@ -309,8 +308,9 @@ impl LuaUserData for Timezone {
 
         // Parses a string to a datetime in the said specific timezone
         methods.add_method("fromString", |_, this, date: String| {
-            let dt = date.parse::<chrono::DateTime<chrono::FixedOffset>>()
-            .map_err(|e| mlua::Error::RuntimeError(format!("Invalid date: {}", e)))?;
+            let dt = date
+                .parse::<chrono::DateTime<chrono::FixedOffset>>()
+                .map_err(|e| mlua::Error::RuntimeError(format!("Invalid date: {}", e)))?;
 
             Ok(DateTime {
                 dt: dt.with_timezone(&this.tz),
@@ -541,9 +541,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         "timedelta_weeks",
         lua.create_function(|_, weeks: I64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_weeks(weeks.0).ok_or(mlua::Error::RuntimeError(
-                    "Invalid number of weeks".to_string(),
-                ))?,
+                timedelta: chrono::Duration::try_weeks(weeks.0).ok_or(
+                    mlua::Error::RuntimeError("Invalid number of weeks".to_string()),
+                )?,
             })
         })?,
     )?;
@@ -563,9 +563,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         "timedelta_hours",
         lua.create_function(|_, hours: I64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_hours(hours.0).ok_or(mlua::Error::RuntimeError(
-                    "Invalid number of hours".to_string(),
-                ))?,
+                timedelta: chrono::Duration::try_hours(hours.0).ok_or(
+                    mlua::Error::RuntimeError("Invalid number of hours".to_string()),
+                )?,
             })
         })?,
     )?;

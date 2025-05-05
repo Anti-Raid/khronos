@@ -1,15 +1,16 @@
 use super::LUA_SERIALIZE_OPTIONS;
-use mlua::prelude::*;
 use crate::lua_promise;
-use std::rc::Rc;
+use crate::plugins::antiraid::promise::LuaPromise;
 use crate::primitives::create_userdata_iterator_with_dyn_fields;
-use std::cell::RefCell;
-use std::collections::HashMap;
 use crate::traits::context::KhronosContext;
-use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider, DataStoreMethod};
+use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreMethod, DataStoreProvider};
+use crate::utils::executorscope::ExecutorScope;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContextRef;
-use crate::utils::executorscope::ExecutorScope;
+use mlua::prelude::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct DataStore<T: KhronosContext> {
@@ -21,13 +22,22 @@ pub struct DataStore<T: KhronosContext> {
 impl<T: KhronosContext> DataStore<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
         if self.ds_impl.need_caps(&action) {
-            if !self.executor.context.has_cap(&format!("datastore:{}", self.ds_impl.name())) && !self.executor.context.has_cap(&format!("datastore:{}:{}", self.ds_impl.name(), action)) {
+            if !self
+                .executor
+                .context
+                .has_cap(&format!("datastore:{}", self.ds_impl.name()))
+                && !self.executor.context.has_cap(&format!(
+                    "datastore:{}:{}",
+                    self.ds_impl.name(),
+                    action
+                ))
+            {
                 return Err(LuaError::runtime(format!(
                     "Datastore action is not allowed in this template context: data store: {}, action: {}",
                     self.ds_impl.name(),
                     action
                 )));
-            }    
+            }
         }
 
         self.executor
@@ -45,12 +55,12 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("need_caps", |_, this, op: String| Ok(this.ds_impl.need_caps(&op)));
+        methods.add_method("need_caps", |_, this, op: String| {
+            Ok(this.ds_impl.need_caps(&op))
+        });
 
         methods.add_method("methods", |lua, this, _: ()| {
-            Ok(
-                lua.to_value_with(&this.ds_impl.methods(), LUA_SERIALIZE_OPTIONS)?
-            ) 
+            Ok(lua.to_value_with(&this.ds_impl.methods(), LUA_SERIALIZE_OPTIONS)?)
         });
 
         methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
@@ -71,24 +81,23 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                     if let Some(method_impl) = this.ds_impl.get_method(key.clone()) {
                         let this_ref = this.clone();
                         let key_ref = key.clone();
-                        let method = lua.create_function(
-                            move |lua, data: LuaMultiValue| {
-                                match &method_impl {
-                                    DataStoreMethod::Async(method_impl) => {
-                                        let method_impl = method_impl.clone();
-    
-                                        Ok(lua_promise!(this_ref, key_ref, method_impl, data, |lua, this_ref, key_ref, method_impl, data|, {
-                                            let mut args = Vec::with_capacity(data.len());
-                                            for value in data {
-                                                args.push(KhronosValue::from_lua(value, &lua)?);
-                                            }
-            
-                                            this_ref.check_action(key_ref.clone())?;
-                                            let result = (method_impl)(args).await.map_err(|e| LuaError::external(e.to_string()))?;
-                                            Ok(result)
-                                        }).into_lua(lua)?)        
-                                    }
-                                    DataStoreMethod::Sync(method_impl) => {
+
+                        let method = {
+                            match method_impl {
+                                DataStoreMethod::Async(method_impl) => {
+                                    LuaPromise::new_function(lua, async move |lua, data: LuaMultiValue| {
+                                        let mut args = Vec::with_capacity(data.len());
+                                        for value in data {
+                                            args.push(KhronosValue::from_lua(value, &lua)?);
+                                        }
+        
+                                        this_ref.check_action(key_ref.clone())?;
+                                        let result = (method_impl)(args).await.map_err(|e| LuaError::external(e.to_string()))?;
+                                        Ok(result)
+                                    })?
+                                },
+                                DataStoreMethod::Sync(method_impl) => {
+                                    lua.create_function(move |lua, data: LuaMultiValue| {
                                         let mut args = Vec::with_capacity(data.len());
                                         for value in data {
                                             args.push(KhronosValue::from_lua(value, &lua)?);
@@ -97,11 +106,11 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                                         this_ref.check_action(key_ref.clone())?;
                                         let result = (method_impl)(args).map_err(|e| LuaError::external(e.to_string()))?;
                                         Ok(result.into_lua(lua)?)
-                                    }
+                                    })?
                                 }
-                            },
-                        )?;
-    
+                            }
+                        };
+
                         let method = LuaValue::Function(method);
     
                         methods_cache.insert(key.to_string(), method.clone());
@@ -130,11 +139,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                 base.extend(ds.ds_impl.methods());
             }
 
-            create_userdata_iterator_with_dyn_fields(
-                lua,
-                ud,
-                base,
-            )
+            create_userdata_iterator_with_dyn_fields(lua, ud, base)
         });
     }
 }
@@ -152,31 +157,35 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_method(LuaMetaMethod::NewIndex, |_, this, (key, value): (LuaValue, LuaValue)| {
-            let key = match key {
-                LuaValue::String(key) => key.to_string_lossy(),
-                _ => {
-                    return Ok(());
-                }
-            };
+        methods.add_meta_method(
+            LuaMetaMethod::NewIndex,
+            |_, this, (key, value): (LuaValue, LuaValue)| {
+                let key = match key {
+                    LuaValue::String(key) => key.to_string_lossy(),
+                    _ => {
+                        return Ok(());
+                    }
+                };
 
-            match value {
-                LuaValue::UserData(ref ds) => {
-                    if !ds.is::<DataStore<T>>() {
+                match value {
+                    LuaValue::UserData(ref ds) => {
+                        if !ds.is::<DataStore<T>>() {
+                            return Ok(());
+                        }
+                    }
+                    _ => {
                         return Ok(());
                     }
                 }
-                _ => {
-                    return Ok(());
-                }
-            }
 
-            this.known_datastores.try_borrow_mut()
-            .map_err(|_| LuaError::external("Failed to borrow datastore"))?
-            .insert(key.to_string(), value);
+                this.known_datastores
+                    .try_borrow_mut()
+                    .map_err(|_| LuaError::external("Failed to borrow datastore"))?
+                    .insert(key.to_string(), value);
 
-            Ok(())
-        });
+                Ok(())
+            },
+        );
 
         methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
             let key = match key {
@@ -187,7 +196,10 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
             };
 
             {
-                let map = this.known_datastores.try_borrow().map_err(|_| LuaError::external("Failed to borrow custom datastores"))?;
+                let map = this
+                    .known_datastores
+                    .try_borrow()
+                    .map_err(|_| LuaError::external("Failed to borrow custom datastores"))?;
                 if let Some(ds) = map.get(key.as_str()) {
                     return Ok(Some(ds.clone()));
                 }
@@ -204,9 +216,10 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
             };
 
             let ds = ds.into_lua(lua)?;
-            this.known_datastores.try_borrow_mut()
-            .map_err(|_| LuaError::external("Failed to borrow custom datastores"))?
-            .insert(key.to_string(), ds.clone());
+            this.known_datastores
+                .try_borrow_mut()
+                .map_err(|_| LuaError::external("Failed to borrow custom datastores"))?
+                .insert(key.to_string(), ds.clone());
 
             Ok(Some(ds))
         });
@@ -222,13 +235,9 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
                     .map_err(|_| LuaError::external("Invalid userdata type"))?;
 
                 this.datastore_provider.public_builtin_data_stores()
-            };            
+            };
 
-            create_userdata_iterator_with_dyn_fields(
-                lua,
-                ud,
-                datastores,
-            )
+            create_userdata_iterator_with_dyn_fields(lua, ud, datastores)
         });
     }
 }
@@ -242,9 +251,11 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
             |lua, (token, scope): (TemplateContextRef<T>, Option<String>)| {
                 let scope = ExecutorScope::scope_str(scope)?;
 
-                let mut cached_datastores = token.cached_datastore.try_borrow_mut()
+                let mut cached_datastores = token
+                    .cached_datastore
+                    .try_borrow_mut()
                     .map_err(|_| LuaError::external("Failed to borrow cached datastores"))?;
-                
+
                 for (ex_scope, ds) in cached_datastores.iter() {
                     if ex_scope == &scope {
                         return Ok(ds.clone());
@@ -261,15 +272,11 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
                     context: token.context.clone(),
                     datastore_provider,
                     known_datastores: Rc::new(RefCell::new(HashMap::new())),
-                }.into_lua(lua)?;
+                }
+                .into_lua(lua)?;
 
                 // Cache the datastore executor
-                cached_datastores.push(
-                    (
-                        scope.clone(),
-                        executor.clone(),
-                    )
-                );
+                cached_datastores.push((scope.clone(), executor.clone()));
 
                 Ok(executor)
             },
@@ -280,4 +287,3 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
 
     Ok(module)
 }
-

@@ -1,6 +1,9 @@
 //! HTTP Client Extensions (cli.httpclient)
 
-use khronos_runtime::{lua_promise, primitives::create_userdata_iterator_with_fields, plugins::antiraid::LUA_SERIALIZE_OPTIONS};
+use khronos_runtime::{
+    lua_promise, plugins::antiraid::LUA_SERIALIZE_OPTIONS,
+    primitives::create_userdata_iterator_with_fields,
+};
 use mlua::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 
@@ -14,9 +17,7 @@ impl LuaUserData for Url {
             Ok(this.url.host_str().map(|h| h.to_string()))
         });
 
-        fields.add_field_method_get("port", |_, this| {
-            Ok(this.url.port())
-        });
+        fields.add_field_method_get("port", |_, this| Ok(this.url.port()));
 
         fields.add_field_method_get("scheme", |_, this| Ok(this.url.scheme().to_string()));
 
@@ -412,19 +413,22 @@ pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
         "new_request",
         lua.create_function(move |_lua, (method, url): (String, String)| {
             let url = reqwest::Url::parse(&url).map_err(mlua::Error::external)?;
-            let method = reqwest::Method::from_bytes(method.as_bytes()).map_err(mlua::Error::external)?;
+            let method =
+                reqwest::Method::from_bytes(method.as_bytes()).map_err(mlua::Error::external)?;
             Ok(Request {
                 client: client.clone(),
                 request: Rc::new(RefCell::new(reqwest::Request::new(method, url))),
             })
-        })?
+        })?,
     )?;
 
     http_client.set(
         "new_headers",
-        lua.create_function(|_, _: ()| Ok(Headers {
-            headers: reqwest::header::HeaderMap::new(),
-        }))?,
+        lua.create_function(|_, _: ()| {
+            Ok(Headers {
+                headers: reqwest::header::HeaderMap::new(),
+            })
+        })?,
     )?;
 
     http_client.set_readonly(true);

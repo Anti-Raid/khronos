@@ -32,15 +32,12 @@ pub fn create_vfs_from_map(
             }
         }
         let path_s = format!("/{}", path_s);
-        fs.create_file(&path_s).map_err(|e| {
-            crate::Error::from(format!("Failed to create file {path_s}: {e}"))
-        })?
-        .write_all(content.as_bytes())
-        .map_err(|e| {
-            crate::Error::from(format!("Failed to write to {path_s}: {e}"))
-        })?;
+        fs.create_file(&path_s)
+            .map_err(|e| crate::Error::from(format!("Failed to create file {path_s}: {e}")))?
+            .write_all(content.as_bytes())
+            .map_err(|e| crate::Error::from(format!("Failed to write to {path_s}: {e}")))?;
     }
-    
+
     Ok(fs)
 }
 
@@ -74,14 +71,11 @@ pub fn create_memory_vfs_from_map(
             }
         }
         let path_s = format!("/{}", path_s);
-        fs.create_file(&path_s).map_err(|e| {
-            crate::Error::from(format!("Failed to create file {path_s}: {e}"))
-        })?
-        .write_all(content.as_bytes())
-        .map_err(|e| {
-            crate::Error::from(format!("Failed to write to {path_s}: {e}"))
-        })?;
+        fs.create_file(&path_s)
+            .map_err(|e| crate::Error::from(format!("Failed to create file {path_s}: {e}")))?
+            .write_all(content.as_bytes())
+            .map_err(|e| crate::Error::from(format!("Failed to write to {path_s}: {e}")))?;
     }
-    
+
     Ok(fs)
 }

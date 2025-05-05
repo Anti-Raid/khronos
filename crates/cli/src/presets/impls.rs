@@ -1,14 +1,15 @@
 //! Provides the implementations for all Antiraid Event Preset Types
 
 use super::defaults::{
-    default_global_member, default_global_unknown_string,
-    default_global_user, default_global_user_id, default_global_userinfo,
-    default_moderation_end_correlation_id, default_moderation_start_correlation_id,
+    default_global_member, default_global_unknown_string, default_global_user,
+    default_global_user_id, default_global_userinfo, default_moderation_end_correlation_id,
+    default_moderation_start_correlation_id,
 };
 use super::types::AntiraidEventPresetType;
 use antiraid_types::ar_event::{
     ExternalKeyUpdateEventData, ExternalKeyUpdateEventDataAction, ModerationEndEventData,
-    TemplateSettingExecuteEventData, TemplateSettingExecuteEventDataAction, ScheduledExecutionEventData
+    ScheduledExecutionEventData, TemplateSettingExecuteEventData,
+    TemplateSettingExecuteEventDataAction,
 };
 use antiraid_types::{
     ar_event::{AntiraidEvent, ModerationAction},
@@ -268,9 +269,7 @@ impl TemplateSettingExecuteEventDataActionPresetBaseInputData {
             Self::View { filters } => TemplateSettingExecuteEventDataAction::View { filters },
             Self::Create { fields } => TemplateSettingExecuteEventDataAction::Create { fields },
             Self::Update { fields } => TemplateSettingExecuteEventDataAction::Update { fields },
-            Self::Delete { fields } => {
-                TemplateSettingExecuteEventDataAction::Delete { fields }
-            }
+            Self::Delete { fields } => TemplateSettingExecuteEventDataAction::Delete { fields },
         }
     }
 }

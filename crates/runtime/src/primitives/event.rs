@@ -72,7 +72,10 @@ impl IntoLua for Event {
         let tab = lua.create_table()?;
         tab.set("base_name", self.inner.base_name.clone())?;
         tab.set("name", self.inner.name.clone())?;
-        tab.set("data", lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?)?;
+        tab.set(
+            "data",
+            lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?,
+        )?;
         tab.set("author", self.inner.author.clone())?;
         tab.set_readonly(true);
         Ok(LuaValue::Table(tab))

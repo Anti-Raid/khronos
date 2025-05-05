@@ -1,7 +1,8 @@
 use super::LUA_SERIALIZE_OPTIONS;
-use crate::lua_promise;
 use captcha::filters::Filter;
 use mlua::prelude::*;
+use crate::utils::khronos_value::KhronosValue;
+use crate::plugins::antiraid::promise::LuaPromise;
 
 pub const CREATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 pub const MAX_CHAR_COUNT: u8 = 10;
@@ -170,24 +171,22 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "new",
-        lua.create_function(|_, (config,): (LuaValue,)| {
-            Ok(lua_promise!(config, |lua, config|, {
-                let config: CaptchaConfig = lua.from_value(config)?;
+        LuaPromise::new_function(lua, async move |lua, (config,): (LuaValue,)| {
+            let config: CaptchaConfig = lua.from_value(config)?;
 
-                let (text, image) = config
-                    .create_captcha(CREATE_TIMEOUT)
-                    .await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+            let (text, image) = config
+                .create_captcha(CREATE_TIMEOUT)
+                .await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let captcha = Captcha {
-                    text,
-                    image: Some(image),
-                    content: Some("Please enter the text from the image".to_string()),
-                };
+            let captcha = Captcha {
+                text,
+                image: Some(image),
+                content: Some("Please enter the text from the image".to_string()),
+            };
 
-                lua.to_value_with(&captcha, LUA_SERIALIZE_OPTIONS) // Return the captcha object
-            }))
-        })?,
+            lua.to_value_with(&captcha, LUA_SERIALIZE_OPTIONS) // Return the captcha object
+        })?
     )?;
 
     module.set_readonly(true); // Block any attempt to modify this table

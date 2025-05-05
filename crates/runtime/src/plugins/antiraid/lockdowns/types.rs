@@ -1,9 +1,10 @@
 use crate::{
-    lua_promise, plugins::antiraid::LUA_SERIALIZE_OPTIONS, traits::{context::KhronosContext, lockdownprovider::LockdownProvider}
+    plugins::antiraid::LUA_SERIALIZE_OPTIONS,
+    traits::{context::KhronosContext, lockdownprovider::LockdownProvider},
 };
 use mlua::prelude::*;
 use std::rc::Rc;
-
+use crate::plugins::antiraid::promise::UserDataLuaPromise;
 use crate::{
     plugins::antiraid::datetime::DateTime, primitives::create_userdata_iterator_with_fields,
 };
@@ -182,9 +183,11 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
         });
 
         fields.add_field_method_get("settings", |lua, this| {
-            let settings = lua.to_value_with(&this.lockdown_set.settings(), LUA_SERIALIZE_OPTIONS).map_err(|e| {
-                LuaError::external(format!("Error while serializing settings: {}", e))
-            })?;
+            let settings = lua
+                .to_value_with(&this.lockdown_set.settings(), LUA_SERIALIZE_OPTIONS)
+                .map_err(|e| {
+                    LuaError::external(format!("Error while serializing settings: {}", e))
+                })?;
 
             Ok(settings)
         });
@@ -192,10 +195,7 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method(LuaMetaMethod::Len, |_, this, _: ()| {
-            let len = this
-                .lockdown_set
-                .lockdowns()
-                .len();
+            let len = this.lockdown_set.lockdowns().len();
 
             Ok(len)
         });
@@ -207,71 +207,63 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
             Ok(())
         });
 
-        methods.add_function(
+        methods.add_promise_function(
             "apply",
-            |_, (this, lockdown_type, reason): (LuaAnyUserData, LuaUserDataRef<LockdownMode>, String)| {
-                Ok(
-                    lua_promise!(this, lockdown_type, reason, |_lua, this, lockdown_type, reason|, {
-                        let mut this = this
-                            .borrow_mut::<LockdownSet<T>>()
-                            .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
-                        
-                        this.check_action(lockdown_type.0.string_form())?;
+            async move |_, (this, lockdown_type, reason): (LuaAnyUserData, LuaUserDataRef<LockdownMode>, String)| {
+                let mut this = this
+                .borrow_mut::<LockdownSet<T>>()
+                .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
+            
+                this.check_action(lockdown_type.0.string_form())?;
 
-                        match this
-                            .lockdown_set
-                            .apply(lockdown_type.0, &reason)
-                            .await {
-                            Ok(lockdown_id) => Ok(LockdownAddStatus::Ok(lockdown_id)),
-                            Err(e) => match e {
-                                lockdowns::LockdownError::LockdownTestFailed(e) => {
-                                    Ok(LockdownAddStatus::LockdownTestFailed(LockdownTestResult(
-                                        Rc::new(e),
-                                        std::marker::PhantomData::<T>
-                                    )))
-                                }
-                                lockdowns::LockdownError::Error(e) => {
-                                    Ok(LockdownAddStatus::Error(e.to_string()))
-                                },
-                            }
+                match this
+                    .lockdown_set
+                    .apply(lockdown_type.0.clone(), &reason)
+                    .await {
+                    Ok(lockdown_id) => Ok(LockdownAddStatus::Ok(lockdown_id)),
+                    Err(e) => match e {
+                        lockdowns::LockdownError::LockdownTestFailed(e) => {
+                            Ok(LockdownAddStatus::LockdownTestFailed(LockdownTestResult(
+                                Rc::new(e),
+                                std::marker::PhantomData::<T>
+                            )))
                         }
-                    }),
-                )
+                        lockdowns::LockdownError::Error(e) => {
+                            Ok(LockdownAddStatus::Error(e.to_string()))
+                        },
+                    }
+                }
             },
         );
 
-        methods.add_function(
+        methods.add_promise_function(
             "remove",
-            |_, (this, id,): (LuaAnyUserData, String,)| {
-                Ok(
-                    lua_promise!(this, id, |_lua, this, id|, {
-                        let mut this = this
-                            .borrow_mut::<LockdownSet<T>>()
-                            .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
+            async move |_, (this, id,): (LuaAnyUserData, String,)| {
+                let mut this = this
+                .borrow_mut::<LockdownSet<T>>()
+                .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
 
-                        this.check_action("remove".to_string())?;
+                this.check_action("remove".to_string())?;
 
-                        let id = uuid::Uuid::parse_str(&id)
-                            .map_err(|e| LuaError::external(format!("Invalid UUID: {}", e)))?;
+                let id = uuid::Uuid::parse_str(&id)
+                    .map_err(|e| LuaError::external(format!("Invalid UUID: {}", e)))?;
 
-                        match this.lockdown_set
-                            .remove(id)
-                            .await {
-                            Ok(()) => Ok(LockdownRemoveStatus::Ok),
-                            Err(e) => match e {
-                                lockdowns::LockdownError::LockdownTestFailed(e) => {
-                                    Ok(LockdownRemoveStatus::LockdownTestFailed(LockdownTestResult(
-                                        Rc::new(e),
-                                        std::marker::PhantomData::<T>,
-                                    )))
-                                }
-                                lockdowns::LockdownError::Error(e) => {
-                                    Ok(LockdownRemoveStatus::Error(e.to_string()))
-                                },
-                            }
+                match this.lockdown_set
+                    .remove(id)
+                    .await {
+                    Ok(()) => Ok(LockdownRemoveStatus::Ok),
+                    Err(e) => match e {
+                        lockdowns::LockdownError::LockdownTestFailed(e) => {
+                            Ok(LockdownRemoveStatus::LockdownTestFailed(LockdownTestResult(
+                                Rc::new(e),
+                                std::marker::PhantomData::<T>,
+                            )))
                         }
-                    }),
-                )
+                        lockdowns::LockdownError::Error(e) => {
+                            Ok(LockdownRemoveStatus::Error(e.to_string()))
+                        },
+                    }
+                }
             },
         );
 
@@ -285,9 +277,12 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
                 ud,
                 [
                     // Fields
-                    "lockdowns", "settings",
+                    "lockdowns",
+                    "settings",
                     // Methods
-                    "apply", "remove", "sort",
+                    "apply",
+                    "remove",
+                    "sort",
                 ],
             )
         });
@@ -329,7 +324,9 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                     }
                 },
                 "id" => match this {
-                    LockdownAddStatus::Ok(id) => LuaValue::String(lua.create_string(&id.to_string())?),
+                    LockdownAddStatus::Ok(id) => {
+                        LuaValue::String(lua.create_string(&id.to_string())?)
+                    }
                     LockdownAddStatus::Error(_) => LuaValue::Nil,
                     LockdownAddStatus::LockdownTestFailed(_) => LuaValue::Nil,
                 },
@@ -344,7 +341,9 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                 "error" => match this {
                     LockdownAddStatus::Ok(_) => LuaValue::Nil,
                     LockdownAddStatus::Error(e) => LuaValue::String(lua.create_string(e)?),
-                    LockdownAddStatus::LockdownTestFailed(e) => LuaValue::String(lua.create_string(&e.0.display_error())?),
+                    LockdownAddStatus::LockdownTestFailed(e) => {
+                        LuaValue::String(lua.create_string(&e.0.display_error())?)
+                    }
                 },
                 _ => mlua::Value::Nil,
             };
@@ -363,8 +362,11 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                 ud,
                 [
                     // Fields
-                    "ok", "type", "id",
-                    "error", "test_result",
+                    "ok",
+                    "type",
+                    "id",
+                    "error",
+                    "test_result",
                     // Methods
                 ],
             )
@@ -423,7 +425,9 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
                 "error" => match this {
                     LockdownRemoveStatus::Ok => LuaValue::Nil,
                     LockdownRemoveStatus::Error(e) => LuaValue::String(lua.create_string(e)?),
-                    LockdownRemoveStatus::LockdownTestFailed(e) => LuaValue::String(lua.create_string(&e.0.display_error())?),
+                    LockdownRemoveStatus::LockdownTestFailed(e) => {
+                        LuaValue::String(lua.create_string(&e.0.display_error())?)
+                    }
                 },
                 _ => mlua::Value::Nil,
             };
@@ -442,8 +446,10 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
                 ud,
                 [
                     // Fields
-                    "ok", "type",
-                    "error", "test_result",
+                    "ok",
+                    "type",
+                    "error",
+                    "test_result",
                     // Methods
                 ],
             )
@@ -462,7 +468,10 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
 }
 
 #[derive(Clone)]
-pub struct LockdownTestResult<T: KhronosContext>(Rc<lockdowns::LockdownTestResult>, std::marker::PhantomData<T>);
+pub struct LockdownTestResult<T: KhronosContext>(
+    Rc<lockdowns::LockdownTestResult>,
+    std::marker::PhantomData<T>,
+);
 
 impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
@@ -473,12 +482,22 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
 
         fields.add_field_method_get("role_changes_needed", |lua, this| {
             lua.to_value_with(&this.0.role_changes_needed, LUA_SERIALIZE_OPTIONS)
-                .map_err(|e| LuaError::external(format!("Error while serializing role changes needed: {}", e)))
+                .map_err(|e| {
+                    LuaError::external(format!(
+                        "Error while serializing role changes needed: {}",
+                        e
+                    ))
+                })
         });
 
         fields.add_field_method_get("other_changes_needed", |lua, this| {
             lua.to_value_with(&this.0.other_changes_needed, LUA_SERIALIZE_OPTIONS)
-                .map_err(|e| LuaError::external(format!("Error while serializing other changes needed: {}", e)))
+                .map_err(|e| {
+                    LuaError::external(format!(
+                        "Error while serializing other changes needed: {}",
+                        e
+                    ))
+                })
         });
 
         fields.add_meta_field(LuaMetaMethod::Type, "LockdownTestResult");
@@ -489,39 +508,35 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
             let s = this.0.display_error();
             Ok(s)
         });
-        
-        methods.add_method("display_changeset", |_, this, lockdown_set: LuaAnyUserData| {
-            Ok(lua_promise!(this, lockdown_set, |_lua, this, lockdown_set|, {
-                let mut lockdown_set = lockdown_set
-                    .borrow_mut::<LockdownSet<T>>()
-                    .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
 
-                let partial_guild = lockdown_set.lockdown_set.partial_guild().await
-                .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
+        methods.add_promise_method("display_changeset", async move |_, this, lockdown_set: LuaAnyUserData| {
+            let mut lockdown_set = lockdown_set
+            .borrow_mut::<LockdownSet<T>>()
+            .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
 
-                let changeset = this.0.display_changeset(partial_guild);
+            let partial_guild = lockdown_set.lockdown_set.partial_guild().await
+            .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
 
-                Ok(changeset)
-            }))
+            let changeset = this.0.display_changeset(partial_guild);
+
+            Ok(changeset)
         });
 
-        methods.add_method("try_auto_fix", |_, this, lockdown_set: LuaAnyUserData| {
-            Ok(lua_promise!(this, lockdown_set, |_lua, this, lockdown_set|, {
-                let mut lockdown_set = lockdown_set
-                    .borrow_mut::<LockdownSet<T>>()
-                    .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
+        methods.add_promise_method("try_auto_fix", async move |_, this, lockdown_set: LuaAnyUserData| {
+            let mut lockdown_set = lockdown_set
+            .borrow_mut::<LockdownSet<T>>()
+            .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
 
-                let lockdown_provider = lockdown_set.lockdown_provider.clone();
-                let http = lockdown_provider.serenity_http();
-                let partial_guild = lockdown_set.lockdown_set.partial_guild_mut().await
-                .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
+            let lockdown_provider = lockdown_set.lockdown_provider.clone();
+            let http = lockdown_provider.serenity_http();
+            let partial_guild = lockdown_set.lockdown_set.partial_guild_mut().await
+            .map_err(|e| LuaError::external(format!("Failed to get partial guild: {}", e)))?;
 
-                this.0.try_auto_fix(http, partial_guild)
-                .await
-                .map_err(|e| LuaError::external(format!("Failed to apply changes: {}", e)))?;
+            this.0.try_auto_fix(http, partial_guild)
+            .await
+            .map_err(|e| LuaError::external(format!("Failed to apply changes: {}", e)))?;
 
-                Ok(())
-            }))
+            Ok(())
         });
 
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, _: ()| {
@@ -539,7 +554,9 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
                 ud,
                 [
                     // Fields
-                    "can_apply_perfectly", "role_changes_needed", "other_changes_needed",
+                    "can_apply_perfectly",
+                    "role_changes_needed",
+                    "other_changes_needed",
                     // Methods
                     "display_changeset",
                 ],

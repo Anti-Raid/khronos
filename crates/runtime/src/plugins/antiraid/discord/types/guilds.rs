@@ -1,6 +1,6 @@
-use serenity::all::*;
-use serde::{Deserialize, Serialize};
 use crate::plugins::antiraid::typesext::MultiOption;
+use serde::{Deserialize, Serialize};
+use serenity::all::*;
 
 /// [Discord docs](https://discord.com/developers/docs/resources/guild#modify-guild).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

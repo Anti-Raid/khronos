@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 
-use crate::lua_promise;
+use crate::plugins::antiraid::promise::UserDataLuaPromise;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
@@ -40,21 +40,19 @@ impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("get", |_, this, (user,): (String,)| {
+        methods.add_promise_method("get", async move |lua, this, (user,): (String,)| {
             let user: serenity::all::UserId = user
                 .parse()
                 .map_err(|e| LuaError::external(format!("Error while parsing user id: {}", e)))?;
 
-            Ok(lua_promise!(this, user, |lua, this, user|, {
-                this.check_action("get".to_string())?;
+            this.check_action("get".to_string())?;
 
-                let userinfo = this.userinfo_provider.get(user).await
-                .map_err(|e| LuaError::external(e.to_string()))?;
+            let userinfo = this.userinfo_provider.get(user).await
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let value = lua.to_value_with(&userinfo, LUA_SERIALIZE_OPTIONS)?;
+            let value = lua.to_value_with(&userinfo, LUA_SERIALIZE_OPTIONS)?;
 
-                Ok(value)
-            }))
+            Ok(value)
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

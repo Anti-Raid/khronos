@@ -1,9 +1,8 @@
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-use crate::utils::executorscope::ExecutorScope;
 use crate::traits::context::KhronosContext;
+use crate::utils::executorscope::ExecutorScope;
 use mlua::prelude::*;
 use std::cell::RefCell;
-use crate::lua_promise;
 
 use super::create_userdata_iterator_with_fields;
 

@@ -1,12 +1,12 @@
+use crate::utils::khronos_value::KhronosValue;
 use mlua::prelude::*;
 use serenity::async_trait;
-use std::{future::Future, pin::Pin};
 use std::rc::Rc;
-use crate::utils::khronos_value::KhronosValue;
+use std::{future::Future, pin::Pin};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SafeString {
-    inner_str: String
+    inner_str: String,
 }
 
 impl SafeString {
@@ -19,9 +19,7 @@ impl SafeString {
             return None;
         }
 
-        Some(Self {
-            inner_str: s
-        })
+        Some(Self { inner_str: s })
     }
 }
 
@@ -29,7 +27,14 @@ impl FromLua for SafeString {
     fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
         let s = String::from_lua(value, lua)?;
         let Some(safe_string) = SafeString::new(s) else {
-            return Err(LuaError::FromLuaConversionError { from: "any", to: "SafeString".to_string(), message: Some("SafeStrings can only contain alphanumeric characters or underscores".to_string()) });
+            return Err(LuaError::FromLuaConversionError {
+                from: "any",
+                to: "SafeString".to_string(),
+                message: Some(
+                    "SafeStrings can only contain alphanumeric characters or underscores"
+                        .to_string(),
+                ),
+            });
         };
         Ok(safe_string)
     }
@@ -45,7 +50,7 @@ impl std::fmt::Display for SafeString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.inner_str)
     }
-}   
+}
 
 impl std::ops::Deref for SafeString {
     type Target = String;
@@ -62,7 +67,9 @@ impl serde::Serialize for SafeString {
     {
         // Ensure the string only contains either alphanumeric characters or underscores
         if !SafeString::is_safe(&self.inner_str) {
-            return Err(serde::ser::Error::custom("SafeStrings can only contain alphanumeric characters or underscores"));
+            return Err(serde::ser::Error::custom(
+                "SafeStrings can only contain alphanumeric characters or underscores",
+            ));
         }
 
         serializer.serialize_str(&self.inner_str)
@@ -75,18 +82,43 @@ impl<'de> serde::Deserialize<'de> for SafeString {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        SafeString::new(s).ok_or(serde::de::Error::custom("SafeStrings can only contain alphanumeric characters or underscores"))
+        SafeString::new(s).ok_or(serde::de::Error::custom(
+            "SafeStrings can only contain alphanumeric characters or underscores",
+        ))
     }
 }
 
 #[derive(Clone)]
 pub enum DataStoreMethod {
-    Async(Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>),
+    Async(
+        Rc<
+            dyn Fn(
+                Vec<KhronosValue>,
+            )
+                -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>,
+        >,
+    ),
     Sync(Rc<dyn Fn(Vec<KhronosValue>) -> Result<KhronosValue, crate::Error>>),
 }
 
-impl From<Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>> for DataStoreMethod {
-    fn from(f: Rc<dyn Fn(Vec<KhronosValue>) -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>>) -> Self {
+impl
+    From<
+        Rc<
+            dyn Fn(
+                Vec<KhronosValue>,
+            )
+                -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>,
+        >,
+    > for DataStoreMethod
+{
+    fn from(
+        f: Rc<
+            dyn Fn(
+                Vec<KhronosValue>,
+            )
+                -> Pin<Box<dyn Future<Output = Result<KhronosValue, crate::Error>>>>,
+        >,
+    ) -> Self {
         DataStoreMethod::Async(f)
     }
 }
@@ -145,26 +177,8 @@ impl DataStoreImpl for CopyDataStore {
 
     fn get_method(&self, key: String) -> Option<DataStoreMethod> {
         if key == "copy" {
-            Some(
-                DataStoreMethod::Async(Rc::new(|v| {
-                    Box::pin(async { 
-                        let mut v = v;
-                        if v.len() == 0 {
-                            return Ok(KhronosValue::Null);
-                        } else if v.len() == 1 {
-                            let Some(v) = v.pop() else {
-                                return Ok(KhronosValue::Null);
-                            };
-                            return Ok(v);
-                        } else {
-                            return Ok(KhronosValue::List(v));
-                        }
-                    })
-                }))
-            )
-        } else if key == "copySync" {
-            Some(
-                DataStoreMethod::Sync(Rc::new(|v| {
+            Some(DataStoreMethod::Async(Rc::new(|v| {
+                Box::pin(async {
                     let mut v = v;
                     if v.len() == 0 {
                         return Ok(KhronosValue::Null);
@@ -176,8 +190,22 @@ impl DataStoreImpl for CopyDataStore {
                     } else {
                         return Ok(KhronosValue::List(v));
                     }
-                }))
-            )
+                })
+            })))
+        } else if key == "copySync" {
+            Some(DataStoreMethod::Sync(Rc::new(|v| {
+                let mut v = v;
+                if v.len() == 0 {
+                    return Ok(KhronosValue::Null);
+                } else if v.len() == 1 {
+                    let Some(v) = v.pop() else {
+                        return Ok(KhronosValue::Null);
+                    };
+                    return Ok(v);
+                } else {
+                    return Ok(KhronosValue::List(v));
+                }
+            })))
         } else {
             None
         }

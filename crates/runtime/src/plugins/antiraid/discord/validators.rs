@@ -1,5 +1,5 @@
-use std::sync::LazyLock;
 use linkify::{LinkFinder, LinkKind};
+use std::sync::LazyLock;
 
 use rustrict::{Censor, Type};
 
@@ -27,10 +27,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
         return Ok(());
     }
 
-    let replaced_input = input
-    .replace("-", " ")
-    .replace("_", " ")
-    .replace("!", "");
+    let replaced_input = input.replace("-", " ").replace("_", " ").replace("!", "");
 
     if ensure_safe::is_safe_word(&replaced_input) {
         return Ok(());
@@ -48,17 +45,17 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
             if c.is_whitespace() || c == '-' || c == '_' {
                 continue;
             }
-    
+
             current_buf.push(c);
-    
+
             if ensure_safe::is_safe_word(&current_buf) {
                 current_buf.clear();
             }
         }
-    
+
         if !current_buf.is_empty() {
             return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
-        }    
+        }
     }
 
     Ok(())
@@ -448,10 +445,13 @@ pub fn validate_image_links(input: &str) -> Result<(), crate::Error> {
 
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Url]);
-    
+
     // Check if the input contains any links
     for link in finder.links(input) {
-        if !valid_link_urls.iter().any(|url| link.as_str().starts_with(url)) {
+        if !valid_link_urls
+            .iter()
+            .any(|url| link.as_str().starts_with(url))
+        {
             return Err(format!("Invalid link: {}", link.as_str()).into());
         }
     }
@@ -470,8 +470,12 @@ mod test_validate_image_links {
         assert!(validate_image_links("Check this out: https://media.discordapp.net").is_ok());
         assert!(validate_image_links("Check this out: https://example.com").is_err());
         assert!(validate_image_links("Check this out: https://discord.com/some/path").is_ok());
-        assert!(validate_image_links("Check this out: https://cdn.discordapp.com/some/path").is_ok());
-        assert!(validate_image_links("Check this out: https://media.discordapp.net/some/path").is_ok());
+        assert!(
+            validate_image_links("Check this out: https://cdn.discordapp.com/some/path").is_ok()
+        );
+        assert!(
+            validate_image_links("Check this out: https://media.discordapp.net/some/path").is_ok()
+        );
         assert!(validate_image_links("NSFW! https://tenor.com/abcdef hello").is_err());
     }
 }
@@ -514,8 +518,7 @@ mod test_validate_word_safe {
         assert!(validate_string_safe("hello_world!").is_ok());
         assert!(validate_string_safe("hello world!").is_ok());
         assert!(validate_string_safe("hello world! hello world!").is_ok());
-        assert!(validate_string_safe("hello world! hello-world! hello_world!")
-            .is_ok());
+        assert!(validate_string_safe("hello world! hello-world! hello_world!").is_ok());
 
         assert!(validate_string_safe("helloworld").is_ok());
         assert!(validate_string_safe("f you").is_err());

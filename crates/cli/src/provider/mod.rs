@@ -8,15 +8,15 @@ use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
 use antiraid_types::userinfo::UserInfo;
 use khronos_runtime::traits::context::KhronosContext;
+use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::discordprovider::DiscordProvider;
+use khronos_runtime::traits::ir::ScheduledExecution;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
+use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
-use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
-use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
-use khronos_runtime::traits::ir::ScheduledExecution;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -47,8 +47,9 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
             return Ok(lockdowns::GuildLockdownSettings::default());
         };
 
-        let record: lockdowns::GuildLockdownSettings = serde_json::from_slice(&file_contents.contents)
-            .map_err(|e| format!("Failed to parse record: {}", e))?;
+        let record: lockdowns::GuildLockdownSettings =
+            serde_json::from_slice(&file_contents.contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
 
         Ok(record)
     }
@@ -114,7 +115,6 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
     }
 }
 
-
 #[derive(Clone)]
 pub struct CliScheduledExecProvider {}
 
@@ -125,15 +125,12 @@ impl ScheduledExecProvider for CliScheduledExecProvider {
 
     async fn list(
         &self,
-        _id: Option<String>
+        _id: Option<String>,
     ) -> Result<Vec<ScheduledExecution>, khronos_runtime::Error> {
         todo!()
     }
 
-    async fn add(
-        &self,
-        _exec: ScheduledExecution,
-    ) -> Result<(), khronos_runtime::Error> {
+    async fn add(&self, _exec: ScheduledExecution) -> Result<(), khronos_runtime::Error> {
         todo!()
     }
 
@@ -243,9 +240,7 @@ impl KhronosContext for CliKhronosContext {
             }
         };
 
-        Some(CliDataStoreProvider {
-            guild_id,
-        })
+        Some(CliDataStoreProvider { guild_id })
     }
 
     fn discord_provider(&self, scope: ExecutorScope) -> Option<Self::DiscordProvider> {
@@ -310,9 +305,17 @@ pub struct CliKVProvider {
 impl KVProvider for CliKVProvider {
     async fn list_scopes(&self) -> Result<Vec<String>, khronos_runtime::Error> {
         self.file_storage_provider
-        .list_files(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], None, None)
-        .await
-        .map(|entries| entries.into_iter().map(|e| e.name).collect())
+            .list_files(
+                &[
+                    "keys".to_string(),
+                    self.guild_id.to_string(),
+                    self.kv_scope.clone(),
+                ],
+                None,
+                None,
+            )
+            .await
+            .map(|entries| entries.into_iter().map(|e| e.name).collect())
     }
 
     async fn get(
@@ -321,15 +324,23 @@ impl KVProvider for CliKVProvider {
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(file_contents) = self
             .file_storage_provider
-            .get_file(&[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()], &key)
+            .get_file(
+                &[
+                    self.guild_id.to_string(),
+                    "keys".to_string(),
+                    self.kv_scope.clone(),
+                ],
+                &key,
+            )
             .await
             .map_err(|e| format!("Failed to get file: {}", e))?
         else {
             return Ok(None);
         };
 
-        let record: khronos_runtime::utils::khronos_value::KhronosValue = serde_json::from_slice(&file_contents.contents)
-            .map_err(|e| format!("Failed to parse record: {}", e))?;
+        let record: khronos_runtime::utils::khronos_value::KhronosValue =
+            serde_json::from_slice(&file_contents.contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
 
         Ok(Some(khronos_runtime::traits::ir::KvRecord {
             key: file_contents.name,
@@ -349,7 +360,11 @@ impl KVProvider for CliKVProvider {
 
         self.file_storage_provider
             .save_file(
-                &[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()],
+                &[
+                    self.guild_id.to_string(),
+                    "keys".to_string(),
+                    self.kv_scope.clone(),
+                ],
                 &key,
                 value.as_bytes(),
             )
@@ -358,7 +373,14 @@ impl KVProvider for CliKVProvider {
 
     async fn delete(&self, key: String) -> Result<(), khronos_runtime::Error> {
         self.file_storage_provider
-            .delete_file(&[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()], &key)
+            .delete_file(
+                &[
+                    self.guild_id.to_string(),
+                    "keys".to_string(),
+                    self.kv_scope.clone(),
+                ],
+                &key,
+            )
             .await
     }
 
@@ -373,7 +395,11 @@ impl KVProvider for CliKVProvider {
         let entries = self
             .file_storage_provider
             .list_files(
-                &[self.guild_id.to_string(), "keys".to_string(), self.kv_scope.clone()],
+                &[
+                    self.guild_id.to_string(),
+                    "keys".to_string(),
+                    self.kv_scope.clone(),
+                ],
                 Some(query),
                 None,
             )
@@ -381,8 +407,9 @@ impl KVProvider for CliKVProvider {
 
         let mut records = Vec::new();
         for record in entries {
-            let value: khronos_runtime::utils::khronos_value::KhronosValue = serde_json::from_slice(&record.contents)
-                .map_err(|e| format!("Failed to parse record: {}", e))?;
+            let value: khronos_runtime::utils::khronos_value::KhronosValue =
+                serde_json::from_slice(&record.contents)
+                    .map_err(|e| format!("Failed to parse record: {}", e))?;
 
             records.push(khronos_runtime::traits::ir::KvRecord {
                 key: record.name,
@@ -397,13 +424,28 @@ impl KVProvider for CliKVProvider {
 
     async fn exists(&self, key: String) -> Result<bool, khronos_runtime::Error> {
         self.file_storage_provider
-            .file_exists(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], &key)
+            .file_exists(
+                &[
+                    "keys".to_string(),
+                    self.guild_id.to_string(),
+                    self.kv_scope.clone(),
+                ],
+                &key,
+            )
             .await
     }
 
     async fn keys(&self) -> Result<Vec<String>, khronos_runtime::Error> {
         self.file_storage_provider
-            .list_files(&["keys".to_string(), self.guild_id.to_string(), self.kv_scope.clone()], None, None)
+            .list_files(
+                &[
+                    "keys".to_string(),
+                    self.guild_id.to_string(),
+                    self.kv_scope.clone(),
+                ],
+                None,
+                None,
+            )
             .await
             .map(|entries| entries.into_iter().map(|e| e.name).collect())
     }
@@ -423,7 +465,7 @@ impl DataStoreProvider for CliDataStoreProvider {
     /// Returns a builtin data store given its name
     fn get_builtin_data_store(&self, name: &str) -> Option<Rc<dyn DataStoreImpl>> {
         if name == "CopyDataStore" {
-            return Some(Rc::new(khronos_runtime::traits::ir::CopyDataStore {}))
+            return Some(Rc::new(khronos_runtime::traits::ir::CopyDataStore {}));
         }
 
         None

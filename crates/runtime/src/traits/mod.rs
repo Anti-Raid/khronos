@@ -1,9 +1,9 @@
 pub mod context;
+pub mod datastoreprovider;
 pub mod discordprovider;
 pub mod ir;
 pub mod kvprovider;
 pub mod lockdownprovider;
 pub mod pageprovider;
-pub mod userinfoprovider;
 pub mod scheduledexecprovider;
-pub mod datastoreprovider;
+pub mod userinfoprovider;

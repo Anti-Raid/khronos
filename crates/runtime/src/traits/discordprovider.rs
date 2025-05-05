@@ -1,6 +1,6 @@
-use serenity::all::InteractionId;
-use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::{HeaderMap as Headers, HeaderValue};
+use serenity::all::InteractionId;
 
 /// A discord provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -97,18 +97,18 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::ChannelId,
     ) -> Result<serenity::all::GuildChannel, crate::Error> {
-        let chan = self.serenity_http()
-            .get_channel(channel_id)
-            .await;
+        let chan = self.serenity_http().get_channel(channel_id).await;
 
         match chan {
             Ok(serenity::all::Channel::Guild(chan)) => {
                 if chan.guild_id != self.guild_id() {
-                    return Err(format!("Channel {} does not belong to the guild", channel_id).into());
+                    return Err(
+                        format!("Channel {} does not belong to the guild", channel_id).into(),
+                    );
                 }
 
                 Ok(chan)
-            },
+            }
             Ok(_) => Err(format!("Channel {} does not belong to a guild", channel_id).into()),
             Err(e) => Err(format!("Failed to fetch channel: {}", e).into()),
         }
@@ -196,20 +196,18 @@ pub trait DiscordProvider: 'static + Clone {
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::FollowedChannel, crate::Error> {
-        Ok(
-            self.serenity_http().fire(
+        Ok(self
+            .serenity_http()
+            .fire(
                 serenity::all::Request::new(
-                    serenity::all::Route::ChannelFollowNews {
-                        channel_id,
-                    },
-                    serenity::all::LightMethod::Post
+                    serenity::all::Route::ChannelFollowNews { channel_id },
+                    serenity::all::LightMethod::Post,
                 )
                 .body(Some(serde_json::to_vec(&map)?))
-                .headers(audit_log_reason.map(reason_into_header))
+                .headers(audit_log_reason.map(reason_into_header)),
             )
             .await
-            .map_err(|e| format!("Failed to follow announcement channel: {}", e))?
-        )
+            .map_err(|e| format!("Failed to follow announcement channel: {}", e))?)
     }
 
     // Guild
@@ -225,9 +223,7 @@ pub trait DiscordProvider: 'static + Clone {
     }
 
     /// Fetches a guild preview
-    async fn get_guild_preview(
-        &self,
-    ) -> Result<serenity::all::GuildPreview, crate::Error> {
+    async fn get_guild_preview(&self) -> Result<serenity::all::GuildPreview, crate::Error> {
         self.serenity_http()
             .get_guild_preview(self.guild_id())
             .await
@@ -249,10 +245,9 @@ pub trait DiscordProvider: 'static + Clone {
     // Delete guild will not be implemented as we can't really use it
 
     /// Gets all guild channels
-    async fn get_guild_channels(
-        &self,
-    ) -> Result<Vec<serenity::all::GuildChannel>, crate::Error> {
-        Ok(self.serenity_http()
+    async fn get_guild_channels(&self) -> Result<Vec<serenity::all::GuildChannel>, crate::Error> {
+        Ok(self
+            .serenity_http()
             .get_channels(self.guild_id())
             .await
             .map_err(|e| format!("Failed to fetch guild channels: {:?}", e))?
@@ -284,14 +279,12 @@ pub trait DiscordProvider: 'static + Clone {
     }
 
     /// List Active Guild Threads
-    async fn list_active_guild_threads(
-        &self
-    ) -> Result<serenity::all::ThreadsData, crate::Error> {
+    async fn list_active_guild_threads(&self) -> Result<serenity::all::ThreadsData, crate::Error> {
         self.serenity_http()
-        .get_guild_active_threads(self.guild_id())
-        .await
-        .map_err(|e| format!("Failed to list active threads: {}", e).into())
-    } 
+            .get_guild_active_threads(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to list active threads: {}", e).into())
+    }
 
     /// Returns a member from the guild.
     ///
@@ -300,9 +293,11 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         user_id: serenity::all::UserId,
     ) -> Result<Option<serenity::all::Member>, crate::Error> {
-        match self.serenity_http()
+        match self
+            .serenity_http()
             .get_member(self.guild_id(), user_id)
-            .await {
+            .await
+        {
             Ok(member) => Ok(Some(member)),
             Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
@@ -310,7 +305,7 @@ pub trait DiscordProvider: 'static + Clone {
                 } else {
                     Err(format!("Failed to fetch member: {:?}", e).into())
                 }
-            },
+            }
             Err(e) => Err(format!("Failed to fetch member: {:?}", e).into()),
         }
     }
@@ -319,7 +314,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn list_guild_members(
         &self,
         limit: Option<serenity::nonmax::NonMaxU16>,
-        after: Option<serenity::all::UserId>,    
+        after: Option<serenity::all::UserId>,
     ) -> Result<Vec<serenity::all::Member>, crate::Error> {
         self.serenity_http()
             .get_guild_members(self.guild_id(), limit, after)
@@ -407,16 +402,17 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         user_id: serenity::all::UserId,
     ) -> Result<Option<serenity::all::Ban>, crate::Error> {
-        match self.serenity_http().fire(
-            serenity::all::Request::new(
+        match self
+            .serenity_http()
+            .fire(serenity::all::Request::new(
                 serenity::all::Route::GuildBan {
                     guild_id: self.guild_id(),
                     user_id,
                 },
-                serenity::all::LightMethod::Get
-            )
-        )
-        .await {
+                serenity::all::LightMethod::Get,
+            ))
+            .await
+        {
             Ok(v) => Ok(Some(v)),
             Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
@@ -424,7 +420,7 @@ pub trait DiscordProvider: 'static + Clone {
                 } else {
                     Err(format!("Failed to get guild ban: {:?}", e).into())
                 }
-            },
+            }
             Err(e) => Err(format!("Failed to get guild ban: {:?}", e).into()),
         }
     }
@@ -464,10 +460,8 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_guild_roles(
         &self,
-    ) -> Result<
-        extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>,
-        crate::Error,
-    > {
+    ) -> Result<extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>, crate::Error>
+    {
         self.serenity_http()
             .get_guild_roles(self.guild_id())
             .await
@@ -510,11 +504,11 @@ pub trait DiscordProvider: 'static + Clone {
 
     /// Gets an invite, this can be overrided to add stuff like caching invite codes etc
     async fn get_invite(
-        &self, 
+        &self,
         code: &str,
         member_counts: bool,
         expiration: bool,
-        event_id: Option<serenity::all::ScheduledEventId>,    
+        event_id: Option<serenity::all::ScheduledEventId>,
     ) -> Result<serenity::all::Invite, crate::Error> {
         self.serenity_http()
             .get_invite(code, member_counts, expiration, event_id)
@@ -667,9 +661,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     // Uncategorized (for now)
 
-    async fn get_guild_commands(
-        &self,
-    ) -> Result<Vec<serenity::all::Command>, crate::Error> {
+    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error> {
         self.serenity_http()
             .get_guild_commands(self.guild_id())
             .await
@@ -712,11 +704,12 @@ fn reason_into_header(reason: &str) -> Headers {
 
     // "The X-Audit-Log-Reason header supports 1-512 URL-encoded UTF-8 characters."
     // https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object
-    let header_value = match std::borrow::Cow::from(utf8_percent_encode(reason, NON_ALPHANUMERIC)) {
-        std::borrow::Cow::Borrowed(value) => HeaderValue::from_str(value),
-        std::borrow::Cow::Owned(value) => HeaderValue::try_from(value),
-    }
-    .expect("Invalid header value even after percent encode");
+    let header_value =
+        match std::borrow::Cow::from(utf8_percent_encode(reason, NON_ALPHANUMERIC)) {
+            std::borrow::Cow::Borrowed(value) => HeaderValue::from_str(value),
+            std::borrow::Cow::Owned(value) => HeaderValue::try_from(value),
+        }
+        .expect("Invalid header value even after percent encode");
 
     headers.insert("X-Audit-Log-Reason", header_value);
     headers

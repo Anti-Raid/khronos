@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 use super::isolate::KhronosIsolate;
 use super::runtime::{KhronosRuntime, OnBrokenFunc};
-use crate::primitives::event::Event;
 
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
 ///

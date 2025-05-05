@@ -46,7 +46,10 @@ impl PluginSet {
     pub fn add_default_plugins<T: KhronosContext>(&mut self) {
         // Antiraid plugins
 
-        self.add_plugin("@antiraid/datastores", antiraid::datastores::init_plugin::<T>);
+        self.add_plugin(
+            "@antiraid/datastores",
+            antiraid::datastores::init_plugin::<T>,
+        );
         self.add_plugin("@antiraid/discord", antiraid::discord::init_plugin::<T>);
         self.add_plugin("@antiraid/interop", antiraid::interop::init_plugin);
         self.add_plugin("@antiraid/img_captcha", antiraid::img_captcha::init_plugin);
@@ -57,7 +60,10 @@ impl PluginSet {
         self.add_plugin("@antiraid/pages", antiraid::pages::init_plugin::<T>);
         self.add_plugin("@antiraid/permissions", antiraid::permissions::init_plugin);
         self.add_plugin("@antiraid/promise", antiraid::promise::init_plugin);
-        self.add_plugin("@antiraid/scheduledexec", antiraid::scheduledexec::init_plugin::<T>);
+        self.add_plugin(
+            "@antiraid/scheduledexec",
+            antiraid::scheduledexec::init_plugin::<T>,
+        );
         self.add_plugin("@antiraid/stores", antiraid::stores::init_plugin::<T>);
         self.add_plugin("@antiraid/datetime", antiraid::datetime::init_plugin);
         self.add_plugin("@antiraid/typesext", antiraid::typesext::init_plugin);
