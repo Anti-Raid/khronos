@@ -314,7 +314,7 @@ impl KhronosIsolate {
 
             match lua
                 .load(&**bytecode)
-                .set_name(name)
+                .set_name(AssetRequirer::find_module_path(name.to_string()))
                 .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
                 .set_environment(self.global_table.clone())
                 .into_lua_thread(lua)

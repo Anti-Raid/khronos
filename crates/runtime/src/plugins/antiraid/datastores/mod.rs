@@ -1,5 +1,4 @@
 use super::LUA_SERIALIZE_OPTIONS;
-use crate::lua_promise;
 use crate::plugins::antiraid::promise::LuaPromise;
 use crate::primitives::create_userdata_iterator_with_dyn_fields;
 use crate::traits::context::KhronosContext;

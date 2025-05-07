@@ -263,7 +263,11 @@ impl KhronosContext for CliKhronosContext {
                 guild_id,
             })
         } else {
-            None
+            Some(CliDiscordProvider {
+                http: Arc::new(serenity::all::Http::new("")),
+                cache: None,
+                guild_id: serenity::all::GuildId::new(0),
+            })
         }
     }
 

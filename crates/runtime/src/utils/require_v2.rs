@@ -206,6 +206,28 @@ impl AssetRequirer {
 
         Ok(suffix)
     }
+
+    /// Finds the module path
+    pub fn find_module_path(path: String) -> String {
+        // Check if `path` ends with `/init.luau` or is equal to `init.luau` and remove the (/)init.luau part
+
+        // Case 1: init.luau
+        if path == "init.luau" {
+            log::trace!("Path: {path} -> /");
+            return "/".to_string();
+        }
+
+        // Case 2: endswith(/init.luau)
+        if path.ends_with("/init.luau") {
+            // Remove the last 9 characters (length of "/init.luau")
+            let pat = path[..path.len() - 10].to_string();
+            log::trace!("Path: {pat} from {path}");
+            return pat;
+        }
+
+        log::trace!("Path: {path} unchanged");
+        return path;
+    }
 }
 
 impl LuaRequire for AssetRequirer {
@@ -264,12 +286,11 @@ impl LuaRequire for AssetRequirer {
     fn to_parent(&self) -> Result<(), NavigateError> {
         log::trace!("Jumping to parent of {:#?}", self.abs_path.borrow());
         let mut abs_path = self.abs_path.borrow().clone();
-        if abs_path.to_string_lossy().is_empty()
-            || abs_path.to_string_lossy() == "."
+        if abs_path.to_string_lossy() == "."
             || abs_path.to_string_lossy() == "/"
         {
-            log::trace!("No parent found for {:#?}", abs_path);
-            return Err(NavigateError::NotFound);
+            *self.abs_path.borrow_mut() = PathBuf::from("");
+            return Ok(()); // Mark it as empty directory to protect against loops here and to workaround a luau require module quirk
         }
         if !abs_path.pop() {
             log::trace!("No parent found for {:#?}", abs_path);
@@ -334,11 +355,13 @@ impl LuaRequire for AssetRequirer {
     }
 
     fn is_config_present(&self) -> bool {
+        log::trace!("Checking if config is present {:#?}", self.abs_path.borrow());
         let p = self.abs_path.borrow().join(".luaurc");
         self.is_file(p.as_ref()).unwrap_or(false)
     }
 
     fn config(&self) -> IoResult<Vec<u8>> {
+        log::trace!("Loading config from {:#?}", self.abs_path.borrow());
         let p = self.abs_path.borrow().join(".luaurc");
         self.get_file(p.as_ref())
     }
@@ -369,7 +392,7 @@ impl LuaRequire for AssetRequirer {
         let lv = lua
             .load(content)
             .set_mode(mlua::ChunkMode::Text)
-            .set_name(chunk_name)
+            .set_name(Self::find_module_path(chunk_name.to_string()))
             .set_environment(self.global_table.clone())
             .into_function()?;
 
@@ -480,8 +503,8 @@ mod require_test {
             .unwrap();
 
         let l: i32 = match lua
-            .load("return require('./test')")
-            .set_name("/init")
+            .load("return require('@self/test')")
+            .set_name("/")
             .call(())
         {
             Ok(v) => v,
@@ -508,8 +531,8 @@ mod require_test {
             .unwrap();
 
         let l: i32 = match lua
-            .load("return require('./reqtest/a')")
-            .set_name("/init.luau")
+            .load("return require('@self/reqtest/a')")
+            .set_name("/")
             .call(())
         {
             Ok(v) => v,
@@ -572,7 +595,7 @@ return {
 
         let func = lua
             .load(main_luau)
-            .set_name("/main.luau")
+            .set_name("/main")
             .into_function()
             .unwrap();
         let th = lua.create_thread(func).unwrap();
@@ -586,5 +609,17 @@ return {
         };
 
         assert_eq!(l, true);
+    }
+
+    #[test]
+    fn test_find_module_path() {
+        let path = AssetRequirer::find_module_path("init.luau".to_string());
+        assert_eq!(path, "/");
+
+        let path = AssetRequirer::find_module_path("foo/init.luau".to_string());
+        assert_eq!(path, "foo");
+
+        let path = AssetRequirer::find_module_path("foo/bar/init.luau".to_string());
+        assert_eq!(path, "foo/bar");
     }
 }
