@@ -1,5 +1,6 @@
 use mlua::prelude::*;
 use serde::{Deserialize, Serialize};
+pub use crate::plugins::antiraid::objectstorage::ObjectStoragePath;
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
@@ -16,6 +17,7 @@ pub enum KhronosValue {
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
+    ObjectStoragePath(ObjectStoragePath),
     Null,
 }
 
@@ -319,6 +321,22 @@ impl TryFrom<KhronosValue> for chrono_tz::Tz {
     }
 }
 
+impl From<ObjectStoragePath> for KhronosValue {
+    fn from(value: ObjectStoragePath) -> Self {
+        KhronosValue::ObjectStoragePath(value)
+    }
+}
+
+impl TryFrom<KhronosValue> for ObjectStoragePath {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::ObjectStoragePath(path) => Ok(path),
+            _ => Err("KhronosValue is not an ObjectStoragePath".into()),
+        }
+    }
+}
+
 impl From<()> for KhronosValue {
     fn from(_: ()) -> Self {
         KhronosValue::Null
@@ -514,6 +532,7 @@ impl KhronosValue {
             KhronosValue::Timestamptz(_) => "timestamptz",
             KhronosValue::Interval(_) => "interval",
             KhronosValue::TimeZone(_) => "timezone",
+            KhronosValue::ObjectStoragePath(_) => "objectstorage_path",
             KhronosValue::Null => "null",
         }
     }
@@ -654,8 +673,11 @@ impl KhronosValue {
                 if let Ok(u_64) = ud.borrow::<crate::plugins::antiraid::typesext::U64>() {
                     return Ok(KhronosValue::UnsignedInteger(u_64.0));
                 }
+                if let Ok(path) = ud.borrow::<ObjectStoragePath>() {
+                    return Ok(KhronosValue::ObjectStoragePath(path.clone()));
+                }
 
-                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
+                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone | ObjectStoragePath".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
             }
             _ => Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -717,6 +739,9 @@ impl KhronosValue {
             }
             KhronosValue::TimeZone(tz) => {
                 crate::plugins::antiraid::datetime::Timezone::new(tz).into_lua(lua)
+            }
+            KhronosValue::ObjectStoragePath(path) => {
+                path.into_lua(lua)
             }
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
@@ -811,6 +836,18 @@ impl KhronosValue {
                     })
                 }
             }
+            KhronosValue::ObjectStoragePath(path) => {
+                if !preserve_types {
+                    serde_json::to_value(path)
+                        .map_err(|e| format!("Failed to serialize ObjectStoragePath: {}", e))?
+                } else {
+                    serde_json::json!({
+                        KHRONOS_VALUE_TYPE_KEY: "objectstorage_path",
+                        "value": serde_json::to_value(path)
+                        .map_err(|e| format!("Failed to serialize ObjectStoragePath: {}", e))?
+                    })
+                }
+            }
             KhronosValue::Null => serde_json::Value::Null,
         })
     }
@@ -873,6 +910,17 @@ impl KhronosValue {
                                     })?,
                                 ));
                             }
+                            "objectstorage_path" => {
+                                let value = m.get("value").ok_or("Missing value field")?;
+                                return Ok(KhronosValue::ObjectStoragePath(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!(
+                                            "Failed to deserialize ObjectStoragePath: {}",
+                                            e
+                                        )
+                                    })?,
+                                ));
+                            }
                             _ => {}
                         }
                     }
@@ -901,111 +949,6 @@ impl KhronosValue {
         Ok(T::deserialize(&value).map_err(|e| {
             crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
         })?)
-    }
-
-    pub fn visit<T: KhronosValueVisitor>(&self, visitor: &mut T) -> Result<(), crate::Error> {
-        match self {
-            KhronosValue::Text(s) => visitor.visit_text(s),
-            KhronosValue::Integer(i) => visitor.visit_integer(*i),
-            KhronosValue::UnsignedInteger(i) => visitor.visit_unsigned_integer(*i),
-            KhronosValue::Float(f) => visitor.visit_float(*f),
-            KhronosValue::Boolean(b) => visitor.visit_boolean(*b),
-            KhronosValue::Vector(v) => visitor.visit_vector(*v),
-            KhronosValue::Map(m) => {
-                visitor.visit_map(m)?;
-                for (k, v) in m {
-                    visitor.visit_map_entry(k, v)?;
-                    v.visit(visitor)?;
-                    visitor.visit_map_entry_end(k, v)?;
-                }
-                visitor.visit_map_end(m)
-            }
-            KhronosValue::List(l) => {
-                visitor.visit_list(l)?;
-                for v in l {
-                    visitor.visit_list_entry(v)?;
-                    v.visit(visitor)?;
-                    visitor.visit_list_entry_end(v)?;
-                }
-                visitor.visit_list_end(l)
-            }
-            KhronosValue::Timestamptz(dt) => visitor.visit_timestamptz(dt),
-            KhronosValue::Interval(i) => visitor.visit_interval(i),
-            KhronosValue::TimeZone(tz) => visitor.visit_timezone(tz),
-            KhronosValue::Null => visitor.visit_null(),
-        }
-    }
-}
-
-/// A trait for visiting KhronosValue types
-/// This is used to implement the visitor pattern for KhronosValue
-pub trait KhronosValueVisitor {
-    fn visit_text(&mut self, _value: &str) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_integer(&mut self, _value: i64) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_unsigned_integer(&mut self, _value: u64) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_float(&mut self, _value: f64) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_boolean(&mut self, _value: bool) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_vector(&mut self, _value: (f32, f32, f32)) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_map(
-        &mut self,
-        _value: &indexmap::IndexMap<String, KhronosValue>,
-    ) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_map_entry(&mut self, _key: &str, _value: &KhronosValue) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_map_entry_end(
-        &mut self,
-        _key: &str,
-        _value: &KhronosValue,
-    ) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_map_end(
-        &mut self,
-        _value: &indexmap::IndexMap<String, KhronosValue>,
-    ) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_list(&mut self, _value: &Vec<KhronosValue>) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_list_entry(&mut self, _value: &KhronosValue) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_list_entry_end(&mut self, _value: &KhronosValue) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_list_end(&mut self, _value: &Vec<KhronosValue>) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_timestamptz(
-        &mut self,
-        _value: &chrono::DateTime<chrono::Utc>,
-    ) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_interval(&mut self, _value: &chrono::Duration) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_timezone(&mut self, _value: &chrono_tz::Tz) -> Result<(), crate::Error> {
-        Ok(())
-    }
-    fn visit_null(&mut self) -> Result<(), crate::Error> {
-        Ok(())
     }
 }
 
@@ -1064,6 +1007,14 @@ impl Serialize for KhronosValue {
                 let mut map = serializer.serialize_map(Some(2))?;
                 map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "timezone")?;
                 map.serialize_entry("value", tz)?;
+                map.end()
+            }
+            KhronosValue::ObjectStoragePath(path) => {
+                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "objectstorage_path")?;
+                map.serialize_entry("value", path)?;
                 map.end()
             }
             KhronosValue::Map(m) => {

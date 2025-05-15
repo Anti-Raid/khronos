@@ -221,6 +221,20 @@ impl FileStorageProvider for LocalFileStorageProvider {
                 },
                 size: entry.metadata().await?.len(),
             });
+
+            // TODO: Test that the below actually works
+            if entry.file_type().await?.is_dir() {
+                // Traverse the directory
+                let sub_files = self
+                    .list_files(
+                        &[entry.file_name().to_string_lossy().to_string()],
+                        pattern.clone(),
+                        limit_offset,
+                    )
+                    .await?;
+                
+                files.extend(sub_files);
+            }
         }
         Ok(files)
     }

@@ -1,7 +1,6 @@
 use super::LUA_SERIALIZE_OPTIONS;
 use captcha::filters::Filter;
 use mlua::prelude::*;
-use crate::utils::khronos_value::KhronosValue;
 use crate::plugins::antiraid::promise::LuaPromise;
 
 pub const CREATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);

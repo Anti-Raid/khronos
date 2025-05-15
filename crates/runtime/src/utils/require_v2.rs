@@ -1,4 +1,4 @@
-use mlua::prelude::{Lua, LuaRequire, LuaResult, LuaTable, LuaValue};
+use mlua::prelude::{Lua, LuaRequire, LuaResult, LuaTable};
 use mlua::NavigateError;
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -377,7 +377,7 @@ impl LuaRequire for AssetRequirer {
     ) -> LuaResult<mlua::Function> {
         log::trace!("Loading module {:#?}", chunk_name);
 
-        let content = {
+        let (content, mod_path) = {
             let suffix = self.suffix.borrow();
             let module_path =
                 PathBuf::from(self.abs_path.borrow().to_string_lossy().to_string() + &*suffix);
@@ -386,13 +386,13 @@ impl LuaRequire for AssetRequirer {
                 .get_file(&module_path)
                 .map_err(|e| mlua::Error::external(format!("Failed to fetch contents: {:?}", e)))?;
 
-            content
+            (content, Self::find_module_path(module_path.display().to_string()))
         };
 
         let lv = lua
             .load(content)
             .set_mode(mlua::ChunkMode::Text)
-            .set_name(Self::find_module_path(chunk_name.to_string()))
+            .set_name(mod_path)
             .set_environment(self.global_table.clone())
             .into_function()?;
 

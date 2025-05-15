@@ -2,6 +2,7 @@ use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
     lockdownprovider::LockdownProvider, pageprovider::PageProvider,
     scheduledexecprovider::ScheduledExecProvider, userinfoprovider::UserInfoProvider,
+    objectstorageprovider::ObjectStorageProvider
 };
 use crate::utils::executorscope::ExecutorScope;
 
@@ -15,6 +16,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type PageProvider: PageProvider;
     type ScheduledExecProvider: ScheduledExecProvider;
     type DataStoreProvider: DataStoreProvider;
+    type ObjectStorageProvider: ObjectStorageProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> Self::Data;
@@ -71,4 +73,12 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a DataStore provider
     fn datastore_provider(&self, scope: ExecutorScope) -> Option<Self::DataStoreProvider>;
+
+    /// Returns a ObjectStorage provider
+    fn objectstorage_provider(&self, scope: ExecutorScope) -> Option<Self::ObjectStorageProvider>;
+
+    /// Returns the contexts memory limit, if any
+    fn memory_limit(&self) -> Option<usize> {
+        None
+    }
 }

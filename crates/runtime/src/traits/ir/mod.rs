@@ -10,9 +10,12 @@ pub mod kv;
 pub mod scheduled_exec;
 /// Settings IR
 pub mod settings_ir;
+/// Object Storage IR
+pub mod objectstorage;
 
 pub use datastores::*;
 pub use kv::*;
 pub use lockdowns::*;
 pub use scheduled_exec::*;
 pub use settings_ir::*;
+pub use objectstorage::*;

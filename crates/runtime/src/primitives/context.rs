@@ -103,6 +103,10 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(v)
         });
 
+        fields.add_field_method_get("memory_limit", |lua, this| {
+            Ok(this.context.memory_limit())
+        });
+
         fields.add_meta_field(LuaMetaMethod::Type, "TemplateContext".to_string());
     }
 
