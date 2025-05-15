@@ -28,6 +28,9 @@ impl<T: AsRef<[u8]>> PartialEq<T> for AssetEntry {
 #[async_trait(?Send)]
 /// File storage provider for khronos CLI
 pub trait FileStorageProvider: Debug {
+    /// Returns the base path for the file storage provider
+    fn base_path(&self) -> PathBuf;
+
     /// Check if a file with the given filename exists
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error>;
 
@@ -127,6 +130,10 @@ impl LocalFileStorageProvider {
 
 #[async_trait(?Send)]
 impl FileStorageProvider for LocalFileStorageProvider {
+    fn base_path(&self) -> PathBuf {
+        self.base_path.clone()
+    }
+
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error> {
         let _g = self.lock.read().await;
 
@@ -419,6 +426,10 @@ impl SqliteFileStorageProvider {
 #[cfg(feature = "sqlite")]
 #[async_trait(?Send)]
 impl FileStorageProvider for SqliteFileStorageProvider {
+    fn base_path(&self) -> PathBuf {
+        PathBuf::from("".to_string())
+    }
+
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error> {
         if self.verbose {
             println!(
@@ -662,6 +673,10 @@ impl SqliteInMemoryProvider {
 #[cfg(feature = "sqlite")]
 #[async_trait(?Send)]
 impl FileStorageProvider for SqliteInMemoryProvider {
+    fn base_path(&self) -> PathBuf {
+        PathBuf::from("".to_string())
+    }
+
     async fn file_exists(&self, file_path: &[String], key: &str) -> Result<bool, Error> {
         if self.verbose {
             println!(

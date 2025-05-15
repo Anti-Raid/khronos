@@ -16,6 +16,7 @@ use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
 use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
+use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
 
 /// Internal short-lived channel cache
@@ -56,25 +57,99 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
 
     async fn get_lockdowns(
         &self,
-        _guild_id: serenity::all::GuildId,
+        guild_id: serenity::all::GuildId,
     ) -> Result<Vec<lockdowns::Lockdown>, lockdowns::Error> {
-        todo!()
+        let Some(file_contents) = self
+            .file_storage_provider
+            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
+            .await
+            .map_err(|e| format!("Failed to get file: {}", e))?
+        else {
+            return Ok(vec![]);
+        };
+
+        let record: Vec<lockdowns::Lockdown> =
+            serde_json::from_slice(&file_contents.contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+        Ok(record)
     }
 
     async fn insert_lockdown(
         &self,
-        _guild_id: serenity::all::GuildId,
-        _lockdown: lockdowns::CreateLockdown,
+        guild_id: serenity::all::GuildId,
+        lockdown: lockdowns::CreateLockdown,
     ) -> Result<lockdowns::Lockdown, lockdowns::Error> {
-        todo!()
+        let file_contents = match self
+            .file_storage_provider
+            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
+            .await
+            .map_err(|e| format!("Failed to get file: {}", e))? {
+        
+                Some(file_contents) => file_contents.contents,
+                None => {
+                    "[]".as_bytes().to_vec()
+                }
+        };
+
+        let mut record: Vec<lockdowns::Lockdown> =
+            serde_json::from_slice(&file_contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+        let new_lockdown = lockdowns::Lockdown {
+            id: uuid::Uuid::new_v4(),
+            reason: lockdown.reason,
+            r#type: lockdown.r#type,
+            data: lockdown.data,
+            created_at: chrono::Utc::now(),
+        };
+
+        record.push(new_lockdown.clone());
+        let value = serde_json::to_string(&record)
+            .map_err(|e| format!("Failed to serialize value: {}", e))?;
+        self.file_storage_provider
+            .save_file(
+                &["lockdowns".to_string()],
+                &guild_id.to_string(),
+                value.as_bytes(),
+            )
+            .await
+            .map_err(|e| format!("Failed to save file: {}", e))?;
+        
+        Ok(new_lockdown)
     }
 
     async fn remove_lockdown(
         &self,
-        _guild_id: serenity::all::GuildId,
-        _id: uuid::Uuid,
+        guild_id: serenity::all::GuildId,
+        id: uuid::Uuid,
     ) -> Result<(), lockdowns::Error> {
-        todo!()
+        let Some(file_contents) = self
+            .file_storage_provider
+            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
+            .await
+            .map_err(|e| format!("Failed to get file: {}", e))?
+        else {
+            return Ok(());
+        };
+
+        let mut record: Vec<lockdowns::Lockdown> =
+            serde_json::from_slice(&file_contents.contents)
+                .map_err(|e| format!("Failed to parse record: {}", e))?;
+
+        record.retain(|l| l.id != id);
+        let value = serde_json::to_string(&record)
+            .map_err(|e| format!("Failed to serialize value: {}", e))?;
+        self.file_storage_provider
+            .save_file(
+                &["lockdowns".to_string()],
+                &guild_id.to_string(),
+                value.as_bytes(),
+            )
+            .await
+            .map_err(|e| format!("Failed to save file: {}", e))?;
+
+        Ok(())
     }
 
     async fn guild(
@@ -162,6 +237,7 @@ impl KhronosContext for CliKhronosContext {
     type PageProvider = CliPageProvider;
     type ScheduledExecProvider = CliScheduledExecProvider;
     type DataStoreProvider = CliDataStoreProvider;
+    type ObjectStorageProvider = CliObjectStorageProvider;
 
     fn data(&self) -> Self::Data {
         if self.data == serde_json::Value::Null {
@@ -296,6 +372,12 @@ impl KhronosContext for CliKhronosContext {
 
     fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider> {
         Some(CliScheduledExecProvider {})
+    }
+
+    fn objectstorage_provider(&self, _scope: ExecutorScope) -> Option<Self::ObjectStorageProvider> {
+        Some(CliObjectStorageProvider {
+            file_storage_provider: self.file_storage_provider.clone(),
+        })
     }
 }
 
@@ -682,5 +764,186 @@ impl PageProvider for CliPageProvider {
 
     async fn delete_page(&self) -> Result<(), khronos_runtime::Error> {
         todo!()
+    }
+}
+
+#[derive(Clone)]
+pub struct CliObjectStorageProvider {
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
+}
+
+/*
+/// A object storage provider.
+///
+/// Unlike a key-value provider, an object storage provider allows for storing larger data blobs more efficiently at several costs/drawbacks:
+/// - Slower access times (as it may go over the network/make multiple HTTP requests versus Postgres/MySQL connection + binary protocol)
+/// - Only bytes may be stored (unlike kv API which can store most antiraid/luau types)
+#[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
+pub trait ObjectStorageProvider: 'static + Clone {
+    /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
+    ///
+    /// This should return an error if ratelimited
+    fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
+
+    /// Returns the bucket name for the object storage provider
+    fn bucket_name(&self) -> String;
+
+    /// List all files in the servers bucket with the specified (optional) prefix.
+    async fn list_files(&self, prefix: Option<String>) -> Result<Vec<ListObjectsResponse>, crate::Error>;
+
+    /// Returns if a specific key exists in the key-value store.
+    async fn file_exists(&self, key: String) -> Result<bool, crate::Error>;
+
+    /// Downloads a file from the key-value store.
+    async fn download_file(&self, key: String) -> Result<Vec<u8>, crate::Error>;
+
+    /// Returns the URL to a file in the key-value store.
+    async fn get_file_url(&self, key: String) -> Result<String, crate::Error>;
+
+    /// Upload a file to the key-value store.
+    async fn upload_file(&self, key: String, data: Vec<u8>) -> Result<(), crate::Error>;
+
+    /// Delete a file from the key-value store.
+    async fn delete_file(&self, key: String) -> Result<(), crate::Error>;
+}
+*/
+
+impl ObjectStorageProvider for CliObjectStorageProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+
+    fn bucket_name(&self) -> String {
+        "cli".to_string()
+    }
+
+    async fn list_files(
+        &self,
+        prefix: Option<String>,
+    ) -> Result<Vec<khronos_runtime::traits::ir::ListObjectsResponse>, khronos_runtime::Error> {
+        let prefix_split = prefix
+            .as_ref()
+            .map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let mut fsp_vec = vec!["objects".to_string()];
+        for prefix in prefix_split.into_iter() {
+            fsp_vec.push(prefix);
+        }
+        let files = self.file_storage_provider
+            .list_files(&fsp_vec, None, None)
+            .await?;
+        
+        let mut objects = Vec::new();
+
+        /*
+            pub key: String,
+    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub size: i64,
+    pub etag: Option<String>,
+        */
+
+        for file in files {
+            let object = khronos_runtime::traits::ir::ListObjectsResponse {
+                key: file.name.clone(),
+                size: file.size as i64,
+                last_modified: Some(file.last_updated_at),
+                etag: format!("{}.{}.{}", file.name, file.created_at, file.last_updated_at).into(),
+            };
+            objects.push(object);
+        }
+
+        Ok(objects)
+    }
+
+    async fn file_exists(&self, key: String) -> Result<bool, khronos_runtime::Error> {
+        // Split the key by '/' and add each part but last to fsp_vec
+        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
+
+        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
+        
+        let mut fsp_vec = vec!["objects".to_string()];
+
+        let key_split_len = key_split.len();
+        for (i, prefix) in key_split.into_iter().enumerate() {
+            if i == key_split_len - 1 {
+                break;
+            }
+            fsp_vec.push(prefix);
+        }
+
+        self.file_storage_provider
+            .file_exists(&fsp_vec, &key)
+            .await
+    }
+
+    async fn download_file(&self, key: String) -> Result<Vec<u8>, khronos_runtime::Error> {
+        // Split the key by '/' and add each part but last to fsp_vec
+        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
+
+        // Get the key itself first
+        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
+
+        let mut fsp_vec = vec!["objects".to_string()];
+
+        let key_split_len = key_split.len();
+        for (i, prefix) in key_split.into_iter().enumerate() {
+            if i == key_split_len - 1 {
+                break;
+            }
+            fsp_vec.push(prefix);
+        }
+
+        self.file_storage_provider
+            .get_file(&fsp_vec, &key)
+            .await?
+            .map(|file| file.contents)
+            .ok_or("Failed to download file".into())
+    }
+
+    async fn get_file_url(&self, key: String) -> Result<String, khronos_runtime::Error> {
+        let base_path = self.file_storage_provider.base_path();
+        Ok(format!("file://{}/{}", base_path.display(), key))
+    }
+
+    async fn upload_file(&self, key: String, data: Vec<u8>) -> Result<(), khronos_runtime::Error> {
+        // Split the key by '/' and add each part but last to fsp_vec
+        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
+
+        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
+
+        let mut fsp_vec = vec!["objects".to_string()];
+
+        let key_split_len = key_split.len();
+        for (i, prefix) in key_split.into_iter().enumerate() {
+            if i == key_split_len - 1 {
+                break;
+            }
+            fsp_vec.push(prefix);
+        }
+
+        self.file_storage_provider
+            .save_file(&fsp_vec, &key, &data)
+            .await
+    }
+
+    async fn delete_file(&self, key: String) -> Result<(), khronos_runtime::Error> {
+        // Split the key by '/' and add each part but last to fsp_vec
+        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
+
+        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
+
+        let mut fsp_vec = vec!["objects".to_string()];
+
+        let key_split_len = key_split.len();
+        for (i, prefix) in key_split.into_iter().enumerate() {
+            if i == key_split_len - 1 {
+                break;
+            }
+            fsp_vec.push(prefix);
+        }
+
+        self.file_storage_provider
+            .delete_file(&fsp_vec, &key)
+            .await
     }
 }
