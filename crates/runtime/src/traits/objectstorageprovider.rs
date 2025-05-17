@@ -1,4 +1,4 @@
-use super::ir::ListObjectsResponse;
+use super::ir::ObjectMetadata;
 
 /// A object storage provider.
 ///
@@ -16,7 +16,7 @@ pub trait ObjectStorageProvider: 'static + Clone {
     fn bucket_name(&self) -> String;
 
     /// List all files in the servers bucket with the specified (optional) prefix.
-    async fn list_files(&self, prefix: Option<String>) -> Result<Vec<ListObjectsResponse>, crate::Error>;
+    async fn list_files(&self, prefix: Option<String>) -> Result<Vec<ObjectMetadata>, crate::Error>;
 
     /// Returns if a specific key exists in the key-value store.
     async fn file_exists(&self, key: String) -> Result<bool, crate::Error>;

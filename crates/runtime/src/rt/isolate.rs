@@ -1,6 +1,5 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
-use crate::utils::require_v2::AssetRequirer;
 use rand::distributions::DistString;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -10,7 +9,7 @@ use crate::primitives::event::Event;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
-use crate::utils::require_v2::FilesystemWrapper;
+use crate::require::{AssetRequirer, FilesystemWrapper};
 use crate::TemplateContext;
 
 use super::runtime::KhronosRuntime;
@@ -273,7 +272,7 @@ impl KhronosIsolate {
         path: &str,
         args: LuaMultiValue,
     ) -> Result<SpawnResult, LuaError> {
-        let code = self.asset_manager.get_file(path).map_err(|e| {
+        let code = self.asset_manager.get_file(path.to_string()).map_err(|e| {
             LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
         })?;
         let code = String::from_utf8(code).map_err(|e| {
@@ -314,7 +313,7 @@ impl KhronosIsolate {
 
             match lua
                 .load(&**bytecode)
-                .set_name(AssetRequirer::find_module_path(name.to_string()))
+                .set_name(name.to_string())
                 .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
                 .set_environment(self.global_table.clone())
                 .into_lua_thread(lua)

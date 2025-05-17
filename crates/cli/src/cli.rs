@@ -224,8 +224,8 @@ impl Cli {
 
         provider::CliKhronosContext {
             data: context_data,
-            aux_opts: self.aux_opts.clone(),
             allowed_caps: self.allowed_caps.clone(),
+            script_data: provider::default_script_data(self.allowed_caps.clone()),
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
             http: self.http.clone(),
@@ -359,7 +359,7 @@ impl Cli {
         println!("Current dir: {:?}", current_dir);
 
         let file_asset_manager = {
-            let fs = khronos_runtime::utils::require_v2::FilesystemWrapper::new(
+            let fs = khronos_runtime::require::FilesystemWrapper::new(
                 vfs::PhysicalFS::new(current_dir),
             );
 

@@ -18,6 +18,7 @@ use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 use khronos_runtime::utils::executorscope::ExecutorScope;
+use khronos_runtime::traits::context::ScriptData;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -218,17 +219,34 @@ impl ScheduledExecProvider for CliScheduledExecProvider {
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
-    pub aux_opts: CliAuxOpts,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
     pub cache: Option<Arc<serenity::cache::Cache>>,
     pub template_name: String,
+    pub script_data: ScriptData,
+}
+
+pub(crate) fn default_script_data(allowed_caps: Vec<String>) -> ScriptData {
+    ScriptData {
+        guild_id: None,
+        name: "cli".to_string(),
+        description: None,
+        shop_name: None,
+        shop_owner: None,
+        events: vec![],
+        error_channel: None,
+        lang: "luau".to_string(),
+        allowed_caps,
+        created_by: None,
+        created_at: None,
+        updated_by: None,
+        updated_at: None,
+    }
 }
 
 impl KhronosContext for CliKhronosContext {
-    type Data = serde_json::Value;
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
     type LockdownDataStore = CliLockdownDataStore;
@@ -239,14 +257,8 @@ impl KhronosContext for CliKhronosContext {
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
 
-    fn data(&self) -> Self::Data {
-        if self.data == serde_json::Value::Null {
-            let val =
-                serde_json::to_value(&self.aux_opts).expect("Failed to serialize aux_opts to JSON");
-
-            return val;
-        }
-        self.data.clone()
+    fn data(&self) -> &ScriptData {
+        &self.script_data    
     }
 
     fn allowed_caps(&self) -> &[String] {
@@ -772,42 +784,6 @@ pub struct CliObjectStorageProvider {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
 }
 
-/*
-/// A object storage provider.
-///
-/// Unlike a key-value provider, an object storage provider allows for storing larger data blobs more efficiently at several costs/drawbacks:
-/// - Slower access times (as it may go over the network/make multiple HTTP requests versus Postgres/MySQL connection + binary protocol)
-/// - Only bytes may be stored (unlike kv API which can store most antiraid/luau types)
-#[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
-pub trait ObjectStorageProvider: 'static + Clone {
-    /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
-    ///
-    /// This should return an error if ratelimited
-    fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
-
-    /// Returns the bucket name for the object storage provider
-    fn bucket_name(&self) -> String;
-
-    /// List all files in the servers bucket with the specified (optional) prefix.
-    async fn list_files(&self, prefix: Option<String>) -> Result<Vec<ListObjectsResponse>, crate::Error>;
-
-    /// Returns if a specific key exists in the key-value store.
-    async fn file_exists(&self, key: String) -> Result<bool, crate::Error>;
-
-    /// Downloads a file from the key-value store.
-    async fn download_file(&self, key: String) -> Result<Vec<u8>, crate::Error>;
-
-    /// Returns the URL to a file in the key-value store.
-    async fn get_file_url(&self, key: String) -> Result<String, crate::Error>;
-
-    /// Upload a file to the key-value store.
-    async fn upload_file(&self, key: String, data: Vec<u8>) -> Result<(), crate::Error>;
-
-    /// Delete a file from the key-value store.
-    async fn delete_file(&self, key: String) -> Result<(), crate::Error>;
-}
-*/
-
 impl ObjectStorageProvider for CliObjectStorageProvider {
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
@@ -820,7 +796,7 @@ impl ObjectStorageProvider for CliObjectStorageProvider {
     async fn list_files(
         &self,
         prefix: Option<String>,
-    ) -> Result<Vec<khronos_runtime::traits::ir::ListObjectsResponse>, khronos_runtime::Error> {
+    ) -> Result<Vec<khronos_runtime::traits::ir::ObjectMetadata>, khronos_runtime::Error> {
         let prefix_split = prefix
             .as_ref()
             .map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>())
@@ -843,7 +819,7 @@ impl ObjectStorageProvider for CliObjectStorageProvider {
         */
 
         for file in files {
-            let object = khronos_runtime::traits::ir::ListObjectsResponse {
+            let object = khronos_runtime::traits::ir::ObjectMetadata {
                 key: file.name.clone(),
                 size: file.size as i64,
                 last_modified: Some(file.last_updated_at),

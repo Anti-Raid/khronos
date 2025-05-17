@@ -6,8 +6,38 @@ use super::{
 };
 use crate::utils::executorscope::ExecutorScope;
 
+/// Extra data about the script context
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ScriptData {
+    /// The guild ID the script is running in, if any
+    pub guild_id: Option<serenity::all::GuildId>,
+    /// The name of the template
+    pub name: String,
+    /// The description of the template
+    pub description: Option<String>,
+    /// The name of the template as it appears on the template shop listing
+    pub shop_name: Option<String>,
+    /// The owner of the template on the template shop
+    pub shop_owner: Option<serenity::all::GuildId>,
+    /// The events that this template listens to
+    pub events: Vec<String>,
+    /// The channel to send errors to
+    pub error_channel: Option<serenity::all::ChannelId>,
+    /// The language of the template
+    pub lang: String,
+    /// The allowed capabilities the template has access to
+    pub allowed_caps: Vec<String>,
+    /// The user who created the template
+    pub created_by: Option<serenity::all::UserId>,
+    /// The time the template was created
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// The user who last updated the template
+    pub updated_by: Option<serenity::all::UserId>,
+    /// The time the template was last updated
+    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 pub trait KhronosContext: 'static + Clone + Sized {
-    type Data: serde::Serialize;
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
     type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
@@ -19,7 +49,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type ObjectStorageProvider: ObjectStorageProvider;
 
     /// Returns context-specific data that will be exposed in context.data
-    fn data(&self) -> Self::Data;
+    fn data(&self) -> &ScriptData;
 
     /// Returns the allowed capabilities for the current context
     fn allowed_caps(&self) -> &[String];

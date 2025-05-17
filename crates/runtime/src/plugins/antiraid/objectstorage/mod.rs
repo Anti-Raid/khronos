@@ -12,7 +12,7 @@ use serde::{Serialize, Deserialize};
 use mlua::Buffer;
 
 to_struct! {
-    pub struct ListObjectsResponse {
+    pub struct ObjectMetadata {
         pub key: String,
         pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
         pub size: i64,
@@ -115,7 +115,7 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             let kv: KhronosValue = result
             .into_iter()
             .map(|r| {
-                ListObjectsResponse {
+                ObjectMetadata {
                     key: r.key,
                     last_modified: r.last_modified,
                     size: r.size,

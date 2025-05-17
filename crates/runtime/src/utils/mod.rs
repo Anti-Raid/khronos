@@ -6,7 +6,6 @@ pub mod pluginholder;
 pub mod prelude;
 pub mod proxyglobal;
 pub mod ratelimits;
-pub mod require_v2;
 pub mod serenity_backports;
 pub mod serenity_utils;
 pub mod threadlimitmw;

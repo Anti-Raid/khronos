@@ -3,6 +3,7 @@ pub mod primitives;
 pub mod rt;
 pub mod traits;
 pub mod utils;
+pub mod require;
 
 pub use primitives::context::{TemplateContext, TemplateContextRef};
 

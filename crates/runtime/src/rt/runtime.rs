@@ -475,26 +475,6 @@ impl KhronosRuntime {
         Ok(())
     }
 
-    /// Returns the require cache table
-    #[inline]
-    pub fn get_require_cache(&self) -> LuaResult<LuaTable> {
-        log::debug!("Getting require cache");
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-        crate::utils::require_v2::get_require_cache(lua)
-    }
-
-    /// Clears the require cache table
-    #[inline]
-    pub fn clear_require_cache(&self) -> LuaResult<()> {
-        log::debug!("Clearing require cache");
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-        crate::utils::require_v2::clear_require_cache(lua)
-    }
-
     /// Sets the print function to use stdout
     pub fn use_stdout_print(&self) -> LuaResult<()> {
         // Ensure print is global as everything basically relies on print
