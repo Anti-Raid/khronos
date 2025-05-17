@@ -199,6 +199,15 @@ impl VfsNavigator {
         return Ok(NavigationStatus::Success);
     }
 
+    pub fn reset_to_stdin(&mut self) -> Result<NavigationStatus, crate::Error>{
+        self.real_path = "./stdin".to_string();
+        self.absolute_real_path = "/stdin".to_string();
+        self.module_path = "./stdin".to_string();
+        self.absolute_module_path = "/stdin".to_string();
+        self.absolute_path_prefix = "".to_string();
+        Ok(NavigationStatus::Success)
+    }
+
     pub fn reset_to_path(&mut self, path: &Path) -> Result<NavigationStatus, crate::Error> {
         let mut normalized_path = normalize_path(path).to_string_lossy().to_string();
 

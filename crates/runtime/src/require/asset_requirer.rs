@@ -56,6 +56,11 @@ impl LuaRequire for AssetRequirer {
             log::error!("Failed to borrow VFS: {:?}", e);
             LuaNavigateError::NotFound
         })?;
+
+        if chunk_name == "=repl" {
+            return vfs.reset_to_stdin().into_nav_error();
+        }
+
         vfs.reset_to_path(&PathBuf::from(chunk_name)).into_nav_error()
     }
 
