@@ -1,4 +1,3 @@
-use crate::plugins::antiraid::promise::LuaPromise;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
@@ -10,6 +9,7 @@ use crate::utils::khronos_value::KhronosValue;
 use crate::to_struct;
 use serde::{Serialize, Deserialize};
 use mlua::Buffer;
+use crate::plugins::antiraid::datetime::TimeDelta;
 
 to_struct! {
     pub struct ObjectMetadata {
@@ -22,7 +22,9 @@ to_struct! {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ObjectStorageReadRange {
+    #[serde(rename = "read_start")]
     pub start: usize,
+    #[serde(rename = "read_end")]
     pub end: usize,
 }
 
@@ -52,6 +54,32 @@ impl LuaUserData for ObjectStoragePath {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
             Ok(this.path.clone())
         });
+
+        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
+            if !ud.is::<ObjectStoragePath>() {
+                return Err(mlua::Error::external("Invalid userdata type"));
+            }
+
+            create_userdata_iterator_with_fields(
+                lua,
+                ud,
+                [
+                    // Fields
+                    "path",
+                ],
+            )
+        });
+    }
+}
+
+type ObjectStoragePathLike = LuaEither<LuaUserDataRef<ObjectStoragePath>, String>;
+
+fn extract_path(pl: ObjectStoragePathLike) -> LuaResult<String> {
+    match pl {
+        LuaEither::Left(p) => {
+            Ok(p.path.clone())
+        },
+        LuaEither::Right(p) => Ok(p)
     }
 }
 
@@ -80,6 +108,7 @@ impl<T: KhronosContext> Bucket<T> {
 
 impl<T: KhronosContext> LuaUserData for Bucket<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "Bucket".to_string());
         fields.add_field_method_get("bucket_name", |_, this| Ok(this.objectstorage_provider.bucket_name()));
     }
 
@@ -127,8 +156,10 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             Ok(kv)
         });
 
-        methods.add_promise_method("file_exists", async move |_, this, key: String| {
+        methods.add_promise_method("file_exists", async move |_, this, key: ObjectStoragePathLike| {
             this.check_action("file_exists".to_string())?;
+
+            let key = extract_path(key)?;
 
             let result = this.objectstorage_provider.file_exists(key).await
             .map_err(|e| {
@@ -138,8 +169,10 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             Ok(result)
         });
 
-        methods.add_promise_method("download_file", async move |lua, this, (key, opts): (String, LuaValue)| {
+        methods.add_promise_method("download_file", async move |lua, this, (key, opts): (ObjectStoragePathLike, LuaValue)| {
             this.check_action("download_file".to_string())?;
+
+            let key = extract_path(key)?;
 
             let opts = lua.from_value::<Option<DownloadFileOpts>>(opts)
                 .map_err(|e| {
@@ -180,10 +213,13 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             Ok(buffer)
         });
 
-        methods.add_promise_method("get_file_url", async move |_, this, key: String| {
+        methods.add_promise_method("get_file_url", async move |_, this, (key, expiry): (ObjectStoragePathLike, LuaUserDataRef<TimeDelta>)| {
             this.check_action("get_file_url".to_string())?;
 
-            let result = this.objectstorage_provider.get_file_url(key).await
+            let key = extract_path(key)?;
+            let expiry = expiry.timedelta.to_std().map_err(LuaError::external)?;
+
+            let result = this.objectstorage_provider.get_file_url(key, expiry).await
             .map_err(|e| {
                 LuaError::external(e.to_string())
             })?;
@@ -191,8 +227,10 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             Ok(result)
         });
 
-        methods.add_promise_method("upload_file", async move |_, this, (key, data): (String, Buffer)| {
+        methods.add_promise_method("upload_file", async move |_, this, (key, data): (ObjectStoragePathLike, Buffer)| {
             this.check_action("upload_file".to_string())?;
+
+            let key = extract_path(key)?;
 
             this.objectstorage_provider.upload_file(key, data.to_vec()).await
             .map_err(|e| {
@@ -202,8 +240,10 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
             Ok(())
         });
 
-        methods.add_promise_method("delete_file", async move |_, this, key: String| {
+        methods.add_promise_method("delete_file", async move |_, this, key: ObjectStoragePathLike| {
             this.check_action("delete_file".to_string())?;
+
+            let key = extract_path(key)?;
 
             this.objectstorage_provider.delete_file(key).await
             .map_err(|e| {
@@ -265,7 +305,8 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
     // Create a new object storage path
     module.set(
         "ObjectStoragePath",
-        lua.create_function(|_, path: String| {
+        lua.create_function(|_, path: ObjectStoragePathLike| {
+            let path = extract_path(path)?;
             let object_storage_path = ObjectStoragePath::new(path);
             Ok(object_storage_path)
         })?,

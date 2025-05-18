@@ -876,7 +876,7 @@ impl ObjectStorageProvider for CliObjectStorageProvider {
             .ok_or("Failed to download file".into())
     }
 
-    async fn get_file_url(&self, key: String) -> Result<String, khronos_runtime::Error> {
+    async fn get_file_url(&self, key: String, expiry: std::time::Duration) -> Result<String, khronos_runtime::Error> {
         let base_path = self.file_storage_provider.base_path();
         Ok(format!("file://{}/{}", base_path.display(), key))
     }

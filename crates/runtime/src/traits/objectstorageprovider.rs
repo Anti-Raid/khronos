@@ -25,7 +25,7 @@ pub trait ObjectStorageProvider: 'static + Clone {
     async fn download_file(&self, key: String) -> Result<Vec<u8>, crate::Error>;
 
     /// Returns the URL to a file in the key-value store.
-    async fn get_file_url(&self, key: String) -> Result<String, crate::Error>;
+    async fn get_file_url(&self, key: String, expiry: std::time::Duration) -> Result<String, crate::Error>;
 
     /// Upload a file to the key-value store.
     async fn upload_file(&self, key: String, data: Vec<u8>) -> Result<(), crate::Error>;
