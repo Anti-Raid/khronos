@@ -224,20 +224,20 @@ impl VfsNavigator {
 
             self.module_path = get_module_path(&mut normalized_path);
 
-            if self.module_path.is_empty() {
-                self.module_path = "/".to_string(); // DEVIATION: Support rooted modules
-            }
-
             let mut joined_path = normalize_path(&PathBuf::from(cwd.to_string() + "/" + &normalized_path)).to_string_lossy().to_string();
             self.absolute_module_path = get_module_path(&mut joined_path);
             
-            if self.absolute_module_path.is_empty() {
-                self.absolute_module_path = "/".to_string(); // DEVIATION: Support rooted modules
-            }
-
             let first_slash = joined_path.find('/').unwrap_or(0);
             
             self.absolute_path_prefix = joined_path[0..first_slash].to_string();
+        }
+
+        if self.module_path.is_empty() {
+            self.module_path = "/".to_string(); // DEVIATION: Support rooted modules
+        }
+
+        if self.absolute_module_path.is_empty() {
+            self.absolute_module_path = "/".to_string(); // DEVIATION: Support rooted modules
         }
 
         log::trace!("module_path: {}", self.module_path);
