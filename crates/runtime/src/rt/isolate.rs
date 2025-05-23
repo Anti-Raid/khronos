@@ -219,22 +219,15 @@ impl KhronosIsolate {
         &self.id
     }
 
-    /// Converts a context and event into a LuaMultiValue
-    ///
-    /// It is a logic error to use the LuaMultiValue if close() has been called on the main runtime
-    pub fn context_event_to_lua_multi<K: KhronosContextTrait>(
-        &self,
-        context: TemplateContext<K>,
-        event: Event,
-    ) -> Result<LuaMultiValue, LuaError> {
+    pub fn create_context<K: KhronosContextTrait>(&self, context: TemplateContext<K>) -> Result<CreatedKhronosContext, LuaError> {
         let Some(ref lua) = *self.inner.lua.borrow_mut() else {
             return Err(LuaError::RuntimeError(
                 "Lua instance is no longer valid".to_string(),
             ));
         };
 
-        match (event, context).into_lua_multi(lua) {
-            Ok(f) => Ok(f),
+        match context.into_lua(lua) {
+            Ok(f) => Ok(CreatedKhronosContext(f)),
             Err(e) => {
                 // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                 if let LuaError::MemoryError(_) = e {
@@ -253,25 +246,37 @@ impl KhronosIsolate {
     /// Runs a script from the asset manager
     ///
     /// with the given KhronosContext and Event primitives
-    pub async fn spawn_asset<K: KhronosContextTrait>(
+    pub async fn spawn_asset(
         &self,
         cache_key: &str,
         path: &str,
-        context: TemplateContext<K>,
+        context: CreatedKhronosContext,
         event: Event,
     ) -> Result<SpawnResult, LuaError> {
-        let args = self.context_event_to_lua_multi(context, event)?;
+        let args = {
+            let Some(ref lua) = *self.inner.lua.borrow_mut() else {
+                return Err(LuaError::RuntimeError(
+                    "Lua instance is no longer valid".to_string(),
+                ));
+            };
 
-        self.spawn_asset_with_args(cache_key, path, args).await
-    }
+            match (event, context.0).into_lua_multi(lua) {
+                Ok(f) => f,
+                Err(e) => {
+                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                    if let LuaError::MemoryError(_) = e {
+                        // Mark VM as broken
+                        self.inner
+                            .mark_broken(true)
+                            .map_err(|e| LuaError::external(e.to_string()))?;
+                    }
 
-    /// Runs a script from the asset manager
-    pub(super) async fn spawn_asset_with_args(
-        &self,
-        cache_key: &str,
-        path: &str,
-        args: LuaMultiValue,
-    ) -> Result<SpawnResult, LuaError> {
+                    return Err(e);
+                }
+            }
+            // Lua should be dropped here
+        };
+
         let code = self.asset_manager.get_file(path.to_string()).map_err(|e| {
             LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
         })?;
@@ -281,13 +286,46 @@ impl KhronosIsolate {
         self.spawn_script(cache_key, path, &code, args).await
     }
 
-    /// Runs a script, returning the result as a LuaMultiValue
+    /// Runs a script from the asset manager
     ///
-    /// Note that the bytecode is cached by-name. Use KhronosRuntimeInner::remove_bytecode_cache
-    /// to remove a script from the cache.
-    ///
-    /// Note 2: You probably want spawn_asset or spawn_asset_with_args instead of this
-    pub async fn spawn_script(
+    /// with the given KhronosContext and Event primitives
+    pub async fn spawn_known_script(
+        &self,
+        cache_key: &str,
+        name: &str,
+        code: &str,
+        context: CreatedKhronosContext,
+        event: Event,
+    ) -> Result<SpawnResult, LuaError> {
+        let args = {
+            let Some(ref lua) = *self.inner.lua.borrow_mut() else {
+                return Err(LuaError::RuntimeError(
+                    "Lua instance is no longer valid".to_string(),
+                ));
+            };
+
+            match (event, context.0).into_lua_multi(lua) {
+                Ok(f) => f,
+                Err(e) => {
+                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                    if let LuaError::MemoryError(_) = e {
+                        // Mark VM as broken
+                        self.inner
+                            .mark_broken(true)
+                            .map_err(|e| LuaError::external(e.to_string()))?;
+                    }
+
+                    return Err(e);
+                }
+            }
+            // Lua should be dropped here
+        };
+
+        self.spawn_script(cache_key, name, &code, args).await
+    }
+
+    // Internal method to actually spawn the script
+    async fn spawn_script(
         &self,
         cache_key: &str,
         name: &str,
@@ -379,6 +417,9 @@ impl KhronosIsolate {
         self.inner.is_closed()
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct CreatedKhronosContext(LuaValue);
 
 /// The result from spawning a script from `KhronosIsolate::spawn_script` and other
 /// spawning functions

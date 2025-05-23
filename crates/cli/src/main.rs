@@ -482,7 +482,7 @@ impl CliArgs {
                     .bot_token
                     .as_ref()
                     .map(|token| Arc::new(serenity::all::Http::new(token))),
-                cached_khronos_rt_args: None,
+                cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
                 file_storage_backend: match self.file_storage_backend {
                     #[cfg(feature = "sqlite")]

@@ -12,6 +12,7 @@ use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
+use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::utils::threadlimitmw::ThreadLimiter;
 use khronos_runtime::TemplateContext;
@@ -171,7 +172,7 @@ pub struct Cli {
     pub http: Option<Arc<serenity::all::Http>>,
 
     /// The cached khronos runtime arguments
-    pub cached_khronos_rt_args: Option<LuaMultiValue>,
+    pub cached_context: Option<CreatedKhronosContext>,
 
     /// Setup data
     pub setup_data: LuaSetupResult,
@@ -248,7 +249,7 @@ impl Cli {
         name: &str,
         code: &str,
     ) -> LuaResult<LuaMultiValue> {
-        let args = match &self.cached_khronos_rt_args {
+        let context = match &self.cached_context {
             Some(context) => context.clone(),
             None => {
                 let context = self.create_khronos_context();
@@ -256,23 +257,21 @@ impl Cli {
                 let template_context: TemplateContext<provider::CliKhronosContext> =
                     TemplateContext::new(context);
 
-                let args = self
+                let ctx = self
                     .setup_data
                     .main_isolate
-                    .context_event_to_lua_multi(template_context, self.create_event())?;
+                    .create_context(template_context)?;
 
-                self.cached_khronos_rt_args = Some(args.clone());
+                self.cached_context = Some(ctx.clone());
 
-                args
+                ctx
             }
         };
-
-        log::debug!("Spawning script: {}", code);
 
         let result = self
             .setup_data
             .main_isolate
-            .spawn_script(cache_key, name, code, args)
+            .spawn_known_script(cache_key, name, code, context, self.create_event())
             .await?;
 
         Ok(result.into_multi_value())

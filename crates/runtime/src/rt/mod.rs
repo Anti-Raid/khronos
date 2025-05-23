@@ -6,6 +6,6 @@ pub mod runtime;
 
 // Re-exports
 
-pub use isolate::KhronosIsolate;
+pub use isolate::{KhronosIsolate, CreatedKhronosContext};
 pub use manager::KhronosRuntimeManager;
 pub use runtime::{KhronosRuntime, KhronosRuntimeInterruptData, RuntimeCreateOpts};
