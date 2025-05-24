@@ -1,6 +1,7 @@
 use mlua::prelude::*;
 use serde::{Deserialize, Serialize};
 pub use crate::plugins::antiraid::objectstorage::ObjectStoragePath;
+use uuid::Uuid;
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
@@ -421,6 +422,36 @@ where
         }
     }
 }
+impl TryFrom<serde_json::Value> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        KhronosValue::from_serde_json_value(value, 0)
+    }
+}
+impl TryFrom<KhronosValue> for serde_json::Value {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        value.into_serde_json_value(0, false)
+    }
+}
+
+impl TryFrom<Uuid> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: Uuid) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Text(value.to_string()))
+    }
+}
+
+impl TryFrom<KhronosValue> for Uuid {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::Text(s) => Ok(s.parse()?),
+            _ => Err("KhronosValue is not a string UUID".into()),
+        }
+    }
+}
+
 impl From<std::collections::HashMap<String, KhronosValue>> for KhronosValue {
     fn from(value: std::collections::HashMap<String, KhronosValue>) -> Self {
         KhronosValue::Map(value.into_iter().collect())
