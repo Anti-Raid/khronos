@@ -452,16 +452,27 @@ impl TryFrom<KhronosValue> for Uuid {
     }
 }
 
-impl From<std::collections::HashMap<String, KhronosValue>> for KhronosValue {
-    fn from(value: std::collections::HashMap<String, KhronosValue>) -> Self {
-        KhronosValue::Map(value.into_iter().collect())
+impl<T: Into<KhronosValue>> From<std::collections::HashMap<String, T>> for KhronosValue {
+    fn from(value: std::collections::HashMap<String, T>) -> Self {
+        let mut map: indexmap::IndexMap<String, KhronosValue> = indexmap::IndexMap::with_capacity(value.len());
+        for (key, item) in value {
+            map.insert(key, item.into());
+        }
+        KhronosValue::Map(map)
     }
 }
-impl TryFrom<KhronosValue> for std::collections::HashMap<String, KhronosValue> {
+
+impl<T: From<KhronosValue>> TryFrom<KhronosValue> for std::collections::HashMap<String, T> {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::Map(m) => Ok(m.into_iter().collect()),
+            KhronosValue::Map(m) => {
+                let mut map = std::collections::HashMap::with_capacity(m.len());
+                for (key, item) in m {
+                    map.insert(key, T::from(item));
+                }
+                Ok(map)
+            },
             _ => Err("KhronosValue is not a map".into()),
         }
     }
