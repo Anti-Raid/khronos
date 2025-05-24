@@ -452,6 +452,23 @@ impl TryFrom<KhronosValue> for Uuid {
     }
 }
 
+impl TryFrom<serenity::all::GuildId> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: serenity::all::GuildId) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Text(value.to_string()))
+    }
+}
+
+impl TryFrom<KhronosValue> for serenity::all::GuildId {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::Text(s) => Ok(s.parse()?),
+            _ => Err("KhronosValue is not a string guild id".into()),
+        }
+    }
+}
+
 impl<T: Into<KhronosValue>> From<std::collections::HashMap<String, T>> for KhronosValue {
     fn from(value: std::collections::HashMap<String, T>) -> Self {
         let mut map: indexmap::IndexMap<String, KhronosValue> = indexmap::IndexMap::with_capacity(value.len());
