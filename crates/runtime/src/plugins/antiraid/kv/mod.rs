@@ -182,7 +182,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 })
                 .collect::<Vec<KvRecord>>();
 
-            Ok::<KhronosValue, LuaError>(records.into())
+            let v: KhronosValue = records.try_into().map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
+
+            Ok(v)
         });
 
         methods.add_promise_method("exists", async move |_, this, key: String| {
@@ -235,7 +237,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 None => KvRecord::default(),
             };
 
-            Ok::<KhronosValue, LuaError>(record.into())
+            let v: KhronosValue = record.try_into().map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
+
+            Ok(v)
         });
 
         methods.add_promise_method("keys", async move |_, this, _g: ()| {

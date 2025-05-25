@@ -35,15 +35,17 @@ impl IntoLua for Box<KhronosValue> {
     }
 }
 
-impl From<&str> for KhronosValue {
-    fn from(value: &str) -> Self {
-        KhronosValue::Text(value.to_string())
+impl TryFrom<&str> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Text(value.to_string()))
     }
 }
 
-impl From<String> for KhronosValue {
-    fn from(value: String) -> Self {
-        KhronosValue::Text(value)
+impl TryFrom<String> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Text(value))
     }
 }
 impl TryFrom<KhronosValue> for String {
@@ -55,9 +57,10 @@ impl TryFrom<KhronosValue> for String {
         }
     }
 }
-impl From<i8> for KhronosValue {
-    fn from(value: i8) -> Self {
-        KhronosValue::Integer(value.into())
+impl TryFrom<i8> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Integer(value.into()))
     }
 }
 impl TryFrom<KhronosValue> for i8 {
@@ -71,9 +74,11 @@ impl TryFrom<KhronosValue> for i8 {
         }
     }
 }
-impl From<i16> for KhronosValue {
-    fn from(value: i16) -> Self {
-        KhronosValue::Integer(value.into())
+
+impl TryFrom<i16> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Integer(value.into()))
     }
 }
 impl TryFrom<KhronosValue> for i16 {
@@ -87,11 +92,14 @@ impl TryFrom<KhronosValue> for i16 {
         }
     }
 }
-impl From<i32> for KhronosValue {
-    fn from(value: i32) -> Self {
-        KhronosValue::Integer(value.into())
+
+impl TryFrom<i32> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Integer(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for i32 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -103,11 +111,14 @@ impl TryFrom<KhronosValue> for i32 {
         }
     }
 }
-impl From<i64> for KhronosValue {
-    fn from(value: i64) -> Self {
-        KhronosValue::Integer(value)
+
+impl TryFrom<i64> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Integer(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for i64 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -117,11 +128,14 @@ impl TryFrom<KhronosValue> for i64 {
         }
     }
 }
-impl From<u8> for KhronosValue {
-    fn from(value: u8) -> Self {
-        KhronosValue::UnsignedInteger(value.into())
+
+impl TryFrom<u8> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::UnsignedInteger(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for u8 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -133,11 +147,14 @@ impl TryFrom<KhronosValue> for u8 {
         }
     }
 }
-impl From<u16> for KhronosValue {
-    fn from(value: u16) -> Self {
-        KhronosValue::UnsignedInteger(value.into())
+
+impl TryFrom<u16> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::UnsignedInteger(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for u16 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -149,11 +166,14 @@ impl TryFrom<KhronosValue> for u16 {
         }
     }
 }
-impl From<u32> for KhronosValue {
-    fn from(value: u32) -> Self {
-        KhronosValue::UnsignedInteger(value.into())
+
+impl TryFrom<u32> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::UnsignedInteger(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for u32 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -165,11 +185,14 @@ impl TryFrom<KhronosValue> for u32 {
         }
     }
 }
-impl From<u64> for KhronosValue {
-    fn from(value: u64) -> Self {
-        KhronosValue::UnsignedInteger(value)
+
+impl TryFrom<u64> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::UnsignedInteger(value.into()))
     }
 }
+
 impl TryFrom<KhronosValue> for u64 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -180,9 +203,10 @@ impl TryFrom<KhronosValue> for u64 {
     }
 }
 
-impl From<usize> for KhronosValue {
-    fn from(value: usize) -> Self {
-        KhronosValue::UnsignedInteger(value as u64)
+impl TryFrom<usize> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::UnsignedInteger(value as u64))
     }
 }
 
@@ -198,9 +222,10 @@ impl TryFrom<KhronosValue> for usize {
     }
 }
 
-impl From<f32> for KhronosValue {
-    fn from(value: f32) -> Self {
-        KhronosValue::Float(value.into())
+impl TryFrom<f32> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: f32) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Float(value.into()))
     }
 }
 impl TryFrom<KhronosValue> for f32 {
@@ -218,9 +243,10 @@ impl TryFrom<KhronosValue> for f32 {
         }
     }
 }
-impl From<f64> for KhronosValue {
-    fn from(value: f64) -> Self {
-        KhronosValue::Float(value)
+impl TryFrom<f64> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Float(value))
     }
 }
 impl TryFrom<KhronosValue> for f64 {
@@ -232,9 +258,11 @@ impl TryFrom<KhronosValue> for f64 {
         }
     }
 }
-impl From<bool> for KhronosValue {
-    fn from(value: bool) -> Self {
-        KhronosValue::Boolean(value)
+
+impl TryFrom<bool> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: bool) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Boolean(value))
     }
 }
 impl TryFrom<KhronosValue> for bool {
@@ -247,9 +275,10 @@ impl TryFrom<KhronosValue> for bool {
     }
 }
 
-impl From<(f32, f32)> for KhronosValue {
-    fn from(value: (f32, f32)) -> Self {
-        KhronosValue::Vector((value.0, value.1, 0.0))
+impl TryFrom<(f32, f32)> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: (f32, f32)) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Vector((value.0, value.1, 0.0)))
     }
 }
 
@@ -263,9 +292,10 @@ impl TryFrom<KhronosValue> for (f32, f32) {
     }
 }
 
-impl From<(f32, f32, f32)> for KhronosValue {
-    fn from(value: (f32, f32, f32)) -> Self {
-        KhronosValue::Vector(value)
+impl TryFrom<(f32, f32, f32)> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: (f32, f32, f32)) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Vector(value))
     }
 }
 
@@ -279,11 +309,13 @@ impl TryFrom<KhronosValue> for (f32, f32, f32) {
     }
 }
 
-impl From<chrono::DateTime<chrono::Utc>> for KhronosValue {
-    fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
-        KhronosValue::Timestamptz(value)
+impl TryFrom<chrono::DateTime<chrono::Utc>> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: chrono::DateTime<chrono::Utc>) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Timestamptz(value))
     }
 }
+
 impl TryFrom<KhronosValue> for chrono::DateTime<chrono::Utc> {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -293,9 +325,11 @@ impl TryFrom<KhronosValue> for chrono::DateTime<chrono::Utc> {
         }
     }
 }
-impl From<chrono::Duration> for KhronosValue {
-    fn from(value: chrono::Duration) -> Self {
-        KhronosValue::Interval(value)
+
+impl TryFrom<chrono::Duration> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: chrono::Duration) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Interval(value))
     }
 }
 impl TryFrom<KhronosValue> for chrono::Duration {
@@ -307,9 +341,11 @@ impl TryFrom<KhronosValue> for chrono::Duration {
         }
     }
 }
-impl From<chrono_tz::Tz> for KhronosValue {
-    fn from(value: chrono_tz::Tz) -> Self {
-        KhronosValue::TimeZone(value)
+
+impl TryFrom<chrono_tz::Tz> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: chrono_tz::Tz) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::TimeZone(value))
     }
 }
 impl TryFrom<KhronosValue> for chrono_tz::Tz {
@@ -322,9 +358,10 @@ impl TryFrom<KhronosValue> for chrono_tz::Tz {
     }
 }
 
-impl From<ObjectStoragePath> for KhronosValue {
-    fn from(value: ObjectStoragePath) -> Self {
-        KhronosValue::ObjectStoragePath(value)
+impl TryFrom<ObjectStoragePath> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: ObjectStoragePath) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::ObjectStoragePath(value))
     }
 }
 
@@ -338,9 +375,10 @@ impl TryFrom<KhronosValue> for ObjectStoragePath {
     }
 }
 
-impl From<()> for KhronosValue {
-    fn from(_: ()) -> Self {
-        KhronosValue::Null
+impl TryFrom<()> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(_: ()) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Null)
     }
 }
 impl TryFrom<KhronosValue> for () {
@@ -353,15 +391,16 @@ impl TryFrom<KhronosValue> for () {
     }
 }
 
-impl<T> From<Option<T>> for KhronosValue
+impl<T> TryFrom<Option<T>> for KhronosValue
 where
-    T: Into<KhronosValue>,
+    T: TryInto<KhronosValue, Error = crate::Error>,
 {
-    fn from(value: Option<T>) -> Self {
-        match value {
-            Some(v) => v.into(),
+    type Error = crate::Error;
+    fn try_from(value: Option<T>) -> Result<Self, Self::Error> {
+        Ok(match value {
+            Some(v) => v.try_into()?,
             None => KhronosValue::Null,
-        }
+        })
     }
 }
 
@@ -378,14 +417,20 @@ where
     }
 }
 
-impl<T> From<Vec<T>> for KhronosValue
+impl<T> TryFrom<Vec<T>> for KhronosValue
 where
-    T: Into<KhronosValue>,
+    T: TryInto<KhronosValue, Error = crate::Error>,
 {
-    fn from(value: Vec<T>) -> Self {
-        KhronosValue::List(value.into_iter().map(|v| v.into()).collect())
+    type Error = crate::Error;
+    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
+        let mut val = Vec::with_capacity(value.len());
+        for v in value {
+            val.push(v.try_into()?);
+        }
+        Ok(KhronosValue::List(val))
     }
 }
+
 impl<T> TryFrom<KhronosValue> for Vec<T>
 where
     T: TryFrom<KhronosValue, Error = crate::Error>,
@@ -399,12 +444,18 @@ where
     }
 }
 
-impl<T> From<indexmap::IndexMap<String, T>> for KhronosValue
+impl<T> TryFrom<indexmap::IndexMap<String, T>> for KhronosValue
 where
-    T: Into<KhronosValue>,
+    T: TryInto<KhronosValue, Error = crate::Error>,
 {
-    fn from(value: indexmap::IndexMap<String, T>) -> Self {
-        KhronosValue::Map(value.into_iter().map(|(k, v)| (k, v.into())).collect())
+    type Error = crate::Error;
+    fn try_from(value: indexmap::IndexMap<String, T>) -> Result<Self, Self::Error> {
+        let mut val = indexmap::IndexMap::with_capacity(value.len());
+        for (key, v) in value {
+            val.insert(key, v.try_into()?);
+        }
+
+        Ok(KhronosValue::Map(val))
     }
 }
 impl<T> TryFrom<KhronosValue> for indexmap::IndexMap<String, T>
@@ -422,6 +473,7 @@ where
         }
     }
 }
+
 impl TryFrom<serde_json::Value> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
@@ -469,24 +521,25 @@ impl TryFrom<KhronosValue> for serenity::all::GuildId {
     }
 }
 
-impl<T: Into<KhronosValue>> From<std::collections::HashMap<String, T>> for KhronosValue {
-    fn from(value: std::collections::HashMap<String, T>) -> Self {
+impl<T: TryInto<KhronosValue, Error = crate::Error>> TryFrom<std::collections::HashMap<String, T>> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: std::collections::HashMap<String, T>) -> Result<Self, Self::Error> {
         let mut map: indexmap::IndexMap<String, KhronosValue> = indexmap::IndexMap::with_capacity(value.len());
         for (key, item) in value {
-            map.insert(key, item.into());
+            map.insert(key, item.try_into()?);
         }
-        KhronosValue::Map(map)
+        Ok(KhronosValue::Map(map))
     }
 }
 
-impl<T: From<KhronosValue>> TryFrom<KhronosValue> for std::collections::HashMap<String, T> {
+impl<T: TryFrom<KhronosValue, Error = crate::Error>> TryFrom<KhronosValue> for std::collections::HashMap<String, T> {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
             KhronosValue::Map(m) => {
                 let mut map = std::collections::HashMap::with_capacity(m.len());
                 for (key, item) in m {
-                    map.insert(key, T::from(item));
+                    map.insert(key, T::try_from(item)?);
                 }
                 Ok(map)
             },
@@ -557,20 +610,20 @@ macro_rules! value {
         {
             let mut map = indexmap::IndexMap::new();
             $(
-                map.insert($key.to_string(), ($value).into());
+                map.insert($key.to_string(), ($value).try_into()?);
             )*
             $crate::utils::khronos_value::KhronosValue::Map(map)
         }
     };
     ($value:expr) => {
-        Into::<$crate::utils::khronos_value::KhronosValue>::into($value)
+        TryInto::<$crate::utils::khronos_value::KhronosValue>::try_into($value)?
     };
     ($valuea:expr, $($value:expr),+) => {
         {
             let mut list = Vec::new();
-            list.push(($valuea).into());
+            list.push(($valuea).try_into()?);
             $(
-                list.push(($value).into());
+                list.push(($value).try_into()?);
             )*
             $crate::utils::khronos_value::KhronosValue::List(list)
         }
@@ -1116,6 +1169,7 @@ impl<'de> Deserialize<'de> for KhronosValue {
 ///
 /// ```
 /// use khronos_runtime::to_struct;
+/// use khronos_runtime::Error;
 /// to_struct!(
 ///     #[derive(Debug, PartialEq, Clone)] // Add derives here
 ///     // Add other attributes like #[serde(...)] if needed
@@ -1197,9 +1251,10 @@ macro_rules! to_struct {
             }
         }
 
-        // --- Generate From<Struct> for KhronosValue ---
-        impl std::convert::From<$struct_name> for $crate::utils::khronos_value::KhronosValue { // Assuming KhronosValue is in the crate root
-            fn from(value: $struct_name) -> Self {
+        // Generate TryFrom<Struct> for KhronosValue ---
+        impl std::convert::TryFrom<$struct_name> for $crate::utils::khronos_value::KhronosValue { // Assuming KhronosValue is in the crate root
+            type Error = Box<dyn std::error::Error + Send + Sync>;
+            fn try_from(value: $struct_name) -> Result<Self, Self::Error> {
                 // Use indexmap::IndexMap directly or ensure it's in scope
                 let mut map = indexmap::IndexMap::new();
                 $(
@@ -1207,10 +1262,10 @@ macro_rules! to_struct {
                     // For now, it uses the Rust field name.
                     let key = stringify!($field_name).to_string();
                     // Use .into() which requires From<FieldType> for KhronosValue / Into trait bound
-                    let khronos_val: $crate::utils::khronos_value::KhronosValue = value.$field_name.into(); // Assuming KhronosValue is in the crate root
+                    let khronos_val: $crate::utils::khronos_value::KhronosValue = value.$field_name.try_into()?; // Assuming KhronosValue is in the crate root
                     map.insert(key, khronos_val);
                 )*
-                $crate::utils::khronos_value::KhronosValue::Map(map) // Assuming KhronosValue is in the crate root
+                Ok($crate::utils::khronos_value::KhronosValue::Map(map)) // Assuming KhronosValue is in the crate root
             }
         }
     };
@@ -1220,7 +1275,7 @@ macro_rules! to_struct {
 mod test_value_macro {
     use super::*;
     #[test]
-    fn test_value_macro() {
+    fn test_value_macro() -> Result<(), crate::Error> {
         let v = value!(1, 2, 3);
         assert_eq!(v.as_list().unwrap().len(), 3);
         assert_eq!(v.as_list().unwrap()[0].as_integer().unwrap(), 1);
@@ -1243,6 +1298,7 @@ mod test_value_macro {
             v2.as_map().unwrap()[&"1".to_string()].as_string().unwrap(),
             "hello"
         );
+        Ok(())
     }
 }
 
@@ -1261,17 +1317,21 @@ mod test_to_struct {
             maybe_float: Option<f64>,
             a_list: Vec<i64>,
             meow: Option<String>,
+            a: std::collections::HashMap<String, i32>
         }
     );
 
     #[test]
-    fn test_to_struct() {
+    fn test_to_struct() -> Result<(), crate::Error> {
         let kv = value!(
             "name".to_string() => "test".to_string(),
             "value".to_string() => 42,
             "is_active".to_string() => true,
             "maybe_float".to_string() => 3.14,
-            "a_list".to_string() => value!(1, 2, 3)
+            "a_list".to_string() => value!(1, 2, 3),
+            "a".to_string() => value!(
+                "b".to_string() => 10
+            )
         );
 
         let my_data: MyData = kv.try_into().unwrap();
@@ -1280,6 +1340,7 @@ mod test_to_struct {
         assert_eq!(my_data.is_active, true);
         assert_eq!(my_data.maybe_float, Some(3.14));
         assert_eq!(my_data.a_list, vec![1, 2, 3]);
-        println!("{:?}", value!(my_data))
+        println!("{:?}", value!(my_data));
+        Ok(())
     }
 }

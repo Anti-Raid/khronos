@@ -151,7 +151,8 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
                     etag: r.etag,
                 }
             })
-            .collect::<Vec<_>>().into();
+            .collect::<Vec<_>>().try_into()
+            .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
 
             Ok(kv)
         });
