@@ -393,9 +393,9 @@ impl TryFrom<KhronosValue> for () {
 
 impl<T> TryFrom<Option<T>> for KhronosValue
 where
-    T: TryInto<KhronosValue, Error = crate::Error>,
+    T: TryInto<KhronosValue>,
 {
-    type Error = crate::Error;
+    type Error = T::Error;
     fn try_from(value: Option<T>) -> Result<Self, Self::Error> {
         Ok(match value {
             Some(v) => v.try_into()?,
@@ -419,13 +419,14 @@ where
 
 impl<T> TryFrom<Vec<T>> for KhronosValue
 where
-    T: TryInto<KhronosValue, Error = crate::Error>,
+    T: TryInto<KhronosValue>,
+    T::Error: Send + Sync + std::fmt::Display
 {
     type Error = crate::Error;
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
         let mut val = Vec::with_capacity(value.len());
         for v in value {
-            val.push(v.try_into()?);
+            val.push(v.try_into().map_err(|x| x.to_string())?);
         }
         Ok(KhronosValue::List(val))
     }
@@ -433,12 +434,19 @@ where
 
 impl<T> TryFrom<KhronosValue> for Vec<T>
 where
-    T: TryFrom<KhronosValue, Error = crate::Error>,
+    T: TryFrom<KhronosValue>,
+    T::Error: Send + Sync + std::fmt::Display
 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::List(l) => l.into_iter().map(T::try_from).collect(),
+            KhronosValue::List(l) => {
+                let mut v = Vec::with_capacity(l.len());
+                for val in l {
+                    v.push(T::try_from(val).map_err(|x| x.to_string())?);
+                }
+                Ok(v)
+            },
             _ => Err("KhronosValue is not a list".into()),
         }
     }
@@ -521,25 +529,33 @@ impl TryFrom<KhronosValue> for serenity::all::GuildId {
     }
 }
 
-impl<T: TryInto<KhronosValue, Error = crate::Error>> TryFrom<std::collections::HashMap<String, T>> for KhronosValue {
+impl<T> TryFrom<std::collections::HashMap<String, T>> for KhronosValue 
+where 
+T: TryInto<KhronosValue>, 
+T::Error: Send + Sync + std::fmt::Display
+{
     type Error = crate::Error;
     fn try_from(value: std::collections::HashMap<String, T>) -> Result<Self, Self::Error> {
         let mut map: indexmap::IndexMap<String, KhronosValue> = indexmap::IndexMap::with_capacity(value.len());
         for (key, item) in value {
-            map.insert(key, item.try_into()?);
+            map.insert(key, item.try_into().map_err(|x| x.to_string())?);
         }
         Ok(KhronosValue::Map(map))
     }
 }
 
-impl<T: TryFrom<KhronosValue, Error = crate::Error>> TryFrom<KhronosValue> for std::collections::HashMap<String, T> {
+impl<T> TryFrom<KhronosValue> for std::collections::HashMap<String, T> 
+where 
+T: TryFrom<KhronosValue>, 
+T::Error: Send + Sync + std::fmt::Display
+{
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
             KhronosValue::Map(m) => {
                 let mut map = std::collections::HashMap::with_capacity(m.len());
                 for (key, item) in m {
-                    map.insert(key, T::try_from(item)?);
+                    map.insert(key, T::try_from(item).map_err(|x| x.to_string())?);
                 }
                 Ok(map)
             },
@@ -1308,16 +1324,17 @@ mod test_to_struct {
     use serde::Serialize;
 
     to_struct!(
-        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct MyData {
             pub name: String,
             pub value: i64,
             is_active: bool,
             maybe_float: Option<f64>,
+            opt_any: Option<crate::utils::khronos_value::KhronosValue>,
             a_list: Vec<i64>,
             meow: Option<String>,
-            a: std::collections::HashMap<String, i32>
+            a: std::collections::HashMap<String, serde_json::Value>
         }
     );
 
