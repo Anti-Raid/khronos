@@ -5,7 +5,7 @@
 use crate::utils::pluginholder::PluginSet;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
 use mlua::prelude::*;
@@ -121,7 +121,6 @@ impl KhronosRuntime {
         let scheduler = Scheduler::new(TaskManager::new(
             &lua,
             Rc::new(sched_feedback),
-            Duration::from_micros(500),
         ));
 
         scheduler.attach()?;
