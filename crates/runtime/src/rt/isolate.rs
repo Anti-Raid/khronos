@@ -334,7 +334,9 @@ impl KhronosIsolate {
     ) -> LuaResult<SpawnResult> {
         {
             if !self.inner.scheduler().is_running() {
+                log::info!("Scheduler not running, running it now");
                 self.inner.scheduler().run_in_task();
+                tokio::task::yield_now().await;
             }
         }
 
