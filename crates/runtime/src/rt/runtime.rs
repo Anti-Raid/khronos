@@ -125,6 +125,8 @@ impl KhronosRuntime {
 
         scheduler.attach()?;
 
+        scheduler.run_in_task();
+
         let scheduler_lib = mlua_scheduler::userdata::scheduler_lib(&lua)?;
 
         // Add in basic globals
