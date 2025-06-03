@@ -14,7 +14,7 @@ use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
 use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::utils::pluginholder::PluginSet;
-use khronos_runtime::utils::threadlimitmw::ThreadLimiter;
+use khronos_runtime::utils::dummyfeedback::DummyFeedback;
 use khronos_runtime::TemplateContext;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
@@ -285,7 +285,7 @@ impl Cli {
 
         let time_now = std::time::Instant::now();
         let runtime = KhronosRuntime::new(
-            ThreadLimiter::new(1000000),
+            DummyFeedback {},
             RuntimeCreateOpts {
                 disable_scheduler_lib: aux_opts.disable_scheduler_lib,
                 disable_task_lib: aux_opts.disable_task_lib,

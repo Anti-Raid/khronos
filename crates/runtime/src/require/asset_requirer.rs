@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::path::PathBuf;
 use mlua::prelude::*;
 use super::vfs_navigator::{VfsNavigator, NavigationStatus};
