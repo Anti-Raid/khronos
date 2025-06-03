@@ -77,9 +77,6 @@ pub struct KhronosIsolate {
     /// The asset manager for the isolate
     asset_manager: FilesystemWrapper,
 
-    /// The asset requirer for the isolate
-    asset_requirer: AssetRequirer,
-
     /// The internal bytecode cache for the isolate
     ///
     /// Users should AVOID using this directly. It is used internally by the isolate to cache
@@ -130,7 +127,7 @@ impl KhronosIsolate {
         log::debug!("Creating new isolate");
         let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
-        let (controller, global_table) = {
+        let global_table = {
             let Some(ref lua) = *inner.lua.borrow_mut() else {
                 return Err(LuaError::RuntimeError(
                     "Lua instance is no longer valid".to_string(),
@@ -143,21 +140,20 @@ impl KhronosIsolate {
                 AssetRequirer::new(asset_manager.clone(), id.clone(), global_table.clone());
 
             if is_subisolate {
-                global_table.set("require", lua.create_require_function(controller.clone())?)?;
+                global_table.set("require", lua.create_require_function(controller)?)?;
             } else {
                 lua.globals()
-                    .set("require", lua.create_require_function(controller.clone())?)?;
+                    .set("require", lua.create_require_function(controller)?)?;
             }
 
             setup_prelude(lua, global_table.clone())?;
 
-            (controller, global_table)
+            global_table
         };
 
         Ok(Self {
             id,
             asset_manager,
-            asset_requirer: controller,
             inner,
             global_table,
             bytecode_cache: Rc::new(BytecodeCache::new()),
@@ -205,12 +201,6 @@ impl KhronosIsolate {
     /// Sets a new bytecode cache for the isolate
     pub fn set_bytecode_cache(&mut self, cache: Rc<BytecodeCache>) {
         self.bytecode_cache = cache;
-    }
-
-    /// Returns the asset requirer for the isolate
-    #[inline]
-    pub fn asset_requirer(&self) -> &AssetRequirer {
-        &self.asset_requirer
     }
 
     /// Returns the id of the isolate

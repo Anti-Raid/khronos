@@ -274,7 +274,6 @@ mod tests {
                 fn on_response(
                     &self,
                     _label: &str,
-                    _tm: &mlua_scheduler::TaskManager,
                     _th: &mlua::Thread,
                     result: mlua::Result<mlua::MultiValue>,
                 ) {
@@ -295,8 +294,9 @@ mod tests {
                     thread_tracker,
                     TaskPrintError {},
                 )),
-                Duration::from_millis(1),
             );
+
+            task_mgr.run_in_task();
 
             let scheduler = mlua_scheduler_ext::Scheduler::new(task_mgr.clone());
 

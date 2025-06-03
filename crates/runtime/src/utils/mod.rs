@@ -8,4 +8,3 @@ pub mod proxyglobal;
 pub mod ratelimits;
 pub mod serenity_backports;
 pub mod serenity_utils;
-pub mod threadlimitmw;

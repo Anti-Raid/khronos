@@ -594,9 +594,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.24"
+version = "1.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16595d3be041c03b09d08d0858631facccee9221e579704070e6e9e4915d3bc7"
+checksum = "d0fc897dc1e865cc67c0e05a836d9d3f1df3cbe442aa4a9473b18e12624a4951"
 dependencies = [
  "jobserver",
  "libc",
@@ -2217,9 +2217,9 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "luau0-src"
-version = "0.14.2+luau672"
+version = "0.15.0+luau676"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdcef7360b48d6b9c822a92213def9669cf16dce30e86d1ee9dffb6067c30117"
+checksum = "f1f08230d81ba1184d59dd3736bd02fdb23f61dd6d3b0f929d2f0264ee13eb43"
 dependencies = [
  "cc",
 ]
@@ -2339,8 +2339,8 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.10.3"
-source = "git+https://github.com/Anti-Raid/mlua#107661d498c6222d68c002209035e9e53df47d71"
+version = "0.11.0-beta.1"
+source = "git+https://github.com/Anti-Raid/mlua#b5589ce0ce5e5814341a9954624be116b4e02dec"
 dependencies = [
  "bstr",
  "either",
@@ -2356,8 +2356,8 @@ dependencies = [
 
 [[package]]
 name = "mlua-sys"
-version = "0.6.7"
-source = "git+https://github.com/Anti-Raid/mlua#107661d498c6222d68c002209035e9e53df47d71"
+version = "0.7.0"
+source = "git+https://github.com/Anti-Raid/mlua#b5589ce0ce5e5814341a9954624be116b4e02dec"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2368,7 +2368,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#8139b680bc4ebaecd87d429f38a1e2f539afd69c"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#e216f14ec820f20755b140d2a2f2bdb90c31700d"
 dependencies = [
  "futures-util",
  "log",
@@ -2380,7 +2380,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler_ext"
 version = "1.0.0"
-source = "git+https://github.com/Anti-Raid/mlua_scheduler#8139b680bc4ebaecd87d429f38a1e2f539afd69c"
+source = "git+https://github.com/Anti-Raid/mlua_scheduler#e216f14ec820f20755b140d2a2f2bdb90c31700d"
 dependencies = [
  "log",
  "mlua",
@@ -3333,9 +3333,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reqwest"
-version = "0.12.18"
+version = "0.12.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e98ff6b0dbbe4d5a37318f433d4fc82babd21631f194d370409ceb2e40b2f0b5"
+checksum = "a2f8e5513d63f2e5b386eb5106dc67eaf3f84e95258e210489136b8b92ad6119"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4430,9 +4430,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fdb0c213ca27a9f57ab69ddb290fd80d970922355b83ae380b395d3986b8a2e"
+checksum = "5cc2d9e086a412a451384326f521c8123a99a466b329941a9403696bff9b0da2"
 dependencies = [
  "bitflags 2.9.1",
  "bytes",

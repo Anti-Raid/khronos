@@ -7,8 +7,7 @@ use std::rc::Rc;
 use super::isolate::KhronosIsolate;
 use super::runtime::{KhronosRuntime, OnBrokenFunc};
 
-#[derive(Clone)]
-pub struct IsolateData<ExtraData: Clone + 'static> {
+pub struct IsolateData<ExtraData: 'static> {
     pub isolate: KhronosIsolate,
     pub data: ExtraData
 }
@@ -16,13 +15,12 @@ pub struct IsolateData<ExtraData: Clone + 'static> {
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
 ///
 /// Like isolates, these are also cheap to clone
-#[derive(Clone)]
-pub struct KhronosRuntimeManager<ExtraData: Clone + 'static> {
+pub struct KhronosRuntimeManager<ExtraData: 'static> {
     /// The runtime itself
     rt: KhronosRuntime,
 
     /// A map of name to sub-isolate
-    sub_isolates: Rc<RefCell<std::collections::HashMap<String, IsolateData<ExtraData>>>>,
+    sub_isolates: Rc<RefCell<std::collections::HashMap<String, Rc<IsolateData<ExtraData>>>>>,
 
     /// The main isolate (if any)
     main_isolate: Rc<RefCell<Option<IsolateData<ExtraData>>>>,
@@ -31,7 +29,18 @@ pub struct KhronosRuntimeManager<ExtraData: Clone + 'static> {
     on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
 }
 
-impl<ExtraData: Clone + 'static> KhronosRuntimeManager<ExtraData> {
+impl<ExtraData: 'static> Clone for KhronosRuntimeManager<ExtraData> {
+    fn clone(&self) -> Self {
+        Self {
+            rt: self.rt.clone(),
+            sub_isolates: self.sub_isolates.clone(),
+            main_isolate: self.main_isolate.clone(),
+            on_broken: self.on_broken.clone()
+        }
+    }
+}
+
+impl<ExtraData: 'static> KhronosRuntimeManager<ExtraData> {
     /// Creates a new runtime manager
     pub fn new(rt: KhronosRuntime) -> Self {
         if rt.has_on_broken() {
@@ -73,22 +82,22 @@ impl<ExtraData: Clone + 'static> KhronosRuntimeManager<ExtraData> {
     }
 
     /// Returns the main isolate (if any)
-    pub fn main_isolate(&self) -> Option<IsolateData<ExtraData>> {
-        self.main_isolate.borrow().clone()
+    pub fn main_isolate(&self) -> std::cell::Ref<Option<IsolateData<ExtraData>>> {
+        self.main_isolate.borrow()
     }
 
     /// Returns a sub-isolate by name
-    pub fn get_sub_isolate(&self, name: &str) -> Option<IsolateData<ExtraData>> {
+    pub fn get_sub_isolate(&self, name: &str) -> Option<Rc<IsolateData<ExtraData>>> {
         self.sub_isolates.borrow().get(name).cloned()
     }
 
     /// Adds a sub-isolate by name
     pub fn add_sub_isolate(&self, name: String, isolate: IsolateData<ExtraData>) {
-        self.sub_isolates.borrow_mut().insert(name, isolate);
+        self.sub_isolates.borrow_mut().insert(name, isolate.into());
     }
 
     /// Removes a sub-isolate by name
-    pub fn remove_sub_isolate(&self, name: &str) -> Option<IsolateData<ExtraData>> {
+    pub fn remove_sub_isolate(&self, name: &str) -> Option<Rc<IsolateData<ExtraData>>> {
         self.sub_isolates.borrow_mut().remove(name)
     }
 
@@ -98,7 +107,7 @@ impl<ExtraData: Clone + 'static> KhronosRuntimeManager<ExtraData> {
     }
 
     /// Returns the hashmap of sub-isolates
-    pub fn sub_isolates(&self) -> std::collections::HashMap<String, IsolateData<ExtraData>> {
+    pub fn sub_isolates(&self) -> std::collections::HashMap<String, Rc<IsolateData<ExtraData>>> {
         self.sub_isolates.borrow().clone()
     }
 
