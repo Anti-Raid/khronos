@@ -1,10 +1,10 @@
 //! HTTP Client Extensions (cli.httpclient)
 
+use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::{
     lua_promise, plugins::antiraid::LUA_SERIALIZE_OPTIONS,
     primitives::create_userdata_iterator_with_fields,
 };
-use mlua::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 
 pub struct Url {
@@ -58,7 +58,7 @@ impl LuaUserData for Headers {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("get", |_, this, key: String| {
             let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
-                .map_err(mlua::Error::external)?;
+                .map_err(LuaError::external)?;
             let value = this
                 .headers
                 .get(&key)
@@ -68,16 +68,16 @@ impl LuaUserData for Headers {
 
         methods.add_method_mut("set", |_, this, (key, value): (String, String)| {
             let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
-                .map_err(mlua::Error::external)?;
+                .map_err(LuaError::external)?;
             let value =
-                reqwest::header::HeaderValue::from_str(&value).map_err(mlua::Error::external)?;
+                reqwest::header::HeaderValue::from_str(&value).map_err(LuaError::external)?;
             this.headers.insert(key, value);
             Ok(())
         });
 
         methods.add_method_mut("remove", |_, this, key: String| {
             let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
-                .map_err(mlua::Error::external)?;
+                .map_err(LuaError::external)?;
             this.headers.remove(&key);
             Ok(())
         });
@@ -105,7 +105,7 @@ impl LuaUserData for Request {
 
         fields.add_field_method_set("method", |_, this, method: String| {
             let method =
-                reqwest::Method::from_bytes(method.as_bytes()).map_err(mlua::Error::external)?;
+                reqwest::Method::from_bytes(method.as_bytes()).map_err(LuaError::external)?;
             let mut req_guard = this.request.borrow_mut();
             *req_guard.method_mut() = method;
             Ok(())
@@ -170,7 +170,7 @@ impl LuaUserData for Request {
                     *req_guard.body_mut() = Some(body);
                 }
                 _ => {
-                    return Err(mlua::Error::external("Invalid body type"));
+                    return Err(LuaError::external("Invalid body type"));
                 }
             };
             Ok(())
@@ -184,7 +184,7 @@ impl LuaUserData for Request {
                 Ok(Some(
                     khronos_runtime::plugins::antiraid::datetime::TimeDelta {
                         timedelta: chrono::Duration::from_std(*timeout)
-                            .map_err(mlua::Error::external)?,
+                            .map_err(LuaError::external)?,
                     },
                 ))
             } else {
@@ -194,7 +194,7 @@ impl LuaUserData for Request {
 
         fields.add_field_method_set("timeout", |_, this, timeout: LuaUserDataRef<khronos_runtime::plugins::antiraid::datetime::TimeDelta>| {
             let mut req_guard = this.request.borrow_mut();
-            *req_guard.timeout_mut() = Some(timeout.timedelta.to_std().map_err(mlua::Error::external)?);
+            *req_guard.timeout_mut() = Some(timeout.timedelta.to_std().map_err(LuaError::external)?);
             Ok(())
         });
 
@@ -211,7 +211,7 @@ impl LuaUserData for Request {
                 "HTTP/1.1" => reqwest::Version::HTTP_11,
                 "HTTP/2.0" => reqwest::Version::HTTP_2,
                 "HTTP/3.0" => reqwest::Version::HTTP_3,
-                _ => return Err(mlua::Error::external("Invalid version")),
+                _ => return Err(LuaError::external("Invalid version")),
             };
 
             let mut req_guard = this.request.borrow_mut();
@@ -249,7 +249,7 @@ impl LuaUserData for Request {
                 let response = builder
                     .send()
                     .await
-                    .map_err(mlua::Error::external)?;
+                    .map_err(LuaError::external)?;
 
                 Ok(Response::new(response))
             }))
@@ -257,7 +257,7 @@ impl LuaUserData for Request {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Request>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -297,7 +297,7 @@ impl LuaUserData for Response {
         fields.add_field_method_get("url", |_, this| {
             let re_guard = this.response.borrow();
             let Some(response) = re_guard.as_ref() else {
-                return Err(mlua::Error::external("Response has been exhausted"));
+                return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(Url {
                 url: response.url().clone(),
@@ -307,7 +307,7 @@ impl LuaUserData for Response {
         fields.add_field_method_get("status", |_, this| {
             let re_guard = this.response.borrow();
             let Some(response) = re_guard.as_ref() else {
-                return Err(mlua::Error::external("Response has been exhausted"));
+                return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(response.status().as_u16())
         });
@@ -315,7 +315,7 @@ impl LuaUserData for Response {
         fields.add_field_method_get("content_length", |_, this| {
             let re_guard = this.response.borrow();
             let Some(response) = re_guard.as_ref() else {
-                return Err(mlua::Error::external("Response has been exhausted"));
+                return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(response.content_length().map(|l| l as i64).unwrap_or(-1))
         });
@@ -323,7 +323,7 @@ impl LuaUserData for Response {
         fields.add_field_method_get("headers", |_, this| {
             let re_guard = this.response.borrow();
             let Some(response) = re_guard.as_ref() else {
-                return Err(mlua::Error::external("Response has been exhausted"));
+                return Err(LuaError::external("Response has been exhausted"));
             };
 
             let headers = response.headers().clone();
@@ -337,12 +337,12 @@ impl LuaUserData for Response {
                 let response = {
                     let mut re_guard = this.response.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
-                let text = response.text().await.map_err(mlua::Error::external)?;
+                let text = response.text().await.map_err(LuaError::external)?;
                 Ok(text)
             }))
         });
@@ -352,13 +352,13 @@ impl LuaUserData for Response {
                 let response = {
                     let mut re_guard = this.response.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
-                let json = response.json::<serde_json::Value>().await.map_err(mlua::Error::external)?;
-                
+                let json = response.json::<serde_json::Value>().await.map_err(LuaError::external)?;
+
                 let lua_value = lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)?;
 
                 Ok(lua_value)
@@ -370,19 +370,19 @@ impl LuaUserData for Response {
                 let response = {
                     let mut re_guard = this.response.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
-                let bytes = response.bytes().await.map_err(mlua::Error::external)?;
+                let bytes = response.bytes().await.map_err(LuaError::external)?;
                 Ok(bytes.to_vec())
             }))
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Response>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -412,9 +412,9 @@ pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
     http_client.set(
         "new_request",
         lua.create_function(move |_lua, (method, url): (String, String)| {
-            let url = reqwest::Url::parse(&url).map_err(mlua::Error::external)?;
+            let url = reqwest::Url::parse(&url).map_err(LuaError::external)?;
             let method =
-                reqwest::Method::from_bytes(method.as_bytes()).map_err(mlua::Error::external)?;
+                reqwest::Method::from_bytes(method.as_bytes()).map_err(LuaError::external)?;
             Ok(Request {
                 client: client.clone(),
                 request: Rc::new(RefCell::new(reqwest::Request::new(method, url))),

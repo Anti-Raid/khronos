@@ -4,7 +4,7 @@ mod http_server;
 
 use std::{cell::RefCell, rc::Rc};
 
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 
 pub fn load_extensions(
     cli_ext_state: Rc<RefCell<crate::cli::CliExtensionState>>,

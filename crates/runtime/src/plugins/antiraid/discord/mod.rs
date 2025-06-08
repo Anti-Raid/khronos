@@ -121,8 +121,8 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         let member_perms = serenity_backports::member_permissions(&guild, &member);
         if !member_perms.contains(needed_permissions) {
             return Err(LuaError::runtime(format!(
-                "User does not have the required permissions: {:?}: {}",
-                needed_permissions, user_id
+                "User does not have the required permissions: {:?}: user_id={}, target_id={}",
+                needed_permissions, user_id, target_id
             )));
         }
 
@@ -139,15 +139,15 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
             .greater_member_hierarchy(&member, &target_member)
             .ok_or_else(|| {
                 LuaError::runtime(format!(
-                    "User does not have a higher role than the target user: {}",
-                    user_id.mention()
+                    "User does not have a higher role than the target user: user_id={}, target_id={}",
+                    user_id, target_id
                 ))
             })?;
 
         if higher_id != member.user.id {
             return Err(LuaError::runtime(format!(
-                "User does not have a higher role than the target user: {}",
-                user_id.mention()
+                "User does not have a higher role than the target user: user_id={}, target_id={}",
+                user_id, target_id
             )));
         }
 

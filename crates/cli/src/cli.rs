@@ -8,16 +8,16 @@ use crate::provider::CliKhronosContext;
 use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::Event;
+use khronos_runtime::rt::mlua::prelude::*;
+use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsync;
+use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
-use khronos_runtime::rt::CreatedKhronosContext;
-use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::utils::dummyfeedback::DummyFeedback;
+use khronos_runtime::utils::pluginholder::PluginSet;
 use khronos_runtime::TemplateContext;
-use mlua::prelude::*;
-use mlua_scheduler::LuaSchedulerAsync;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
@@ -287,13 +287,12 @@ impl Cli {
         let runtime = KhronosRuntime::new(
             DummyFeedback {},
             RuntimeCreateOpts {
-                disable_scheduler_lib: aux_opts.disable_scheduler_lib,
                 disable_task_lib: aux_opts.disable_task_lib,
             },
             Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
                 Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
             }),
-            None::<(fn(&Lua, LuaThread) -> Result<(), mlua::Error>, fn() -> ())>,
+            None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn() -> ())>,
         )
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());
@@ -358,9 +357,8 @@ impl Cli {
         println!("Current dir: {:?}", current_dir);
 
         let file_asset_manager = {
-            let fs = khronos_runtime::require::FilesystemWrapper::new(
-                vfs::PhysicalFS::new(current_dir),
-            );
+            let fs =
+                khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
 
             fs
         };
@@ -487,6 +485,8 @@ impl Cli {
                         );
                     }
 
+                    println!("here");
+
                     self.setup_data
                         .main_isolate
                         .inner()
@@ -557,16 +557,6 @@ impl Cli {
                                     ReplTaskWaitMode::None
                                     | ReplTaskWaitMode::YieldBeforePrompt => {}
                                     ReplTaskWaitMode::WaitAfterExecution => {
-                                        if !self
-                                            .setup_data
-                                            .main_isolate
-                                            .inner()
-                                            .scheduler()
-                                            .is_empty()
-                                        {
-                                            println!("[waiting for all pending tasks to finish]");
-                                        }
-
                                         self.setup_data
                                             .main_isolate
                                             .inner()
@@ -619,10 +609,6 @@ impl Cli {
                     match task_wait_mode {
                         ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
                         ReplTaskWaitMode::WaitAfterExecution => {
-                            if !self.setup_data.main_isolate.inner().scheduler().is_empty() {
-                                println!("[waiting for all pending tasks to finish]");
-                            }
-
                             self.setup_data
                                 .main_isolate
                                 .inner()

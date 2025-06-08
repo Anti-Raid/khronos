@@ -23,8 +23,8 @@ pub fn create_vfs_from_map(
 
             let mut current_path = String::new();
             for folder in folder_part {
-                current_path.push_str("/");
-                current_path.push_str(&folder);
+                current_path.push('/');
+                current_path.push_str(folder);
                 if !created.contains(&current_path) {
                     fs.create_dir(&current_path)?;
                     created.insert(current_path.clone());

@@ -805,7 +805,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     module.set(
         "randstring",
         lua.create_function(|_lua, length: usize| {
-            if length <= 0 || length > 255 {
+            if length == 0 || length > 255 {
                 return Err(LuaError::external(
                     "Length must be greater than 0 and less than 256",
                 ));

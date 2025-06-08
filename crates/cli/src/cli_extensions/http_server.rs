@@ -4,7 +4,7 @@ use khronos_runtime::lua_promise;
 use khronos_runtime::plugins::antiraid::datetime::TimeDelta;
 use khronos_runtime::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use khronos_runtime::primitives::create_userdata_iterator_with_fields;
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -166,7 +166,7 @@ impl LuaUserData for ServerResponse {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<ServerResponse>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -194,13 +194,13 @@ impl LuaUserData for ServerRequestBody {
                 let response = {
                     let mut re_guard = this.body.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
                 let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| mlua::Error::external(e.to_string()))?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
                 bytes.into_lua_multi(&lua)
             }))
         });
@@ -210,13 +210,13 @@ impl LuaUserData for ServerRequestBody {
                 let response = {
                     let mut re_guard = this.body.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
                 let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| mlua::Error::external(e.to_string()))?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 let buffer = lua.create_buffer(bytes)?;
 
@@ -229,16 +229,16 @@ impl LuaUserData for ServerRequestBody {
                 let response = {
                     let mut re_guard = this.body.borrow_mut();
                     let Some(response) = re_guard.take() else {
-                        return Err(mlua::Error::external("Response has been exhausted"));
+                        return Err(LuaError::external("Response has been exhausted"));
                     };
                     response
                 };
 
                 let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| mlua::Error::external(e.to_string()))?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 let json: serde_json::Value = serde_json::from_slice(&bytes)
-                    .map_err(|e| mlua::Error::external(e.to_string()))?;
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)
             }))
@@ -246,7 +246,7 @@ impl LuaUserData for ServerRequestBody {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<ServerRequestBody>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -375,7 +375,7 @@ impl LuaUserData for BindAddr {
         });
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<BindAddr>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -427,7 +427,7 @@ impl LuaUserData for ServerRequest {
         });
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<ServerRequest>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -942,7 +942,7 @@ impl LuaUserData for Router {
                     }
                 };
 
-                let taskmgr = mlua_scheduler_ext::Scheduler::get(&lua);
+                let taskmgr = khronos_runtime::rt::mlua_scheduler_ext::Scheduler::get(&lua);
 
                 while let Some(req) = rx.recv().await {
                     match req {
@@ -1033,7 +1033,7 @@ impl LuaUserData for Router {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Router>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(LuaError::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -1179,7 +1179,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
             |_,
              (status, body, headers): (
                 u16,
-                LuaEither<Vec<u8>, mlua::Buffer>,
+                LuaEither<Vec<u8>, khronos_runtime::rt::mlua::Buffer>,
                 Option<LuaUserDataRef<Headers>>,
             )| {
                 let resp = (

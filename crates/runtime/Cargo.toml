@@ -18,7 +18,7 @@ percent-encoding = { version = "2" }
 linkify = { git = "https://github.com/robinst/linkify" }
 mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler", features = ["v2_taskmgr"] }
 mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", features = ["luau", "serialize"] }
+mlua = { git = "https://github.com/Anti-Raid/mlua-cont", features = ["luau", "serialize"], branch = "mlua-listofaux" }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
@@ -81,3 +81,4 @@ features = ["v4", "fast-rng", "serde"]
 
 [features]
 default = []
+strong_count_supported = []

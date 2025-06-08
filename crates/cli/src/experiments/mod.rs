@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 
 #[cfg(feature = "experiment_image_classification")]
 mod image_classification;

@@ -1,6 +1,6 @@
+pub use crate::plugins::antiraid::objectstorage::ObjectStoragePath;
 use mlua::prelude::*;
 use serde::{Deserialize, Serialize};
-pub use crate::plugins::antiraid::objectstorage::ObjectStoragePath;
 use uuid::Uuid;
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
@@ -420,7 +420,7 @@ where
 impl<T> TryFrom<Vec<T>> for KhronosValue
 where
     T: TryInto<KhronosValue>,
-    T::Error: Send + Sync + std::fmt::Display
+    T::Error: Send + Sync + std::fmt::Display,
 {
     type Error = crate::Error;
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
@@ -435,7 +435,7 @@ where
 impl<T> TryFrom<KhronosValue> for Vec<T>
 where
     T: TryFrom<KhronosValue>,
-    T::Error: Send + Sync + std::fmt::Display
+    T::Error: Send + Sync + std::fmt::Display,
 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -446,7 +446,7 @@ where
                     v.push(T::try_from(val).map_err(|x| x.to_string())?);
                 }
                 Ok(v)
-            },
+            }
             _ => Err("KhronosValue is not a list".into()),
         }
     }
@@ -529,14 +529,15 @@ impl TryFrom<KhronosValue> for serenity::all::GuildId {
     }
 }
 
-impl<T> TryFrom<std::collections::HashMap<String, T>> for KhronosValue 
-where 
-T: TryInto<KhronosValue>, 
-T::Error: Send + Sync + std::fmt::Display
+impl<T> TryFrom<std::collections::HashMap<String, T>> for KhronosValue
+where
+    T: TryInto<KhronosValue>,
+    T::Error: Send + Sync + std::fmt::Display,
 {
     type Error = crate::Error;
     fn try_from(value: std::collections::HashMap<String, T>) -> Result<Self, Self::Error> {
-        let mut map: indexmap::IndexMap<String, KhronosValue> = indexmap::IndexMap::with_capacity(value.len());
+        let mut map: indexmap::IndexMap<String, KhronosValue> =
+            indexmap::IndexMap::with_capacity(value.len());
         for (key, item) in value {
             map.insert(key, item.try_into().map_err(|x| x.to_string())?);
         }
@@ -544,10 +545,10 @@ T::Error: Send + Sync + std::fmt::Display
     }
 }
 
-impl<T> TryFrom<KhronosValue> for std::collections::HashMap<String, T> 
-where 
-T: TryFrom<KhronosValue>, 
-T::Error: Send + Sync + std::fmt::Display
+impl<T> TryFrom<KhronosValue> for std::collections::HashMap<String, T>
+where
+    T: TryFrom<KhronosValue>,
+    T::Error: Send + Sync + std::fmt::Display,
 {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -558,7 +559,7 @@ T::Error: Send + Sync + std::fmt::Display
                     map.insert(key, T::try_from(item).map_err(|x| x.to_string())?);
                 }
                 Ok(map)
-            },
+            }
             _ => Err("KhronosValue is not a map".into()),
         }
     }
@@ -868,9 +869,7 @@ impl KhronosValue {
             KhronosValue::TimeZone(tz) => {
                 crate::plugins::antiraid::datetime::Timezone::new(tz).into_lua(lua)
             }
-            KhronosValue::ObjectStoragePath(path) => {
-                path.into_lua(lua)
-            }
+            KhronosValue::ObjectStoragePath(path) => path.into_lua(lua),
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
@@ -1042,10 +1041,7 @@ impl KhronosValue {
                                 let value = m.get("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::ObjectStoragePath(
                                     serde_json::from_value(value.clone()).map_err(|e| {
-                                        format!(
-                                            "Failed to deserialize ObjectStoragePath: {}",
-                                            e
-                                        )
+                                        format!("Failed to deserialize ObjectStoragePath: {}", e)
                                     })?,
                                 ));
                             }
@@ -1334,7 +1330,7 @@ mod test_to_struct {
             opt_any: Option<crate::utils::khronos_value::KhronosValue>,
             a_list: Vec<i64>,
             meow: Option<String>,
-            a: std::collections::HashMap<String, serde_json::Value>
+            a: std::collections::HashMap<String, serde_json::Value>,
         }
     );
 
@@ -1344,7 +1340,7 @@ mod test_to_struct {
             "name".to_string() => "test".to_string(),
             "value".to_string() => 42,
             "is_active".to_string() => true,
-            "maybe_float".to_string() => 3.14,
+            "maybe_float".to_string() => 3.244,
             "a_list".to_string() => value!(1, 2, 3),
             "a".to_string() => value!(
                 "b".to_string() => 10
@@ -1355,7 +1351,7 @@ mod test_to_struct {
         assert_eq!(my_data.name, "test");
         assert_eq!(my_data.value, 42);
         assert_eq!(my_data.is_active, true);
-        assert_eq!(my_data.maybe_float, Some(3.14));
+        assert_eq!(my_data.maybe_float, Some(3.244));
         assert_eq!(my_data.a_list, vec![1, 2, 3]);
         println!("{:?}", value!(my_data));
         Ok(())

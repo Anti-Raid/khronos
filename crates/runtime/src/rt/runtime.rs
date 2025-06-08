@@ -32,7 +32,6 @@ pub type OnBrokenFunc = Box<dyn Fn()>;
 /// Auxillary options for the creation of a Khronos runtime
 #[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize, Default)]
 pub struct RuntimeCreateOpts {
-    pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
 }
 
@@ -118,27 +117,15 @@ impl KhronosRuntime {
 
         let sched_feedback = ChainFeedback::new(tt, sched_feedback);
 
-        let scheduler = Scheduler::new(TaskManager::new(
-            &lua,
-            Rc::new(sched_feedback),
-        ));
+        let scheduler = Scheduler::new(TaskManager::new(&lua, Rc::new(sched_feedback)));
 
         scheduler.attach()?;
 
         scheduler.run_in_task();
 
-        let scheduler_lib = mlua_scheduler::userdata::scheduler_lib(&lua)?;
-
-        // Add in basic globals
-        if !opts.disable_scheduler_lib {
-            lua.globals().set("scheduler", scheduler_lib.clone())?;
-        }
-
         if !opts.disable_task_lib {
-            lua.globals().set(
-                "task",
-                mlua_scheduler::userdata::task_lib(&lua, scheduler_lib)?,
-            )?;
+            lua.globals()
+                .set("task", mlua_scheduler::userdata::task_lib(&lua)?)?;
         }
 
         let broken = Rc::new(Cell::new(false));
@@ -552,13 +539,18 @@ impl KhronosRuntime {
     pub fn close(&self) -> Result<(), crate::Error> {
         self.broken.set(true); // Mark the runtime as broken if it is closed
 
-        if let Some(ref lua) = *self.lua.borrow_mut() {
-            // Ensure strong_count == 1
-            if lua.strong_count() > 1 {
-                log::warn!("Lua VM is still in use and may not be closed immediately");
+        #[cfg(feature = "strong_count_supported")]
+        {
+            if let Some(ref lua) = *self.lua.borrow_mut() {
+                {
+                    // Ensure strong_count == 1
+                    if lua.strong_count() > 1 {
+                        log::warn!("Lua VM is still in use and may not be closed immediately");
+                    }
+                }
+            } else {
+                return Ok(()); // Lua VM is already closed
             }
-        } else {
-            return Ok(()); // Lua VM is already closed
         }
 
         *self.lua.borrow_mut() = None; // Drop the Lua VM

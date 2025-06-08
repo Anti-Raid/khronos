@@ -25,29 +25,24 @@ impl LuaPromise {
     pub fn new_function<A, F, FR>(lua: &Lua, func: F) -> LuaResult<LuaFunction>
     where
         A: FromLuaMulti + mlua::MaybeSend + 'static,
-        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
-            + mlua::MaybeSend
-            + Clone
-            + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR> + mlua::MaybeSend + Clone + 'static,
         FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
     {
         // We need userdata to be explicitly borrowed in the promise due to rust things but we
         // can otherwise just use raw mlua arg conversion code directly
-        lua.create_function(
-            move |_lua, args: LuaMultiValue| {
-                let func = func.clone();
+        lua.create_function(move |_lua, args: LuaMultiValue| {
+            let func = func.clone();
 
-                Ok(LuaPromise {
-                    inner: Box::new(move |lua| {
-                        Box::pin(async move {
-                            let args = A::from_lua_multi(args, &lua)?;
-                            let ret = (func)(&lua, args).await?;
-                            Ok(ret.into_lua_multi(&lua)?)
-                        })
-                    }),
-                })
-            },
-        )
+            Ok(LuaPromise {
+                inner: Box::new(move |lua| {
+                    Box::pin(async move {
+                        let args = A::from_lua_multi(args, &lua)?;
+                        let ret = (func)(&lua, args).await?;
+                        Ok(ret.into_lua_multi(&lua)?)
+                    })
+                }),
+            })
+        })
     }
 }
 
@@ -55,7 +50,9 @@ impl LuaPromise {
 /// }) -> LuaPromise
 /// Clones all arguments and the lua instance
 #[macro_export]
-#[deprecated(note = "Use either LuaPromise::new_function or add_promise_method/add_promise_method_mut instead")]
+#[deprecated(
+    note = "Use either LuaPromise::new_function or add_promise_method/add_promise_method_mut instead"
+)]
 macro_rules! lua_promise {
     ($($arg:ident),* $(,)?, |$lua:ident, $($args:ident),*|, $code:block) => {
         {
@@ -86,10 +83,7 @@ pub trait UserDataLuaPromise<T> {
     fn add_promise_function<A, F, FR>(&mut self, name: &str, func: F)
     where
         A: FromLuaMulti + mlua::MaybeSend + 'static,
-        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
-            + mlua::MaybeSend
-            + Clone
-            + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR> + mlua::MaybeSend + Clone + 'static,
         FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
         T: LuaUserData + 'static;
 
@@ -121,31 +115,25 @@ where
     fn add_promise_function<A, F, FR>(&mut self, name: &str, func: F)
     where
         A: FromLuaMulti + mlua::MaybeSend + 'static,
-        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR>
-            + mlua::MaybeSend
-            + Clone
-            + 'static,
+        F: AsyncFnOnce(&Lua, A) -> LuaResult<FR> + mlua::MaybeSend + Clone + 'static,
         FR: mlua::IntoLuaMulti + mlua::MaybeSend + 'static,
         T: LuaUserData + 'static,
     {
         // We need userdata to be explicitly borrowed in the promise due to rust things but we
         // can otherwise just use raw mlua arg conversion code directly
-        self.add_function(
-            name,
-            move |_lua, args: LuaMultiValue| {
-                let func = func.clone();
+        self.add_function(name, move |_lua, args: LuaMultiValue| {
+            let func = func.clone();
 
-                Ok(LuaPromise {
-                    inner: Box::new(move |lua| {
-                        Box::pin(async move {
-                            let args = A::from_lua_multi(args, &lua)?;
-                            let ret = (func)(&lua, args).await?;
-                            Ok(ret.into_lua_multi(&lua)?)
-                        })
-                    }),
-                })
-            },
-        );
+            Ok(LuaPromise {
+                inner: Box::new(move |lua| {
+                    Box::pin(async move {
+                        let args = A::from_lua_multi(args, &lua)?;
+                        let ret = (func)(&lua, args).await?;
+                        Ok(ret.into_lua_multi(&lua)?)
+                    })
+                }),
+            })
+        });
     }
 
     fn add_promise_method<A, F, FR>(&mut self, name: &str, func: F)
@@ -247,8 +235,6 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use super::*;
 
     #[test]

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, io::Write, rc::Rc, str::FromStr};
 
 use khronos_runtime::lua_promise;
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 use std::io::IsTerminal;
 use termcolor::{Color, ColorChoice, WriteColor};
 
@@ -116,7 +116,7 @@ pub fn ext(
                     }
                 }
                 LuaValue::Table(_) => lua.from_value(data)?,
-                _ => return Err(mlua::Error::external("Invalid color data")),
+                _ => return Err(LuaError::external("Invalid color data")),
             };
 
             if choice == ColorChoice::Auto && !std::io::stdin().is_terminal() {
@@ -128,19 +128,13 @@ pub fn ext(
                 termcolor::ColorSpec::new()
                     .set_fg(match data.fg_color {
                         Some(ref color) => Some(Color::from_str(color).map_err(|e| {
-                            mlua::Error::external(format!(
-                                "Failed to parse color for fg_color: {}",
-                                e
-                            ))
+                            LuaError::external(format!("Failed to parse color for fg_color: {}", e))
                         })?),
                         None => None,
                     })
                     .set_bg(match data.bg_color {
                         Some(ref color) => Some(Color::from_str(color).map_err(|e| {
-                            mlua::Error::external(format!(
-                                "Failed to parse color for bg_color: {}",
-                                e
-                            ))
+                            LuaError::external(format!("Failed to parse color for bg_color: {}", e))
                         })?),
                         None => None,
                     })

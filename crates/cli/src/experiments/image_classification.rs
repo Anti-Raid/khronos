@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 
 // Image classification experiments
 use tch::{

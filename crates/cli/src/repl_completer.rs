@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use mlua::prelude::*;
+use khronos_runtime::rt::mlua::prelude::*;
 use rustyline::{
     completion::Completer, highlight::Highlighter, hint::Hinter, validate::Validator, Helper,
 };

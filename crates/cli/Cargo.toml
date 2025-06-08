@@ -34,9 +34,6 @@ vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 # Antiraid
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
-mlua = { git = "https://github.com/Anti-Raid/mlua", features = ["luau"] }
-mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 futures-util = "0.3.31"
