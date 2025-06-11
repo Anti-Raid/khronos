@@ -237,7 +237,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 let data =
                     lua.from_value::<structs::AntiRaidCheckPermissionsAndHierarchyOptions>(data)?;
                 
-                println!("user_id={user_id}", user_id=data.user_id);
+                //println!("user_id={user_id}", user_id=data.user_id);
                 let (partial_guild, member, permissions) = this
                     .check_permissions_and_hierarchy(
                         data.user_id,
