@@ -1,10 +1,10 @@
 use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
-use khronos_runtime::lua_promise;
-use khronos_runtime::plugins::antiraid::datetime::TimeDelta;
+use khronos_runtime::core::datetime::TimeDelta;
 use khronos_runtime::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use khronos_runtime::primitives::create_userdata_iterator_with_fields;
 use khronos_runtime::rt::mlua::prelude::*;
+use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -189,59 +189,56 @@ pub struct ServerRequestBody {
 
 impl LuaUserData for ServerRequestBody {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("bytes", |_lua, this, limit: Option<usize>| {
-            Ok(lua_promise!(this, limit, |lua, this, limit|, {
-                let response = {
-                    let mut re_guard = this.body.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("bytes", async |lua, this, limit: Option<usize>| {
+            let response = {
+                let mut re_guard = this.body.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-                bytes.into_lua_multi(&lua)
-            }))
+            let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+            bytes.into_lua_multi(&lua)
         });
 
-        methods.add_method("tobuffer", |_lua, this, limit: Option<usize>| {
-            Ok(lua_promise!(this, limit, |lua, this, limit|, {
-                let response = {
-                    let mut re_guard = this.body.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("tobuffer", async |lua, this, limit: Option<usize>| {
+            let response = {
+                let mut re_guard = this.body.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
+            let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let buffer = lua.create_buffer(bytes)?;
+            let buffer = lua.create_buffer(bytes)?;
 
-                Ok(buffer)
-            }))
+            Ok(buffer)
         });
 
-        methods.add_method("json", |_lua, this, limit: Option<usize>| {
-            Ok(lua_promise!(this, limit, |lua, this, limit|, {
-                let response = {
-                    let mut re_guard = this.body.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("json", async |lua, this, limit: Option<usize>| {
+            let response = {
+                let mut re_guard = this.body.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX)).await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
+            let bytes = axum::body::to_bytes(response, limit.unwrap_or(usize::MAX))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let json: serde_json::Value = serde_json::from_slice(&bytes)
-                    .map_err(|e| LuaError::external(e.to_string()))?;
+            let json: serde_json::Value =
+                serde_json::from_slice(&bytes).map_err(|e| LuaError::external(e.to_string()))?;
 
-                lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)
-            }))
+            lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
@@ -887,7 +884,7 @@ impl LuaUserData for Router {
         methods.add_method("is_running", |_lua, this, _: ()| Ok(this.is_running()));
 
         // Starts serving requests
-        methods.add_method_mut("serve", |_lua, this, _g: ()| {
+        methods.add_scheduler_async_method_mut("serve", async |lua, this, _g: ()| {
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(());
 
             {
@@ -895,140 +892,135 @@ impl LuaUserData for Router {
                 *_g = Some(stop_tx);
             }
 
-            Ok(lua_promise!(this, _g, stop_rx, |lua, this, _g, stop_rx|, {
-                let routes = this.routes
+            let routes = this
+                .routes
                 .borrow()
                 .iter()
                 .map(|((method, pattern), _th)| {
-                    let duration = this.route_timeouts.get(&(*method, pattern.clone()))
+                    let duration = this
+                        .route_timeouts
+                        .get(&(*method, pattern.clone()))
                         .copied()
                         .unwrap_or_else(|| Duration::from_secs(30));
                     (*method, pattern.clone(), duration)
                 })
                 .collect();
 
-                let rx = Router::start_routing(
-                    routes,
-                    crate::http_binder::CreateRpcServerOptions {
-                        bind: match &this.bind_addr {
-                            #[cfg(unix)]
-                            BindAddr::Unix { path } => {
-                                crate::http_binder::CreateRpcServerBind::UnixSocket(
-                                    path.clone(),
-                                )
-                            }
-                            BindAddr::Tcp { addr } => {
-                                crate::http_binder::CreateRpcServerBind::Address(
-                                    *addr,
-                                )
-                            }
-                        },
-                    },
-                    stop_rx
-                )
-                .await
-                .map_err(|e| LuaError::external(e.to_string()));
-
-                let mut rx = match rx {
-                    Ok(rx) => rx,
-                    Err(e) => {
-
-                        {
-                            let mut _g = this.stop.borrow_mut();
-                            *_g = None;
+            let rx = Router::start_routing(
+                routes,
+                crate::http_binder::CreateRpcServerOptions {
+                    bind: match &this.bind_addr {
+                        #[cfg(unix)]
+                        BindAddr::Unix { path } => {
+                            crate::http_binder::CreateRpcServerBind::UnixSocket(path.clone())
                         }
+                        BindAddr::Tcp { addr } => {
+                            crate::http_binder::CreateRpcServerBind::Address(*addr)
+                        }
+                    },
+                },
+                stop_rx,
+            )
+            .await
+            .map_err(|e| LuaError::external(e.to_string()));
 
-                        return Err(e);
+            let mut rx = match rx {
+                Ok(rx) => rx,
+                Err(e) => {
+                    {
+                        let mut _g = this.stop.borrow_mut();
+                        *_g = None;
                     }
-                };
 
-                let taskmgr = khronos_runtime::rt::mlua_scheduler_ext::Scheduler::get(&lua);
+                    return Err(e);
+                }
+            };
 
-                while let Some(req) = rx.recv().await {
-                    match req {
-                        RoutedRequest::Request {
-                            method,
-                            parts,
-                            path_params,
-                            matched_pattern,
-                            body,
-                            callback,
-                        } => {
-                            let th = {
-                                let routes = this.routes.borrow();
-                                let th = routes.get(&(method, matched_pattern));
-                                th.cloned()
-                            };
+            let taskmgr = khronos_runtime::rt::mlua_scheduler::taskmgr::get(&lua);
 
-                            if let Some(th) = th {
-                                let th = match lua.create_thread(th) {
-                                    Ok(th) => th,
-                                    Err(e) => {
-                                        let _ = callback.send(
-                                            (
-                                                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                                e.to_string(),
-                                            )
-                                                .into_response(),
-                                        );
-                                        continue;
-                                    }
-                                };
+            while let Some(req) = rx.recv().await {
+                match req {
+                    RoutedRequest::Request {
+                        method,
+                        parts,
+                        path_params,
+                        matched_pattern,
+                        body,
+                        callback,
+                    } => {
+                        let th = {
+                            let routes = this.routes.borrow();
+                            let th = routes.get(&(method, matched_pattern));
+                            th.cloned()
+                        };
 
-                                let Ok(request) = ServerRequest {
-                                    route_method: method,
-                                    parts,
-                                    path: path_params,
-                                    body: ServerRequestBody {
-                                        body: Rc::new(RefCell::new(Some(body))),
-                                    },
-                                }.into_lua_multi(&lua) else {
+                        if let Some(th) = th {
+                            let th = match lua.create_thread(th) {
+                                Ok(th) => th,
+                                Err(e) => {
                                     let _ = callback.send(
                                         (
                                             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                            "Failed to create request object",
+                                            e.to_string(),
                                         )
                                             .into_response(),
                                     );
                                     continue;
-                                };
+                                }
+                            };
 
-                                let taskmgr = taskmgr.clone();
-                                tokio::task::spawn_local(async move {
-                                    let output = taskmgr
-                                    .spawn_thread_and_wait("AxumPath", th, request)
-                                    .await;
-
-                                    // Output must be a ServerResponse struct
-                                    let parsed_output = Self::parse_lua_thread_response(output);
-
-                                    match parsed_output {
-                                        LuaServerResponseParsed::Response { resp } => {
-                                            let _ = callback.send(resp);
-                                        }
-                                    }
-                                });
-                            } else {
+                            let Ok(request) = ServerRequest {
+                                route_method: method,
+                                parts,
+                                path: path_params,
+                                body: ServerRequestBody {
+                                    body: Rc::new(RefCell::new(Some(body))),
+                                },
+                            }
+                            .into_lua_multi(&lua) else {
                                 let _ = callback.send(
                                     (
-                                        axum::http::StatusCode::NOT_FOUND,
-                                        "No route found for request",
+                                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                        "Failed to create request object",
                                     )
                                         .into_response(),
                                 );
-                            }
+                                continue;
+                            };
+
+                            let taskmgr = taskmgr.clone();
+                            tokio::task::spawn_local(async move {
+                                let output = taskmgr.spawn_thread_and_wait(th, request).await;
+
+                                // Output must be a ServerResponse struct
+                                let parsed_output = Self::parse_lua_thread_response(output);
+
+                                match parsed_output {
+                                    LuaServerResponseParsed::Response { resp } => {
+                                        let _ = callback.send(resp);
+                                    }
+                                }
+                            });
+                        } else {
+                            let _ = callback.send(
+                                (
+                                    axum::http::StatusCode::NOT_FOUND,
+                                    "No route found for request",
+                                )
+                                    .into_response(),
+                            );
                         }
-                        RoutedRequest::StopServer {} => break,
                     }
+                    RoutedRequest::StopServer {} => break,
                 }
+            }
 
-                {
-                    let mut _g = this.stop.borrow_mut();
-                    *_g = None;
-                }
+            {
+                let mut _g = this.stop.borrow_mut();
+                *_g = None;
+            }
 
-                Ok(())
-            }))
+            Ok(())
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

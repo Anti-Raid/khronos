@@ -16,17 +16,20 @@ rustrict = "0.7"
 reqwest = { version = "0.12" }
 percent-encoding = { version = "2" }
 linkify = { git = "https://github.com/robinst/linkify" }
-mlua_scheduler = { git = "https://github.com/Anti-Raid/mlua_scheduler", features = ["v2_taskmgr"] }
-mlua_scheduler_ext = { git = "https://github.com/Anti-Raid/mlua_scheduler" }
-mlua = { git = "https://github.com/Anti-Raid/mlua-cont", features = ["luau", "serialize"], branch = "mlua-listofaux" }
+mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
+mlua = { git = "https://github.com/mluau/mluau", features = [
+    "luau",
+    "serialize",
+] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
+bitflags = { version = "2", features = ["serde"] }
 
 # @lune/datetime
-chrono = { version = "0.4", features = ["serde"]}
-chrono-tz = { version = "0.10", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = { version = "0.10", features = ["serde"] }
 chrono_lc = "0.1"
 thiserror = "1.0"
 self_cell = "1"

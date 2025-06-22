@@ -1,9 +1,10 @@
 //! HTTP Client Extensions (cli.httpclient)
 
+use khronos_runtime::core::datetime::TimeDelta;
 use khronos_runtime::rt::mlua::prelude::*;
+use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
 use khronos_runtime::{
-    lua_promise, plugins::antiraid::LUA_SERIALIZE_OPTIONS,
-    primitives::create_userdata_iterator_with_fields,
+    plugins::antiraid::LUA_SERIALIZE_OPTIONS, primitives::create_userdata_iterator_with_fields,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -181,20 +182,18 @@ impl LuaUserData for Request {
             let timeout = req_guard.timeout();
 
             if let Some(timeout) = timeout {
-                Ok(Some(
-                    khronos_runtime::plugins::antiraid::datetime::TimeDelta {
-                        timedelta: chrono::Duration::from_std(*timeout)
-                            .map_err(LuaError::external)?,
-                    },
-                ))
+                Ok(Some(TimeDelta {
+                    timedelta: chrono::Duration::from_std(*timeout).map_err(LuaError::external)?,
+                }))
             } else {
                 Ok(None)
             }
         });
 
-        fields.add_field_method_set("timeout", |_, this, timeout: LuaUserDataRef<khronos_runtime::plugins::antiraid::datetime::TimeDelta>| {
+        fields.add_field_method_set("timeout", |_, this, timeout: LuaUserDataRef<TimeDelta>| {
             let mut req_guard = this.request.borrow_mut();
-            *req_guard.timeout_mut() = Some(timeout.timedelta.to_std().map_err(LuaError::external)?);
+            *req_guard.timeout_mut() =
+                Some(timeout.timedelta.to_std().map_err(LuaError::external)?);
             Ok(())
         });
 
@@ -221,38 +220,32 @@ impl LuaUserData for Request {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("send", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                let builder = {
-                    let mut req_guard = this.request.borrow_mut();
+        methods.add_scheduler_async_method("send", async |_lua, this, _g: ()| {
+            let builder = {
+                let mut req_guard = this.request.borrow_mut();
 
-                    let method = req_guard.method().clone();
-                    let url = req_guard.url().clone();
-                    let headers = req_guard.headers().clone();
-                    let body = req_guard.body_mut().take();
-                    let timeout = req_guard.timeout();
+                let method = req_guard.method().clone();
+                let url = req_guard.url().clone();
+                let headers = req_guard.headers().clone();
+                let body = req_guard.body_mut().take();
+                let timeout = req_guard.timeout();
 
-                    let mut builder = this.client.request(method, url)
-                        .headers(headers);
+                let mut builder = this.client.request(method, url).headers(headers);
 
-                    if let Some(body) = body {
-                        builder = builder.body(body);
-                    }
+                if let Some(body) = body {
+                    builder = builder.body(body);
+                }
 
-                    if let Some(timeout) = timeout {
-                        builder = builder.timeout(*timeout);
-                    }
+                if let Some(timeout) = timeout {
+                    builder = builder.timeout(*timeout);
+                }
 
-                    builder
-                };
+                builder
+            };
 
-                let response = builder
-                    .send()
-                    .await
-                    .map_err(LuaError::external)?;
+            let response = builder.send().await.map_err(LuaError::external)?;
 
-                Ok(Response::new(response))
-            }))
+            Ok(Response::new(response))
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
@@ -332,52 +325,49 @@ impl LuaUserData for Response {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("text", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                let response = {
-                    let mut re_guard = this.response.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("text", async |_lua, this, _g: ()| {
+            let response = {
+                let mut re_guard = this.response.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let text = response.text().await.map_err(LuaError::external)?;
-                Ok(text)
-            }))
+            let text = response.text().await.map_err(LuaError::external)?;
+            Ok(text)
         });
 
-        methods.add_method("json", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |lua, this, _g|, {
-                let response = {
-                    let mut re_guard = this.response.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("json", async |lua, this, _g: ()| {
+            let response = {
+                let mut re_guard = this.response.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let json = response.json::<serde_json::Value>().await.map_err(LuaError::external)?;
+            let json = response
+                .json::<serde_json::Value>()
+                .await
+                .map_err(LuaError::external)?;
 
-                let lua_value = lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)?;
+            let lua_value = lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)?;
 
-                Ok(lua_value)
-            }))
+            Ok(lua_value)
         });
 
-        methods.add_method("bytes", |_lua, this, _g: ()| {
-            Ok(lua_promise!(this, _g, |_lua, this, _g|, {
-                let response = {
-                    let mut re_guard = this.response.borrow_mut();
-                    let Some(response) = re_guard.take() else {
-                        return Err(LuaError::external("Response has been exhausted"));
-                    };
-                    response
+        methods.add_scheduler_async_method("bytes", async |lua, this, _g: ()| {
+            let response = {
+                let mut re_guard = this.response.borrow_mut();
+                let Some(response) = re_guard.take() else {
+                    return Err(LuaError::external("Response has been exhausted"));
                 };
+                response
+            };
 
-                let bytes = response.bytes().await.map_err(LuaError::external)?;
-                Ok(bytes.to_vec())
-            }))
+            let bytes = response.bytes().await.map_err(LuaError::external)?;
+            lua.create_buffer(bytes)
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

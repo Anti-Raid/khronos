@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["rt"] }
 clap = { version = "4.5.20", features = ["derive", "string"] }
 env_logger = "0.11"
 log = "0.4"
-chrono = { version = "0.4", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde"] }
 extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
 indexmap = { version = "2", features = ["serde"] }
 rustyline = "15"
@@ -22,7 +22,6 @@ tch = { version = "0.19", features = ["download-libtorch"], optional = true }
 dirs = "6"
 regex = "1"
 data-encoding = "2"
-rusqlite = { version = "^0.32", features = ["bundled", "chrono"], optional = true }
 reqwest = "0.12"
 axum = { version = "0.8", features = ["macros"] }
 hyper = "1"
@@ -30,6 +29,12 @@ hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
 tower = "0.5"
 termcolor = "1"
 vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio-rustls",
+    "chrono",
+    "postgres",
+    "uuid",
+] }
 
 # Antiraid
 khronos_runtime = { path = "../runtime" }
@@ -37,6 +42,7 @@ antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 futures-util = "0.3.31"
+bitflags = "2.9.1"
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"
@@ -56,10 +62,7 @@ version = "1"
 features = ["v4", "fast-rng", "serde"]
 
 [features]
-default = ["sqlite"]
-
-# SQLite file storage backend
-sqlite = ["dep:rusqlite"]
+default = []
 
 # Image classification experiments
 experiment_image_classification = ["dep:tch"]

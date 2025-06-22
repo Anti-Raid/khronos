@@ -1,8 +1,8 @@
-use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::traits::context::KhronosContext;
-use crate::utils::executorscope::ExecutorScope;
 use mlua::prelude::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use super::create_userdata_iterator_with_fields;
 
@@ -15,18 +15,28 @@ pub struct TemplateContext<T: KhronosContext> {
     /// The cached serialized value of the current user
     current_discord_user: RefCell<Option<LuaValue>>,
 
-    /// Cached datastore. Internally used for the datastore plugin
-    pub(crate) cached_datastore: RefCell<Vec<(ExecutorScope, LuaValue)>>,
+    /// Store table
+    store_table: LuaTable,
+
+    /// Cached plugin data
+    pub(crate) cached_plugin_data: RefCell<HashMap<String, LuaValue>>,
 }
 
 impl<T: KhronosContext> TemplateContext<T> {
-    pub fn new(context: T) -> Self {
-        Self {
+    pub fn new(lua: &Lua, context: T) -> LuaResult<Self> {
+        let store = lua
+            .app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>()
+            .ok_or(mlua::Error::RuntimeError(
+                "No runtime global table found".to_string(),
+            ))?;
+
+        Ok(Self {
             context,
+            store_table: store.0.clone(),
             cached_data: RefCell::default(),
             current_discord_user: RefCell::default(),
-            cached_datastore: RefCell::default(),
-        }
+            cached_plugin_data: RefCell::new(HashMap::new()),
+        })
     }
 
     fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
@@ -64,12 +74,76 @@ impl<T: KhronosContext> TemplateContext<T> {
 
         Ok(v)
     }
-}
 
-pub type TemplateContextRef<T> = LuaUserDataRef<TemplateContext<T>>;
+    /// Gets a plugin from cache or runs 'f' to get it
+    fn get_plugin<F, V>(&self, lua: &Lua, plugin_name: &str, f: F) -> LuaResult<LuaValue>
+    where
+        F: FnOnce(&Lua, &Self) -> LuaResult<V>,
+        V: IntoLua,
+    {
+        let mut cached_plugin_data = self
+            .cached_plugin_data
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        if let Some(v) = cached_plugin_data.get(plugin_name) {
+            return Ok(v.clone());
+        }
+
+        let v = f(lua, self)?.into_lua(lua)?;
+
+        cached_plugin_data.insert(plugin_name.to_string(), v.clone());
+
+        Ok(v)
+    }
+}
 
 impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        // Plugins
+        fields.add_field_method_get("DataStores", |lua, this| {
+            this.get_plugin(lua, "DataStores", antiraid::datastores::init_plugin)
+        });
+
+        fields.add_field_method_get("Discord", |lua, this| {
+            this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
+        });
+
+        fields.add_field_method_get("ImageCaptcha", |lua, this| {
+            this.get_plugin(lua, "ImageCaptcha", antiraid::img_captcha::init_plugin)
+        });
+
+        fields.add_field_method_get("KV", |lua, this| {
+            this.get_plugin(lua, "KV", antiraid::kv::init_plugin)
+        });
+
+        fields.add_field_method_get("Lockdowns", |lua, this| {
+            this.get_plugin(lua, "Lockdowns", antiraid::lockdowns::init_plugin)
+        });
+
+        fields.add_field_method_get("ObjectStorage", |lua, this| {
+            this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
+        });
+
+        fields.add_field_method_get("Pages", |lua, this| {
+            this.get_plugin(lua, "Pages", antiraid::pages::init_plugin)
+        });
+
+        fields.add_field_method_get("ScheduledExecution", |lua, this| {
+            this.get_plugin(
+                lua,
+                "ScheduledExecution",
+                antiraid::scheduledexec::init_plugin,
+            )
+        });
+
+        fields.add_field_method_get("UserInfo", |lua, this| {
+            this.get_plugin(lua, "UserInfo", antiraid::userinfo::init_plugin)
+        });
+
+        // Fields
+        fields.add_field_method_get("store", |_, this| Ok(this.store_table.clone()));
+
         fields.add_field_method_get("data", |lua, this| {
             let data = this.get_cached_data(lua)?;
             Ok(data)
@@ -103,9 +177,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(v)
         });
 
-        fields.add_field_method_get("memory_limit", |_lua, this| {
-            Ok(this.context.memory_limit())
-        });
+        fields.add_field_method_get("memory_limit", |_lua, this| Ok(this.context.memory_limit()));
 
         fields.add_meta_field(LuaMetaMethod::Type, "TemplateContext".to_string());
     }
@@ -127,6 +199,16 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
                 ud,
                 [
                     // Fields
+                    "DataStores",
+                    "Discord",
+                    "ImageCaptcha",
+                    "KV",
+                    "Lockdowns",
+                    "ObjectStorage",
+                    "Pages",
+                    "ScheduledExecution",
+                    "UserInfo",
+                    // Fields (raw)
                     "data",
                     "guild_id",
                     "owner_guild_id",

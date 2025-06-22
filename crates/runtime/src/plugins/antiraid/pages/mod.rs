@@ -5,9 +5,9 @@ use super::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::pageprovider::PageProvider;
-use crate::utils::executorscope::ExecutorScope;
-use crate::{plugins::antiraid::promise::UserDataLuaPromise, TemplateContextRef};
+use crate::TemplateContext;
 use mlua::prelude::*;
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 use settings_ir::Setting;
 
 const MAX_TITLE_LENGTH: usize = 256;
@@ -54,7 +54,7 @@ impl<T: KhronosContext> PageExecutor<T> {
 
 impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_promise_method("get", async move |lua, this, _g: ()| {
+        methods.add_scheduler_async_method("get", async move |lua, this, _g: ()| {
             this.check_action("get".to_string())?;
 
             let page = match this.page_provider.get_page().await {
@@ -75,7 +75,7 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
             Ok(page)
         });
 
-        methods.add_promise_method("save", async move |lua, this, page: LuaValue| {
+        methods.add_scheduler_async_method("save", async move |lua, this, page: LuaValue| {
             this.check_action("save".to_string())?;
 
             let page: Page = lua.from_value(page)?;
@@ -89,17 +89,21 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
                 settings: page.settings.into_iter().map(|e| e.into()).collect(),
             };
 
-            this.page_provider.set_page(page).await
-            .map_err(|e| LuaError::external(e.to_string()))?;
+            this.page_provider
+                .set_page(page)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(())
         });
 
-        methods.add_promise_method("delete", async move |_, this, _g: ()| {
+        methods.add_scheduler_async_method("delete", async move |_, this, _g: ()| {
             this.check_action("delete".to_string())?;
 
-            this.page_provider.delete_page().await
-            .map_err(|e| LuaError::external(e.to_string()))?;
+            this.page_provider
+                .delete_page()
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(())
         });
@@ -125,31 +129,22 @@ impl<T: KhronosContext> LuaUserData for PageExecutor<T> {
     }
 }
 
-pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
-    let module = lua.create_table()?;
+// WIP: not yet enabled
+pub fn init_plugin<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaValue> {
+    let Some(page_provider) = token.context.page_provider() else {
+        return Err(LuaError::external(
+            "The pages plugin is not supported in this context",
+        ));
+    };
 
-    module.set(
-        "new",
-        lua.create_function(
-            |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
-                let scope = ExecutorScope::scope_str(scope)?;
-                let Some(page_provider) = token.context.page_provider(scope) else {
-                    return Err(LuaError::external(
-                        "The pages plugin is not supported in this context",
-                    ));
-                };
+    let executor = PageExecutor {
+        context: token.context.clone(),
+        page_provider,
+    }
+    .into_lua(lua)?;
 
-                let executor = PageExecutor {
-                    context: token.context.clone(),
-                    page_provider,
-                };
-
-                Ok(executor)
-            },
-        )?,
-    )?;
-
-    module.set_readonly(true); // Block any attempt to modify this table
-
-    Ok(module)
+    Ok(executor)
 }

@@ -1,12 +1,11 @@
 use mlua::prelude::*;
 
-use crate::plugins::antiraid::promise::UserDataLuaPromise;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::userinfoprovider::UserInfoProvider;
-use crate::utils::executorscope::ExecutorScope;
-use crate::TemplateContextRef;
+use crate::TemplateContext;
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 
 #[derive(Clone)]
 /// An user info executor is used to fetch UserInfo's about users
@@ -40,15 +39,18 @@ impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_promise_method("get", async move |lua, this, (user,): (String,)| {
+        methods.add_scheduler_async_method("get", async move |lua, this, (user,): (String,)| {
             let user: serenity::all::UserId = user
                 .parse()
                 .map_err(|e| LuaError::external(format!("Error while parsing user id: {}", e)))?;
 
             this.check_action("get".to_string())?;
 
-            let userinfo = this.userinfo_provider.get(user).await
-            .map_err(|e| LuaError::external(e.to_string()))?;
+            let userinfo = this
+                .userinfo_provider
+                .get(user)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
             let value = lua.to_value_with(&userinfo, LUA_SERIALIZE_OPTIONS)?;
 
@@ -72,30 +74,21 @@ impl<T: KhronosContext> LuaUserData for UserInfoExecutor<T> {
     }
 }
 
-pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
-    let module = lua.create_table()?;
+pub fn init_plugin<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaValue> {
+    let Some(userinfo_provider) = token.context.userinfo_provider() else {
+        return Err(LuaError::external(
+            "The userinfo plugin is not supported in this context",
+        ));
+    };
 
-    module.set(
-        "new",
-        lua.create_function(
-            |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
-                let scope = ExecutorScope::scope_str(scope)?;
-                let Some(userinfo_provider) = token.context.userinfo_provider(scope) else {
-                    return Err(LuaError::external(
-                        "The userinfo plugin is not supported in this context",
-                    ));
-                };
+    let executor = UserInfoExecutor {
+        context: token.context.clone(),
+        userinfo_provider,
+    }
+    .into_lua(lua)?;
 
-                let executor = UserInfoExecutor {
-                    context: token.context.clone(),
-                    userinfo_provider,
-                };
-
-                Ok(executor)
-            },
-        )?,
-    )?;
-
-    module.set_readonly(true);
-    Ok(module)
+    Ok(executor)
 }

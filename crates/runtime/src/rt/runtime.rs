@@ -2,16 +2,13 @@
 
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
-use crate::utils::pluginholder::PluginSet;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
 use mlua::prelude::*;
-use mlua_scheduler::TaskManager;
-use mlua_scheduler_ext::feedbacks::{ChainFeedback, ThreadTracker};
-use mlua_scheduler_ext::Scheduler;
+use mlua_scheduler::{ReturnTracker, TaskManager};
 
 /// A wrapper around the Lua vm that cannot be cloned
 pub struct KhronosLuaRef<'a>(&'a Lua);
@@ -53,7 +50,7 @@ pub struct KhronosRuntime {
     compiler: mlua::Compiler,
 
     /// The vm scheduler
-    scheduler: Scheduler,
+    scheduler: TaskManager,
 
     /// Has the runtime been sandboxed
     sandboxed: bool,
@@ -87,12 +84,10 @@ impl KhronosRuntime {
     ///
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub fn new<
-        SF: mlua_scheduler::taskmgr::SchedulerFeedback + 'static,
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mlua::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn() -> () + 'static,
     >(
-        sched_feedback: SF,
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
         on_thread_event_callback: Option<(
@@ -112,12 +107,7 @@ impl KhronosRuntime {
 
         lua.set_compiler(compiler.clone());
 
-        let tt = ThreadTracker::new(); // Set up the critical thread tracker feedback
-        lua.set_app_data(tt.clone());
-
-        let sched_feedback = ChainFeedback::new(tt, sched_feedback);
-
-        let scheduler = Scheduler::new(TaskManager::new(&lua, Rc::new(sched_feedback)));
+        let scheduler = TaskManager::new(&lua, ReturnTracker::new());
 
         scheduler.attach()?;
 
@@ -237,6 +227,26 @@ impl KhronosRuntime {
         let store_table = lua.create_table()?;
         lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()));
 
+        // Load core modules
+        lua.register_module(
+            "@antiraid/datetime",
+            crate::core::datetime::init_plugin(&lua)?,
+        )?;
+        lua.register_module(
+            "@antiraid/interop",
+            crate::core::interop::init_plugin(&lua)?,
+        )?;
+        lua.register_module("@antiraid/lazy", crate::core::lazy::init_plugin(&lua)?)?;
+        lua.register_module("@antiraid/luau", crate::core::luau::init_plugin(&lua)?)?;
+        lua.register_module(
+            "@antiraid/permissions",
+            crate::core::permissions::init_plugin(&lua)?,
+        )?;
+        lua.register_module(
+            "@antiraid/typesext",
+            crate::core::typesext::init_plugin(&lua)?,
+        )?;
+
         Ok(Self {
             store_table,
             lua: Rc::new(RefCell::new(Some(lua))),
@@ -257,7 +267,7 @@ impl KhronosRuntime {
     /// The use of this function is *highly* discouraged. Do *not* hold the returned value across await points
     /// as it is internally a RefCell
     #[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
-    pub fn lua(&self) -> std::cell::Ref<Option<Lua>> {
+    pub fn lua(&'_ self) -> std::cell::Ref<'_, Option<Lua>> {
         log::debug!("Getting lua vm");
         self.lua.borrow()
     }
@@ -279,7 +289,7 @@ impl KhronosRuntime {
     }
 
     /// Returns the scheduler
-    pub fn scheduler(&self) -> &Scheduler {
+    pub fn scheduler(&self) -> &TaskManager {
         log::debug!("Getting scheduler");
         &self.scheduler
     }
@@ -449,20 +459,6 @@ impl KhronosRuntime {
         &self.store_table
     }
 
-    /// Loads plugins to be exposed to all isolates
-    pub fn load_plugins(&self, plugins: PluginSet) -> LuaResult<()> {
-        log::debug!("Loading plugins");
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-
-        for (name, plugin) in plugins.into_iter() {
-            let table = (plugin.0)(&lua)?;
-            lua.register_module(&name, table)?;
-        }
-        Ok(())
-    }
-
     /// Sets the print function to use stdout
     pub fn use_stdout_print(&self) -> LuaResult<()> {
         // Ensure print is global as everything basically relies on print
@@ -510,6 +506,23 @@ impl KhronosRuntime {
         };
 
         (func)(KhronosLuaRef(lua))
+    }
+
+    /// Sets a custom global
+    pub fn set_custom_global<
+        A: IntoLua + mlua::MaybeSend + 'static,
+        V: IntoLua + mlua::MaybeSend + 'static,
+    >(
+        &self,
+        name: A,
+        value: V,
+    ) -> LuaResult<()> {
+        let Some(ref lua) = *self.lua.borrow() else {
+            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+        };
+
+        lua.globals().set(name, value)?;
+        Ok(())
     }
 
     /// Sets a custom global function

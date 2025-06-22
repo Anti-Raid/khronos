@@ -1,4 +1,4 @@
-use super::LUA_SERIALIZE_OPTIONS;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {

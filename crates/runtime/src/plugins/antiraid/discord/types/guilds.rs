@@ -1,4 +1,4 @@
-use crate::plugins::antiraid::typesext::MultiOption;
+use crate::core::typesext::MultiOption;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 

@@ -1,7 +1,12 @@
-use super::LUA_SERIALIZE_OPTIONS;
+use crate::{
+    to_struct,
+    traits::context::KhronosContext,
+    utils::khronos_value::{KhronosBuffer, KhronosValue},
+    TemplateContext,
+};
 use captcha::filters::Filter;
 use mlua::prelude::*;
-use crate::plugins::antiraid::promise::LuaPromise;
+use mlua_scheduler::LuaSchedulerAsync;
 
 pub const CREATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 pub const MAX_CHAR_COUNT: u8 = 10;
@@ -9,11 +14,11 @@ pub const MAX_FILTERS: usize = 12;
 pub const MAX_VIEWBOX_X: u32 = 512;
 pub const MAX_VIEWBOX_Y: u32 = 512;
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct Captcha {
-    pub text: String,
-    pub content: Option<String>, // Message content
-    pub image: Option<Vec<u8>>,  // Image data
+to_struct! {
+    pub struct Captcha {
+        pub text: String,
+        pub image: KhronosBuffer,
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -165,27 +170,32 @@ impl CaptchaConfig {
     }
 }
 
-pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
+pub async fn new(lua: &Lua, config: CaptchaConfig) -> LuaResult<LuaValue> {
+    let (text, image) = config
+        .create_captcha(CREATE_TIMEOUT)
+        .await
+        .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+    let kv: KhronosValue = Captcha {
+        text,
+        image: KhronosBuffer::new(image),
+    }
+    .try_into()
+    .map_err(|e| LuaError::runtime(format!("Failed to convert captcha: {}", e)))?;
+
+    Ok(kv.into_lua(lua)?)
+}
+
+pub fn init_plugin<T: KhronosContext>(lua: &Lua, _: &TemplateContext<T>) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
     module.set(
-        "new",
-        LuaPromise::new_function(lua, async move |lua, (config,): (LuaValue,)| {
+        "Create",
+        lua.create_scheduler_async_function(async move |lua, (config,): (LuaValue,)| {
             let config: CaptchaConfig = lua.from_value(config)?;
 
-            let (text, image) = config
-                .create_captcha(CREATE_TIMEOUT)
-                .await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            let captcha = Captcha {
-                text,
-                image: Some(image),
-                content: Some("Please enter the text from the image".to_string()),
-            };
-
-            lua.to_value_with(&captcha, LUA_SERIALIZE_OPTIONS) // Return the captcha object
-        })?
+            new(&lua, config).await
+        })?,
     )?;
 
     module.set_readonly(true); // Block any attempt to modify this table

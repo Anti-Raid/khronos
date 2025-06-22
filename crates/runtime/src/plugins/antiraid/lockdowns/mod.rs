@@ -1,13 +1,12 @@
 mod types;
 
-use crate::plugins::antiraid::promise::UserDataLuaPromise;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::KhronosContext;
 use crate::traits::lockdownprovider::LockdownProvider;
-use crate::utils::executorscope::ExecutorScope;
-use crate::TemplateContextRef;
+use crate::TemplateContext;
 use lockdowns::LockdownSet;
 use mlua::prelude::*;
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 use types::{CreateLockdownMode, LockdownMode};
 
 #[derive(Clone)]
@@ -43,7 +42,7 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_promise_method("fetch_lockdown_set", async move |_, this, _g: ()| {
+        methods.add_scheduler_async_method("fetch_lockdown_set", async move |_, this, _g: ()| {
             this.check_action("fetch_lockdown_set".to_string())?;
 
             // Get the current lockdown set
@@ -80,29 +79,24 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
     }
 }
 
-pub fn init_plugin<T: KhronosContext>(lua: &Lua) -> LuaResult<LuaTable> {
+pub fn init_plugin<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    module.set(
-        "new",
-        lua.create_function(
-            |_, (token, scope): (TemplateContextRef<T>, Option<String>)| {
-                let scope = ExecutorScope::scope_str(scope)?;
-                let Some(lockdown_provider) = token.context.lockdown_provider(scope) else {
-                    return Err(LuaError::external(
-                        "The lockdown plugin is not supported in this context",
-                    ));
-                };
+    let Some(lockdown_provider) = token.context.lockdown_provider() else {
+        return Err(LuaError::external(
+            "The lockdown plugin is not supported in this context",
+        ));
+    };
 
-                let executor = LockdownExecutor {
-                    context: token.context.clone(),
-                    lockdown_provider,
-                };
+    let executor = LockdownExecutor {
+        context: token.context.clone(),
+        lockdown_provider,
+    };
 
-                Ok(executor)
-            },
-        )?,
-    )?;
+    module.set("Client", executor)?;
 
     module.set(
         "CreateQuickServerLockdown",

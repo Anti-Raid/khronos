@@ -13,4 +13,3 @@ pub use runtime::{KhronosRuntime, KhronosRuntimeInterruptData, RuntimeCreateOpts
 // Re-export for convenience
 pub use mlua;
 pub use mlua_scheduler;
-pub use mlua_scheduler_ext;

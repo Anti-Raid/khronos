@@ -4,9 +4,9 @@ use crate::{
 };
 use mlua::prelude::*;
 use std::rc::Rc;
-use crate::plugins::antiraid::promise::UserDataLuaPromise;
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 use crate::{
-    plugins::antiraid::datetime::DateTime, primitives::create_userdata_iterator_with_fields,
+    core::datetime::DateTime, primitives::create_userdata_iterator_with_fields,
 };
 
 pub struct CreateLockdownMode(pub Box<(dyn lockdowns::CreateLockdownMode + 'static)>);
@@ -207,13 +207,9 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
             Ok(())
         });
 
-        methods.add_promise_function(
+        methods.add_scheduler_async_method_mut(
             "apply",
-            async move |_, (this, lockdown_type, reason): (LuaAnyUserData, LuaUserDataRef<LockdownMode>, String)| {
-                let mut this = this
-                .borrow_mut::<LockdownSet<T>>()
-                .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
-            
+            async move |_lua, mut this, (lockdown_type, reason): (LuaUserDataRef<LockdownMode>, String)| {            
                 this.check_action(lockdown_type.0.string_form())?;
 
                 match this
@@ -236,13 +232,9 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
             },
         );
 
-        methods.add_promise_function(
+        methods.add_scheduler_async_method_mut(
             "remove",
-            async move |_, (this, id,): (LuaAnyUserData, String,)| {
-                let mut this = this
-                .borrow_mut::<LockdownSet<T>>()
-                .map_err(|_| LuaError::external("Failed to lock access to lockdown set. Please note that you cannot apply/remove multiple lockdowns at the same time"))?;
-
+            async move |_lua, mut this, id: String| {
                 this.check_action("remove".to_string())?;
 
                 let id = uuid::Uuid::parse_str(&id)
@@ -509,7 +501,7 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
             Ok(s)
         });
 
-        methods.add_promise_method("display_changeset", async move |_, this, lockdown_set: LuaAnyUserData| {
+        methods.add_scheduler_async_method("display_changeset", async move |_, this, lockdown_set: LuaAnyUserData| {
             let mut lockdown_set = lockdown_set
             .borrow_mut::<LockdownSet<T>>()
             .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;
@@ -522,7 +514,7 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
             Ok(changeset)
         });
 
-        methods.add_promise_method("try_auto_fix", async move |_, this, lockdown_set: LuaAnyUserData| {
+        methods.add_scheduler_async_method("try_auto_fix", async move |_, this, lockdown_set: LuaAnyUserData| {
             let mut lockdown_set = lockdown_set
             .borrow_mut::<LockdownSet<T>>()
             .map_err(|_| LuaError::external("Failed to lock access to lockdown test result"))?;

@@ -1,9 +1,18 @@
-pub use crate::plugins::antiraid::objectstorage::ObjectStoragePath;
 use mlua::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct KhronosBuffer(pub Vec<u8>);
+
+impl KhronosBuffer {
+    pub fn new(data: Vec<u8>) -> Self {
+        KhronosBuffer(data)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum KhronosValue {
@@ -12,13 +21,13 @@ pub enum KhronosValue {
     UnsignedInteger(u64),
     Float(f64),
     Boolean(bool),
+    Buffer(KhronosBuffer),   // Binary data
     Vector((f32, f32, f32)), // Luau vector
     Map(indexmap::IndexMap<String, KhronosValue>),
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
-    ObjectStoragePath(ObjectStoragePath),
     Null,
 }
 
@@ -48,6 +57,7 @@ impl TryFrom<String> for KhronosValue {
         Ok(KhronosValue::Text(value))
     }
 }
+
 impl TryFrom<KhronosValue> for String {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -265,12 +275,30 @@ impl TryFrom<bool> for KhronosValue {
         Ok(KhronosValue::Boolean(value))
     }
 }
+
 impl TryFrom<KhronosValue> for bool {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
             KhronosValue::Boolean(b) => Ok(b),
             _ => Err("KhronosValue is not a bool".into()),
+        }
+    }
+}
+
+impl TryFrom<KhronosBuffer> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: KhronosBuffer) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::Buffer(value))
+    }
+}
+
+impl TryFrom<KhronosValue> for KhronosBuffer {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::Buffer(b) => Ok(b),
+            _ => Err("KhronosValue is not a buffer".into()),
         }
     }
 }
@@ -354,23 +382,6 @@ impl TryFrom<KhronosValue> for chrono_tz::Tz {
         match value {
             KhronosValue::TimeZone(tz) => Ok(tz),
             _ => Err("KhronosValue is not a TimeZone".into()),
-        }
-    }
-}
-
-impl TryFrom<ObjectStoragePath> for KhronosValue {
-    type Error = crate::Error;
-    fn try_from(value: ObjectStoragePath) -> Result<Self, Self::Error> {
-        Ok(KhronosValue::ObjectStoragePath(value))
-    }
-}
-
-impl TryFrom<KhronosValue> for ObjectStoragePath {
-    type Error = crate::Error;
-    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
-        match value {
-            KhronosValue::ObjectStoragePath(path) => Ok(path),
-            _ => Err("KhronosValue is not an ObjectStoragePath".into()),
         }
     }
 }
@@ -655,13 +666,13 @@ impl KhronosValue {
             KhronosValue::UnsignedInteger(_) => "unsigned_integer",
             KhronosValue::Float(_) => "float",
             KhronosValue::Boolean(_) => "boolean",
+            KhronosValue::Buffer(_) => "buffer",
             KhronosValue::Vector(_) => "vector",
             KhronosValue::Map(_) => "map",
             KhronosValue::List(_) => "list",
             KhronosValue::Timestamptz(_) => "timestamptz",
             KhronosValue::Interval(_) => "interval",
             KhronosValue::TimeZone(_) => "timezone",
-            KhronosValue::ObjectStoragePath(_) => "objectstorage_path",
             KhronosValue::Null => "null",
         }
     }
@@ -701,6 +712,13 @@ impl KhronosValue {
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             KhronosValue::Boolean(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_buffer(&self) -> Option<&KhronosBuffer> {
+        match self {
+            KhronosValue::Buffer(b) => Some(b),
             _ => None,
         }
     }
@@ -761,6 +779,10 @@ impl KhronosValue {
             LuaValue::Integer(i) => Ok(KhronosValue::Integer(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
             LuaValue::Boolean(b) => Ok(KhronosValue::Boolean(b)),
+            LuaValue::Buffer(buf) => {
+                let data = buf.to_vec();
+                Ok(KhronosValue::Buffer(KhronosBuffer::new(data)))
+            }
             LuaValue::Vector(v) => Ok(KhronosValue::Vector((v.x(), v.y(), v.z()))),
             LuaValue::Nil => Ok(KhronosValue::Null),
             LuaValue::Table(table) => {
@@ -785,28 +807,23 @@ impl KhronosValue {
                 Ok(KhronosValue::List(list))
             }
             LuaValue::UserData(ud) => {
-                if let Ok(dt) =
-                    ud.borrow::<crate::plugins::antiraid::datetime::DateTime<chrono_tz::Tz>>()
-                {
+                if let Ok(dt) = ud.borrow::<crate::core::datetime::DateTime<chrono_tz::Tz>>() {
                     return Ok(KhronosValue::Timestamptz(dt.dt.with_timezone(&chrono::Utc)));
                 }
-                if let Ok(delta) = ud.borrow::<crate::plugins::antiraid::datetime::TimeDelta>() {
+                if let Ok(delta) = ud.borrow::<crate::core::datetime::TimeDelta>() {
                     return Ok(KhronosValue::Interval(delta.timedelta));
                 }
-                if let Ok(tz) = ud.borrow::<crate::plugins::antiraid::datetime::Timezone>() {
+                if let Ok(tz) = ud.borrow::<crate::core::datetime::Timezone>() {
                     return Ok(KhronosValue::TimeZone(tz.tz.clone()));
                 }
-                if let Ok(i_64) = ud.borrow::<crate::plugins::antiraid::typesext::I64>() {
+                if let Ok(i_64) = ud.borrow::<crate::core::typesext::I64>() {
                     return Ok(KhronosValue::Integer(i_64.0));
                 }
-                if let Ok(u_64) = ud.borrow::<crate::plugins::antiraid::typesext::U64>() {
+                if let Ok(u_64) = ud.borrow::<crate::core::typesext::U64>() {
                     return Ok(KhronosValue::UnsignedInteger(u_64.0));
                 }
-                if let Ok(path) = ud.borrow::<ObjectStoragePath>() {
-                    return Ok(KhronosValue::ObjectStoragePath(path.clone()));
-                }
 
-                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone | ObjectStoragePath".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
+                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
             }
             _ => Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -832,16 +849,19 @@ impl KhronosValue {
                 let min_luau_integer = -9007199254740991; // 2^53 - 1
                 let max_luau_integer = 9007199254740991; // 2^53 - 1
                 if i > max_luau_integer || i < min_luau_integer {
-                    crate::plugins::antiraid::typesext::I64(i).into_lua(lua)
+                    crate::core::typesext::I64(i).into_lua(lua)
                 } else {
                     Ok(LuaValue::Integer(i))
                 }
             }
-            KhronosValue::UnsignedInteger(i) => {
-                crate::plugins::antiraid::typesext::U64(i).into_lua(lua)
-            } // An UnsignedInteger can only be created through explicit U64 parse
+            KhronosValue::UnsignedInteger(i) => crate::core::typesext::U64(i).into_lua(lua), // An UnsignedInteger can only be created through explicit U64 parse
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
+            KhronosValue::Buffer(buf) => {
+                let data = buf.0;
+                let lua_buf = lua.create_buffer(data)?;
+                Ok(LuaValue::Buffer(lua_buf))
+            }
             KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
             KhronosValue::Map(j) => {
                 let table = lua.create_table()?;
@@ -860,16 +880,10 @@ impl KhronosValue {
                 Ok(LuaValue::Table(table))
             }
             KhronosValue::Timestamptz(dt) => {
-                crate::plugins::antiraid::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt)
-                    .into_lua(lua)
+                crate::core::datetime::DateTime::<chrono_tz::Tz>::from_utc(dt).into_lua(lua)
             }
-            KhronosValue::Interval(i) => {
-                crate::plugins::antiraid::datetime::TimeDelta::new(i).into_lua(lua)
-            }
-            KhronosValue::TimeZone(tz) => {
-                crate::plugins::antiraid::datetime::Timezone::new(tz).into_lua(lua)
-            }
-            KhronosValue::ObjectStoragePath(path) => path.into_lua(lua),
+            KhronosValue::Interval(i) => crate::core::datetime::TimeDelta::new(i).into_lua(lua),
+            KhronosValue::TimeZone(tz) => crate::core::datetime::Timezone::new(tz).into_lua(lua),
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
@@ -893,6 +907,18 @@ impl KhronosValue {
                 serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap())
             }
             KhronosValue::Boolean(b) => serde_json::Value::Bool(b),
+            KhronosValue::Buffer(buf) => {
+                if !preserve_types {
+                    serde_json::to_value(buf)
+                        .map_err(|e| format!("Failed to serialize Buffer: {}", e))?
+                } else {
+                    serde_json::json!({
+                        KHRONOS_VALUE_TYPE_KEY: "buffer",
+                        "value": serde_json::to_value(buf)
+                        .map_err(|e| format!("Failed to serialize Buffer: {}", e))?
+                    })
+                }
+            }
             KhronosValue::Vector(v) => {
                 if !preserve_types {
                     serde_json::to_value(v)
@@ -963,18 +989,6 @@ impl KhronosValue {
                     })
                 }
             }
-            KhronosValue::ObjectStoragePath(path) => {
-                if !preserve_types {
-                    serde_json::to_value(path)
-                        .map_err(|e| format!("Failed to serialize ObjectStoragePath: {}", e))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "objectstorage_path",
-                        "value": serde_json::to_value(path)
-                        .map_err(|e| format!("Failed to serialize ObjectStoragePath: {}", e))?
-                    })
-                }
-            }
             KhronosValue::Null => serde_json::Value::Null,
         })
     }
@@ -1005,6 +1019,14 @@ impl KhronosValue {
                 if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
                     if let Some(khronos_value_type) = khronos_value_type.as_str() {
                         match khronos_value_type {
+                            "buffer" => {
+                                let value = m.get("value").ok_or("Missing value field")?;
+                                return Ok(KhronosValue::Buffer(
+                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                        format!("Failed to deserialize Buffer: {}", e)
+                                    })?,
+                                ));
+                            }
                             "vector" => {
                                 let value = m.get("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Vector(
@@ -1034,14 +1056,6 @@ impl KhronosValue {
                                 return Ok(KhronosValue::TimeZone(
                                     serde_json::from_value(value.clone()).map_err(|e| {
                                         format!("Failed to deserialize TimeZone: {}", e)
-                                    })?,
-                                ));
-                            }
-                            "objectstorage_path" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::ObjectStoragePath(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
-                                        format!("Failed to deserialize ObjectStoragePath: {}", e)
                                     })?,
                                 ));
                             }
@@ -1097,6 +1111,14 @@ impl Serialize for KhronosValue {
         match self {
             KhronosValue::Null => serializer.serialize_unit(),
             KhronosValue::Boolean(b) => serializer.serialize_bool(*b),
+            KhronosValue::Buffer(buf) => {
+                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "buffer")?;
+                map.serialize_entry("value", buf)?;
+                map.end()
+            }
             KhronosValue::Vector(v) => {
                 // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
                 use serde::ser::SerializeMap;
@@ -1131,14 +1153,6 @@ impl Serialize for KhronosValue {
                 let mut map = serializer.serialize_map(Some(2))?;
                 map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "timezone")?;
                 map.serialize_entry("value", tz)?;
-                map.end()
-            }
-            KhronosValue::ObjectStoragePath(path) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "objectstorage_path")?;
-                map.serialize_entry("value", path)?;
                 map.end()
             }
             KhronosValue::Map(m) => {

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, io::Write, rc::Rc, str::FromStr};
 
-use khronos_runtime::lua_promise;
 use khronos_runtime::rt::mlua::prelude::*;
+use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsync;
 use std::io::IsTerminal;
 use termcolor::{Color, ColorChoice, WriteColor};
 
@@ -21,36 +21,34 @@ pub fn ext(
 
     ext.set(
         "input",
-        lua.create_function(move |_lua, (prompt,): (String,)| {
-            Ok(lua_promise!(prompt, |_lua, prompt|, {
-                let (tx, rx) = tokio::sync::oneshot::channel();
+        lua.create_scheduler_async_function(async |_lua, (prompt,): (String,)| {
+            let (tx, rx) = tokio::sync::oneshot::channel();
 
-                std::thread::spawn(move || {
-                    let mut editor = match rustyline::DefaultEditor::new() {
-                        Ok(e) => e,
-                        Err(e) => {
-                            let _ = tx.send(Err(format!("Failed to create editor: {}", e)));
-                            return;
-                        }
-                    };
+            std::thread::spawn(move || {
+                let mut editor = match rustyline::DefaultEditor::new() {
+                    Ok(e) => e,
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("Failed to create editor: {}", e)));
+                        return;
+                    }
+                };
 
-                    let input = match editor.readline(&prompt) {
-                        Ok(i) => i,
-                        Err(e) => {
-                            let _ = tx.send(Err(format!("Failed to read input: {}", e)));
-                            return;
-                        }
-                    };
+                let input = match editor.readline(&prompt) {
+                    Ok(i) => i,
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("Failed to read input: {}", e)));
+                        return;
+                    }
+                };
 
-                    let _ = tx.send(Ok(input));
-                });
+                let _ = tx.send(Ok(input));
+            });
 
-                match rx.await {
-                    Ok(Ok(input)) => Ok(input),
-                    Ok(Err(e)) => Err(LuaError::external(e)),
-                    Err(_) => Err(LuaError::external("Failed to receive input")),
-                }
-            }))
+            match rx.await {
+                Ok(Ok(input)) => Ok(input),
+                Ok(Err(e)) => Err(LuaError::external(e)),
+                Err(_) => Err(LuaError::external("Failed to receive input")),
+            }
         })?,
     )?;
 

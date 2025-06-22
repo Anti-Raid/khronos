@@ -1,4 +1,4 @@
-use super::LUA_SERIALIZE_OPTIONS;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use std::cell::RefCell;
 

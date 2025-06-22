@@ -6,15 +6,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::primitives::event::Event;
+use crate::require::{AssetRequirer, FilesystemWrapper};
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
-use crate::require::{AssetRequirer, FilesystemWrapper};
 use crate::TemplateContext;
 
 use super::runtime::KhronosRuntime;
 use mlua::prelude::*;
-use mlua_scheduler_ext::traits::IntoLuaThread;
 use rand::distributions::Alphanumeric;
 
 /// A bytecode cacher for Luau scripts
@@ -209,12 +208,18 @@ impl KhronosIsolate {
         &self.id
     }
 
-    pub fn create_context<K: KhronosContextTrait>(&self, context: TemplateContext<K>) -> Result<CreatedKhronosContext, LuaError> {
+    /// Creates a new TemplateContext with the given KhronosContext
+    pub fn create_context<K: KhronosContextTrait>(
+        &self,
+        context: K,
+    ) -> Result<CreatedKhronosContext, LuaError> {
         let Some(ref lua) = *self.inner.lua.borrow_mut() else {
             return Err(LuaError::RuntimeError(
                 "Lua instance is no longer valid".to_string(),
             ));
         };
+
+        let context = TemplateContext::new(lua, context)?;
 
         match context.into_lua(lua) {
             Ok(f) => Ok(CreatedKhronosContext(f)),
@@ -347,13 +352,28 @@ impl KhronosIsolate {
                 Cow::Owned(bytecode)
             };
 
-            match lua
+            let f = match lua
                 .load(&**bytecode)
                 .set_name(name.to_string())
                 .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
                 .set_environment(self.global_table.clone())
-                .into_lua_thread(lua)
+                .into_function()
             {
+                Ok(f) => f,
+                Err(e) => {
+                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                    if let LuaError::MemoryError(_) = e {
+                        // Mark VM as broken
+                        self.inner
+                            .mark_broken(true)
+                            .map_err(|e| LuaError::external(e.to_string()))?;
+                    }
+
+                    return Err(e);
+                }
+            };
+
+            match lua.create_thread(f) {
                 Ok(f) => f,
                 Err(e) => {
                     // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -376,7 +396,7 @@ impl KhronosIsolate {
         let res = self
             .inner
             .scheduler()
-            .spawn_thread_and_wait("Exec", thread, args)
+            .spawn_thread_and_wait(thread, args)
             .await?;
 
         // Do a GC

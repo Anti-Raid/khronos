@@ -10,14 +10,14 @@ use super::runtime::{KhronosRuntime, OnBrokenFunc};
 #[derive(Clone)]
 pub struct IsolateData<ExtraData: Clone + 'static> {
     pub isolate: KhronosIsolate,
-    pub data: ExtraData
+    pub data: ExtraData,
 }
 
 /// A simple abstraction around khronos runtime/isolates to allow named isolate access
 ///
 /// Like isolates, these are also cheap to clone
 #[derive(Clone)]
-pub struct KhronosRuntimeManager<ExtraData: Clone +'static> {
+pub struct KhronosRuntimeManager<ExtraData: Clone + 'static> {
     /// The runtime itself
     rt: KhronosRuntime,
 
@@ -73,7 +73,7 @@ impl<ExtraData: Clone + 'static> KhronosRuntimeManager<ExtraData> {
     }
 
     /// Returns the main isolate (if any)
-    pub fn main_isolate(&self) -> std::cell::Ref<Option<IsolateData<ExtraData>>> {
+    pub fn main_isolate(&'_ self) -> std::cell::Ref<'_, Option<IsolateData<ExtraData>>> {
         self.main_isolate.borrow()
     }
 

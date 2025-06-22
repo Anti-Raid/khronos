@@ -4,28 +4,22 @@ use crate::filestorage::FileStorageProvider;
 use crate::presets::impls::CreateEventFromPresetType;
 use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
-use crate::provider::CliKhronosContext;
 use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::rt::mlua::prelude::*;
-use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsync;
 use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
-use khronos_runtime::utils::dummyfeedback::DummyFeedback;
-use khronos_runtime::utils::pluginholder::PluginSet;
-use khronos_runtime::TemplateContext;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
-use std::env::consts::OS;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{path::PathBuf, time::Duration};
 use tokio::fs;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -57,12 +51,6 @@ pub enum ReplTaskWaitMode {
 
 #[derive(Debug, Clone, Copy)]
 pub enum FileStorageBackend {
-    #[cfg(feature = "sqlite")]
-    SqliteInMemory,
-    #[cfg(feature = "sqlite")]
-    SqliteFile,
-    #[cfg(feature = "sqlite")]
-    SqliteFileNoSynchronize,
     LocalFs,
 }
 
@@ -179,6 +167,9 @@ pub struct Cli {
 
     /// CLI extension state
     pub ext_state: Rc<RefCell<CliExtensionState>>,
+
+    /// Postgres Pool
+    pub pool: Option<sqlx::PgPool>,
 }
 
 impl Cli {
@@ -233,6 +224,7 @@ impl Cli {
             cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
             template_name: self.template_name.clone(),
+            pool: self.pool.clone(),
         }
     }
 
@@ -254,13 +246,7 @@ impl Cli {
             None => {
                 let context = self.create_khronos_context();
 
-                let template_context: TemplateContext<provider::CliKhronosContext> =
-                    TemplateContext::new(context);
-
-                let ctx = self
-                    .setup_data
-                    .main_isolate
-                    .create_context(template_context)?;
+                let ctx = self.setup_data.main_isolate.create_context(context)?;
 
                 self.cached_context = Some(ctx.clone());
 
@@ -285,7 +271,6 @@ impl Cli {
 
         let time_now = std::time::Instant::now();
         let runtime = KhronosRuntime::new(
-            DummyFeedback {},
             RuntimeCreateOpts {
                 disable_task_lib: aux_opts.disable_task_lib,
             },
@@ -362,10 +347,6 @@ impl Cli {
 
             fs
         };
-
-        let mut pset = PluginSet::new();
-        pset.add_default_plugins::<CliKhronosContext>();
-        runtime.load_plugins(pset).expect("Failed to add plugins");
 
         let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
             .expect("Failed to create main isolate");
@@ -491,8 +472,9 @@ impl Cli {
                         .main_isolate
                         .inner()
                         .scheduler()
-                        .wait_till_done(Duration::from_millis(1000))
-                        .await;
+                        .wait_till_done()
+                        .await
+                        .expect("Failed to wait till done");
                 }
             }
             CliEntrypointAction::Repl { task_wait_mode } => {
@@ -561,8 +543,9 @@ impl Cli {
                                             .main_isolate
                                             .inner()
                                             .scheduler()
-                                            .wait_till_done(Duration::from_millis(1000))
-                                            .await;
+                                            .wait_till_done()
+                                            .await
+                                            .expect("Failed to wait till done");
                                     }
                                 }
                                 break;
@@ -613,8 +596,9 @@ impl Cli {
                                 .main_isolate
                                 .inner()
                                 .scheduler()
-                                .wait_till_done(Duration::from_millis(1000))
-                                .await;
+                                .wait_till_done()
+                                .await
+                                .expect("Failed to wait till done");
                         }
                     }
                 }

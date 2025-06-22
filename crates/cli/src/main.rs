@@ -19,12 +19,6 @@ use tokio::fs;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
 pub enum FileStorageBackend {
-    #[cfg(feature = "sqlite")]
-    SqliteInMemory,
-    #[cfg(feature = "sqlite")]
-    SqliteFile,
-    #[cfg(feature = "sqlite")]
-    SqliteFileNoSynchronize,
     LocalFs,
 }
 
@@ -206,6 +200,14 @@ struct CliArgs {
     #[clap(long)]
     file_storage_base_path: Option<PathBuf>,
 
+    /// The postgres connection string to use for the kv store
+    ///
+    ///  If unset, the kv store will not be available
+    ///
+    ///  Environment variable: `KV_STORE_CONNECTION_STRING`
+    #[clap(long)]
+    kv_store_connection_string: Option<String>,
+
     /// Whether or not to use env vars at all
     ///
     /// This may be slower performance wise and is hence disabled by default
@@ -383,6 +385,10 @@ impl CliArgs {
                 .expect("Failed to parse use custom print");
         }
 
+        if let Ok(kv_store_connection_string) = src.var("KV_STORE_CONNECTION_STRING") {
+            self.kv_store_connection_string = Some(kv_store_connection_string);
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -485,14 +491,6 @@ impl CliArgs {
                 cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
                 file_storage_backend: match self.file_storage_backend {
-                    #[cfg(feature = "sqlite")]
-                    FileStorageBackend::SqliteInMemory => cli::FileStorageBackend::SqliteInMemory,
-                    #[cfg(feature = "sqlite")]
-                    FileStorageBackend::SqliteFile => cli::FileStorageBackend::SqliteFile,
-                    #[cfg(feature = "sqlite")]
-                    FileStorageBackend::SqliteFileNoSynchronize => {
-                        cli::FileStorageBackend::SqliteFileNoSynchronize
-                    }
                     FileStorageBackend::LocalFs => cli::FileStorageBackend::LocalFs,
                 },
                 file_storage_provider: {
@@ -522,73 +520,44 @@ impl CliArgs {
                                     .expect("Failed to create file storage provider"),
                             )
                         }
-                        #[cfg(feature = "sqlite")]
-                        FileStorageBackend::SqliteFile => {
-                            let base_path =
-                                self.file_storage_base_path.clone().unwrap_or_else(|| {
-                                    let base_path = var("XDG_DATA_HOME")
-                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                        .unwrap_or_else(|_| {
-                                            dirs::data_dir()
-                                                .expect("Failed to get data dir")
-                                                .join("khronos-cli")
-                                        });
-
-                                    if !base_path.exists() {
-                                        std::fs::create_dir_all(&base_path)
-                                            .expect("Failed to create base path");
-                                    }
-
-                                    base_path
-                                });
-
-                            Rc::new(
-                                filestorage::SqliteFileStorageProvider::new(
-                                    base_path,
-                                    self.verbose,
-                                    true,
-                                )
-                                .await
-                                .expect("Failed to create file storage provider"),
-                            )
-                        }
-                        #[cfg(feature = "sqlite")]
-                        FileStorageBackend::SqliteFileNoSynchronize => {
-                            let base_path =
-                                self.file_storage_base_path.clone().unwrap_or_else(|| {
-                                    let base_path = var("XDG_DATA_HOME")
-                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                        .unwrap_or_else(|_| {
-                                            dirs::data_dir()
-                                                .expect("Failed to get data dir")
-                                                .join("khronos-cli")
-                                        });
-
-                                    if !base_path.exists() {
-                                        std::fs::create_dir_all(&base_path)
-                                            .expect("Failed to create base path");
-                                    }
-
-                                    base_path
-                                });
-
-                            Rc::new(
-                                filestorage::SqliteFileStorageProvider::new(
-                                    base_path,
-                                    self.verbose,
-                                    false,
-                                )
-                                .await
-                                .expect("Failed to create file storage provider"),
-                            )
-                        }
-                        #[cfg(feature = "sqlite")]
-                        FileStorageBackend::SqliteInMemory => Rc::new(
-                            filestorage::SqliteInMemoryProvider::new(self.verbose)
-                                .await
-                                .expect("Failed to create file storage provider"),
-                        ),
                     }
+                },
+                pool: match self.kv_store_connection_string {
+                    Some(s) => {
+                        let pool = sqlx::PgPool::connect(&s)
+                            .await
+                            .expect("Failed to connect to postgres");
+
+                        sqlx::query("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
+                            .execute(&pool)
+                            .await
+                            .expect("Failed to create extension");
+
+                        sqlx::query(
+                            "
+                            CREATE TABLE IF NOT EXISTS kv_table (
+                                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                                key TEXT NOT NULL,
+                                value JSONB NOT NULL,
+                                scopes TEXT[] NOT NULL,
+                                guild_id TEXT NOT NULL,
+                                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                            )
+                        ",
+                        )
+                        .execute(&pool)
+                        .await
+                        .expect("Failed to create kv_table");
+
+                        sqlx::query("CREATE INDEX IF NOT EXISTS idx_kv_scopes_gin ON kv_table USING gin (scopes)")
+                        .execute(&pool)
+                        .await
+                        .expect("Failed to create index");
+
+                        Some(pool)
+                    }
+                    None => None,
                 },
             },
             entrypoint_action,
