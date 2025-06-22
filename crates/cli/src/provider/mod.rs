@@ -388,7 +388,7 @@ ORDER BY scope;
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT key, value, created_at, last_updated_at, scopes
+            "SELECT id, key, value, created_at, last_updated_at, scopes
             FROM kv_table
             WHERE 
             guild_id = $1 AND
@@ -411,6 +411,7 @@ ORDER BY scope;
         let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
+            id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
             key: data.get::<String, _>("key"),
             value: record,
             created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
@@ -500,7 +501,7 @@ ORDER BY scope;
         query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let entries = sqlx::query(
-            "SELECT key, value, created_at, last_updated_at, scopes
+            "SELECT id, key, value, created_at, last_updated_at, scopes
             FROM kv_table
             WHERE 
             guild_id = $1 
@@ -522,6 +523,7 @@ ORDER BY scope;
             let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
 
             let file_contents = khronos_runtime::traits::ir::KvRecord {
+                id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
                 key: data.get::<String, _>("key"),
                 value: record,
                 created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),

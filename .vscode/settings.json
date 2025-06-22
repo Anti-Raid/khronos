@@ -1,6 +1,6 @@
 {
   "rust-analyzer.cargo.features": [
-    "experiment_resnet50"
+    "experiment_image_classification"
   ],
   "luau-lsp.require.mode": "relativeToFile",
   "luau-lsp.require.directoryAliases": {

@@ -18,6 +18,7 @@ pub struct KvExecutor<T: KhronosContext> {
 to_struct!(
     /// Represents a full record complete with metadata
     pub struct KvRecord {
+        pub id: String,
         pub key: String,
         pub value: KhronosValue,
         pub scopes: Vec<String>,
@@ -30,6 +31,7 @@ to_struct!(
 impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
     fn from(record: crate::traits::ir::kv::KvRecord) -> Self {
         KvRecord {
+            id: record.id,
             key: record.key,
             exists: true,
             value: record.value,
@@ -43,6 +45,7 @@ impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
 impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
     fn from(record: KvRecord) -> Self {
         crate::traits::ir::kv::KvRecord {
+            id: record.id,
             key: record.key,
             value: record.value,
             scopes: record.scopes,
@@ -55,6 +58,7 @@ impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
 impl KvRecord {
     fn default() -> KvRecord {
         KvRecord {
+            id: "".to_string(),
             key: "".to_string(),
             value: KhronosValue::Null,
             scopes: vec![],
@@ -80,22 +84,27 @@ impl<T: KhronosContext> KvExecutor<T> {
     }
 
     pub fn check_keys(&self, scopes: &[String]) -> Result<(), crate::Error> {
-        if !self
-            .context
-            .has_cap(&format!("kv.meta[{}]:keys", scopes.join(";")))
-        // kv.meta[{scope}]:keys means that the action can be performed on any key
-        && !self
-            .context
-            .has_cap("kv.meta:keys")
-        {
-            return Err(
-                format!(
-                    "Either kv.meta[{}]:keys or kv.meta:keys capability is required to list keys in this template context for the specified scopes ({}).",
-                    scopes.join(";"),
-                    scopes.join(", ")
-                )
-                .into()
-            );
+        if scopes.is_empty() && !self.unscoped_allowed {
+            return Err("Unscoped operations are not allowed in this executor".into());
+        }
+
+        if self.context.has_cap("kv.meta:keys") {
+            return Ok(());
+        }
+
+        for scope in scopes {
+            if !self.context.has_cap(&format!("kv.meta[{}]:keys", scope))
+            // kv.meta[{scope}]:keys means that the action can be performed on any key
+            {
+                return Err(
+                    format!(
+                        "Either kv.meta[{}]:keys or kv.meta:keys capability is required to list keys in this template context for the specified scopes ({}).",
+                        scope,
+                        scopes.join(", ")
+                    )
+                    .into()
+                );
+            }
         }
 
         Ok(())
@@ -111,33 +120,36 @@ impl<T: KhronosContext> KvExecutor<T> {
             return Err("Unscoped operations are not allowed in this executor".into());
         }
 
-        if !self
-        .context
-        .has_cap("kv:*") // KV:* means all KV operations are allowed
-        && !self
-        .context
-        .has_cap(&format!("kv:{}:*", action)) // kv:{action} means that the action can be performed on any key
-        && !self
-        .context
-        .has_cap(&format!("kv:{}:{}", action, key)) // kv:{action}:{key} means that the action can only be performed on said key
-        && !self
-        .context
-        .has_cap(&format!("kv[{}]:*", scopes.join(";"))) // kv[{scopes}]:* means that the scope can be performed on any key
-        && !self
+        if self.context.has_cap("kv:*") // KV:* means all KV operations are allowed
+        || self.context.has_cap(&format!("kv:{}:*", action)) // kv:{action} means that the action can be performed on any key
+        ||  self
             .context
-            .has_cap(&format!("kv[{}]:{}", scopes.join(";"), action)) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
-        && !self
-            .context
-            .has_cap(&format!("kv[{}]:{}:{}", scopes.join(";"), action, key))
-        // kv[{scopes}]:{action}:{key} means that the action can only be performed on said key in the scope
+            .has_cap(&format!("kv:{}:{}", action, key))
+        // kv:{action}:{key} means that the action can only be performed on said key
         {
-            return Err(format!(
-                "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
-                action,
-                key,
-                scopes.join(";")
-            )
-            .into());
+            return Ok(()); // No need to check scopes if the action is allowed globally or for the specific key
+        }
+
+        for scope in scopes {
+            if !self
+            .context
+            .has_cap(&format!("kv[{}]:*", scope)) // kv[{scopes}]:* means that the scope can be performed on any key
+            && !self
+                .context
+                .has_cap(&format!("kv[{}]:{}", scope, action)) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
+            && !self
+                .context
+                .has_cap(&format!("kv[{}]:{}:{}", scope, action, key))
+            // kv[{scopes}]:{action}:{key} means that the action can only be performed on said key in the scope
+            {
+                return Err(format!(
+                    "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
+                    action,
+                    key,
+                    scope
+                )
+                .into());
+            }
         }
 
         self.kv_provider.attempt_action(&scopes, &action)?; // Check rate limits
@@ -203,6 +215,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     .map_err(|e| LuaError::external(e.to_string()))?
                     .into_iter()
                     .map(|k| KvRecord {
+                        id: k.id,
                         key: k.key,
                         value: k.value,
                         scopes: k.scopes,
@@ -277,6 +290,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 let record = match record {
                     Some(rec) => KvRecord {
+                        id: rec.id,
                         key: rec.key,
                         value: rec.value,
                         scopes: rec.scopes,

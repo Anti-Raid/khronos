@@ -1,5 +1,4 @@
 pub mod ensure_safe;
-pub mod executorscope;
 pub mod khronos_value;
 pub mod memoryvfs;
 pub mod prelude;
