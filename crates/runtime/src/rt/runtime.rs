@@ -98,7 +98,9 @@ impl KhronosRuntime {
         log::debug!("Creating new Khronos runtime");
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
-            LuaOptions::new().catch_rust_panics(true),
+            LuaOptions::new()
+                .catch_rust_panics(true)
+                .disable_error_userdata(true),
         )?;
 
         let compiler = mlua::Compiler::new()
