@@ -31,7 +31,6 @@ pub struct CreateEmbed {
     pub author: Option<CreateEmbedAuthor>,
     /// No point using a Cow slice, as there is no set_fields method
     /// and CreateEmbedField is not public.
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
     #[serde(default)]
     pub fields: Vec<CreateEmbedField>,
 }
