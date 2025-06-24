@@ -75,7 +75,7 @@ branch = "next"
 features = ["model", "http", "cache", "rustls_backend", "unstable"]
 
 [dependencies.kittycat]
-git = "https://github.com/infinitybotlist/kittycat"
+git = "https://github.com/anti-raid/kittycat"
 branch = "main"
 
 [dependencies.uuid]
