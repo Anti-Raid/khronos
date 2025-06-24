@@ -27,8 +27,8 @@ pub enum AntiraidEventPresetType {
     /// A template setting execute event. Fired when a template setting is executed
     TemplateSettingExecute,
 
-    /// A scheduled execution event
-    ScheduledExecution,
+    /// A key expiry event
+    KeyExpiry,
 }
 
 impl AntiraidEventPresetType {
@@ -50,7 +50,7 @@ impl std::str::FromStr for AntiraidEventPresetType {
             "moderationend" => Ok(Self::ModerationEnd),
             "externalkeyupdate" => Ok(Self::ExternalKeyUpdate),
             "templatesettingexecute" => Ok(Self::TemplateSettingExecute),
-            "scheduledexec" | "scheduledexecution" => Ok(Self::ScheduledExecution),
+            "keyexpiry" => Ok(Self::KeyExpiry),
             _ => Err(format!(
                 "Unknown preset type: {}, expected one of {:?}",
                 s,

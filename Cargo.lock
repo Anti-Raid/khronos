@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "antiraid-types"
 version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/antiraid-types#3a330641c98eebe5187b6d515d44e56e2da9a43f"
+source = "git+https://github.com/Anti-Raid/antiraid-types#2c1df7eaa7551a89d3ca623a85b2999b638f2958"
 dependencies = [
  "chrono",
  "extract_map",
@@ -2341,9 +2341,9 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "luau0-src"
-version = "0.15.1+luau678"
+version = "0.15.2+luau679"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3827343a043ca58658692da678f3c9db2a26e5d741757ab5088b0568ac175922"
+checksum = "829d1609fb22f827d84a017cd15649947eea96cd2e218723e10d89e37e66de74"
 dependencies = [
  "cc",
 ]
@@ -2463,8 +2463,8 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.11.0-beta.2"
-source = "git+https://github.com/mluau/mluau#d76d03d520dd3d4d37e41b3b4600eacaf866d7ab"
+version = "0.11.0-beta.3"
+source = "git+https://github.com/mluau/mluau#33c493087a91779dcf005681b5f84112195866d2"
 dependencies = [
  "bstr",
  "either",
@@ -2480,8 +2480,8 @@ dependencies = [
 
 [[package]]
 name = "mlua-sys"
-version = "0.8.0"
-source = "git+https://github.com/mluau/mluau#d76d03d520dd3d4d37e41b3b4600eacaf866d7ab"
+version = "0.8.1"
+source = "git+https://github.com/mluau/mluau#33c493087a91779dcf005681b5f84112195866d2"
 dependencies = [
  "cc",
  "cfg-if",
@@ -5506,9 +5506,9 @@ dependencies = [
 
 [[package]]
 name = "windows-registry"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3bab093bdd303a1240bb99b8aba8ea8a69ee19d34c9e2ef9594e708a4878820"
+checksum = "5b8a9ed28765efc97bbc954883f4e6796c33a06546ebafacbabee9696967499e"
 dependencies = [
  "windows-link",
  "windows-result",

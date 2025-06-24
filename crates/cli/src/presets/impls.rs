@@ -7,9 +7,8 @@ use super::defaults::{
 };
 use super::types::AntiraidEventPresetType;
 use antiraid_types::ar_event::{
-    ExternalKeyUpdateEventData, ExternalKeyUpdateEventDataAction, ModerationEndEventData,
-    ScheduledExecutionEventData, TemplateSettingExecuteEventData,
-    TemplateSettingExecuteEventDataAction,
+    ExternalKeyUpdateEventData, ExternalKeyUpdateEventDataAction, KeyExpiryEvent,
+    ModerationEndEventData, TemplateSettingExecuteEventData, TemplateSettingExecuteEventDataAction,
 };
 use antiraid_types::{
     ar_event::{AntiraidEvent, ModerationAction},
@@ -60,9 +59,9 @@ impl CreateEventFromPresetType for AntiraidEventPresetType {
                     data.into_external_key_update_event_data(),
                 ))
             }
-            Self::ScheduledExecution => {
-                let data: ScheduledExecutionEventData = from_value(input_data)?;
-                Ok(AntiraidEvent::ScheduledExecution(data))
+            Self::KeyExpiry => {
+                let data: KeyExpiryEvent = from_value(input_data)?;
+                Ok(AntiraidEvent::KeyExpiry(data))
             }
             Self::TemplateSettingExecute => {
                 let data: TemplateSettingExecuteEventDataPresetBaseInputData =
