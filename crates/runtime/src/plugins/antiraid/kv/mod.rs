@@ -1,9 +1,11 @@
+use crate::core::datetime::DateTimeRef;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::to_struct;
 use crate::traits::context::KhronosContext;
 use crate::traits::kvprovider::KVProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
+use chrono::Utc;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 
@@ -16,6 +18,14 @@ pub struct KvExecutor<T: KhronosContext> {
 }
 
 to_struct!(
+    /// Represents a result of a set operation in the key-value store
+    pub struct SetResult {
+        pub exists: bool, // If true, the key already existed
+        pub id: String,   // The ID of the record
+    }
+);
+
+to_struct!(
     /// Represents a full record complete with metadata
     pub struct KvRecord {
         pub id: String,
@@ -25,6 +35,7 @@ to_struct!(
         pub exists: bool,
         pub created_at: Option<chrono::DateTime<chrono::Utc>>,
         pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+        pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
     }
 );
 
@@ -38,6 +49,7 @@ impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
             scopes: record.scopes,
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
+            expires_at: record.expires_at,
         }
     }
 }
@@ -51,6 +63,7 @@ impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
             scopes: record.scopes,
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
+            expires_at: record.expires_at,
         }
     }
 }
@@ -65,6 +78,7 @@ impl KvRecord {
             exists: false,
             created_at: None,
             last_updated_at: None,
+            expires_at: None,
         }
     }
 }
@@ -131,30 +145,60 @@ impl<T: KhronosContext> KvExecutor<T> {
         }
 
         for scope in scopes {
-            if !self
+            if self
             .context
-            .has_cap(&format!("kv[{}]:*", scope)) // kv[{scopes}]:* means that the scope can be performed on any key
-            && !self
+            .has_cap(&format!("kv[{}]:*", scope)) // kv[{scopes}]:* means that the action can be performed on any key in the scope
+            || self
                 .context
                 .has_cap(&format!("kv[{}]:{}", scope, action)) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
-            && !self
+            || self
                 .context
                 .has_cap(&format!("kv[{}]:{}:{}", scope, action, key))
             // kv[{scopes}]:{action}:{key} means that the action can only be performed on said key in the scope
             {
-                return Err(format!(
-                    "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
-                    action,
-                    key,
-                    scope
-                )
-                .into());
+                return Ok(()); // allow if any scope succeeds
             }
+
+            return Err(format!(
+                "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
+                action, key, scope
+            )
+            .into());
         }
 
         self.kv_provider.attempt_action(&scopes, &action)?; // Check rate limits
 
         Ok(())
+    }
+
+    pub fn id_check(&self, action: &str) -> Result<(), crate::Error> {
+        if !self.context.has_cap("kv.meta:id_ops") {
+            return Err(
+                "The kv.meta:id_ops capability is required to use ID-taking methods".into(),
+            );
+        }
+
+        self.kv_provider.attempt_action(&[], &action)?; // Check rate limits
+
+        Ok(())
+    }
+
+    pub fn validate_expiry(
+        &self,
+        expiry: Option<DateTimeRef>,
+    ) -> LuaResult<Option<chrono::DateTime<Utc>>> {
+        match expiry {
+            Some(dt) => {
+                let dt = dt.dt.with_timezone(&chrono_tz::Tz::UTC).to_utc();
+
+                if dt <= chrono::Utc::now() {
+                    return Err(LuaError::external("Expiry time must be in the future"));
+                }
+
+                Ok(Some(dt))
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -222,6 +266,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         exists: true,
                         created_at: k.created_at,
                         last_updated_at: k.last_updated_at,
+                        expires_at: k.expires_at,
                     })
                     .collect::<Vec<KvRecord>>();
 
@@ -253,7 +298,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             "get",
             async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
                 let scopes = scopes.unwrap_or_default();
-                log::info!("Starting get operation");
 
                 this.check(&scopes, "get".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
@@ -274,6 +318,24 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 }
             },
         );
+
+        methods.add_scheduler_async_method("getbyid", async move |_, this, id: String| {
+            this.id_check("getbyid")
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let record = this
+                .kv_provider
+                .get_by_id(id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            match record {
+                // Return None and true if record was found but value is null
+                Some(rec) => Ok((Some(rec.value), true)),
+                // Return None and 0 if record was not found
+                None => Ok((None, false)),
+            }
+        });
 
         methods.add_scheduler_async_method(
             "getrecord",
@@ -297,6 +359,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         exists: true,
                         created_at: rec.created_at,
                         last_updated_at: rec.last_updated_at,
+                        expires_at: rec.expires_at,
                     },
                     None => KvRecord::default(),
                 };
@@ -308,6 +371,37 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 Ok(v)
             },
         );
+
+        methods.add_scheduler_async_method("getrecordbyid", async move |_, this, id: String| {
+            this.id_check("getbyid")
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let record = this
+                .kv_provider
+                .get_by_id(id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let record = match record {
+                Some(rec) => KvRecord {
+                    id: rec.id,
+                    key: rec.key,
+                    value: rec.value,
+                    scopes: rec.scopes,
+                    exists: true,
+                    created_at: rec.created_at,
+                    last_updated_at: rec.last_updated_at,
+                    expires_at: rec.expires_at,
+                },
+                None => KvRecord::default(),
+            };
+
+            let v: KhronosValue = record
+                .try_into()
+                .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
+
+            Ok(v)
+        });
 
         methods.add_scheduler_async_method(
             "keys",
@@ -330,15 +424,93 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             "set",
             async move |lua,
                         this,
-                        (key, value, scopes): (String, LuaValue, Option<Vec<String>>)| {
+                        (key, value, scopes, expires_at): (
+                String,
+                LuaValue,
+                Option<Vec<String>>,
+                Option<DateTimeRef>,
+            )| {
                 let scopes = scopes.unwrap_or_default();
                 this.check(&scopes, "set".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let value = KhronosValue::from_lua(value, &lua)?;
+                let expires_at = this.validate_expiry(expires_at)?;
+
+                let (exists, id) = this
+                    .kv_provider
+                    .set(&scopes, key, value, expires_at)
+                    .await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let rec = SetResult { exists, id };
+
+                let rec: KhronosValue = rec
+                    .try_into()
+                    .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
+
+                Ok(rec)
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "setbyid",
+            async move |lua,
+                        this,
+                        (id, value, expires_at): (
+                String,
+                LuaValue,
+                Option<DateTimeRef>,
+            )| {
+                this.id_check("setbyid")
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let value = KhronosValue::from_lua(value, &lua)?;
+                let expires_at = this.validate_expiry(expires_at)?;
+
+                let rec = this
+                    .kv_provider
+                    .set_by_id(id, value, expires_at)
+                    .await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                Ok(rec)
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "setexpiry",
+            async move |_lua,
+                        this,
+                        (key, scopes, expires_at): (
+                String,
+                Option<Vec<String>>,
+                Option<DateTimeRef>,
+            )| {
+                let scopes = scopes.unwrap_or_default();
+                this.check(&scopes, "setexpiry".to_string(), key.clone())
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let expires_at = this.validate_expiry(expires_at)?;
 
                 this.kv_provider
-                    .set(&scopes, key, value)
+                    .set_expiry(&scopes, key, expires_at)
+                    .await
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                Ok(())
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "setexpirybyid",
+            async move |_lua, this, (id, expires_at): (String, Option<DateTimeRef>)| {
+                this.id_check("setexpirybyid")
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let expires_at = this.validate_expiry(expires_at)?;
+
+                this.kv_provider
+                    .set_expiry_by_id(id, expires_at)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
                 Ok(())
@@ -361,6 +533,18 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             },
         );
 
+        methods.add_scheduler_async_method("deletebyid", async move |_, this, id: String| {
+            this.id_check("deletebyid")
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            this.kv_provider
+                .delete_by_id(id)
+                .await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            Ok(())
+        });
+
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<KvExecutor<T>>() {
                 return Err(mlua::Error::external("Invalid userdata type"));
@@ -376,10 +560,16 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     "find",
                     "exists",
                     "get",
+                    "getbyid",
                     "getrecord",
+                    "getrecordbyid",
                     "keys",
                     "set",
+                    "setbyid",
+                    "setexpiry",
+                    "setexpirybyid",
                     "delete",
+                    "deletebyid",
                 ],
             )
         });

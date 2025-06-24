@@ -7,6 +7,8 @@ use mlua::prelude::*;
 
 use crate::primitives::create_userdata_iterator_with_fields;
 
+pub type DateTimeRef = LuaUserDataRef<DateTime<chrono_tz::Tz>>;
+
 pub struct TimeDelta {
     pub timedelta: chrono::TimeDelta,
 }

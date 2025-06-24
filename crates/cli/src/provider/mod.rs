@@ -12,12 +12,10 @@ use khronos_runtime::traits::context::KhronosContext;
 use khronos_runtime::traits::context::ScriptData;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::discordprovider::DiscordProvider;
-use khronos_runtime::traits::ir::ScheduledExecution;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 use khronos_runtime::traits::pageprovider::PageProvider;
-use khronos_runtime::traits::scheduledexecprovider::ScheduledExecProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 
 /// Internal short-lived channel cache
@@ -187,30 +185,6 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
 }
 
 #[derive(Clone)]
-pub struct CliScheduledExecProvider {}
-
-impl ScheduledExecProvider for CliScheduledExecProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    async fn list(
-        &self,
-        _id: Option<String>,
-    ) -> Result<Vec<ScheduledExecution>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn add(&self, _exec: ScheduledExecution) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn remove(&self, _id: String) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-}
-
-#[derive(Clone)]
 pub struct CliKhronosContext {
     pub data: serde_json::Value,
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
@@ -250,7 +224,6 @@ impl KhronosContext for CliKhronosContext {
     type LockdownProvider = CliLockdownProvider;
     type UserInfoProvider = CliUserInfoProvider;
     type PageProvider = CliPageProvider;
-    type ScheduledExecProvider = CliScheduledExecProvider;
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
 
@@ -347,10 +320,6 @@ impl KhronosContext for CliKhronosContext {
         Some(CliPageProvider {})
     }
 
-    fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider> {
-        Some(CliScheduledExecProvider {})
-    }
-
     fn objectstorage_provider(&self) -> Option<Self::ObjectStorageProvider> {
         Some(CliObjectStorageProvider {
             file_storage_provider: self.file_storage_provider.clone(),
@@ -388,7 +357,7 @@ ORDER BY scope;
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
             FROM kv_table
             WHERE 
             guild_id = $1 AND
@@ -417,6 +386,45 @@ ORDER BY scope;
             created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
             scopes: data.get::<Vec<String>, _>("scopes"),
+            expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
+        };
+
+        Ok(Some(file_contents))
+    }
+
+    async fn get_by_id(
+        &self,
+        id: String,
+    ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
+        let Some(data) = sqlx::query(
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
+            FROM kv_table
+            WHERE 
+            guild_id = $1 AND
+            id = $2
+        ",
+        )
+        .bind(self.guild_id.to_string())
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to get key: {}", e))?
+        else {
+            return Ok(None);
+        };
+
+        let value = data.get::<serde_json::Value, _>("value");
+
+        let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
+
+        let file_contents = khronos_runtime::traits::ir::KvRecord {
+            id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
+            key: data.get::<String, _>("key"),
+            value: record,
+            created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
+            last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
+            scopes: data.get::<Vec<String>, _>("scopes"),
+            expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
         };
 
         Ok(Some(file_contents))
@@ -427,7 +435,8 @@ ORDER BY scope;
         scopes: &[String],
         key: String,
         value: khronos_runtime::utils::khronos_value::KhronosValue,
-    ) -> Result<(), khronos_runtime::Error> {
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(bool, String), khronos_runtime::Error> {
         if let Some(existing) = sqlx::query(
             "SELECT id
             FROM kv_table
@@ -445,25 +454,100 @@ ORDER BY scope;
         .map_err(|e| format!("Failed to get existing keys: {}", e))?
         {
             let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
-            sqlx::query("UPDATE kv_table SET value = $1, scopes = $2 WHERE id = $3")
+            sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
                 .bind(value.into_serde_json_value(1, true)?)
-                .bind(scopes)
+                .bind(expires_at)
                 .bind(&key)
                 .execute(&self.pool)
                 .await
                 .map_err(|e| format!("Failed to set key: {}", e))?;
 
-            return Ok(());
+            return Ok((true, key.to_string()));
         }
 
-        sqlx::query("INSERT INTO kv_table (guild_id, key, value, scopes) VALUES ($1, $2, $3, $4)")
+        let id = sqlx::query("INSERT INTO kv_table (guild_id, key, value, scopes, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING id")
             .bind(self.guild_id.to_string())
             .bind(&key)
             .bind(value.into_serde_json_value(1, true)?)
             .bind(scopes)
+            .bind(expires_at)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| format!("Failed to set key: {}", e))?
+            .try_get::<sqlx::types::uuid::Uuid, _>("id")
+            .map_err(|e| format!("Failed to get ID: {}", e))?;
+
+        Ok((false, id.to_string()))
+    }
+
+    async fn set_by_id(
+        &self,
+        id: String,
+        value: khronos_runtime::utils::khronos_value::KhronosValue,
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), khronos_runtime::Error> {
+        let key = sqlx::types::uuid::Uuid::parse_str(&id)
+            .map_err(|e| format!("Failed to parse ID: {}", e))?;
+
+        sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
+            .bind(value.into_serde_json_value(1, true)?)
+            .bind(expires_at)
+            .bind(&key)
             .execute(&self.pool)
             .await
             .map_err(|e| format!("Failed to set key: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn set_expiry(
+        &self,
+        scopes: &[String],
+        key: String,
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), khronos_runtime::Error> {
+        sqlx::query(
+            "UPDATE kv_table
+            SET expires_at = $1
+            WHERE 
+            guild_id = $2 AND
+            key = $3 AND
+            scopes @> $4
+        ",
+        )
+        .bind(expires_at)
+        .bind(self.guild_id.to_string())
+        .bind(key)
+        .bind(scopes)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to set expiry: {}", e))?;
+
+        Ok(())
+    }
+
+    async fn set_expiry_by_id(
+        &self,
+        id: String,
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), khronos_runtime::Error> {
+        let key = sqlx::types::uuid::Uuid::parse_str(&id)
+            .map_err(|e| format!("Failed to parse ID: {}", e))?;
+
+        sqlx::query(
+            "UPDATE kv_table
+            SET expires_at = $1
+            WHERE
+            guild_id = $2 AND
+            id = $3
+        ",
+        )
+        .bind(expires_at)
+        .bind(self.guild_id.to_string())
+        .bind(&key)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to set expiry: {}", e))?;
 
         Ok(())
     }
@@ -487,6 +571,23 @@ ORDER BY scope;
         Ok(())
     }
 
+    async fn delete_by_id(&self, id: String) -> Result<(), khronos_runtime::Error> {
+        sqlx::query(
+            "DELETE FROM kv_table
+            WHERE 
+            guild_id = $1 AND
+            id = $2
+        ",
+        )
+        .bind(self.guild_id.to_string())
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to get key: {}", e))?;
+
+        Ok(())
+    }
+
     fn attempt_action(
         &self,
         _scopes: &[String],
@@ -501,7 +602,7 @@ ORDER BY scope;
         query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let entries = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
             FROM kv_table
             WHERE 
             guild_id = $1 
@@ -531,6 +632,7 @@ ORDER BY scope;
                     data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at"),
                 ),
                 scopes: data.get::<Vec<String>, _>("scopes"),
+                expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
             };
 
             records.push(file_contents);

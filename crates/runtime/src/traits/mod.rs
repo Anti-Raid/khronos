@@ -6,5 +6,4 @@ pub mod kvprovider;
 pub mod lockdownprovider;
 pub mod objectstorageprovider;
 pub mod pageprovider;
-pub mod scheduledexecprovider;
 pub mod userinfoprovider;

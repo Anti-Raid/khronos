@@ -8,4 +8,7 @@ pub struct KvRecord {
     pub scopes: Vec<String>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Returns when the key will expire, if set.
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }

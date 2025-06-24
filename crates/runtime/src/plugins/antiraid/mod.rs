@@ -5,7 +5,6 @@ pub mod kv;
 pub mod lockdowns;
 pub mod objectstorage;
 pub mod pages;
-pub mod scheduledexec;
 pub mod userinfo;
 
 use mlua::prelude::*;

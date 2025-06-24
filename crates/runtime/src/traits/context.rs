@@ -1,8 +1,7 @@
 use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
     lockdownprovider::LockdownProvider, objectstorageprovider::ObjectStorageProvider,
-    pageprovider::PageProvider, scheduledexecprovider::ScheduledExecProvider,
-    userinfoprovider::UserInfoProvider,
+    pageprovider::PageProvider, userinfoprovider::UserInfoProvider,
 };
 use bitflags::bitflags;
 
@@ -57,7 +56,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
     type PageProvider: PageProvider;
-    type ScheduledExecProvider: ScheduledExecProvider;
     type DataStoreProvider: DataStoreProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
 
@@ -122,9 +120,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a Page provider
     fn page_provider(&self) -> Option<Self::PageProvider>;
-
-    /// Returns a ScheduledExec provider
-    fn scheduled_exec_provider(&self) -> Option<Self::ScheduledExecProvider>;
 
     /// Returns a DataStore provider
     fn datastore_provider(&self) -> Option<Self::DataStoreProvider>;
