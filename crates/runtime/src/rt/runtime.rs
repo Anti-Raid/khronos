@@ -250,19 +250,19 @@ impl KhronosRuntime {
         )?;
         lua.register_module(
             "@lune/datetime",
-            crate::plugins::lune::datetime::init_plugin(&lua),
+            crate::plugins::lune::datetime::init_plugin(&lua)?,
         )?;
         lua.register_module(
             "@lune/regex",
-            crate::plugins::lune::regex::init_plugin(&lua),
+            crate::plugins::lune::regex::init_plugin(&lua)?,
         )?;
         lua.register_module(
             "@lune/serde",
-            crate::plugins::lune::serde::init_plugin(&lua),
+            crate::plugins::lune::serde::init_plugin(&lua)?,
         )?;
         lua.register_module(
             "@lune/roblox",
-            crate::plugins::lune::roblox::init_plugin(&lua),
+            crate::plugins::lune::roblox::init_plugin(&lua)?,
         )?;
 
         Ok(Self {
