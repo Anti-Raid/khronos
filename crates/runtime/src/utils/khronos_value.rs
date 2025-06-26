@@ -787,6 +787,14 @@ impl KhronosValue {
             LuaValue::Nil => Ok(KhronosValue::Null),
             LuaValue::Table(table) => {
                 if table.raw_len() == 0 {
+                    // Check for array metatable
+                    if let Some(mt) = table.metatable() {
+                        if mt == lua.array_metatable() {
+                            // Empty list
+                            return Ok(KhronosValue::List(Vec::new()));
+                        }
+                    }
+
                     // Map
                     let mut map = indexmap::IndexMap::new();
                     for pair in table.pairs::<String, LuaValue>() {
