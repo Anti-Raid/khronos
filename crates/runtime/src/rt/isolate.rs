@@ -133,9 +133,6 @@ impl KhronosIsolate {
                 ));
             };
 
-            lua.globals()
-                .set("__kanalytics_memusagebeforeisolateproxy", lua.used_memory())?;
-
             let global_table = proxy_global(lua)?;
 
             lua.globals()
