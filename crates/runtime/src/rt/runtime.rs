@@ -229,6 +229,9 @@ impl KhronosRuntime {
         let store_table = lua.create_table()?;
         lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()));
 
+        lua.globals()
+            .set("__kanalytics_memusagebeforeregister", lua.used_memory())?;
+
         // Load core modules
         lua.register_module(
             "@antiraid/datetime",
@@ -260,10 +263,17 @@ impl KhronosRuntime {
             "@lune/serde",
             crate::plugins::lune::serde::init_plugin(&lua)?,
         )?;
+
+        lua.globals()
+            .set("__kanalytics_memusagebeforeroblox", lua.used_memory())?;
+
         lua.register_module(
             "@lune/roblox",
             crate::plugins::lune::roblox::init_plugin(&lua)?,
         )?;
+
+        lua.globals()
+            .set("__kanalytics_memusageaftercreate", lua.used_memory())?;
 
         Ok(Self {
             store_table,
