@@ -408,6 +408,9 @@ impl KhronosRuntime {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
 
+        lua.globals()
+            .set("__kanalytics_memusagebeforesandbox", lua.used_memory())?;
+
         lua.sandbox(true)?;
         lua.globals().set_readonly(true);
         self.sandboxed = true;

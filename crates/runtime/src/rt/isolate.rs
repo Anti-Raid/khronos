@@ -133,7 +133,13 @@ impl KhronosIsolate {
                 ));
             };
 
+            lua.globals()
+                .set("__kanalytics_memusagebeforeisolateproxy", lua.used_memory())?;
+
             let global_table = proxy_global(lua)?;
+
+            lua.globals()
+                .set("__kanalytics_memusageafterisolateproxy", lua.used_memory())?;
 
             let controller =
                 AssetRequirer::new(asset_manager.clone(), id.clone(), global_table.clone());
@@ -144,6 +150,11 @@ impl KhronosIsolate {
                 lua.globals()
                     .set("require", lua.create_require_function(controller)?)?;
             }
+
+            lua.globals().set(
+                "__kanalytics_memusageafterrequirecreated",
+                lua.used_memory(),
+            )?;
 
             setup_prelude(lua, global_table.clone())?;
 
