@@ -306,13 +306,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 let resolved_perms = serenity_backports::member_permissions(&partial_guild, &member);
 
-                member_and_resolved_perms.push((member, resolved_perms));
+                member_and_resolved_perms.push(structs::AntiraidFusedMemberSingle {
+                    member,
+                    resolved_perms,
+                });
             }
             
             Ok(Lazy::new(
-                structs::FusedMember {
+                structs::AntiraidFusedMember {
                     guild: partial_guild,
-                    member_and_resolved_perms,
+                    members: member_and_resolved_perms,
                 }
             ))
         });
