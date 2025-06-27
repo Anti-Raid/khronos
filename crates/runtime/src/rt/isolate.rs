@@ -331,6 +331,10 @@ impl KhronosIsolate {
             } else {
                 let compiler = self.inner.compiler();
                 let bytecode = compiler.compile(code)?;
+
+                self.global_table
+                    .set("__kanalytics_memusagebeforefn", lua.used_memory())?;
+
                 let function = match lua
                     .load(&bytecode)
                     .set_name(name.to_string())
@@ -350,6 +354,9 @@ impl KhronosIsolate {
                         return Err(e);
                     }
                 };
+
+                self.global_table
+                    .set("__kanalytics_memusageafterfn", lua.used_memory())?;
 
                 cache.insert(cache_key.to_string(), function.clone());
                 function
