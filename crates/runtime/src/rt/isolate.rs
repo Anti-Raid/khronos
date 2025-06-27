@@ -20,33 +20,23 @@ use rand::distributions::Alphanumeric;
 ///
 /// Note that it is assumed for BytecodeCache to be uniquely made per runtime instance
 /// and that the bytecode is not shared between runtimes
-pub struct BytecodeCache(RefCell<std::collections::HashMap<String, Rc<Vec<u8>>>>);
+struct FunctionCache(RefCell<std::collections::HashMap<String, LuaFunction>>);
 
-impl Default for BytecodeCache {
+impl Default for FunctionCache {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BytecodeCache {
-    /// Create a new bytecode cache
+impl FunctionCache {
+    /// Create a new function cache
     pub fn new() -> Self {
-        BytecodeCache(RefCell::new(std::collections::HashMap::new()))
+        Self(RefCell::new(std::collections::HashMap::new()))
     }
 
     /// Returns the inner cache
-    pub fn inner(&self) -> &RefCell<std::collections::HashMap<String, Rc<Vec<u8>>>> {
+    pub fn inner(&self) -> &RefCell<std::collections::HashMap<String, LuaFunction>> {
         &self.0
-    }
-
-    /// Clear the bytecode cache
-    pub fn clear_bytecode_cache(&self) {
-        self.inner().borrow_mut().clear();
-    }
-
-    /// Removes a script from the bytecode cache by name
-    pub fn remove_bytecode_cache(&self, name: &str) {
-        self.inner().borrow_mut().remove(name);
     }
 }
 
@@ -76,11 +66,8 @@ pub struct KhronosIsolate {
     /// The asset manager for the isolate
     asset_manager: FilesystemWrapper,
 
-    /// The internal bytecode cache for the isolate
-    ///
-    /// Users should AVOID using this directly. It is used internally by the isolate to cache
-    /// repeatedly used scripts in bytecode form to avoid unneeded recompilation.
-    bytecode_cache: Rc<BytecodeCache>,
+    /// The internal function_cache for the isolate
+    function_cache: Rc<FunctionCache>,
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
@@ -164,7 +151,7 @@ impl KhronosIsolate {
             asset_manager,
             inner,
             global_table,
-            bytecode_cache: Rc::new(BytecodeCache::new()),
+            function_cache: Rc::new(FunctionCache::new()),
         })
     }
 
@@ -196,19 +183,6 @@ impl KhronosIsolate {
             return None;
         }
         Some(&self.global_table)
-    }
-
-    /// Returns the bytecode cache for the isolate
-    ///
-    /// Note that due to the Rc, it is not possible to access the BytecodeCache in mutable form
-    /// and nor is this useful (as the cache has no mutable methods)
-    pub fn bytecode_cache(&self) -> &BytecodeCache {
-        &self.bytecode_cache
-    }
-
-    /// Sets a new bytecode cache for the isolate
-    pub fn set_bytecode_cache(&mut self, cache: Rc<BytecodeCache>) {
-        self.bytecode_cache = cache;
     }
 
     /// Returns the id of the isolate
@@ -351,35 +325,34 @@ impl KhronosIsolate {
                 ));
             };
 
-            let mut cache = self.bytecode_cache.inner().borrow_mut();
-            let bytecode = if let Some(bytecode) = cache.get(cache_key) {
-                Cow::Borrowed(bytecode)
+            let mut cache = self.function_cache.inner().borrow_mut();
+            let f = if let Some(f) = cache.get(cache_key) {
+                f.clone() // f is cheap to clone
             } else {
                 let compiler = self.inner.compiler();
-                let bytecode = Rc::new(compiler.compile(code)?);
-                cache.insert(cache_key.to_string(), bytecode.clone());
-                Cow::Owned(bytecode)
-            };
-
-            let f = match lua
-                .load(&**bytecode)
-                .set_name(name.to_string())
-                .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
-                .set_environment(self.global_table.clone())
-                .into_function()
-            {
-                Ok(f) => f,
-                Err(e) => {
-                    // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                    if let LuaError::MemoryError(_) = e {
-                        // Mark VM as broken
-                        self.inner
-                            .mark_broken(true)
-                            .map_err(|e| LuaError::external(e.to_string()))?;
+                let bytecode = compiler.compile(code)?;
+                let function = match lua
+                    .load(&bytecode)
+                    .set_name(name.to_string())
+                    .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
+                    .set_environment(self.global_table.clone())
+                    .into_function()
+                {
+                    Ok(f) => f,
+                    Err(e) => {
+                        // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                        if let LuaError::MemoryError(_) = e {
+                            // Mark VM as broken
+                            self.inner
+                                .mark_broken(true)
+                                .map_err(|e| LuaError::external(e.to_string()))?;
+                        }
+                        return Err(e);
                     }
+                };
 
-                    return Err(e);
-                }
+                cache.insert(cache_key.to_string(), function.clone());
+                function
             };
 
             match lua.create_thread(f) {
