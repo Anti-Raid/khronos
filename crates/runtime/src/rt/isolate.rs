@@ -135,8 +135,7 @@ impl KhronosIsolate {
 
             let global_table = proxy_global(lua)?;
 
-            lua.globals()
-                .set("__kanalytics_memusageafterisolateproxy", lua.used_memory())?;
+            global_table.set("__kanalytics_memusageafterisolateproxy", lua.used_memory())?;
 
             let controller =
                 AssetRequirer::new(asset_manager.clone(), id.clone(), global_table.clone());
