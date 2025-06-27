@@ -1,7 +1,6 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
 use rand::distributions::DistString;
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
