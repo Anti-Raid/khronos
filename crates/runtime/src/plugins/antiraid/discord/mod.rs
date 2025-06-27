@@ -7,7 +7,7 @@ use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::{serenity_backports, serenity_utils};
 use crate::{core::lazy::Lazy, TemplateContext};
 use mlua::prelude::*;
-use serenity::all::Mentionable;
+use serenity::all::{Mentionable, ParseIdError};
 use structs::{
     CreateAutoModerationRuleOptions, DeleteAutoModerationRuleOptions, EditAutoModerationRuleOptions,
 };
@@ -271,6 +271,48 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     member,
                     channel,
                     permissions,
+                }
+            ))
+        });
+
+        methods.add_scheduler_async_method("antiraid_get_fused_member", async move |
+            _lua, 
+            this,
+            ids: Vec<String>,
+        | {
+            let mut user_ids = Vec::with_capacity(ids.len());
+
+            for user_id in ids {
+                let user_id: serenity::all::UserId = user_id
+                    .parse()
+                    .map_err(|e: ParseIdError| LuaError::external(e.to_string()))?;
+                user_ids.push(user_id);
+            }
+
+            // Fetch the partial guild *once*
+            let partial_guild = this.discord_provider
+                .get_guild()
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let mut member_and_resolved_perms = Vec::with_capacity(user_ids.len());
+
+            for id in user_ids {
+                let member = this.discord_provider
+                .get_guild_member(id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?
+                .ok_or_else(|| LuaError::runtime("Member not found"))?;
+
+                let resolved_perms = serenity_backports::member_permissions(&partial_guild, &member);
+
+                member_and_resolved_perms.push((member, resolved_perms));
+            }
+            
+            Ok(Lazy::new(
+                structs::FusedMember {
+                    guild: partial_guild,
+                    member_and_resolved_perms,
                 }
             ))
         });

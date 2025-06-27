@@ -340,3 +340,11 @@ pub struct DeleteInviteOptions {
     pub code: String,
     pub reason: String,
 }
+
+/// A fused member contains both a member, the guild and the resolved permissions of
+/// the member in the guild. This is useful for operations that require both the member and the guild context, such as permission checks.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FusedMember {
+    pub guild: serenity::all::PartialGuild,
+    pub member_and_resolved_perms: Vec<(serenity::all::Member, serenity::all::Permissions)>,
+}
