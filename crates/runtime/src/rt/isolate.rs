@@ -147,7 +147,7 @@ impl KhronosIsolate {
                     .set("require", lua.create_require_function(controller)?)?;
             }
 
-            lua.globals().set(
+            global_table.set(
                 "__kanalytics_memusageafterrequirecreated",
                 lua.used_memory(),
             )?;
