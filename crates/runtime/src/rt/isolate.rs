@@ -154,6 +154,8 @@ impl KhronosIsolate {
 
             setup_prelude(lua, global_table.clone())?;
 
+            global_table.set("__kanalytics_memusageafterprelude", lua.used_memory())?;
+
             global_table
         };
 
