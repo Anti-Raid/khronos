@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use crate::core::datetime::DateTimeRef;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::to_struct;
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::kvprovider::KVProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
@@ -12,7 +14,7 @@ use mlua_scheduler::LuaSchedulerAsyncUserData;
 /// An kv executor is used to execute key-value ops from Lua
 /// templates
 pub struct KvExecutor<T: KhronosContext> {
-    context: T,
+    limitations: Rc<Limitations>,
     kv_provider: T::KVProvider,
     unscoped_allowed: bool, // If false, the executor will not allow unscoped operations
 }
@@ -85,7 +87,7 @@ impl KvRecord {
 
 impl<T: KhronosContext> KvExecutor<T> {
     pub fn check_list_scopes(&self) -> Result<(), crate::Error> {
-        if !self.context.has_cap("kv.meta:list_scopes")
+        if !self.limitations.has_cap("kv.meta:list_scopes")
         // KV:* means all KV operations are allowed
         {
             return Err(
@@ -102,12 +104,14 @@ impl<T: KhronosContext> KvExecutor<T> {
             return Err("Unscoped operations are not allowed in this executor".into());
         }
 
-        if self.context.has_cap("kv.meta:keys") {
+        if self.limitations.has_cap("kv.meta:keys") {
             return Ok(());
         }
 
         for scope in scopes {
-            if !self.context.has_cap(&format!("kv.meta[{}]:keys", scope))
+            if !self
+                .limitations
+                .has_cap(&format!("kv.meta[{}]:keys", scope))
             // kv.meta[{scope}]:keys means that the action can be performed on any key
             {
                 return Err(
@@ -134,10 +138,10 @@ impl<T: KhronosContext> KvExecutor<T> {
             return Err("Unscoped operations are not allowed in this executor".into());
         }
 
-        if self.context.has_cap("kv:*") // KV:* means all KV operations are allowed
-        || self.context.has_cap(&format!("kv:{}:*", action)) // kv:{action} means that the action can be performed on any key
+        if self.limitations.has_cap("kv:*") // KV:* means all KV operations are allowed
+        || self.limitations.has_cap(&format!("kv:{}:*", action)) // kv:{action} means that the action can be performed on any key
         ||  self
-            .context
+            .limitations
             .has_cap(&format!("kv:{}:{}", action, key))
         // kv:{action}:{key} means that the action can only be performed on said key
         {
@@ -146,13 +150,13 @@ impl<T: KhronosContext> KvExecutor<T> {
 
         for scope in scopes {
             if self
-            .context
+            .limitations
             .has_cap(&format!("kv[{}]:*", scope)) // kv[{scopes}]:* means that the action can be performed on any key in the scope
             || self
-                .context
+                .limitations
                 .has_cap(&format!("kv[{}]:{}", scope, action)) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
             || self
-                .context
+                .limitations
                 .has_cap(&format!("kv[{}]:{}:{}", scope, action, key))
             // kv[{scopes}]:{action}:{key} means that the action can only be performed on said key in the scope
             {
@@ -172,7 +176,7 @@ impl<T: KhronosContext> KvExecutor<T> {
     }
 
     pub fn id_check(&self, action: &str) -> Result<(), crate::Error> {
-        if !self.context.has_cap("kv.meta:id_ops") {
+        if !self.limitations.has_cap("kv.meta:id_ops") {
             return Err(
                 "The kv.meta:id_ops capability is required to use ID-taking methods".into(),
             );
@@ -207,7 +211,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         fields.add_meta_field(LuaMetaMethod::Type, "KvExecutor");
 
         fields.add_field_method_get("unscoped_allowed", |_, this| {
-            if !this.context.has_cap("kv.meta:unscoped_allowed") {
+            if !this.limitations.has_cap("kv.meta:unscoped_allowed") {
                 return Err(LuaError::external(
                     "The kv.meta:unscoped_allowed capability is required to access this field",
                 ));
@@ -217,7 +221,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         });
 
         fields.add_field_method_set("unscoped_allowed", |_, this, value: bool| {
-            if !this.context.has_cap("kv.meta:unscoped_allowed:set") {
+            if !this.limitations.has_cap("kv.meta:unscoped_allowed:set") {
                 return Err(LuaError::external(
                     "The kv.meta:unscoped_allowed:set capability is required to set this field",
                 ));
@@ -585,8 +589,8 @@ pub fn init_plugin<T: KhronosContext>(
             "The key-value plugin is not supported in this context",
         ));
     };
-    let executor = KvExecutor {
-        context: token.context.clone(),
+    let executor = KvExecutor::<T> {
+        limitations: token.limitations.clone(),
         kv_provider,
         unscoped_allowed: token
             .context

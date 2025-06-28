@@ -1,9 +1,11 @@
 // To avoid over-relying on Settings
 mod settings_ir;
 
+use std::rc::Rc;
+
 use super::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::pageprovider::PageProvider;
 use crate::TemplateContext;
 use mlua::prelude::*;
@@ -36,13 +38,13 @@ impl Page {
 
 #[derive(Clone)]
 pub struct PageExecutor<T: KhronosContext> {
-    context: T,
+    limitations: Rc<Limitations>,
     page_provider: T::PageProvider,
 }
 
 impl<T: KhronosContext> PageExecutor<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("page:{}", action)) {
+        if !self.limitations.has_cap(&format!("page:{}", action)) {
             return Err(LuaError::runtime(
                 "Page action is not allowed in this template context",
             ));
@@ -140,8 +142,8 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
 
-    let executor = PageExecutor {
-        context: token.context.clone(),
+    let executor = PageExecutor::<T> {
+        limitations: token.limitations.clone(),
         page_provider,
     }
     .into_lua(lua)?;

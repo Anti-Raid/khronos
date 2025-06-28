@@ -1,6 +1,6 @@
 use super::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_dyn_fields;
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreMethod, DataStoreProvider};
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
@@ -22,9 +22,9 @@ impl<T: KhronosContext> DataStore<T> {
         if self.ds_impl.need_caps(&action) {
             if !self
                 .executor
-                .context
+                .limitations
                 .has_cap(&format!("datastore:{}", self.ds_impl.name()))
-                && !self.executor.context.has_cap(&format!(
+                && !self.executor.limitations.has_cap(&format!(
                     "datastore:{}:{}",
                     self.ds_impl.name(),
                     action
@@ -159,7 +159,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
 
 #[derive(Clone)]
 pub struct DataStoreExecutor<T: KhronosContext> {
-    context: T,
+    limitations: Rc<Limitations>,
     datastore_provider: T::DataStoreProvider,
     known_datastores: Rc<RefCell<HashMap<String, LuaValue>>>,
 }
@@ -235,8 +235,8 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
 
-    let executor = DataStoreExecutor {
-        context: token.context.clone(),
+    let executor = DataStoreExecutor::<T> {
+        limitations: token.limitations.clone(),
         datastore_provider,
         known_datastores: Rc::new(RefCell::new(HashMap::new())),
     }

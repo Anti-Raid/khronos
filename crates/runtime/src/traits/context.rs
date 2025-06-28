@@ -1,3 +1,5 @@
+use crate::to_struct;
+
 use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
     lockdownprovider::LockdownProvider, objectstorageprovider::ObjectStorageProvider,
@@ -49,6 +51,42 @@ pub struct ScriptData {
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+to_struct!(
+    /// Represents a result of a set operation in the key-value store
+    pub struct Limitations {
+        pub capabilities: Vec<String>,
+    }
+);
+
+impl Limitations {
+    /// Returns a new limitations instance with the given capabilities
+    pub fn new(capabilities: Vec<String>) -> Self {
+        Self { capabilities }
+    }
+
+    /// Returns Ok(()) if `other` is a subset of `self`, otherwise returns an error
+    pub fn subset_of(&self, other: &Self) -> Result<(), String> {
+        for cap in &self.capabilities {
+            if !other.has_cap(cap) {
+                return Err(format!("Missing capability: {}. A context can only be limited into a set of limitations that are strictly a subset of itself", cap));
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks if the limitations allow a specific capability
+    pub fn has_cap(&self, cap: &str) -> bool {
+        self.capabilities.iter().any(|c| c == cap || c == "*")
+    }
+
+    /// Checks if the limitations allow any of a set of capabilities
+    pub fn has_any_cap(&self, caps: &[String]) -> bool {
+        self.capabilities
+            .iter()
+            .any(|c| caps.iter().any(|cap| c == cap || c == "*"))
+    }
+}
+
 pub trait KhronosContext: 'static + Clone + Sized {
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
@@ -62,25 +100,18 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> &ScriptData;
 
-    /// Returns the allowed capabilities for the current context
-    fn allowed_caps(&self) -> &[String] {
-        &self.data().allowed_caps
-    }
+    /// Returns the (outer) limitations for the context
+    ///
+    /// Note that subcontexts may have subsets of these limitations (e.g. with ctx:withlimits)
+    /// to further limit the capabilities available within sections of a script/shared core
+    /// between scripts
+    ///
+    /// Note: TemplateContext will auto-cache Limitations and use it.
+    fn limitations(&self) -> Limitations;
 
     /// Returns the compatibility flags for the current context
     fn compatibility_flags(&self) -> CompatibilityFlags {
         self.data().compatibility_flags
-    }
-
-    /// Returns if the current context has a specific capability
-    fn has_cap(&self, cap: &str) -> bool {
-        for allowed_cap in self.allowed_caps() {
-            if allowed_cap == cap || allowed_cap == "*" {
-                return true;
-            }
-        }
-
-        false
     }
 
     /// Returns the guild ID of the current context, if any

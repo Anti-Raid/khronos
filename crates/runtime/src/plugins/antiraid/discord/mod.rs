@@ -1,8 +1,10 @@
 mod structs;
 mod types;
 mod validators;
+use std::rc::Rc;
+
 //use crate::primitives::create_userdata_iterator_with_fields;
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::{serenity_backports, serenity_utils};
 use crate::{core::lazy::Lazy, TemplateContext};
@@ -21,6 +23,7 @@ const MAX_NICKNAME_LENGTH: usize = 32;
 /// templates
 pub struct DiscordActionExecutor<T: KhronosContext> {
     context: T,
+    limitations: Rc<Limitations>,
     discord_provider: T::DiscordProvider,
 }
 
@@ -39,7 +42,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
     }
 
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("discord:{}", action)) {
+        if !self.limitations.has_cap(&format!("discord:{}", action)) {
             return Err(LuaError::runtime(format!(
                 "Discord action `{}` not allowed in this template context",
                 action
@@ -2158,6 +2161,7 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua, token: &TemplateContext<T>) -> 
 
     let executor = DiscordActionExecutor {
         context: token.context.clone(),
+        limitations: token.limitations.clone(),
         discord_provider,
     }
     .into_lua(lua)?;

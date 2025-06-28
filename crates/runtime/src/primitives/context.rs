@@ -1,13 +1,22 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
+use crate::utils::khronos_value::KhronosValue;
 use mlua::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::create_userdata_iterator_with_fields;
 
 pub struct TemplateContext<T: KhronosContext> {
     pub context: T,
+
+    /// The current limitations for the context.
+    ///
+    /// This will (for the outermost context) be the same as `context.limitations()`.
+    ///
+    /// For subcontexts (created with `ctx:withlimits`), this will be a subset of the outer limitations.
+    pub limitations: Rc<Limitations>,
 
     /// The cached serialized value of the data
     cached_data: RefCell<Option<LuaValue>>,
@@ -31,7 +40,8 @@ impl<T: KhronosContext> TemplateContext<T> {
             ))?;
 
         Ok(Self {
-            context,
+            limitations: Rc::new(context.limitations()),
+            context: context,
             store_table: store.0.clone(),
             cached_data: RefCell::default(),
             current_discord_user: RefCell::default(),
@@ -154,7 +164,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         });
 
         fields.add_field_method_get("allowed_caps", |lua, this| {
-            let v = lua.to_value_with(this.context.allowed_caps(), LUA_SERIALIZE_OPTIONS)?;
+            let v = lua.to_value_with(&this.limitations.capabilities, LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
         });
@@ -178,7 +188,34 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _, _: ()| Ok("TemplateContext"));
 
         methods.add_method("has_cap", |_, this, cap: String| {
-            Ok(this.context.has_cap(&cap))
+            Ok(this.limitations.has_cap(&cap))
+        });
+
+        methods.add_method("has_any_cap", |_, this, caps: Vec<String>| {
+            Ok(this.limitations.has_any_cap(&caps))
+        });
+
+        methods.add_method("withlimits", |_lua, this, limits: KhronosValue| {
+            let limits: Limitations = limits.try_into().map_err(|e| {
+                mlua::Error::external(format!("Failed to convert LuaValue to Limitations: {}", e))
+            })?;
+
+            // Ensure that the new limitations are a subset of the current limitations
+            limits
+                .subset_of(&this.limitations)
+                .map_err(|e| mlua::Error::external(e))?;
+
+            // Create a new context with the given limitations
+            let new_context = TemplateContext {
+                limitations: Rc::new(limits),
+                context: this.context.clone(),
+                store_table: this.store_table.clone(),
+                cached_data: RefCell::default(),
+                current_discord_user: RefCell::default(),
+                cached_plugin_data: RefCell::new(HashMap::new()),
+            };
+
+            Ok(new_context)
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {

@@ -1,9 +1,11 @@
 mod types;
 
-use crate::primitives::create_userdata_iterator_with_fields;
+use std::rc::Rc;
+
 use crate::traits::context::KhronosContext;
 use crate::traits::lockdownprovider::LockdownProvider;
 use crate::TemplateContext;
+use crate::{primitives::create_userdata_iterator_with_fields, traits::context::Limitations};
 use lockdowns::LockdownSet;
 use mlua::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
@@ -14,6 +16,7 @@ use types::{CreateLockdownMode, LockdownMode};
 /// templates
 pub struct LockdownExecutor<T: KhronosContext> {
     pub context: T,
+    pub limitations: Rc<Limitations>,
     pub lockdown_provider: T::LockdownProvider,
 }
 
@@ -22,7 +25,7 @@ pub struct LockdownExecutor<T: KhronosContext> {
 // Executes actions on discord
 impl<T: KhronosContext> LockdownExecutor<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("lockdown:{}", action)) {
+        if !self.limitations.has_cap(&format!("lockdown:{}", action)) {
             return Err(LuaError::runtime(
                 "Lockdown action is not allowed in this template context",
             ));
@@ -55,9 +58,9 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
             .await
             .map_err(|e| LuaError::external(format!("Error while fetching lockdown set: {}", e)))?;
 
-            Ok(types::LockdownSet {
+            Ok(types::LockdownSet::<T> {
                 lockdown_set,
-                context: this.context.clone(),
+                limitations: this.limitations.clone(),
                 lockdown_provider: this.lockdown_provider.clone(),
             })
         });
@@ -93,6 +96,7 @@ pub fn init_plugin<T: KhronosContext>(
 
     let executor = LockdownExecutor {
         context: token.context.clone(),
+        limitations: token.limitations.clone(),
         lockdown_provider,
     };
 

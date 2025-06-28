@@ -1,16 +1,21 @@
+use std::rc::Rc;
+
 use mlua::prelude::*;
 
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use crate::primitives::create_userdata_iterator_with_fields;
-use crate::traits::context::KhronosContext;
+use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::userinfoprovider::UserInfoProvider;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 
 #[derive(Clone)]
 /// An user info executor is used to fetch UserInfo's about users
+///
+/// Note: This executor will most likely be removed soon and replaced with
+/// a in-Luau UserInfo class
 pub struct UserInfoExecutor<T: KhronosContext> {
-    context: T,
+    limitations: Rc<Limitations>,
     userinfo_provider: T::UserInfoProvider,
 }
 
@@ -19,7 +24,7 @@ pub struct UserInfoExecutor<T: KhronosContext> {
 // Executes actions on discord
 impl<T: KhronosContext> UserInfoExecutor<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("userinfo:{}", action)) {
+        if !self.limitations.has_cap(&format!("userinfo:{}", action)) {
             return Err(LuaError::runtime(
                 "User info action is not allowed in this template context",
             ));
@@ -84,8 +89,8 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
 
-    let executor = UserInfoExecutor {
-        context: token.context.clone(),
+    let executor = UserInfoExecutor::<T> {
+        limitations: token.limitations.clone(),
         userinfo_provider,
     }
     .into_lua(lua)?;

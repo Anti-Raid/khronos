@@ -1,6 +1,6 @@
 use crate::{
     plugins::antiraid::LUA_SERIALIZE_OPTIONS,
-    traits::{context::KhronosContext, lockdownprovider::LockdownProvider},
+    traits::{context::{KhronosContext, Limitations}, lockdownprovider::LockdownProvider},
 };
 use mlua::prelude::*;
 use std::rc::Rc;
@@ -148,14 +148,14 @@ impl LuaUserData for Lockdown {
 }
 
 pub struct LockdownSet<T: KhronosContext> {
-    pub context: T,
+    pub limitations: Rc<Limitations>,
     pub lockdown_provider: T::LockdownProvider,
     pub lockdown_set: lockdowns::LockdownSet<T::LockdownDataStore>,
 }
 
 impl<T: KhronosContext> LockdownSet<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("lockdown:{}", action)) {
+        if !self.limitations.has_cap(&format!("lockdown:{}", action)) {
             return Err(LuaError::runtime(
                 "Lockdown action is not allowed in this template context",
             ));

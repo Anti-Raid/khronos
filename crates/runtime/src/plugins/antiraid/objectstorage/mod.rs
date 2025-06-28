@@ -1,7 +1,10 @@
+use std::rc::Rc;
+
 use crate::core::datetime::TimeDelta;
 use crate::primitives::create_userdata_iterator_with_fields;
 use crate::to_struct;
 use crate::traits::context::KhronosContext;
+use crate::traits::context::Limitations;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
@@ -35,12 +38,16 @@ pub struct DownloadFileOpts {
 #[derive(Clone)]
 pub struct Bucket<T: KhronosContext> {
     context: T,
+    limitations: Rc<Limitations>,
     objectstorage_provider: T::ObjectStorageProvider,
 }
 
 impl<T: KhronosContext> Bucket<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.context.has_cap(&format!("objectstorage:{}", action)) {
+        if !self
+            .limitations
+            .has_cap(&format!("objectstorage:{}", action))
+        {
             return Err(LuaError::runtime(format!(
                 "Objectstorage action `{}` not allowed in this template context",
                 action
@@ -246,6 +253,7 @@ pub fn init_plugin<T: KhronosContext>(
 
     let bucket = Bucket {
         context: token.context.clone(),
+        limitations: token.limitations.clone(),
         objectstorage_provider,
     }
     .into_lua(lua)?;

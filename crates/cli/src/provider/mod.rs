@@ -1,4 +1,5 @@
 use khronos_runtime::traits::context::CompatibilityFlags;
+use khronos_runtime::traits::context::Limitations;
 use moka::future::Cache;
 use sqlx::Row;
 use std::rc::Rc;
@@ -186,7 +187,6 @@ impl lockdowns::LockdownDataStore for CliLockdownDataStore {
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
-    pub data: serde_json::Value,
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
@@ -231,8 +231,8 @@ impl KhronosContext for CliKhronosContext {
         &self.script_data
     }
 
-    fn allowed_caps(&self) -> &[String] {
-        self.allowed_caps.as_ref()
+    fn limitations(&self) -> Limitations {
+        Limitations::new(self.allowed_caps.clone())
     }
 
     fn guild_id(&self) -> Option<serenity::all::GuildId> {

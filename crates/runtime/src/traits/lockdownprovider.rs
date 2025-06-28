@@ -2,7 +2,7 @@ pub enum LockdownError {}
 
 /// A lockdown provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
-pub trait LockdownProvider<T: lockdowns::LockdownDataStore + Clone>: 'static + Clone {
+pub trait LockdownProvider<T: lockdowns::LockdownDataStore>: 'static + Clone {
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
     ///
     /// This should return an error if ratelimited

@@ -208,14 +208,7 @@ impl Cli {
 
     /// Create a khronos context
     fn create_khronos_context(&self) -> provider::CliKhronosContext {
-        let context_data = if let Some(ref context_data) = self.context_data {
-            serde_json::from_str(context_data).expect("Failed to parse context data")
-        } else {
-            serde_json::Value::Null
-        };
-
         provider::CliKhronosContext {
-            data: context_data,
             allowed_caps: self.allowed_caps.clone(),
             script_data: provider::default_script_data(self.allowed_caps.clone()),
             guild_id: self.guild_id,
