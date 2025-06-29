@@ -241,6 +241,8 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
                     "current_user",
                     // Methods
                     "has_cap",
+                    "has_any_cap",
+                    "withlimits",
                 ],
             )
         });
