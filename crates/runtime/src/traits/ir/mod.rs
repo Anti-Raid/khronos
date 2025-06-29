@@ -8,11 +8,8 @@ pub mod datastores;
 pub mod kv;
 /// Object Storage IR
 pub mod objectstorage;
-/// Settings IR
-pub mod settings_ir;
 
 pub use datastores::*;
 pub use kv::*;
 pub use lockdowns::*;
 pub use objectstorage::*;
-pub use settings_ir::*;
