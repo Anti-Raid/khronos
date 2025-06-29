@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "antiraid-types"
 version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/antiraid-types#8c82ea24b31d9db85034bbe96563e6e4387a2a7f"
+source = "git+https://github.com/Anti-Raid/antiraid-types#e59c28b75aff7b9e2baf0431caef44577e6a85d8"
 dependencies = [
  "chrono",
  "extract_map",
@@ -1952,9 +1952,9 @@ checksum = "d0263a3d970d5c054ed9312c0057b4f3bde9c0b33836d3637361d4a9e6e7a408"
 
 [[package]]
 name = "indexmap"
-version = "2.9.0"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
+checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.4",
@@ -2464,7 +2464,7 @@ dependencies = [
 [[package]]
 name = "mlua"
 version = "0.11.0-beta.3"
-source = "git+https://github.com/mluau/mluau#f767c0f189fc0811cdd95f62f2d451d76d1f05b4"
+source = "git+https://github.com/mluau/mluau#8329465420607e0c710eb39b57035692fd5da478"
 dependencies = [
  "bstr",
  "either",
@@ -2481,7 +2481,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.8.1"
-source = "git+https://github.com/mluau/mluau#f767c0f189fc0811cdd95f62f2d451d76d1f05b4"
+source = "git+https://github.com/mluau/mluau#8329465420607e0c710eb39b57035692fd5da478"
 dependencies = [
  "cc",
  "cfg-if",
@@ -3970,7 +3970,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.4"
-source = "git+https://github.com/Anti-Raid/serenity?branch=next#fbaac0df72b12206691ea68097d0f268f604a75b"
+source = "git+https://github.com/Anti-Raid/serenity?branch=next#3d1288f59e44960c6026ad93e3b50f9976f2380b"
 dependencies = [
  "aformat",
  "arrayvec",

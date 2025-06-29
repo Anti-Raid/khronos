@@ -135,10 +135,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
         });
 
-        fields.add_field_method_get("Pages", |lua, this| {
-            this.get_plugin(lua, "Pages", antiraid::pages::init_plugin)
-        });
-
         fields.add_field_method_get("UserInfo", |lua, this| {
             this.get_plugin(lua, "UserInfo", antiraid::userinfo::init_plugin)
         });

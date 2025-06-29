@@ -10,25 +10,17 @@ pub enum AntiraidEventPresetType {
     /// The inner Vec<String> is the list of templates modified/reloaded
     OnStartup,
 
-    /// A permission check event is fired when a permission check is done
-    PermissionCheckExecute,
-
-    /// A moderation start event is fired prior to the execution of a moderation action
-    ModerationStart,
-
-    /// A moderation end event is fired after the execution of a moderation action
-    ///
-    /// Note that this event is not guaranteed to be fired (e.g. the action fails, jobserver timeout etc.)
-    ModerationEnd,
-
     /// A key external modify event. Fired when a key is modified externally
     ExternalKeyUpdate,
 
-    /// A template setting execute event. Fired when a template setting is executed
-    TemplateSettingExecute,
-
     /// A key expiry event
     KeyExpiry,
+
+    /// A get settings event
+    GetSettings,
+
+    /// A execute setting event
+    ExecuteSetting,
 }
 
 impl AntiraidEventPresetType {
@@ -45,12 +37,10 @@ impl std::str::FromStr for AntiraidEventPresetType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "onstartup" | "on_startup" | "startup" | "start" | "init" => Ok(Self::OnStartup),
-            "permissioncheckexecute" => Ok(Self::PermissionCheckExecute),
-            "moderationstart" => Ok(Self::ModerationStart),
-            "moderationend" => Ok(Self::ModerationEnd),
             "externalkeyupdate" => Ok(Self::ExternalKeyUpdate),
-            "templatesettingexecute" => Ok(Self::TemplateSettingExecute),
             "keyexpiry" => Ok(Self::KeyExpiry),
+            "getsettings" | "get_settings" => Ok(Self::GetSettings),
+            "executesetting" | "execute_setting" => Ok(Self::ExecuteSetting),
             _ => Err(format!(
                 "Unknown preset type: {}, expected one of {:?}",
                 s,

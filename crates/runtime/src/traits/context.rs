@@ -3,7 +3,7 @@ use crate::to_struct;
 use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
     lockdownprovider::LockdownProvider, objectstorageprovider::ObjectStorageProvider,
-    pageprovider::PageProvider, userinfoprovider::UserInfoProvider,
+    userinfoprovider::UserInfoProvider,
 };
 use bitflags::bitflags;
 
@@ -93,7 +93,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
     type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type UserInfoProvider: UserInfoProvider;
-    type PageProvider: PageProvider;
     type DataStoreProvider: DataStoreProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
 
@@ -148,9 +147,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a UserInfo provider
     fn userinfo_provider(&self) -> Option<Self::UserInfoProvider>;
-
-    /// Returns a Page provider
-    fn page_provider(&self) -> Option<Self::PageProvider>;
 
     /// Returns a DataStore provider
     fn datastore_provider(&self) -> Option<Self::DataStoreProvider>;

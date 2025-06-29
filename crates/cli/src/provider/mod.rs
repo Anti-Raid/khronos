@@ -16,7 +16,6 @@ use khronos_runtime::traits::discordprovider::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
-use khronos_runtime::traits::pageprovider::PageProvider;
 use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 
 /// Internal short-lived channel cache
@@ -223,7 +222,6 @@ impl KhronosContext for CliKhronosContext {
     type LockdownDataStore = CliLockdownDataStore;
     type LockdownProvider = CliLockdownProvider;
     type UserInfoProvider = CliUserInfoProvider;
-    type PageProvider = CliPageProvider;
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
 
@@ -314,10 +312,6 @@ impl KhronosContext for CliKhronosContext {
 
     fn userinfo_provider(&self) -> Option<Self::UserInfoProvider> {
         Some(CliUserInfoProvider {})
-    }
-
-    fn page_provider(&self) -> Option<Self::PageProvider> {
-        Some(CliPageProvider {})
     }
 
     fn objectstorage_provider(&self) -> Option<Self::ObjectStorageProvider> {
@@ -890,30 +884,6 @@ impl UserInfoProvider for CliUserInfoProvider {
         &self,
         _user_id: serenity::all::UserId,
     ) -> Result<UserInfo, khronos_runtime::Error> {
-        todo!()
-    }
-}
-
-#[derive(Clone)]
-pub struct CliPageProvider {}
-
-impl PageProvider for CliPageProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn get_page(&self) -> Option<khronos_runtime::traits::ir::Page> {
-        todo!()
-    }
-
-    async fn set_page(
-        &self,
-        _page: khronos_runtime::traits::ir::Page,
-    ) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn delete_page(&self) -> Result<(), khronos_runtime::Error> {
         todo!()
     }
 }
