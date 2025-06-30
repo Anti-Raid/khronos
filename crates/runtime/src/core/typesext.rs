@@ -546,7 +546,7 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
     )?;
 
     submodule.set(
-        "bnor",
+        "bnot",
         lua.create_function(|_lua, n: U64| {
             let result = !n.0;
             Ok(U64(result))
