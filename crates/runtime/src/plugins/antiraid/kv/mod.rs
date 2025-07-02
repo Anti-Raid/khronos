@@ -435,6 +435,11 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 Option<DateTimeRef>,
             )| {
                 let scopes = scopes.unwrap_or_default();
+                if scopes.is_empty() {
+                    return Err(LuaError::external(
+                        "Setting keys without a scope is not allowed (even with unscoped_allowed set to true)".to_string(),
+                    ));
+                }
                 this.check(&scopes, "set".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
