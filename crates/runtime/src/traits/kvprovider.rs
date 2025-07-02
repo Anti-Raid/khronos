@@ -2,6 +2,8 @@ use super::ir::KvRecord;
 use crate::utils::khronos_value::KhronosValue;
 
 /// A key-value provider.
+///
+/// General note: if scopes is empty, then the operation is global and not limited to any specific scope.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
 pub trait KVProvider: 'static + Clone {
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
@@ -12,7 +14,9 @@ pub trait KVProvider: 'static + Clone {
     /// List all scopes that currently exist
     async fn list_scopes(&self) -> Result<Vec<String>, crate::Error>;
 
-    /// Finds all records with the specified query. % means wildcard before/after query. E.g. %abc% will match any occurrence of abc
+    /// Finds all records with the specified query. % means wildcard before/after query. 
+    /// 
+    /// E.g. %abc% will match any occurrence of abc
     async fn find(&self, scopes: &[String], query: String) -> Result<Vec<KvRecord>, crate::Error>;
 
     /// Returns if a specific key exists in the key-value store.
