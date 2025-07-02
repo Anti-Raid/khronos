@@ -244,10 +244,6 @@ impl KhronosRuntime {
         lua.register_module("@antiraid/lazy", crate::core::lazy::init_plugin(&lua)?)?;
         lua.register_module("@antiraid/luau", crate::core::luau::init_plugin(&lua)?)?;
         lua.register_module(
-            "@antiraid/permissions",
-            crate::core::permissions::init_plugin(&lua)?,
-        )?;
-        lua.register_module(
             "@antiraid/typesext",
             crate::core::typesext::init_plugin(&lua)?,
         )?;
