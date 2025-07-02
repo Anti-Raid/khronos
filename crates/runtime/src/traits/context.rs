@@ -10,12 +10,7 @@ use bitflags::bitflags;
 bitflags! {
     /// The compatibility flags for the script context.
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
-    pub struct CompatibilityFlags: u8 {
-        /// Whether or not to allow unscoped key-value operations by default.
-        ///
-        /// Older scripts without per-operation scopes do not have scopes set, so this flag allows them to run without modification.
-        const ALLOW_UNSCOPED_KV = 1 << 0;
-    }
+    pub struct CompatibilityFlags: u8 {}
 }
 
 /// Extra data about the script context

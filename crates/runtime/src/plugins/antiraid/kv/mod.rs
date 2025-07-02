@@ -211,24 +211,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         fields.add_meta_field(LuaMetaMethod::Type, "KvExecutor");
 
         fields.add_field_method_get("unscoped_allowed", |_, this| {
-            if !this.limitations.has_cap("kv.meta:unscoped_allowed") {
-                return Err(LuaError::external(
-                    "The kv.meta:unscoped_allowed capability is required to access this field",
-                ));
-            }
-
             Ok(this.unscoped_allowed)
-        });
-
-        fields.add_field_method_set("unscoped_allowed", |_, this, value: bool| {
-            if !this.limitations.has_cap("kv.meta:unscoped_allowed:set") {
-                return Err(LuaError::external(
-                    "The kv.meta:unscoped_allowed:set capability is required to set this field",
-                ));
-            }
-
-            this.unscoped_allowed = value;
-            Ok(())
         });
     }
 
@@ -251,8 +234,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "find",
-            async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
-                let scopes = scopes.unwrap_or_default();
+            async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "find".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -284,8 +266,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "exists",
-            async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
-                let scopes = scopes.unwrap_or_default();
+            async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "exists".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -300,9 +281,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "get",
-            async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
-                let scopes = scopes.unwrap_or_default();
-
+            async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "get".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -343,8 +322,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "getrecord",
-            async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
-                let scopes = scopes.unwrap_or_default();
+            async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "get".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -409,8 +387,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "keys",
-            async move |_, this, scopes: Option<Vec<String>>| {
-                let scopes = scopes.unwrap_or_default();
+            async move |_, this, scopes: Vec<String>| {
                 this.check_keys(&scopes)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -431,10 +408,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         (key, value, scopes, expires_at): (
                 String,
                 LuaValue,
-                Option<Vec<String>>,
+                Vec<String>,
                 Option<DateTimeRef>,
             )| {
-                let scopes = scopes.unwrap_or_default();
                 if scopes.is_empty() {
                     return Err(LuaError::external(
                         "Setting keys without a scope is not allowed (even with unscoped_allowed set to true)".to_string(),
@@ -493,10 +469,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         this,
                         (key, scopes, expires_at): (
                 String,
-                Option<Vec<String>>,
+                Vec<String>,
                 Option<DateTimeRef>,
             )| {
-                let scopes = scopes.unwrap_or_default();
                 this.check(&scopes, "setexpiry".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -528,8 +503,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "delete",
-            async move |_, this, (key, scopes): (String, Option<Vec<String>>)| {
-                let scopes = scopes.unwrap_or_default();
+            async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "delete".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -597,10 +571,26 @@ pub fn init_plugin<T: KhronosContext>(
     let executor = KvExecutor::<T> {
         limitations: token.limitations.clone(),
         kv_provider,
-        unscoped_allowed: token
-            .context
-            .compatibility_flags()
-            .contains(crate::traits::context::CompatibilityFlags::ALLOW_UNSCOPED_KV),
+        unscoped_allowed: false,
+    }
+    .into_lua(lua)?;
+
+    Ok(executor)
+}
+
+pub fn init_plugin_unscoped<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaValue> {
+    let Some(kv_provider) = token.context.kv_provider() else {
+        return Err(LuaError::external(
+            "The key-value plugin is not supported in this context",
+        ));
+    };
+    let executor = KvExecutor::<T> {
+        limitations: token.limitations.clone(),
+        kv_provider,
+        unscoped_allowed: true,
     }
     .into_lua(lua)?;
 
