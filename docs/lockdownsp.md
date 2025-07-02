@@ -1,6 +1,6 @@
-<div id="@antiraid/lockdowns"></div>
+<div id="lockdownsp"></div>
 
-# @antiraid/lockdowns
+# lockdownsp
 
 <div id="Types"></div>
 
@@ -10,141 +10,12 @@
 
 ## CreateLockdownMode
 
-[[
-impl LuaUserData for CreateLockdownMode {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("syntax", |_, this| {
-            let syntax = this.0.syntax();
-            Ok(syntax.to_string())
-        });
-    }
-
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("to_lockdown_mode", |_, this, string_form: String| {
-            let lockdown_mode = this
-                .0
-                .to_lockdown_mode(&string_form)
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            Ok(lockdown_mode.map(LockdownMode))
-        });
-
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<CreateLockdownMode>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "syntax",
-                    // Methods
-                    "to_lockdown_mode",
-                ],
-            )
-        });
-    }
-}
-
-pub struct LockdownMode(pub Box<(dyn lockdowns::LockdownMode + 'static)>);
-
-impl Clone for LockdownMode {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl LuaUserData for LockdownMode {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("creator", |_, this| {
-            let creator = this.0.creator();
-            Ok(CreateLockdownMode(creator))
-        });
-
-        fields.add_field_method_get("string_form", |_, this| {
-            let string_form = this.0.string_form();
-            Ok(string_form)
-        });
-
-        fields.add_field_method_get("specificity", |_, this| {
-            let specificity = this.0.specificity();
-            Ok(specificity)
-        });
-    }
-}]]
-
 Structure for creating new lockdown modes
 
 <details>
 <summary>Raw Type</summary>
 
 ```luau
---[[
-impl LuaUserData for CreateLockdownMode {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("syntax", |_, this| {
-            let syntax = this.0.syntax();
-            Ok(syntax.to_string())
-        });
-    }
-
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("to_lockdown_mode", |_, this, string_form: String| {
-            let lockdown_mode = this
-                .0
-                .to_lockdown_mode(&string_form)
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            Ok(lockdown_mode.map(LockdownMode))
-        });
-
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<CreateLockdownMode>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "syntax",
-                    // Methods
-                    "to_lockdown_mode",
-                ],
-            )
-        });
-    }
-}
-
-pub struct LockdownMode(pub Box<(dyn lockdowns::LockdownMode + 'static)>);
-
-impl Clone for LockdownMode {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl LuaUserData for LockdownMode {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("creator", |_, this| {
-            let creator = this.0.creator();
-            Ok(CreateLockdownMode(creator))
-        });
-
-        fields.add_field_method_get("string_form", |_, this| {
-            let string_form = this.0.string_form();
-            Ok(string_form)
-        });
-
-        fields.add_field_method_get("specificity", |_, this| {
-            let specificity = this.0.specificity();
-            Ok(specificity)
-        });
-    }
-}]]
 --- Structure for creating new lockdown modes
 type CreateLockdownMode = {
 	--- The syntax of the lockdown mode
@@ -278,13 +149,13 @@ type Lockdown = {
 	reason: string,
 
 	--- The type of the lockdown in its string form
-	type: string,
+	type: LockdownMode,
 
 	--- The data internally stored for the lockdown.
 	data: any,
 
 	--- The timestamp when the lockdown was created.
-	created_at: string
+	created_at: datetime.DateTime
 }
 ```
 
@@ -312,7 +183,7 @@ The reason for the lockdown.
 
 The type of the lockdown in its string form
 
-[string](#string)
+[LockdownMode](#LockdownMode)
 
 <div id="data"></div>
 
@@ -328,7 +199,7 @@ The data internally stored for the lockdown.
 
 The timestamp when the lockdown was created.
 
-[string](#string)
+[datetime](./datetime.md).[DateTime](./datetime.md#DateTime)
 
 <div id="GuildLockdownSettings"></div>
 
@@ -379,15 +250,19 @@ type LockdownSet = {
 	--- This acquires a exclusive write lock on the LockdownSet
 	sort: (self: LockdownSet) -> (),
 
+	--- @yields
+	---
 	--- Applies a lockdown. 
 	---
 	--- This acquires a exclusive write lock on the LockdownSet
-	apply: (self: LockdownSet, lockdown_type: LockdownMode, reason: string) -> Promise.LuaPromise<LockdownAddStatus>,
+	apply: (self: LockdownSet, lockdown_type: LockdownMode, reason: string) -> LockdownAddStatus,
 
+	--- @yields
+	---
 	--- Removes a lockdown by ID
 	---
 	--- This acquires a exclusive write lock on the LockdownSet
-	remove: (self: LockdownSet, id: string) -> Promise.LuaPromise<LockdownRemoveStatus>
+	remove: (self: LockdownSet, id: string) -> LockdownRemoveStatus
 }
 ```
 
@@ -419,6 +294,12 @@ sort: (self: LockdownSet) -> ()
 
 ### apply
 
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
 Applies a lockdown.
 
 
@@ -429,10 +310,12 @@ This acquires a exclusive write lock on the LockdownSet
 <summary>Function Signature</summary>
 
 ```luau
+--- @yields
+---
 --- Applies a lockdown. 
 ---
 --- This acquires a exclusive write lock on the LockdownSet
-apply: (self: LockdownSet, lockdown_type: LockdownMode, reason: string) -> Promise.LuaPromise<LockdownAddStatus>
+apply: (self: LockdownSet, lockdown_type: LockdownMode, reason: string) -> LockdownAddStatus
 ```
 
 </details>
@@ -461,9 +344,15 @@ apply: (self: LockdownSet, lockdown_type: LockdownMode, reason: string) -> Promi
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LockdownAddStatus](#LockdownAddStatus)&gt;<div id="remove"></div>
+[LockdownAddStatus](#LockdownAddStatus)<div id="remove"></div>
 
 ### remove
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
 
 Removes a lockdown by ID
 
@@ -475,10 +364,12 @@ This acquires a exclusive write lock on the LockdownSet
 <summary>Function Signature</summary>
 
 ```luau
+--- @yields
+---
 --- Removes a lockdown by ID
 ---
 --- This acquires a exclusive write lock on the LockdownSet
-remove: (self: LockdownSet, id: string) -> Promise.LuaPromise<LockdownRemoveStatus>
+remove: (self: LockdownSet, id: string) -> LockdownRemoveStatus
 ```
 
 </details>
@@ -501,7 +392,7 @@ remove: (self: LockdownSet, id: string) -> Promise.LuaPromise<LockdownRemoveStat
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LockdownRemoveStatus](#LockdownRemoveStatus)&gt;<div id="lockdowns"></div>
+[LockdownRemoveStatus](#LockdownRemoveStatus)<div id="lockdowns"></div>
 
 ### lockdowns
 
@@ -819,10 +710,12 @@ type LockdownTestResult = {
 	other_changes_needed: {string},
 
 	--- Display the changeset, resolved with role names
-	display_changeset: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Promise.LuaPromise<string>,
+	display_changeset: (self: LockdownTestResult, lockdown_set: LockdownSet) -> string,
 
+	--- @yields
+	---
 	--- Tries to autofix the issues
-	try_auto_fix: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Promise.LuaPromise<nil>,
+	try_auto_fix: (self: LockdownTestResult, lockdown_set: LockdownSet) -> nil,
 
 	-- Metatable
 	--- Converts the LockdownTestResult to a error string
@@ -871,7 +764,7 @@ Display the changeset, resolved with role names
 
 ```luau
 --- Display the changeset, resolved with role names
-display_changeset: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Promise.LuaPromise<string>
+display_changeset: (self: LockdownTestResult, lockdown_set: LockdownSet) -> string
 ```
 
 </details>
@@ -894,9 +787,15 @@ display_changeset: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Prom
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[string](#string)&gt;<div id="try_auto_fix"></div>
+[string](#string)<div id="try_auto_fix"></div>
 
 ### try_auto_fix
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
 
 Tries to autofix the issues
 
@@ -904,8 +803,10 @@ Tries to autofix the issues
 <summary>Function Signature</summary>
 
 ```luau
+--- @yields
+---
 --- Tries to autofix the issues
-try_auto_fix: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Promise.LuaPromise<nil>
+try_auto_fix: (self: LockdownTestResult, lockdown_set: LockdownSet) -> nil
 ```
 
 </details>
@@ -928,7 +829,7 @@ try_auto_fix: (self: LockdownTestResult, lockdown_set: LockdownSet) -> Promise.L
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[nil](#nil)&gt;<div id="MetatableFields"></div>
+[nil](#nil)<div id="MetatableFields"></div>
 
 ### Metatable Fields
 
@@ -971,12 +872,13 @@ LockdownExecutor allows templates to list, create and delete AntiRaid lockdowns
 --- LockdownExecutor allows templates to list, create and delete AntiRaid lockdowns
 ---@class LockdownExecutor
 type LockdownExecutor = {
+	--- @yields
 	--- Fetches the current lockdown set of the guild
 	---
 	--- A lockdown set is the main entrypoint for viewing and applying lockdowns
 	---
 	--- Needed capability: ``lockdowns:fetch_lockdown_set``
-	fetch_lockdown_set: (self: LockdownExecutor) -> Promise.LuaPromise<LockdownSet>
+	fetch_lockdown_set: (self: LockdownExecutor) -> LockdownSet
 }
 ```
 
@@ -985,6 +887,10 @@ type LockdownExecutor = {
 <div id="fetch_lockdown_set"></div>
 
 ### fetch_lockdown_set
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
 
 Fetches the current lockdown set of the guild
 
@@ -1000,12 +906,13 @@ Needed capability: ``lockdowns:fetch_lockdown_set``
 <summary>Function Signature</summary>
 
 ```luau
+--- @yields
 --- Fetches the current lockdown set of the guild
 ---
 --- A lockdown set is the main entrypoint for viewing and applying lockdowns
 ---
 --- Needed capability: ``lockdowns:fetch_lockdown_set``
-fetch_lockdown_set: (self: LockdownExecutor) -> Promise.LuaPromise<LockdownSet>
+fetch_lockdown_set: (self: LockdownExecutor) -> LockdownSet
 ```
 
 </details>
@@ -1018,151 +925,218 @@ fetch_lockdown_set: (self: LockdownExecutor) -> Promise.LuaPromise<LockdownSet>
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[LockdownSet](#LockdownSet)&gt;<div id="Functions"></div>
+[LockdownSet](#LockdownSet)<div id="Plugin"></div>
 
-# Functions
+## Plugin
 
-<div id="new"></div>
+<details>
+<summary>Raw Type</summary>
 
-## new
+```luau
+type Plugin = {
+	Client: LockdownExecutor,
+
+	CreateQuickServerLockdown: CreateLockdownMode,
+
+	CreateTraditionalServerLockdown: CreateLockdownMode,
+
+	CreateSingleChannelLockdown: (channel_id: string) -> CreateLockdownMode,
+
+	CreateRoleLockdown: (role_id: string) -> CreateLockdownMode,
+
+	QuickServerLockdown: () -> LockdownMode,
+
+	TraditionalServerLockdown: () -> LockdownMode,
+
+	SingleChannelLockdown: (channel_id: string) -> LockdownMode,
+
+	RoleLockdown: (role_id: string) -> LockdownMode
+}
+```
+
+</details>
+
+<div id="CreateSingleChannelLockdown"></div>
+
+### CreateSingleChannelLockdown
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
-function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorScope?) -> LockdownExecutor end
+CreateSingleChannelLockdown: (channel_id: string) -> CreateLockdownMode
 ```
 
 </details>
 
 <div id="Arguments"></div>
 
-## Arguments
-
-<div id="token"></div>
-
-### token
-
-[Primitives](./primitives.md).[TemplateContext](./primitives.md#TemplateContext)
-
-<div id="scope"></div>
-
-### scope
-
-*This field is optional and may not be specified*
-
-[ExecutorScope](./executorscope.md).[ExecutorScope](./executorscope.md#ExecutorScope)?
-
-<div id="Returns"></div>
-
-## Returns
-
-<div id="ret1"></div>
-
-### ret1
-
-[LockdownExecutor](#LockdownExecutor)<div id="QuickServerLockdown"></div>
-
-## QuickServerLockdown
-
-<details>
-<summary>Function Signature</summary>
-
-```luau
-function QuickServerLockdown() -> LockdownMode end
-```
-
-</details>
-
-<div id="Returns"></div>
-
-## Returns
-
-<div id="ret1"></div>
-
-### ret1
-
-[LockdownMode](#LockdownMode)<div id="TraditionalServerLockdown"></div>
-
-## TraditionalServerLockdown
-
-<details>
-<summary>Function Signature</summary>
-
-```luau
-function TraditionalServerLockdown() -> LockdownMode end
-```
-
-</details>
-
-<div id="Returns"></div>
-
-## Returns
-
-<div id="ret1"></div>
-
-### ret1
-
-[LockdownMode](#LockdownMode)<div id="SingleChannelLockdown"></div>
-
-## SingleChannelLockdown
-
-<details>
-<summary>Function Signature</summary>
-
-```luau
-function SingleChannelLockdown(channel_id: string) -> LockdownMode end
-```
-
-</details>
-
-<div id="Arguments"></div>
-
-## Arguments
+#### Arguments
 
 <div id="channel_id"></div>
 
-### channel_id
+##### channel_id
 
 [string](#string)
 
 <div id="Returns"></div>
 
-## Returns
+#### Returns
 
 <div id="ret1"></div>
 
-### ret1
+##### ret1
 
-[LockdownMode](#LockdownMode)<div id="RoleLockdown"></div>
+[CreateLockdownMode](#CreateLockdownMode)<div id="CreateRoleLockdown"></div>
 
-## RoleLockdown
+### CreateRoleLockdown
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
-function RoleLockdown(role_id: string) -> LockdownMode end
+CreateRoleLockdown: (role_id: string) -> CreateLockdownMode
 ```
 
 </details>
 
 <div id="Arguments"></div>
 
-## Arguments
+#### Arguments
 
 <div id="role_id"></div>
 
-### role_id
+##### role_id
 
 [string](#string)
 
 <div id="Returns"></div>
 
-## Returns
+#### Returns
 
 <div id="ret1"></div>
 
-### ret1
+##### ret1
 
-[LockdownMode](#LockdownMode)
+[CreateLockdownMode](#CreateLockdownMode)<div id="QuickServerLockdown"></div>
+
+### QuickServerLockdown
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+QuickServerLockdown: () -> LockdownMode
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LockdownMode](#LockdownMode)<div id="TraditionalServerLockdown"></div>
+
+### TraditionalServerLockdown
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+TraditionalServerLockdown: () -> LockdownMode
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LockdownMode](#LockdownMode)<div id="SingleChannelLockdown"></div>
+
+### SingleChannelLockdown
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+SingleChannelLockdown: (channel_id: string) -> LockdownMode
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="channel_id"></div>
+
+##### channel_id
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LockdownMode](#LockdownMode)<div id="RoleLockdown"></div>
+
+### RoleLockdown
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+RoleLockdown: (role_id: string) -> LockdownMode
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="role_id"></div>
+
+##### role_id
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LockdownMode](#LockdownMode)<div id="Client"></div>
+
+### Client
+
+[LockdownExecutor](#LockdownExecutor)
+
+<div id="CreateQuickServerLockdown"></div>
+
+### CreateQuickServerLockdown
+
+[CreateLockdownMode](#CreateLockdownMode)
+
+<div id="CreateTraditionalServerLockdown"></div>
+
+### CreateTraditionalServerLockdown
+
+[CreateLockdownMode](#CreateLockdownMode)
+

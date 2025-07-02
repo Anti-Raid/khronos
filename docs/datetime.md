@@ -39,6 +39,9 @@ type TimeDelta = {
 	--- @field weeks: The number of weeks in the time delta.
 	weeks: number,
 
+	--- @field as_secs: The total fractional seconds in the time delta (not yet released)
+	as_secs: number,
+
 	--- @function () -> string
 	--- Returns an 'offset' string representation of the time delta.
 	--- E.g. "+05:30" for 5 hours and 30 minutes.
@@ -100,6 +103,12 @@ type TimeDelta = {
 <div id="weeks"></div>
 
 ### weeks
+
+[number](#number)
+
+<div id="as_secs"></div>
+
+### as_secs
 
 [number](#number)
 
@@ -927,15 +936,15 @@ type DateTime = {
 
 	--- @function (TimeZone) -> DateTime
 	--- Converts the datetime to the specified timezone.
-	with_timezone: (self: TimeZone, TimeZone) -> DateTime,
+	with_timezone: (self: DateTime, TimeZone) -> DateTime,
 
 	--- @function (string) -> string
 	--- Formats the datetime using the specified format string.
-	format: (self: TimeZone, string) -> string,
+	format: (self: DateTime, string) -> string,
 
 	--- @function (DateTime) -> TimeDelta
 	--- Calculates the duration between the current datetime and another datetime.
-	duration_since: (self: TimeZone, DateTime) -> TimeDelta,
+	duration_since: (self: DateTime, DateTime) -> TimeDelta,
 
 	-- Metatable
 	__add: (DateTime, TimeDelta) -> DateTime,
@@ -1067,7 +1076,7 @@ Converts the datetime to the specified timezone.
 ```luau
 --- @function (TimeZone) -> DateTime
 --- Converts the datetime to the specified timezone.
-with_timezone: (self: TimeZone, TimeZone) -> DateTime
+with_timezone: (self: DateTime, TimeZone) -> DateTime
 ```
 
 </details>
@@ -1104,7 +1113,7 @@ Formats the datetime using the specified format string.
 ```luau
 --- @function (string) -> string
 --- Formats the datetime using the specified format string.
-format: (self: TimeZone, string) -> string
+format: (self: DateTime, string) -> string
 ```
 
 </details>
@@ -1141,7 +1150,7 @@ Calculates the duration between the current datetime and another datetime.
 ```luau
 --- @function (DateTime) -> TimeDelta
 --- Calculates the duration between the current datetime and another datetime.
-duration_since: (self: TimeZone, DateTime) -> TimeDelta
+duration_since: (self: DateTime, DateTime) -> TimeDelta
 ```
 
 </details>

@@ -2178,4 +2178,38 @@ Union with variants:
 
 ### ret1
 
-[I64](#I64)
+[I64](#I64)<div id="randstring"></div>
+
+## randstring
+
+Generates a random string of length `length`
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- Generates a random string of length `length`
+function randstring(length: number) -> string end
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+## Arguments
+
+<div id="length"></div>
+
+### length
+
+[number](#number)
+
+<div id="Returns"></div>
+
+## Returns
+
+<div id="ret1"></div>
+
+### ret1
+
+[string](#string)

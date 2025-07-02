@@ -1,6 +1,6 @@
-<div id="@antiraid/userinfo"></div>
+<div id="userinfop"></div>
 
-# @antiraid/userinfo
+# userinfop
 
 <div id="Types"></div>
 
@@ -123,7 +123,7 @@ Allows templates to get permission-related information about a user
 type UserInfoExecutor = {
 	--- Gets the UserInfo for a user
 	--- @param user_id discord.Snowflake The ID of the user to get the UserInfo for
-	get: (self: UserInfoExecutor, user_id: discord.Snowflake) -> Promise.LuaPromise<UserInfo>
+	get: (self: UserInfoExecutor, user_id: discord.Snowflake) -> UserInfo
 }
 ```
 
@@ -141,7 +141,7 @@ Gets the UserInfo for a user
 ```luau
 --- Gets the UserInfo for a user
 --- @param user_id discord.Snowflake The ID of the user to get the UserInfo for
-get: (self: UserInfoExecutor, user_id: discord.Snowflake) -> Promise.LuaPromise<UserInfo>
+get: (self: UserInfoExecutor, user_id: discord.Snowflake) -> UserInfo
 ```
 
 </details>
@@ -166,47 +166,18 @@ discord.Snowflake The ID of the user to get the UserInfo for
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[UserInfo](#UserInfo)&gt;<div id="Functions"></div>
+[UserInfo](#UserInfo)<div id="Plugin"></div>
 
-# Functions
-
-<div id="new"></div>
-
-## new
+## Plugin
 
 <details>
-<summary>Function Signature</summary>
+<summary>Raw Type</summary>
 
 ```luau
-function new(token: Primitives.TemplateContext, scope: ExecutorScope.ExecutorScope?) -> UserInfoExecutor end
+type Plugin = UserInfoExecutor
 ```
 
 </details>
 
-<div id="Arguments"></div>
-
-## Arguments
-
-<div id="token"></div>
-
-### token
-
-[Primitives](./primitives.md).[TemplateContext](./primitives.md#TemplateContext)
-
-<div id="scope"></div>
-
-### scope
-
-*This field is optional and may not be specified*
-
-[ExecutorScope](./executorscope.md).[ExecutorScope](./executorscope.md#ExecutorScope)?
-
-<div id="Returns"></div>
-
-## Returns
-
-<div id="ret1"></div>
-
-### ret1
-
 [UserInfoExecutor](#UserInfoExecutor)
+

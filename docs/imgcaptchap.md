@@ -1,6 +1,6 @@
-<div id="@antiraid/img_captcha"></div>
+<div id="imgcaptchap"></div>
 
-# @antiraid/img_captcha
+# imgcaptchap
 
 <div id="Types"></div>
 
@@ -19,16 +19,24 @@ Represents the area which contains text in a CAPTCHA.
 --- Represents the area which contains text in a CAPTCHA.
 type Geometry = {
 	--- The minimum x coordinate of the area which contains text (inclusive).
-	left: Primitives.u32,
+	---
+	--- Max size: u32
+	left: number,
 
 	--- The maximum x coordinate of the area which contains text (inclusive).
-	right: Primitives.u32,
+	---
+	--- Max size: u32
+	right: number,
 
 	--- The minimum y coordinate of the area which contains text (inclusive).
-	top: Primitives.u32,
+	---
+	--- Max size: u32
+	top: number,
 
 	--- The maximum y coordinate of the area which contains text (inclusive).
-	bottom: Primitives.u32
+	--- 
+	--- Max size: u32
+	bottom: number
 }
 ```
 
@@ -40,7 +48,11 @@ type Geometry = {
 
 The minimum x coordinate of the area which contains text (inclusive).
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="right"></div>
 
@@ -48,7 +60,11 @@ The minimum x coordinate of the area which contains text (inclusive).
 
 The maximum x coordinate of the area which contains text (inclusive).
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="top"></div>
 
@@ -56,7 +72,11 @@ The maximum x coordinate of the area which contains text (inclusive).
 
 The minimum y coordinate of the area which contains text (inclusive).
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="bottom"></div>
 
@@ -64,7 +84,11 @@ The minimum y coordinate of the area which contains text (inclusive).
 
 The maximum y coordinate of the area which contains text (inclusive).
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="SerdeColor"></div>
 
@@ -78,14 +102,14 @@ Represents a color in RGB format.
 ```luau
 --- Represents a color in RGB format.
 type SerdeColor = {
-	--- The red component of the color.
-	r: Primitives.u8,
+	--- The red component of the color (0-255)
+	r: number,
 
-	--- The green component of the color.
-	g: Primitives.u8,
+	--- The green component of the color (0-255)
+	g: number,
 
-	--- The blue component of the color.
-	b: Primitives.u8
+	--- The blue component of the color (0-255)
+	b: number
 }
 ```
 
@@ -95,25 +119,25 @@ type SerdeColor = {
 
 ### r
 
-The red component of the color.
+The red component of the color (0-255)
 
-[Primitives](./primitives.md).[u8](./primitives.md#u8)
+[number](#number)
 
 <div id="g"></div>
 
 ### g
 
-The green component of the color.
+The green component of the color (0-255)
 
-[Primitives](./primitives.md).[u8](./primitives.md#u8)
+[number](#number)
 
 <div id="b"></div>
 
 ### b
 
-The blue component of the color.
+The blue component of the color (0-255)
 
-[Primitives](./primitives.md).[u8](./primitives.md#u8)
+[number](#number)
 
 <div id="ColorInvertFilter"></div>
 
@@ -156,13 +180,19 @@ type CowFilter = {
 	filter: "Cow",
 
 	--- The minimum radius of the cows
-	min_radius: Primitives.u32,
+	---
+	--- Max size: u32
+	min_radius: number,
 
 	--- The maximum radius of the cows
-	max_radius: Primitives.u32,
+	---
+	--- Max size: u32
+	max_radius: number,
 
 	--- The number of cows to generate
-	n: Primitives.u32,
+	---
+	--- Max size: u32
+	n: number,
 
 	--- Whether to allow duplicate cows
 	allow_duplicates: boolean,
@@ -188,7 +218,11 @@ type CowFilter = {
 
 The minimum radius of the cows
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="max_radius"></div>
 
@@ -196,7 +230,11 @@ The minimum radius of the cows
 
 The maximum radius of the cows
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="n"></div>
 
@@ -204,7 +242,11 @@ The maximum radius of the cows
 
 The number of cows to generate
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="allow_duplicates"></div>
 
@@ -239,13 +281,19 @@ type DotFilter = {
 	filter: "Dot",
 
 	--- The number of dots to generate
-	n: Primitives.u32,
+	---
+	--- Max size: u32
+	n: number,
 
 	--- The minimum radius of the dots
-	min_radius: Primitives.u32,
+	---
+	--- Max size: u32
+	min_radius: number,
 
 	--- The maximum radius of the dots
-	max_radius: Primitives.u32
+	---
+	--- Max size: u32
+	max_radius: number
 }
 ```
 
@@ -265,7 +313,11 @@ type DotFilter = {
 
 The number of dots to generate
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="min_radius"></div>
 
@@ -273,7 +325,11 @@ The number of dots to generate
 
 The minimum radius of the dots
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="max_radius"></div>
 
@@ -281,7 +337,11 @@ The minimum radius of the dots
 
 The maximum radius of the dots
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="GridFilter"></div>
 
@@ -304,10 +364,14 @@ type GridFilter = {
 	filter: "Grid",
 
 	--- The Y gap between the vertical lines
-	y_gap: Primitives.u32,
+	---
+	--- Max size: u32
+	y_gap: number,
 
-	--- The X gap between the horizontal lines
-	x_gap: Primitives.u32
+	--- The X gap between the horizontal linesPrimitives.u32
+	---
+	--- Max size: u32
+	x_gap: number
 }
 ```
 
@@ -327,15 +391,23 @@ type GridFilter = {
 
 The Y gap between the vertical lines
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="x_gap"></div>
 
 ### x_gap
 
-The X gap between the horizontal lines
+The X gap between the horizontal linesPrimitives.u32
 
-[Primitives](./primitives.md).[u32](./primitives.md#u32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="LineFilter"></div>
 
@@ -352,13 +424,19 @@ type LineFilter = {
 	filter: "Line",
 
 	--- Point 1, must be an array of two numbers
-	p1: {Primitives.f32},
+	---
+	--- Max size: f32
+	p1: {number},
 
 	--- Point 2, must be an array of two numbers
-	p2: {Primitives.f32},
+	---
+	--- Max size: f32
+	p2: {number},
 
 	--- The thickness of the line
-	thickness: Primitives.f32,
+	---
+	--- Max size: u32
+	thickness: number,
 
 	--- The color of the line
 	color: SerdeColor
@@ -381,7 +459,11 @@ type LineFilter = {
 
 Point 1, must be an array of two numbers
 
-{[Primitives](./primitives.md).[f32](./primitives.md#f32)}
+
+
+Max size: f32
+
+{[number](#number)}
 
 <div id="p2"></div>
 
@@ -389,7 +471,11 @@ Point 1, must be an array of two numbers
 
 Point 2, must be an array of two numbers
 
-{[Primitives](./primitives.md).[f32](./primitives.md#f32)}
+
+
+Max size: f32
+
+{[number](#number)}
 
 <div id="thickness"></div>
 
@@ -397,7 +483,11 @@ Point 2, must be an array of two numbers
 
 The thickness of the line
 
-[Primitives](./primitives.md).[f32](./primitives.md#f32)
+
+
+Max size: u32
+
+[number](#number)
 
 <div id="color"></div>
 
@@ -422,7 +512,9 @@ type NoiseFilter = {
 	filter: "Noise",
 
 	--- The probability of adding noise
-	prob: Primitives.f32
+	---
+	--- Max size: f32
+	prob: number
 }
 ```
 
@@ -442,7 +534,11 @@ type NoiseFilter = {
 
 The probability of adding noise
 
-[Primitives](./primitives.md).[f32](./primitives.md#f32)
+
+
+Max size: f32
+
+[number](#number)
 
 <div id="RandomLineFilter"></div>
 
@@ -485,10 +581,14 @@ type WaveFilter = {
 	filter: "Wave",
 
 	--- The frequency of the wave
-	f: Primitives.f32,
+	---
+	--- Max size: f32
+	f: number,
 
 	--- The amplitude of the wave
-	amp: Primitives.f32,
+	---
+	--- Max size: f32
+	amp: number,
 
 	--- The direction of the wave
 	d: "horizontal" | "vertical"
@@ -511,7 +611,11 @@ type WaveFilter = {
 
 The frequency of the wave
 
-[Primitives](./primitives.md).[f32](./primitives.md#f32)
+
+
+Max size: f32
+
+[number](#number)
 
 <div id="amp"></div>
 
@@ -519,7 +623,11 @@ The frequency of the wave
 
 The amplitude of the wave
 
-[Primitives](./primitives.md).[f32](./primitives.md#f32)
+
+
+Max size: f32
+
+[number](#number)
 
 <div id="d"></div>
 
@@ -633,18 +741,22 @@ Captcha configuration
 ```luau
 --- Captcha configuration
 type CaptchaConfig = {
-	--- The number of characters the CAPTCHA should have.
-	char_count: Primitives.u8,
+	--- The number of characters the CAPTCHA should have (0-255)
+	char_count: number,
 
 	--- The list of filters
 	filters: {Filter},
 
 	--- The size of the viewbox to render the CAPTCHA in.
 	--- (first element is width, second element is height)
-	viewbox_size: {Primitives.u32},
+	---
+	--- Max size: u32
+	viewbox_size: {number},
 
 	--- At what index of CAPTCHA generation should a viewbox be created at.
-	set_viewbox_at_idx: Primitives.u8
+	---
+	--- Max size: u32
+	set_viewbox_at_idx: number
 }
 ```
 
@@ -654,9 +766,9 @@ type CaptchaConfig = {
 
 ### char_count
 
-The number of characters the CAPTCHA should have.
+The number of characters the CAPTCHA should have (0-255)
 
-[Primitives](./primitives.md).[u8](./primitives.md#u8)
+[number](#number)
 
 <div id="filters"></div>
 
@@ -674,7 +786,11 @@ The size of the viewbox to render the CAPTCHA in.
 
 (first element is width, second element is height)
 
-{[Primitives](./primitives.md).[u32](./primitives.md#u32)}
+
+
+Max size: u32
+
+{[number](#number)}
 
 <div id="set_viewbox_at_idx"></div>
 
@@ -682,15 +798,74 @@ The size of the viewbox to render the CAPTCHA in.
 
 At what index of CAPTCHA generation should a viewbox be created at.
 
-[Primitives](./primitives.md).[u8](./primitives.md#u8)
 
-<div id="Functions"></div>
 
-# Functions
+Max size: u32
 
-<div id="new"></div>
+[number](#number)
 
-## new
+<div id="Captcha"></div>
+
+## Captcha
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+type Captcha = {
+	--- The text of the CAPTCHA.
+	text: string,
+
+	--- The image of the CAPTCHA (Luau buffer).
+	image: buffer
+}
+```
+
+</details>
+
+<div id="text"></div>
+
+### text
+
+The text of the CAPTCHA.
+
+[string](#string)
+
+<div id="image"></div>
+
+### image
+
+The image of the CAPTCHA (Luau buffer).
+
+[buffer](#buffer)
+
+<div id="Plugin"></div>
+
+## Plugin
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+type Plugin = {
+	--- @yields
+	---
+	--- Creates a new CAPTCHA with the given configuration.
+	Create: (config: CaptchaConfig) -> Captcha
+}
+```
+
+</details>
+
+<div id="Create"></div>
+
+### Create
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
 
 Creates a new CAPTCHA with the given configuration.
 
@@ -698,28 +873,30 @@ Creates a new CAPTCHA with the given configuration.
 <summary>Function Signature</summary>
 
 ```luau
+--- @yields
+---
 --- Creates a new CAPTCHA with the given configuration.
-function new(config: CaptchaConfig) -> promise.LuaPromise<{Primitives.u8}> end
+Create: (config: CaptchaConfig) -> Captcha
 ```
 
 </details>
 
 <div id="Arguments"></div>
 
-## Arguments
+#### Arguments
 
 <div id="config"></div>
 
-### config
+##### config
 
 [CaptchaConfig](#CaptchaConfig)
 
 <div id="Returns"></div>
 
-## Returns
+#### Returns
 
 <div id="ret1"></div>
 
-### ret1
+##### ret1
 
-[promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;{[Primitives](./primitives.md).[u8](./primitives.md#u8)}&gt;
+[Captcha](#Captcha)

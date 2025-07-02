@@ -15,29 +15,31 @@
 
 ```luau
 type Chunk = {
-	--- Requires the ``luau:eval.set_environment`` capability to modify
+	--- Sets the environment of the chunk (_G).
 	environment: {
 		[any]: any
 	}?,
 
-	--- Requires the ``luau:eval.set_optimization_level`` capability to modify
+	--- Sets the optimization level of the chunk.
 	optimization_level: number?,
 
-	--- Requires the ``luau:eval.modify_set_code`` capability to modify
+	--- Text code to be evaluated. Bytecode evaluation is not allowed due to
+	--- security reasons.
 	code: string,
 
-	--- Requires the ``luau:eval.set_chunk_name`` capability to modify
+	---  The name of the chunk, used for debugging purposes.
 	chunk_name: string?,
 
-	--- Requires the ``luau:eval.call`` capability to use. Takes in args and returns the 
-	--- returned values from the ``code`` being evaluated.
+	--- Takes in args and returns the returned values from the ``code`` being evaluated. This will run the code in main thread / coroutine.running() == nil
 	call: (self: Chunk, args: any) -> any,
 
-	--- Requires the ``luau:eval.call_async`` capability to use. Takes in args and returns the
-	--- returned values from the ``code`` being evaluated.
+	--- @yields
 	---
-	--- This runs the code asynchronously
-	call_async: (self: Chunk, args: any) -> Promise.LuaPromise<any>
+	--- Takes in args and returns the returned values from the ``code`` being evaluated.
+	---
+	--- This runs the code asynchronously within a coroutine, allowing it to call
+	--- yielding functions
+	call_async: (self: Chunk, args: any) -> any
 }
 ```
 
@@ -47,16 +49,13 @@ type Chunk = {
 
 ### call
 
-Requires the ``luau:eval.call`` capability to use. Takes in args and returns the
-
-returned values from the ``code`` being evaluated.
+Takes in args and returns the returned values from the ``code`` being evaluated. This will run the code in main thread / coroutine.running() == nil
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Requires the ``luau:eval.call`` capability to use. Takes in args and returns the 
---- returned values from the ``code`` being evaluated.
+--- Takes in args and returns the returned values from the ``code`` being evaluated. This will run the code in main thread / coroutine.running() == nil
 call: (self: Chunk, args: any) -> any
 ```
 
@@ -84,23 +83,31 @@ call: (self: Chunk, args: any) -> any
 
 ### call_async
 
-Requires the ``luau:eval.call_async`` capability to use. Takes in args and returns the
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
 
-returned values from the ``code`` being evaluated.
+
+
+Takes in args and returns the returned values from the ``code`` being evaluated.
 
 
 
-This runs the code asynchronously
+This runs the code asynchronously within a coroutine, allowing it to call
+
+yielding functions
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Requires the ``luau:eval.call_async`` capability to use. Takes in args and returns the
---- returned values from the ``code`` being evaluated.
+--- @yields
 ---
---- This runs the code asynchronously
-call_async: (self: Chunk, args: any) -> Promise.LuaPromise<any>
+--- Takes in args and returns the returned values from the ``code`` being evaluated.
+---
+--- This runs the code asynchronously within a coroutine, allowing it to call
+--- yielding functions
+call_async: (self: Chunk, args: any) -> any
 ```
 
 </details>
@@ -123,11 +130,11 @@ call_async: (self: Chunk, args: any) -> Promise.LuaPromise<any>
 
 ##### ret1
 
-[Promise](./promise.md).[LuaPromise](./promise.md#LuaPromise)&lt;[any](#any)&gt;<div id="environment"></div>
+[any](#any)<div id="environment"></div>
 
 ### environment
 
-Requires the ``luau:eval.set_environment`` capability to modify
+Sets the environment of the chunk (_G).
 
 *This field is optional and may not be specified*
 
@@ -137,7 +144,7 @@ Requires the ``luau:eval.set_environment`` capability to modify
 
 ### optimization_level
 
-Requires the ``luau:eval.set_optimization_level`` capability to modify
+Sets the optimization level of the chunk.
 
 *This field is optional and may not be specified*
 
@@ -147,7 +154,9 @@ Requires the ``luau:eval.set_optimization_level`` capability to modify
 
 ### code
 
-Requires the ``luau:eval.modify_set_code`` capability to modify
+Text code to be evaluated. Bytecode evaluation is not allowed due to
+
+security reasons.
 
 [string](#string)
 
@@ -155,7 +164,7 @@ Requires the ``luau:eval.modify_set_code`` capability to modify
 
 ### chunk_name
 
-Requires the ``luau:eval.set_chunk_name`` capability to modify
+The name of the chunk, used for debugging purposes.
 
 *This field is optional and may not be specified*
 
@@ -169,17 +178,14 @@ Requires the ``luau:eval.set_chunk_name`` capability to modify
 
 ## load
 
-Requires the ``luau:eval`` capability to use. Be careful as this allows
-
-for arbitrary code execution.
+Loads a Luau chunk.
 
 <details>
 <summary>Function Signature</summary>
 
 ```luau
---- Requires the ``luau:eval`` capability to use. Be careful as this allows
---- for arbitrary code execution.
-function load(token: Primitives.TemplateContext, code: string) -> Chunk end
+--- Loads a Luau chunk.
+function load(code: string) -> Chunk end
 ```
 
 </details>
@@ -187,12 +193,6 @@ function load(token: Primitives.TemplateContext, code: string) -> Chunk end
 <div id="Arguments"></div>
 
 ## Arguments
-
-<div id="token"></div>
-
-### token
-
-[Primitives](./primitives.md).[TemplateContext](./primitives.md#TemplateContext)
 
 <div id="code"></div>
 
