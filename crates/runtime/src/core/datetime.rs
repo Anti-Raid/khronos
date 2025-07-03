@@ -202,7 +202,7 @@ where
             "duration_since",
             |_, this, other: LuaUserDataRef<DateTime<Tz>>| {
                 Ok(TimeDelta {
-                    timedelta: this.dt.clone().signed_duration_since(other.dt.clone()),
+                    timedelta: this.dt.clone().signed_duration_since(&other.dt),
                 })
             },
         );

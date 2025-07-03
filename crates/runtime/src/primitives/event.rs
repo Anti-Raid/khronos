@@ -1,6 +1,27 @@
-use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use mlua::prelude::*;
 use std::sync::Arc;
+use crate::utils::khronos_value::KhronosValue;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+use serde::Deserialize;
+
+#[derive(Debug, Clone, serde::Serialize)]
+enum InnerEventData {
+    /// The inner data of the object
+    Json(serde_json::Value),
+    /// The inner data of the object, as a KhronosValue
+    Khronos(KhronosValue),
+}
+
+impl<'de> Deserialize<'de> for InnerEventData {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        Ok(Self::Json(value))
+    }
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct InnerEvent {
@@ -9,7 +30,7 @@ struct InnerEvent {
     /// The name of the event
     name: String,
     /// The inner data of the object
-    data: serde_json::Value,
+    data: InnerEventData,
     /// The author, if any, of the event
     author: Option<String>,
 }
@@ -32,7 +53,24 @@ impl CreateEvent {
             inner: Arc::new(InnerEvent {
                 base_name,
                 name,
-                data,
+                data: InnerEventData::Json(data),
+                author,
+            }),
+        }
+    }
+
+    /// Create a new Event given a KhronosValue
+    pub fn new_khronos(
+        base_name: String,
+        name: String,
+        data: KhronosValue,
+        author: Option<String>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(InnerEvent {
+                base_name,
+                name,
+                data: InnerEventData::Khronos(data),
                 author,
             }),
         }
@@ -74,7 +112,14 @@ impl IntoLua for Event {
         tab.set("name", self.inner.name.clone())?;
         tab.set(
             "data",
-            lua.to_value_with(&self.inner.data, LUA_SERIALIZE_OPTIONS)?,
+            match &self.inner.data {
+                InnerEventData::Json(ref value) => {
+                    lua.to_value_with(value, LUA_SERIALIZE_OPTIONS)?
+                },
+                InnerEventData::Khronos(khronos_value) => {
+                    khronos_value.into_lua_from_ref(lua, 0)?
+                },
+            },
         )?;
         tab.set("author", self.inner.author.clone())?;
         tab.set_readonly(true);

@@ -760,12 +760,12 @@ impl KhronosValue {
 
     pub fn as_timezone(&self) -> Option<chrono_tz::Tz> {
         match self {
-            KhronosValue::TimeZone(tz) => Some(tz.clone()),
+            KhronosValue::TimeZone(tz) => Some(*tz),
             _ => None,
         }
     }
 
-    fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
+    pub fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
         if depth > 10 {
             return Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -822,7 +822,7 @@ impl KhronosValue {
                     return Ok(KhronosValue::Interval(delta.timedelta));
                 }
                 if let Ok(tz) = ud.borrow::<crate::core::datetime::Timezone>() {
-                    return Ok(KhronosValue::TimeZone(tz.tz.clone()));
+                    return Ok(KhronosValue::TimeZone(tz.tz));
                 }
                 if let Ok(i_64) = ud.borrow::<crate::core::typesext::I64>() {
                     return Ok(KhronosValue::Integer(i_64.0));
@@ -841,7 +841,7 @@ impl KhronosValue {
         }
     }
 
-    fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
+    pub fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
         if depth > 10 {
             return Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -892,6 +892,64 @@ impl KhronosValue {
             }
             KhronosValue::Interval(i) => crate::core::datetime::TimeDelta::new(i).into_lua(lua),
             KhronosValue::TimeZone(tz) => crate::core::datetime::Timezone::new(tz).into_lua(lua),
+            KhronosValue::Null => Ok(LuaValue::Nil),
+        }
+    }
+
+    /// Same as `into_lua_impl`, but takes a reference to the KhronosValue.
+    pub fn into_lua_from_ref(&self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
+        if depth > 10 {
+            return Err(LuaError::FromLuaConversionError {
+                from: "any",
+                to: "KhronosValue".to_string(),
+                message: Some("Recursion limit exceeded".to_string()),
+            });
+        }
+
+        match self {
+            KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(&s)?)),
+            KhronosValue::Integer(i) => {
+                let i = *i; // Dereference to get the value
+
+                // If i is above/below the 52 bit precision limit, use a typesext.I64
+                let min_luau_integer = -9007199254740991; // 2^53 - 1
+                let max_luau_integer = 9007199254740991; // 2^53 - 1
+                if i > max_luau_integer || i < min_luau_integer {
+                    crate::core::typesext::I64(i).into_lua(lua)
+                } else {
+                    Ok(LuaValue::Integer(i))
+                }
+            }
+            KhronosValue::UnsignedInteger(i) => crate::core::typesext::U64(*i).into_lua(lua), // An UnsignedInteger can only be created through explicit U64 parse
+            KhronosValue::Float(f) => Ok(LuaValue::Number(*f)),
+            KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(*b)),
+            KhronosValue::Buffer(buf) => {
+                let data = &buf.0;
+                let lua_buf = lua.create_buffer(data)?;
+                Ok(LuaValue::Buffer(lua_buf))
+            }
+            KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
+            KhronosValue::Map(j) => {
+                let table = lua.create_table()?;
+                for (k, v) in j.iter() {
+                    let v = v.into_lua_from_ref(lua, depth + 1)?;
+                    table.set(k.as_str(), v)?;
+                }
+                Ok(LuaValue::Table(table))
+            }
+            KhronosValue::List(l) => {
+                let table = lua.create_table()?;
+                for v in l.iter() {
+                    let v = v.into_lua_from_ref(lua, depth + 1)?;
+                    table.set(table.raw_len() + 1, v)?;
+                }
+                Ok(LuaValue::Table(table))
+            }
+            KhronosValue::Timestamptz(dt) => {
+                crate::core::datetime::DateTime::<chrono_tz::Tz>::from_utc(*dt).into_lua(lua)
+            }
+            KhronosValue::Interval(i) => crate::core::datetime::TimeDelta::new(*i).into_lua(lua),
+            KhronosValue::TimeZone(tz) => crate::core::datetime::Timezone::new(*tz).into_lua(lua),
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
@@ -1023,46 +1081,46 @@ impl KhronosValue {
                 }
             }
             serde_json::Value::Bool(b) => KhronosValue::Boolean(b),
-            serde_json::Value::Object(m) => {
+            serde_json::Value::Object(mut m) => {
                 if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
                     if let Some(khronos_value_type) = khronos_value_type.as_str() {
                         match khronos_value_type {
                             "buffer" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
+                                let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Buffer(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                    serde_json::from_value(value).map_err(|e| {
                                         format!("Failed to deserialize Buffer: {}", e)
                                     })?,
                                 ));
                             }
                             "vector" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
+                                let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Vector(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                    serde_json::from_value(value).map_err(|e| {
                                         format!("Failed to deserialize Vector: {}", e)
                                     })?,
                                 ));
                             }
                             "timestamptz" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
+                                let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Timestamptz(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                    serde_json::from_value(value).map_err(|e| {
                                         format!("Failed to deserialize DateTime: {}", e)
                                     })?,
                                 ));
                             }
                             "interval" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
+                                let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Interval(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                    serde_json::from_value(value).map_err(|e| {
                                         format!("Failed to deserialize Interval: {}", e)
                                     })?,
                                 ));
                             }
                             "timezone" => {
-                                let value = m.get("value").ok_or("Missing value field")?;
+                                let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::TimeZone(
-                                    serde_json::from_value(value.clone()).map_err(|e| {
+                                    serde_json::from_value(value).map_err(|e| {
                                         format!("Failed to deserialize TimeZone: {}", e)
                                     })?,
                                 ));

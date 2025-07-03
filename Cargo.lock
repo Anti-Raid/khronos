@@ -2158,7 +2158,6 @@ dependencies = [
  "governor",
  "hmac",
  "indexmap",
- "kittycat",
  "linkify",
  "lockdowns",
  "log",

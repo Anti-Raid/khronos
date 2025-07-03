@@ -59,12 +59,18 @@ impl LuaUserData for Chunk {
             this.optimization_level = Some(level);
             Ok(())
         });
-        fields.add_field_method_get("code", |_, this| Ok(this.code.clone()));
+        fields.add_field_method_get("code", |lua, this| Ok(lua.create_string(&this.code)?));
         fields.add_field_method_set("code", |_, this, code: String| {
             this.code = code;
             Ok(())
         });
-        fields.add_field_method_get("chunk_name", |_, this| Ok(this.chunk_name.clone()));
+        fields.add_field_method_get("chunk_name", |lua, this| {
+            if let Some(name) = &this.chunk_name {
+                Ok(LuaValue::String(lua.create_string(name)?))
+            } else {
+                Ok(LuaValue::Nil)
+            }
+        });
         fields.add_field_method_set("chunk_name", |_, this, name: Option<String>| {
             this.chunk_name = name;
             Ok(())
