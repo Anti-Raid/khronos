@@ -20,8 +20,10 @@ impl IntoNavError for Result<NavigationStatus, crate::Error> {
                 }
             },
             Err(e) => {
-                log::error!("Error while navigating: {:?}", e);
-                Err(LuaNavigateError::NotFound)
+                Err(LuaNavigateError::Other(LuaError::external(format!(
+                    "Navigation error: {}",
+                    e
+                ))))
             }
         }
     }
