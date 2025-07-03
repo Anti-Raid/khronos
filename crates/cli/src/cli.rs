@@ -459,8 +459,6 @@ impl Cli {
                         );
                     }
 
-                    println!("here");
-
                     self.setup_data
                         .main_isolate
                         .inner()

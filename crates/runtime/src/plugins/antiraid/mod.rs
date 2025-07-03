@@ -4,7 +4,6 @@ pub mod img_captcha;
 pub mod kv;
 pub mod lockdowns;
 pub mod objectstorage;
-pub mod userinfo;
 
 use mlua::prelude::*;
 

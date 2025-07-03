@@ -8,7 +8,6 @@ use std::sync::LazyLock;
 
 use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
-use antiraid_types::userinfo::UserInfo;
 use khronos_runtime::traits::context::KhronosContext;
 use khronos_runtime::traits::context::ScriptData;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
@@ -16,7 +15,6 @@ use khronos_runtime::traits::discordprovider::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
-use khronos_runtime::traits::userinfoprovider::UserInfoProvider;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
@@ -221,7 +219,6 @@ impl KhronosContext for CliKhronosContext {
     type DiscordProvider = CliDiscordProvider;
     type LockdownDataStore = CliLockdownDataStore;
     type LockdownProvider = CliLockdownProvider;
-    type UserInfoProvider = CliUserInfoProvider;
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
 
@@ -308,10 +305,6 @@ impl KhronosContext for CliKhronosContext {
             },
             http: http.clone(),
         })
-    }
-
-    fn userinfo_provider(&self) -> Option<Self::UserInfoProvider> {
-        Some(CliUserInfoProvider {})
     }
 
     fn objectstorage_provider(&self) -> Option<Self::ObjectStorageProvider> {
@@ -869,22 +862,6 @@ impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
 
     fn serenity_http(&self) -> &serenity::http::Http {
         &self.http
-    }
-}
-
-#[derive(Clone)]
-pub struct CliUserInfoProvider {}
-
-impl UserInfoProvider for CliUserInfoProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn get(
-        &self,
-        _user_id: serenity::all::UserId,
-    ) -> Result<UserInfo, khronos_runtime::Error> {
-        todo!()
     }
 }
 
