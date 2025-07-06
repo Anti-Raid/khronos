@@ -10,7 +10,7 @@ use crate::primitives::create_userdata_iterator_with_fields;
 ///
 /// This can be much more efficient than serializing the data every time it is accessed
 pub struct Lazy<T: Serialize + for<'de> Deserialize<'de> + 'static> {
-    data: T,
+    pub data: T,
     cached_data: RefCell<Option<LuaValue>>,
 }
 
@@ -44,6 +44,23 @@ impl<'de, T: serde::Serialize + for<'a> Deserialize<'a>> Deserialize<'de> for La
     }
 }
 
+impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + Clone> Clone for Lazy<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            cached_data: self.cached_data.clone(),
+        }
+    }
+}
+
+impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + std::fmt::Debug> std::fmt::Debug for Lazy<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Lazy")
+            .field("data", &self.data)
+            .finish()
+    }
+}
+
 // A Lazy<T> is a LuaUserData
 impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> LuaUserData for Lazy<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
@@ -68,6 +85,8 @@ impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> LuaUserData for 
 
         // Always returns true. Allows the user to check if the data is a lazy or not
         fields.add_field_method_get("lazy", |_lua, _this| Ok(true));
+
+        fields.add_meta_field(LuaMetaMethod::Type, "Lazy");
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
