@@ -1192,6 +1192,14 @@ impl KhronosValue {
             crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
         })?)
     }
+
+    /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
+    pub fn into_value_untyped<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
+        let value = self.into_serde_json_value(0, false)?;
+        Ok(T::deserialize(&value).map_err(|e| {
+            crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
+        })?)
+    }
 }
 
 impl FromLua for KhronosValue {
