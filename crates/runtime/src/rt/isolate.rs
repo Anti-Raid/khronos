@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::primitives::event::Event;
 use crate::require::{AssetRequirer, FilesystemWrapper};
 use crate::traits::context::KhronosContext as KhronosContextTrait;
+use crate::utils::khronos_value::KhronosValue;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
 use crate::TemplateContext;
@@ -449,13 +450,14 @@ impl SpawnResult {
         }
     }
 
-    pub fn into_serde_json_value(self, isolate: &KhronosIsolate) -> LuaResult<serde_json::Value> {
+    /// Converts the result into a KhronosValue
+    pub fn into_khronos_value(self, isolate: &KhronosIsolate) -> LuaResult<KhronosValue> {
         let Some(values) = self.result else {
-            return Ok(serde_json::Value::Null);
+            return Ok(KhronosValue::Null);
         };
 
         match values.len() {
-            0 => Ok(serde_json::Value::Null),
+            0 => Ok(KhronosValue::Null),
             1 => {
                 let value = values.into_iter().next().unwrap();
 
@@ -466,7 +468,7 @@ impl SpawnResult {
                         ));
                     };
 
-                    lua.from_value::<serde_json::Value>(value)
+                    KhronosValue::from_lua(value, lua)
                 }; // Lua should be dropped here
 
                 match result_value {
@@ -496,7 +498,7 @@ impl SpawnResult {
                             ));
                         };
 
-                        lua.from_value::<serde_json::Value>(v)
+                        KhronosValue::from_lua(v, lua)
                     }; // Lua should be dropped here
 
                     match result_value {
@@ -516,7 +518,7 @@ impl SpawnResult {
                     }
                 }
 
-                Ok(serde_json::Value::Array(arr))
+                Ok(KhronosValue::List(arr))
             }
         }
     }
