@@ -17,6 +17,11 @@ impl KhronosBuffer {
 }
 
 #[derive(Debug, Clone)]
+pub struct KhronosLazyValue {
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
@@ -26,7 +31,7 @@ pub enum KhronosValue {
     Buffer(KhronosBuffer),   // Binary data
     Vector((f32, f32, f32)), // Luau vector
     Map(indexmap::IndexMap<String, KhronosValue>),
-    LazyValue(Lazy<serde_json::Value>),
+    LazyValue(KhronosLazyValue),
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
@@ -499,7 +504,9 @@ where
 impl TryFrom<Lazy<serde_json::Value>> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: Lazy<serde_json::Value>) -> Result<Self, Self::Error> {
-        Ok(KhronosValue::LazyValue(value))
+        Ok(KhronosValue::LazyValue(KhronosLazyValue {
+            data: value.data
+        }))
     }
 }
 
@@ -507,11 +514,28 @@ impl TryFrom<KhronosValue> for Lazy<serde_json::Value> {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         match value {
-            KhronosValue::LazyValue(lazy) => Ok(lazy),
+            KhronosValue::LazyValue(lazy) => Ok(Lazy::new(lazy.data)),
             _ => {
                 let serde_json_value = value.into_serde_json_value(0, false)?;
                 Ok(Lazy::new(serde_json_value))
             },
+        }
+    }
+}
+
+impl TryFrom<KhronosLazyValue> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: KhronosLazyValue) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::LazyValue(value))
+    }
+}
+
+impl TryFrom<KhronosValue> for KhronosLazyValue {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::LazyValue(lazy) => Ok(lazy),
+            _ => Err("KhronosValue is not a LazyValue".into()),
         }
     }
 }
@@ -761,7 +785,7 @@ impl KhronosValue {
         }
     }
 
-    pub fn as_lazy_value(&self) -> Option<&Lazy<serde_json::Value>> {
+    pub fn as_lazy_value(&self) -> Option<&KhronosLazyValue> {
         match self {
             KhronosValue::LazyValue(lazy) => Some(lazy),
             _ => None,
@@ -861,6 +885,11 @@ impl KhronosValue {
                 if let Ok(u_64) = ud.borrow::<crate::core::typesext::U64>() {
                     return Ok(KhronosValue::UnsignedInteger(u_64.0));
                 }
+                if let Ok(lazy) = ud.borrow::<Lazy<serde_json::Value>>() {
+                    return Ok(KhronosValue::LazyValue(KhronosLazyValue {
+                        data: lazy.data.clone(),
+                    }));
+                }
 
                 return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
             }
@@ -910,7 +939,7 @@ impl KhronosValue {
                 }
                 Ok(LuaValue::Table(table))
             }
-            KhronosValue::LazyValue(lazy) => lazy.into_lua(lua),
+            KhronosValue::LazyValue(lazy) => Lazy::new(lazy.data).into_lua(lua),
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.into_iter() {
@@ -969,7 +998,7 @@ impl KhronosValue {
                 }
                 Ok(LuaValue::Table(table))
             }
-            KhronosValue::LazyValue(lazy) => lazy.clone().into_lua(lua),
+            KhronosValue::LazyValue(lazy) => Lazy::new(lazy.data.clone()).into_lua(lua),
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.iter() {
@@ -1449,6 +1478,8 @@ mod test_to_struct {
     use serde::Deserialize;
     use serde::Serialize;
 
+    use crate::utils::khronos_value::KhronosValue;
+
     to_struct!(
         #[derive(Debug, Clone, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -1485,5 +1516,12 @@ mod test_to_struct {
         assert_eq!(my_data.a_list, vec![1, 2, 3]);
         println!("{:?}", value!(my_data));
         Ok(())
+    }
+
+    // Ensure KhronosValue is Send+Sync
+    #[test]
+    fn test_khronos_value_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<KhronosValue>();
     }
 }
