@@ -5,7 +5,7 @@ pub mod kv;
 pub mod lockdowns;
 pub mod objectstorage;
 
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 // NOTE: These are options for going from other format -> lua ("serializing" lua values)
 pub const LUA_SERIALIZE_OPTIONS: LuaSerializeOptions = LuaSerializeOptions::new()
@@ -17,7 +17,7 @@ pub const LUA_SERIALIZE_OPTIONS: LuaSerializeOptions = LuaSerializeOptions::new(
 pub mod test_type_metamethod {
     #[test]
     fn test_type_metamethod() {
-        use mlua::prelude::*;
+        use mluau::prelude::*;
 
         let lua = Lua::new();
         lua.sandbox(true).expect("failed to enable sandbox");
@@ -27,10 +27,10 @@ pub mod test_type_metamethod {
         }
 
         impl LuaUserData for A<String> {
-            fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+            fn add_fields<F: mluau::UserDataFields<Self>>(fields: &mut F) {
                 fields.add_meta_field(LuaMetaMethod::Type, "MyType".to_string());
             }
-            fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+            fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
                 methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, ()| {
                     Ok("MyString".to_string())
                 });

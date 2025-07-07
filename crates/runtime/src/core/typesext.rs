@@ -1,5 +1,5 @@
 use crate::primitives::create_userdata_iterator_with_fields;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use rand::distributions::{Alphanumeric, DistString};
 
 /// Syntactically:
@@ -275,7 +275,7 @@ impl LuaUserData for U64 {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<U64>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -479,7 +479,7 @@ impl LuaUserData for I64 {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<I64>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -822,11 +822,11 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
 #[cfg(test)]
 mod tests {
-    use mlua::prelude::*;
+    use mluau::prelude::*;
 
     #[test]
     fn test_multi_option() {
-        let lua = mlua::Lua::new();
+        let lua = mluau::Lua::new();
 
         lua.globals()
             .set(

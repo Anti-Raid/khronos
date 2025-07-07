@@ -4,7 +4,7 @@ use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreMethod, DataStoreProvider};
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -137,7 +137,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<DataStore<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             let mut base = vec![
@@ -209,7 +209,7 @@ impl<T: KhronosContext> LuaUserData for DataStoreExecutor<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<DataStoreExecutor<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             let datastores = {

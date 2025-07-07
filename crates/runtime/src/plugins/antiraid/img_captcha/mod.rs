@@ -5,7 +5,7 @@ use crate::{
     TemplateContext,
 };
 use captcha::filters::Filter;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
 
 pub const CREATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);

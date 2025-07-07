@@ -4,7 +4,7 @@ mod matches;
 mod regex;
 
 use crate::plugins::lune::{regex::regex::LuaRegex, utils::TableBuilder};
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 /**
     Creates the `regex` standard library module.

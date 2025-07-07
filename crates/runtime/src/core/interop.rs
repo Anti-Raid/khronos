@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;

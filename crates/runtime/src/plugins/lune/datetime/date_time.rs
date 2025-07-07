@@ -3,7 +3,7 @@
 /// SPDX-License-Identifier: MPL-2.0
 use std::cmp::Ordering;
 
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use chrono::prelude::*;
 use chrono::DateTime as ChronoDateTime;

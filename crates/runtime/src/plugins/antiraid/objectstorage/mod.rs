@@ -8,8 +8,8 @@ use crate::traits::context::Limitations;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
-use mlua::prelude::*;
-use mlua::Buffer;
+use mluau::prelude::*;
+use mluau::Buffer;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use serde::{Deserialize, Serialize};
 
@@ -219,7 +219,7 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Bucket<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

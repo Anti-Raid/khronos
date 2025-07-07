@@ -3,7 +3,7 @@
 /// SPDX-License-Identifier: MPL-2.0
 use std::{ops::Range, sync::Arc};
 
-use mlua::prelude::*;
+use mluau::prelude::*;
 use regex::Match;
 
 /**

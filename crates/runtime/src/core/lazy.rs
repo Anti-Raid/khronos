@@ -1,5 +1,5 @@
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use std::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
@@ -92,7 +92,7 @@ impl<T: serde::Serialize + 'static> LuaUserData for Lazy<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Lazy<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

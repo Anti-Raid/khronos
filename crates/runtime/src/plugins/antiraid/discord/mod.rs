@@ -8,7 +8,7 @@ use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::{serenity_backports, serenity_utils};
 use crate::{core::lazy::Lazy, TemplateContext};
-use mlua::prelude::*;
+use mluau::prelude::*;
 use serenity::all::{Mentionable, ParseIdError};
 use structs::{
     CreateAutoModerationRuleOptions, DeleteAutoModerationRuleOptions, EditAutoModerationRuleOptions,

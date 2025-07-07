@@ -1,5 +1,5 @@
 use crate::primitives::create_userdata_iterator_with_fields;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 
 #[derive(Clone)]
@@ -14,7 +14,7 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn setup_chunk(&self, lua: &Lua) -> LuaResult<LuaChunk<'_>> {
-        let mut compiler = mlua::Compiler::new();
+        let mut compiler = mluau::Compiler::new();
         if let Some(level) = self.optimization_level {
             compiler = compiler.set_optimization_level(level);
         }
@@ -22,7 +22,7 @@ impl Chunk {
         let bytecode = compiler.compile(&self.code)?;
 
         let mut chunk = lua.load(bytecode);
-        chunk = chunk.set_mode(mlua::ChunkMode::Binary); // We've compiled it anyways so
+        chunk = chunk.set_mode(mluau::ChunkMode::Binary); // We've compiled it anyways so
 
         if let Some(name) = &self.chunk_name {
             chunk = chunk.set_name(name);
@@ -104,7 +104,7 @@ impl LuaUserData for Chunk {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Chunk>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

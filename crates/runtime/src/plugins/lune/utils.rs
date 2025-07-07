@@ -5,7 +5,7 @@
 /// SPDX-License-Identifier: MPL-2.0
 use std::future::Future;
 
-use mlua::{prelude::*, MaybeSend};
+use mluau::{prelude::*, MaybeSend};
 use mlua_scheduler::LuaSchedulerAsync;
 
 /**

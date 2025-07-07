@@ -1,7 +1,7 @@
 /// From https://github.com/lune-org/lune/blob/main/crates/lune-std-datetime/src/result.rs
 ///
 /// SPDX-License-Identifier: MPL-2.0
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use thiserror::Error;
 

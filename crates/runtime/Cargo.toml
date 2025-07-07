@@ -17,7 +17,7 @@ reqwest = { version = "0.12" }
 percent-encoding = { version = "2" }
 linkify = { git = "https://github.com/robinst/linkify" }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
-mlua = { git = "https://github.com/mluau/mluau", features = [
+mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
     "serialize",
 ] }
@@ -58,16 +58,6 @@ sha3 = "0.10.8"
 # This feature MIGHT break due to the unstable nature of the digest crate.
 # Check before updating it.
 blake3 = { version = "=1.5.0", features = ["traits-preview"] }
-
-# Lune Roblox
-glam = "0.27"
-rand = "0.8"
-rbx_binary = "0.7.7"
-rbx_dom_weak = "2.9.0"
-rbx_reflection = "4.7.0"
-rbx_reflection_database = "0.2.12"
-rbx_xml = "0.13.5"
-futures-util = "0.3.31"
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"

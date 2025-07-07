@@ -8,7 +8,7 @@ use crate::traits::kvprovider::KVProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
 use chrono::Utc;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 
 /// An kv executor is used to execute key-value ops from Lua
@@ -530,7 +530,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<KvExecutor<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

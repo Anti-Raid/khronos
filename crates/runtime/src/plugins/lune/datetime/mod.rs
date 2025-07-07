@@ -6,7 +6,7 @@ pub mod result;
 pub mod values;
 
 use crate::plugins::lune::{datetime::date_time::DateTime, utils::TableBuilder};
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 /**
     Creates the `datetime` standard library module.

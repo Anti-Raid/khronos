@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use chrono::{Datelike, TimeZone, Timelike};
 use chrono_tz::OffsetComponents;
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use crate::primitives::create_userdata_iterator_with_fields;
 
@@ -79,7 +79,7 @@ impl LuaUserData for TimeDelta {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<TimeDelta>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -209,7 +209,7 @@ where
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<DateTime<Tz>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -312,7 +312,7 @@ impl LuaUserData for Timezone {
         methods.add_method("fromString", |_, this, date: String| {
             let dt = date
                 .parse::<chrono::DateTime<chrono::FixedOffset>>()
-                .map_err(|e| mlua::Error::RuntimeError(format!("Invalid date: {}", e)))?;
+                .map_err(|e| mluau::Error::RuntimeError(format!("Invalid date: {}", e)))?;
 
             Ok(DateTime {
                 dt: dt.with_timezone(&this.tz),
@@ -349,7 +349,7 @@ impl LuaUserData for Timezone {
                         }
                     }
                     chrono::LocalResult::None => {
-                        Err(mlua::Error::RuntimeError("Invalid date".to_string()))
+                        Err(mluau::Error::RuntimeError("Invalid date".to_string()))
                     }
                 }
             },
@@ -390,7 +390,7 @@ impl LuaUserData for Timezone {
                         }
                     }
                     chrono::LocalResult::None => {
-                        Err(mlua::Error::RuntimeError("Invalid date".to_string()))
+                        Err(mluau::Error::RuntimeError("Invalid date".to_string()))
                     }
                 }
             },
@@ -403,11 +403,11 @@ impl LuaUserData for Timezone {
                 let now = chrono::Utc::now();
                 let now = now
                     .with_hour(hours)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_minute(minutes)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_second(secs)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_timezone(&this.tz);
                 Ok(DateTime { dt: now })
             },
@@ -420,11 +420,11 @@ impl LuaUserData for Timezone {
                 let now = this.tz.from_utc_datetime(&chrono::Utc::now().naive_utc());
                 let now = now
                     .with_hour(hours)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_minute(minutes)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_second(secs)
-                    .ok_or(mlua::Error::RuntimeError("Invalid time".to_string()))?
+                    .ok_or(mluau::Error::RuntimeError("Invalid time".to_string()))?
                     .with_timezone(&chrono_tz::Tz::UTC);
 
                 Ok(DateTime { dt: now })
@@ -441,7 +441,7 @@ impl LuaUserData for Timezone {
         // Given a unix time, returns a DateTime object with this timezone
         methods.add_method("fromTime", |_, this, time: I64| {
             let Some(dt) = chrono::DateTime::from_timestamp(time.0, 0) else {
-                return Err(mlua::Error::RuntimeError(
+                return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
             };
@@ -452,7 +452,7 @@ impl LuaUserData for Timezone {
         // Given a unix time in milliseconds, returns a DateTime object with this timezone
         methods.add_method("fromTimeMillis", |_, this, time: I64| {
             let Some(dt) = chrono::DateTime::from_timestamp_millis(time.0) else {
-                return Err(mlua::Error::RuntimeError(
+                return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
             };
@@ -463,7 +463,7 @@ impl LuaUserData for Timezone {
         // Given a unix time in microseconds, returns a DateTime object with this timezone
         methods.add_method("fromTimeMicros", |_, this, time: I64| {
             let Some(dt) = chrono::DateTime::from_timestamp_micros(time.0) else {
-                return Err(mlua::Error::RuntimeError(
+                return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
             };
@@ -480,7 +480,7 @@ impl LuaUserData for Timezone {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Timezone>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -528,7 +528,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                     if let Ok(tz) = chrono_tz::Tz::from_str(&tz) {
                         Ok(Timezone { tz })
                     } else {
-                        Err(mlua::Error::RuntimeError("Invalid timezone".to_string()))
+                        Err(mluau::Error::RuntimeError("Invalid timezone".to_string()))
                     }
                 }
             }
@@ -544,7 +544,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|_, weeks: I64| {
             Ok(TimeDelta {
                 timedelta: chrono::Duration::try_weeks(weeks.0).ok_or(
-                    mlua::Error::RuntimeError("Invalid number of weeks".to_string()),
+                    mluau::Error::RuntimeError("Invalid number of weeks".to_string()),
                 )?,
             })
         })?,
@@ -554,7 +554,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         "timedelta_days",
         lua.create_function(|_, days: I64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_days(days.0).ok_or(mlua::Error::RuntimeError(
+                timedelta: chrono::Duration::try_days(days.0).ok_or(mluau::Error::RuntimeError(
                     "Invalid number of days".to_string(),
                 ))?,
             })
@@ -566,7 +566,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|_, hours: I64| {
             Ok(TimeDelta {
                 timedelta: chrono::Duration::try_hours(hours.0).ok_or(
-                    mlua::Error::RuntimeError("Invalid number of hours".to_string()),
+                    mluau::Error::RuntimeError("Invalid number of hours".to_string()),
                 )?,
             })
         })?,
@@ -577,7 +577,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|_, minutes: I64| {
             Ok(TimeDelta {
                 timedelta: chrono::Duration::try_minutes(minutes.0).ok_or(
-                    mlua::Error::RuntimeError("Invalid number of minutes".to_string()),
+                    mluau::Error::RuntimeError("Invalid number of minutes".to_string()),
                 )?,
             })
         })?,
@@ -588,7 +588,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|_, seconds: I64| {
             Ok(TimeDelta {
                 timedelta: chrono::Duration::try_seconds(seconds.0).ok_or(
-                    mlua::Error::RuntimeError("Invalid number of seconds".to_string()),
+                    mluau::Error::RuntimeError("Invalid number of seconds".to_string()),
                 )?,
             })
         })?,
@@ -599,7 +599,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         lua.create_function(|_, millis: I64| {
             Ok(TimeDelta {
                 timedelta: chrono::Duration::try_milliseconds(millis.0).ok_or(
-                    mlua::Error::RuntimeError("Invalid number of milliseconds".to_string()),
+                    mluau::Error::RuntimeError("Invalid number of milliseconds".to_string()),
                 )?,
             })
         })?,

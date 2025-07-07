@@ -2,7 +2,7 @@ use crate::{
     plugins::antiraid::LUA_SERIALIZE_OPTIONS,
     traits::{context::{KhronosContext, Limitations}, lockdownprovider::LockdownProvider},
 };
-use mlua::prelude::*;
+use mluau::prelude::*;
 use std::rc::Rc;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use crate::{
@@ -37,7 +37,7 @@ impl LuaUserData for CreateLockdownMode {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<CreateLockdownMode>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -128,7 +128,7 @@ impl LuaUserData for Lockdown {
     fn add_methods<F: LuaUserDataMethods<Self>>(methods: &mut F) {
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<Lockdown>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -261,7 +261,7 @@ impl<T: KhronosContext> LuaUserData for LockdownSet<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<LockdownSet<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -337,7 +337,7 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
                         LuaValue::String(lua.create_string(&e.0.display_error())?)
                     }
                 },
-                _ => mlua::Value::Nil,
+                _ => mluau::Value::Nil,
             };
 
             Ok(v)
@@ -346,7 +346,7 @@ impl<T: KhronosContext> LuaUserData for LockdownAddStatus<T> {
         // Iter
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<LockdownAddStatus<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -421,7 +421,7 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
                         LuaValue::String(lua.create_string(&e.0.display_error())?)
                     }
                 },
-                _ => mlua::Value::Nil,
+                _ => mluau::Value::Nil,
             };
 
             Ok(v)
@@ -430,7 +430,7 @@ impl<T: KhronosContext> LuaUserData for LockdownRemoveStatus<T> {
         // Iter
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<LockdownRemoveStatus<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(
@@ -538,7 +538,7 @@ impl<T: KhronosContext> LuaUserData for LockdownTestResult<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<LockdownTestResult<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

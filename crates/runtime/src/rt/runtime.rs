@@ -260,17 +260,6 @@ impl KhronosRuntime {
             crate::plugins::lune::serde::init_plugin(&lua)?,
         )?;
 
-        lua.globals()
-            .set("__kanalytics_memusagebeforeroblox", lua.used_memory())?;
-
-        lua.register_module(
-            "@lune/roblox",
-            crate::plugins::lune::roblox::init_plugin(&lua)?,
-        )?;
-
-        lua.globals()
-            .set("__kanalytics_memusageaftercreate", lua.used_memory())?;
-
         Ok(Self {
             store_table,
             lua: Rc::new(RefCell::new(Some(lua))),

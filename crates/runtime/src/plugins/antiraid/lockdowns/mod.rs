@@ -7,7 +7,7 @@ use crate::traits::lockdownprovider::LockdownProvider;
 use crate::TemplateContext;
 use crate::{primitives::create_userdata_iterator_with_fields, traits::context::Limitations};
 use lockdowns::LockdownSet;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use types::{CreateLockdownMode, LockdownMode};
 
@@ -67,7 +67,7 @@ impl<T: KhronosContext> LuaUserData for LockdownExecutor<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<LockdownExecutor<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

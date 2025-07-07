@@ -3,7 +3,7 @@
 /// SPDX-License-Identifier: MPL-2.0
 use std::sync::Arc;
 
-use mlua::prelude::*;
+use mluau::prelude::*;
 use regex::{Captures, Regex};
 use self_cell::self_cell;
 
