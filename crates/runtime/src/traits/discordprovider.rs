@@ -13,6 +13,27 @@ pub trait DiscordProvider: 'static + Clone {
     /// Http client
     fn serenity_http(&self) -> &serenity::http::Http;
 
+    /// Cache client (needed for get_cached_guild)
+    fn serenity_cache(&self) -> Option<&serenity::cache::Cache> {
+        None
+    }
+
+    /// Get a cached guild
+    fn get_cached_guild<I, R>(
+        &self,
+        input: I,
+        f: impl FnOnce(I, &serenity::all::Guild) -> R + 'static,
+    ) -> Option<R> {
+        let Some(cache) = self.serenity_cache() else {
+            return None;
+        };
+
+        match self.guild_id().to_guild_cached(cache) {
+            Some(guild) => Some(f(input, &guild)),
+            None => None,
+        }
+    }
+
     /// Returns the guild ID
     fn guild_id(&self) -> serenity::all::GuildId;
 

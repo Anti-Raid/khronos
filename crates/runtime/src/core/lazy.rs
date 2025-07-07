@@ -9,12 +9,12 @@ use crate::primitives::create_userdata_iterator_with_fields;
 /// Represents data that is only serialized to Lua upon first access
 ///
 /// This can be much more efficient than serializing the data every time it is accessed
-pub struct Lazy<T: Serialize + for<'de> Deserialize<'de> + 'static> {
+pub struct Lazy<T: Serialize + 'static> {
     pub data: T,
     cached_data: RefCell<Option<LuaValue>>,
 }
 
-impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> Lazy<T> {
+impl<T: serde::Serialize + 'static> Lazy<T> {
     pub fn new(data: T) -> Self {
         Self {
             data,
@@ -24,14 +24,14 @@ impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> Lazy<T> {
 }
 
 // A T can be converted to a Lazy<T> by just wrapping it
-impl<T: serde::Serialize + for<'de> Deserialize<'de>> From<T> for Lazy<T> {
+impl<T: serde::Serialize> From<T> for Lazy<T> {
     fn from(data: T) -> Self {
         Self::new(data)
     }
 }
 
 // Ensure Lazy<T> serializes to T
-impl<T: serde::Serialize + for<'de> Deserialize<'de>> Serialize for Lazy<T> {
+impl<T: serde::Serialize> Serialize for Lazy<T> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.data.serialize(serializer)
     }
@@ -44,7 +44,7 @@ impl<'de, T: serde::Serialize + for<'a> Deserialize<'a>> Deserialize<'de> for La
     }
 }
 
-impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + Clone> Clone for Lazy<T> {
+impl<T: serde::Serialize + Clone> Clone for Lazy<T> {
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
@@ -53,7 +53,7 @@ impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + Clone> Clone for Lazy<
     }
 }
 
-impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + std::fmt::Debug> std::fmt::Debug for Lazy<T> {
+impl<T: serde::Serialize + std::fmt::Debug> std::fmt::Debug for Lazy<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Lazy")
             .field("data", &self.data)
@@ -62,7 +62,7 @@ impl<'de, T: serde::Serialize + for<'a> Deserialize<'a> + std::fmt::Debug> std::
 }
 
 // A Lazy<T> is a LuaUserData
-impl<T: serde::Serialize + for<'de> Deserialize<'de> + 'static> LuaUserData for Lazy<T> {
+impl<T: serde::Serialize + 'static> LuaUserData for Lazy<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         // Returns the data, serializing it if it hasn't been serialized yet
         fields.add_field_method_get("data", |lua, this| {
