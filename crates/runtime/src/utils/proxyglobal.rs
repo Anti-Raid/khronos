@@ -96,7 +96,7 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
     // Block getmetatable
     global_mt.set("__metatable", false)?;
 
-    global_tab.set_metatable(Some(global_mt));
+    global_tab.set_metatable(Some(global_mt))?;
 
     Ok(global_tab)
 }
