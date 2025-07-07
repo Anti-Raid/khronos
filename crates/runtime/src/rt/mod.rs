@@ -11,5 +11,6 @@ pub use manager::{IsolateData, KhronosRuntimeManager};
 pub use runtime::{KhronosRuntime, KhronosRuntimeInterruptData, RuntimeCreateOpts};
 
 // Re-export for convenience
-pub use mlua;
+pub use mluau;
+pub use mluau as mlua;
 pub use mlua_scheduler;

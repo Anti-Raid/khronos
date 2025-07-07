@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use mluau::prelude::*;
 use std::cell::Cell;
 use std::rc::Rc;
 

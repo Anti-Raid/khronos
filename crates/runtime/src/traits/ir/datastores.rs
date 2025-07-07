@@ -1,5 +1,5 @@
 use crate::utils::khronos_value::KhronosValue;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use serenity::async_trait;
 use std::rc::Rc;
 use std::{future::Future, pin::Pin};

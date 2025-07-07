@@ -1,6 +1,6 @@
 use crate::primitives::create_userdata_iterator_with_fields;
 use mluau::prelude::*;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 
 /// Syntactically:
 ///
@@ -811,7 +811,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                 ));
             }
 
-            Ok(Alphanumeric.sample_string(&mut rand::thread_rng(), length))
+            Ok(Alphanumeric.sample_string(&mut rand::rng(), length))
         })?,
     )?;
 

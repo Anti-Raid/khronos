@@ -87,7 +87,7 @@ fn test_basic_nested_require() {
         }),
     );
 
-    let lua = mlua::Lua::new();
+    let lua = mluau::Lua::new();
 
     let c = AssetRequirer::new(
         crate::utils::memoryvfs::create_vfs_from_map(tree).expect("Failed to make vfs"),
@@ -115,7 +115,7 @@ fn test_basic_nested_require() {
 
 #[test]
 fn test_reqtest() {
-    let lua = mlua::Lua::new();
+    let lua = mluau::Lua::new();
 
     let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
@@ -166,7 +166,7 @@ resolved = true
 }
     "#;
 
-    let lua = mlua::Lua::new();
+    let lua = mluau::Lua::new();
 
     let c = FilesystemWrapper::new(vfs::MemoryFS::new());
 

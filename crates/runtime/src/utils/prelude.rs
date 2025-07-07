@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 /// Disables potentially harmful functions in the Lua environment
 pub fn disable_harmful(lua: &Lua) -> Result<(), LuaError> {

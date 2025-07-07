@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use mlua_scheduler::{ReturnTracker, TaskManager};
 
 /// A wrapper around the Lua vm that cannot be cloned
@@ -47,7 +47,7 @@ pub struct KhronosRuntime {
     pub(super) lua: Rc<RefCell<Option<Lua>>>,
 
     /// The lua compiler itself
-    compiler: mlua::Compiler,
+    compiler: mluau::Compiler,
 
     /// The vm scheduler
     scheduler: TaskManager,
@@ -85,7 +85,7 @@ impl KhronosRuntime {
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub fn new<
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
-        ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mlua::Error> + 'static,
+        ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn() -> () + 'static,
     >(
         opts: RuntimeCreateOpts,
@@ -103,7 +103,7 @@ impl KhronosRuntime {
                 .disable_error_userdata(true),
         )?;
 
-        let compiler = mlua::Compiler::new()
+        let compiler = mluau::Compiler::new()
             .set_optimization_level(2)
             .set_type_info_level(1);
 
@@ -168,7 +168,7 @@ impl KhronosRuntime {
                 log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
                     // Prevent runaway threads
-                    return Err(mlua::Error::RuntimeError(format!(
+                    return Err(mluau::Error::RuntimeError(format!(
                         "Maximum number of threads exceeded: {} (current: {}, max: {})",
                         new,
                         current_threads_ref.get(),
@@ -203,7 +203,7 @@ impl KhronosRuntime {
                 log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
                 if new > max_threads_ref.get() {
                     // Prevent runaway threads
-                    return Err(mlua::Error::RuntimeError(format!(
+                    return Err(mluau::Error::RuntimeError(format!(
                         "Maximum number of threads exceeded: {} (current: {}, max: {})",
                         new,
                         current_threads_ref.get(),
@@ -286,13 +286,13 @@ impl KhronosRuntime {
     }
 
     /// Returns the lua compiler being used
-    pub fn compiler(&self) -> &mlua::Compiler {
+    pub fn compiler(&self) -> &mluau::Compiler {
         log::debug!("Getting lua compiler");
         &self.compiler
     }
 
     /// Sets the lua compiler being used on both the lua vm and the runtime
-    pub fn set_compiler(&mut self, compiler: mlua::Compiler) {
+    pub fn set_compiler(&mut self, compiler: mluau::Compiler) {
         log::debug!("Setting lua compiler");
         let Some(ref lua) = *self.lua.borrow() else {
             return;
@@ -513,7 +513,7 @@ impl KhronosRuntime {
     /// Executes a function in the lua vm.
     ///
     /// The given lua vm is wrapped in a KhronosLuaRef to try and block cloning
-    pub fn exec_lua<F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mlua::MaybeSend + 'static>(
+    pub fn exec_lua<F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mluau::MaybeSend + 'static>(
         &self,
         func: F,
     ) -> LuaResult<()> {
@@ -526,8 +526,8 @@ impl KhronosRuntime {
 
     /// Sets a custom global
     pub fn set_custom_global<
-        A: IntoLua + mlua::MaybeSend + 'static,
-        V: IntoLua + mlua::MaybeSend + 'static,
+        A: IntoLua + mluau::MaybeSend + 'static,
+        V: IntoLua + mluau::MaybeSend + 'static,
     >(
         &self,
         name: A,
@@ -543,7 +543,7 @@ impl KhronosRuntime {
 
     /// Sets a custom global function
     pub fn set_custom_global_function<
-        F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mlua::MaybeSend + 'static,
+        F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mluau::MaybeSend + 'static,
         A: FromLuaMulti,
         R: IntoLuaMulti,
     >(

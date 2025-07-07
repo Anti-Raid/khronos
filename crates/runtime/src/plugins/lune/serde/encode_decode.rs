@@ -1,7 +1,7 @@
 /// Adapted from https://github.com/lune-org/lune/blob/main/crates/lune-std-serde/src/encode_decode.rs
 ///
 /// SPDX-License-Identifier: MPL-2.0
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;

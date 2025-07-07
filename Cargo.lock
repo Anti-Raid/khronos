@@ -2162,6 +2162,7 @@ dependencies = [
  "mlua_scheduler",
  "mluau",
  "percent-encoding",
+ "rand 0.9.1",
  "regex",
  "reqwest",
  "rustrict",

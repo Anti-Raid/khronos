@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use super::vfs_navigator::{VfsNavigator, NavigationStatus};
 use super::fswrapper::FilesystemWrapper;
 use super::utils::is_absolute_path;
@@ -102,11 +102,11 @@ impl LuaRequire for AssetRequirer {
         let chunk_name = self.vfs.get_absolute_file_path();
         let content = self.vfs.fs
             .get_file(chunk_name.to_string())
-            .map_err(|e| mlua::Error::external(format!("Failed to fetch contents: {:?}", e)))?;
+            .map_err(|e| mluau::Error::external(format!("Failed to fetch contents: {:?}", e)))?;
 
         let lv = lua
             .load(content)
-            .set_mode(mlua::ChunkMode::Text)
+            .set_mode(mluau::ChunkMode::Text)
             .set_name(chunk_name)
             .set_environment(self.global_table.clone())
             .into_function()?;

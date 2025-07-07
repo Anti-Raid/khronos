@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use mluau::prelude::*;
 use std::sync::Arc;
 use crate::utils::khronos_value::KhronosValue;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;

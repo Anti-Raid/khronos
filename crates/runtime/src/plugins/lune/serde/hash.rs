@@ -5,7 +5,7 @@ use std::fmt::Write;
 
 use bstr::BString;
 use md5::Md5;
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use blake3::Hasher as Blake3;
 use sha1::Sha1;

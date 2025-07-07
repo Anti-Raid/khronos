@@ -3,7 +3,7 @@
 /// SPDX-License-Identifier: MPL-2.0
 use std::io::{copy as copy_std, Cursor, Read as _, Write as _};
 
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use lz4::{Decoder, EncoderBuilder};
 use tokio::{

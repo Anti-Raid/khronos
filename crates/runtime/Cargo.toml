@@ -26,6 +26,7 @@ antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
 vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 bitflags = { version = "2", features = ["serde"] }
+rand = { version = "0.9", features = ["std"] }
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"] }

@@ -1,4 +1,4 @@
-use mlua::prelude::*;
+use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

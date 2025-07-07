@@ -1,7 +1,7 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::traits::context::{KhronosContext, Limitations};
 use crate::utils::khronos_value::KhronosValue;
-use mlua::prelude::*;
+use mluau::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,7 +35,7 @@ impl<T: KhronosContext> TemplateContext<T> {
     pub fn new(lua: &Lua, context: T) -> LuaResult<Self> {
         let store = lua
             .app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>()
-            .ok_or(mlua::Error::RuntimeError(
+            .ok_or(mluau::Error::RuntimeError(
                 "No runtime global table found".to_string(),
             ))?;
 
@@ -199,13 +199,13 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         methods.add_method("withlimits", |_lua, this, limits: KhronosValue| {
             let limits: Limitations = limits.try_into().map_err(|e| {
-                mlua::Error::external(format!("Failed to convert LuaValue to Limitations: {}", e))
+                mluau::Error::external(format!("Failed to convert LuaValue to Limitations: {}", e))
             })?;
 
             // Ensure that the new limitations are a subset of the current limitations
             limits
                 .subset_of(&this.limitations)
-                .map_err(|e| mlua::Error::external(e))?;
+                .map_err(|e| mluau::Error::external(e))?;
 
             // Create a new context with the given limitations
             let new_context = TemplateContext {
@@ -222,7 +222,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
             if !ud.is::<TemplateContext<T>>() {
-                return Err(mlua::Error::external("Invalid userdata type"));
+                return Err(mluau::Error::external("Invalid userdata type"));
             }
 
             create_userdata_iterator_with_fields(

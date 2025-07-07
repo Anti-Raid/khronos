@@ -2,7 +2,7 @@
 ///
 /// SPDX-License-Identifier: MPL-2.0
 use bstr::BString;
-use mlua::prelude::*;
+use mluau::prelude::*;
 
 use crate::plugins::lune::utils::TableBuilder;
 

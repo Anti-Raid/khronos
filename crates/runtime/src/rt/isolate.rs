@@ -1,6 +1,5 @@
 #![allow(clippy::disallowed_methods)] // Allow RefCell borrow here
 
-use rand::distributions::DistString;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,8 +12,8 @@ use crate::utils::proxyglobal::proxy_global;
 use crate::TemplateContext;
 
 use super::runtime::KhronosRuntime;
-use mlua::prelude::*;
-use rand::distributions::Alphanumeric;
+use mluau::prelude::*;
+use rand::distr::{Alphanumeric, SampleString};
 
 /// A bytecode cacher for Luau scripts
 ///
@@ -111,7 +110,7 @@ impl KhronosIsolate {
         is_subisolate: bool,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new isolate");
-        let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+        let id = Alphanumeric.sample_string(&mut rand::rng(), 16);
 
         let global_table = {
             let Some(ref lua) = *inner.lua.borrow_mut() else {
@@ -338,7 +337,7 @@ impl KhronosIsolate {
                 let function = match lua
                     .load(&bytecode)
                     .set_name(name.to_string())
-                    .set_mode(mlua::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
+                    .set_mode(mluau::ChunkMode::Binary) // Ensure auto-detection never selects binary mode
                     .set_environment(self.global_table.clone())
                     .into_function()
                 {
