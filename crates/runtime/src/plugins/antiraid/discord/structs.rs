@@ -328,6 +328,19 @@ impl PartialOrd<serenity::all::Role> for ModifyRolePosition {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+pub struct EditGuildRoleOptions {
+    pub role_id: serenity::all::RoleId,
+    pub reason: String,
+    pub data: EditRole,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteGuildRoleOptions {
+    pub role_id: serenity::all::RoleId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetInviteOptions {
     pub code: String,
     pub with_counts: Option<bool>,     // default to false

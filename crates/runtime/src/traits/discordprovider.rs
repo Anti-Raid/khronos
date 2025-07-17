@@ -521,6 +521,29 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to modify guild role positions: {}", e).into())
     }
 
+    async fn modify_guild_role(
+        &self,
+        role_id: serenity::all::RoleId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::Role, crate::Error> {
+        self.serenity_http()
+            .edit_role(self.guild_id(), role_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify guild role: {}", e).into())
+    }
+
+    async fn delete_guild_role(
+        &self,
+        role_id: serenity::all::RoleId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_role(self.guild_id(), role_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify guild role: {}", e).into())
+    }
+
     // Invites
 
     /// Gets an invite, this can be overrided to add stuff like caching invite codes etc

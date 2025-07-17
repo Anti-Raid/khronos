@@ -1737,6 +1737,157 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(roles))
         });
 
+        // Should be documented
+        methods.add_scheduler_async_method("modify_guild_role", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::EditGuildRoleOptions>(data)?;
+
+            this.check_action("modify_guild_role".to_string())
+                .map_err(LuaError::external)?;
+
+            if let Some(ref name) = data.data.name {
+                if name.len() > 100 || name.is_empty() {
+                    return Err(LuaError::external(
+                        "Role name must be a maximum of 100 characters and not empty",
+                    ));
+                }
+            }
+
+            this.check_reason(&data.reason)
+            .map_err(LuaError::external)?;
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            let (guild, member, bot_perms) = this.check_permissions(
+                bot_user.id,
+                serenity::all::Permissions::MANAGE_ROLES,
+            )
+            .await
+            .map_err(LuaError::external)?; 
+
+            let mut bot_highest_role: Option<&serenity::all::Role> = None;
+            let mut mod_role: Option<&serenity::all::Role> = None;
+
+            for role in guild.roles.iter() {
+                if role.id == data.role_id {
+                    mod_role = Some(role);
+                }
+
+                if (bot_highest_role.is_none() || bot_highest_role.unwrap() < role) && member.roles.contains(&role.id) {
+                    bot_highest_role = Some(role);
+                }
+            }
+
+            let Some(mod_role) = mod_role else {
+                return Err(LuaError::runtime("The role being modified could not be found on the server"));
+            };
+
+            let Some(bot_highest_role) = bot_highest_role else {
+                return Err(LuaError::runtime("The bot must have roles in order to modify a guild role"));
+            };  
+
+            if bot_highest_role <= mod_role {
+                return Err(LuaError::runtime("The bot must have a role that is higher than the role it is trying to modify"));
+            }
+
+            let mut guild_has_role_icons = false;
+            for feature in guild.features.iter() {
+                match feature.as_str() {
+                    "ROLE_ICONS" => guild_has_role_icons = true,
+                    _ => {}
+                }
+            }
+            
+            if let Some(permissions) = data.data.permissions {
+                if !bot_perms.contains(permissions) {
+                    return Err(LuaError::external(
+                        format!("Bot does not have permissions: {:?}", permissions.difference(bot_perms)),
+                    ));
+                }
+            }
+
+            if let Some(ref icon) = data.data.icon.as_inner_ref() {
+                if !guild_has_role_icons {
+                    return Err(LuaError::external("Guild does not have the Role Icons feature and as such cannot create a role with a role_icon field"));
+                }
+
+                let format = get_format_from_image_data(icon)
+                .map_err(LuaError::external)?;
+
+                if format != "png" && format != "jpeg" && format != "gif" {
+                    return Err(LuaError::external(
+                        "Icon must be a PNG, JPEG, or GIF format",
+                    ));
+                }
+            }
+
+            let role = this.discord_provider
+                .modify_guild_role(data.role_id, data.data, Some(data.reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(role))
+        });
+
+        // Should be documented
+        methods.add_scheduler_async_method("delete_guild_role", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::DeleteGuildRoleOptions>(data)?;
+
+            if data.role_id.to_string() == this.discord_provider.guild_id().to_string() {
+                return Err(LuaError::runtime("Cannot remove the default @everyone role"));
+            }
+
+            this.check_action("delete_guild_role".to_string())
+                .map_err(LuaError::external)?;
+
+            this.check_reason(&data.reason)
+            .map_err(LuaError::external)?;
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            let (guild, member, _) = this.check_permissions(
+                bot_user.id,
+                serenity::all::Permissions::MANAGE_ROLES,
+            )
+            .await
+            .map_err(LuaError::external)?; 
+
+            let mut bot_highest_role: Option<&serenity::all::Role> = None;
+            let mut mod_role: Option<&serenity::all::Role> = None;
+
+            for role in guild.roles.iter() {
+                if role.id == data.role_id {
+                    mod_role = Some(role);
+                }
+
+                if (bot_highest_role.is_none() || bot_highest_role.unwrap() < role) && member.roles.contains(&role.id) {
+                    bot_highest_role = Some(role);
+                }
+            }
+
+            let Some(mod_role) = mod_role else {
+                return Err(LuaError::runtime("The role being modified could not be found on the server"));
+            };
+
+            let Some(bot_highest_role) = bot_highest_role else {
+                return Err(LuaError::runtime("The bot must have roles in order to modify a guild role"));
+            };  
+
+            if bot_highest_role <= mod_role {
+                return Err(LuaError::runtime("The bot must have a role that is higher than the role it is trying to modify"));
+            }
+
+            this.discord_provider
+                .delete_guild_role(data.role_id, Some(data.reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
         // Invites
         methods.add_scheduler_async_method("get_invite", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetInviteOptions>(data)?;
