@@ -8,9 +8,9 @@ use crate::traits::context::Limitations;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
 use mluau::Buffer;
-use mlua_scheduler::LuaSchedulerAsyncUserData;
 use serde::{Deserialize, Serialize};
 
 to_struct! {
@@ -44,13 +44,9 @@ pub struct Bucket<T: KhronosContext> {
 
 impl<T: KhronosContext> Bucket<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self
-            .limitations
-            .has_cap(&format!("objectstorage:{}", action))
-        {
+        if !self.limitations.has_cap(&format!("objectstorage:{action}")) {
             return Err(LuaError::runtime(format!(
-                "Objectstorage action `{}` not allowed in this template context",
-                action
+                "Objectstorage action `{action}` not allowed in this template context",
             )));
         }
 

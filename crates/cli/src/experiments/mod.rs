@@ -15,7 +15,7 @@ fn load_or_warn(
             tab.set(tab_name, exp_tab)?;
         }
         Err(e) => {
-            eprintln!("Failed to load experiment {}: {}", tab_name, e);
+            eprintln!("Failed to load experiment {tab_name}: {e}");
         }
     }
 
@@ -39,8 +39,7 @@ pub fn load_experiments(lua: &Lua, experiments: &[String]) -> LuaResult<LuaTable
             }
             _ => {
                 return Err(LuaError::external(format!(
-                    "Unknown experiment: {}",
-                    experiment
+                    "Unknown experiment: {experiment}",
                 )))
             }
         }

@@ -28,7 +28,7 @@ pub fn ext(
                 let mut editor = match rustyline::DefaultEditor::new() {
                     Ok(e) => e,
                     Err(e) => {
-                        let _ = tx.send(Err(format!("Failed to create editor: {}", e)));
+                        let _ = tx.send(Err(format!("Failed to create editor: {e}")));
                         return;
                     }
                 };
@@ -36,7 +36,7 @@ pub fn ext(
                 let input = match editor.readline(&prompt) {
                     Ok(i) => i,
                     Err(e) => {
-                        let _ = tx.send(Err(format!("Failed to read input: {}", e)));
+                        let _ = tx.send(Err(format!("Failed to read input: {e}")));
                         return;
                     }
                 };
@@ -126,20 +126,20 @@ pub fn ext(
                 termcolor::ColorSpec::new()
                     .set_fg(match data.fg_color {
                         Some(ref color) => Some(Color::from_str(color).map_err(|e| {
-                            LuaError::external(format!("Failed to parse color for fg_color: {}", e))
+                            LuaError::external(format!("Failed to parse color for fg_color: {e}"))
                         })?),
                         None => None,
                     })
                     .set_bg(match data.bg_color {
                         Some(ref color) => Some(Color::from_str(color).map_err(|e| {
-                            LuaError::external(format!("Failed to parse color for bg_color: {}", e))
+                            LuaError::external(format!("Failed to parse color for bg_color: {e}"))
                         })?),
                         None => None,
                     })
                     .set_bold(data.bold.unwrap_or(false))
                     .set_dimmed(data.dimmed.unwrap_or(false)),
             )?;
-            write!(&mut stdout, "{}", text)?;
+            write!(&mut stdout, "{text}")?;
             stdout.reset()?;
             stdout.write_all(b"\n")?;
             Ok(())

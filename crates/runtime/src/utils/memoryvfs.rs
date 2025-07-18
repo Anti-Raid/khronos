@@ -31,7 +31,7 @@ pub fn create_vfs_from_map(
                 }
             }
         }
-        let path_s = format!("/{}", path_s);
+        let path_s = format!("/{path_s}");
         fs.create_file(&path_s)
             .map_err(|e| crate::Error::from(format!("Failed to create file {path_s}: {e}")))?
             .write_all(content.as_bytes())
@@ -62,15 +62,15 @@ pub fn create_memory_vfs_from_map(
 
             let mut current_path = String::new();
             for folder in folder_part {
-                current_path.push_str("/");
-                current_path.push_str(&folder);
+                current_path.push('/');
+                current_path.push_str(folder);
                 if !created.contains(&current_path) {
                     fs.create_dir(&current_path)?;
                     created.insert(current_path.clone());
                 }
             }
         }
-        let path_s = format!("/{}", path_s);
+        let path_s = format!("/{path_s}");
         fs.create_file(&path_s)
             .map_err(|e| crate::Error::from(format!("Failed to create file {path_s}: {e}")))?
             .write_all(content.as_bytes())

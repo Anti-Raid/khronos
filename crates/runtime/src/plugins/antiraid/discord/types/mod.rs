@@ -7,7 +7,6 @@ pub mod embed;
 pub mod guilds;
 pub mod interactions;
 pub mod message;
-pub mod permission_overwrites;
 pub mod poll;
 
 pub use app_commands::*;

@@ -254,12 +254,12 @@ impl KhronosIsolate {
             // Lua should be dropped here
         };
 
-        let code = self.asset_manager.get_file(path.to_string()).map_err(|e| {
-            LuaError::RuntimeError(format!("Failed to load asset '{}': {}", path, e))
-        })?;
-        let code = String::from_utf8(code).map_err(|e| {
-            LuaError::RuntimeError(format!("Failed to decode asset '{}': {}", path, e))
-        })?;
+        let code = self
+            .asset_manager
+            .get_file(path.to_string())
+            .map_err(|e| LuaError::RuntimeError(format!("Failed to load asset '{path}': {e}")))?;
+        let code = String::from_utf8(code)
+            .map_err(|e| LuaError::RuntimeError(format!("Failed to decode asset '{path}': {e}")))?;
         self.spawn_script(cache_key, path, &code, args).await
     }
 
@@ -298,7 +298,7 @@ impl KhronosIsolate {
             // Lua should be dropped here
         };
 
-        self.spawn_script(cache_key, name, &code, args).await
+        self.spawn_script(cache_key, name, code, args).await
     }
 
     // Internal method to actually spawn the script

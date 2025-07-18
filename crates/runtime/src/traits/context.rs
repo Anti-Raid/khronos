@@ -2,7 +2,7 @@ use crate::to_struct;
 
 use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider, kvprovider::KVProvider,
-    lockdownprovider::LockdownProvider, objectstorageprovider::ObjectStorageProvider,
+    objectstorageprovider::ObjectStorageProvider,
 };
 use bitflags::bitflags;
 
@@ -62,7 +62,7 @@ impl Limitations {
     pub fn subset_of(&self, other: &Self) -> Result<(), String> {
         for cap in &self.capabilities {
             if !other.has_cap(cap) {
-                return Err(format!("Missing capability: {}. A context can only be limited into a set of limitations that are strictly a subset of itself", cap));
+                return Err(format!("Missing capability: {cap}. A context can only be limited into a set of limitations that are strictly a subset of itself"));
             }
         }
         Ok(())
@@ -84,8 +84,6 @@ impl Limitations {
 pub trait KhronosContext: 'static + Clone + Sized {
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
-    type LockdownDataStore: lockdowns::LockdownDataStore + Clone;
-    type LockdownProvider: LockdownProvider<Self::LockdownDataStore>;
     type DataStoreProvider: DataStoreProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
 
@@ -134,9 +132,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     ///
     /// This is used to interact with Discord API
     fn discord_provider(&self) -> Option<Self::DiscordProvider>;
-
-    /// Returns a Lockdown provider
-    fn lockdown_provider(&self) -> Option<Self::LockdownProvider>;
 
     /// Returns a DataStore provider
     fn datastore_provider(&self) -> Option<Self::DataStoreProvider>;

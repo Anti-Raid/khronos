@@ -327,7 +327,7 @@ impl FromLuaMulti for BindAddr {
             };
 
             return Ok(BindAddr::Tcp {
-                addr: format!("{}:{}", addr, port)
+                addr: format!("{addr}:{port}")
                     .to_socket_addrs()
                     .map_err(LuaError::external)?
                     .next()
@@ -443,7 +443,7 @@ impl LuaUserData for ServerRequest {
 pub enum RoutedRequest {
     Request {
         method: Method,
-        parts: axum::http::request::Parts,
+        parts: Box<axum::http::request::Parts>,
         path_params:
             Result<axum::extract::RawPathParams, axum::extract::rejection::RawPathParamsRejection>,
         matched_pattern: String,
@@ -510,7 +510,7 @@ impl Router {
 
                             let _ = tx.send(RoutedRequest::Request {
                                 method,
-                                parts,
+                                parts: Box::new(parts),
                                 path_params,
                                 matched_pattern: pattern,
                                 body,
@@ -577,7 +577,7 @@ impl Router {
 
         startup_status_rx
             .await?
-            .map_err(|e| format!("failed to spawn server: {}", e))?;
+            .map_err(|e| format!("failed to spawn server: {e}"))?;
 
         Ok(rx)
     }
@@ -624,7 +624,7 @@ impl Router {
             LuaValue::String(s) => (axum::http::StatusCode::OK, s.to_string_lossy())
                 .into_response()
                 .into(),
-            r => (axum::http::StatusCode::OK, format!("{:#?}", r))
+            r => (axum::http::StatusCode::OK, format!("{r:#?}"))
                 .into_response()
                 .into(),
         }
@@ -971,7 +971,7 @@ impl LuaUserData for Router {
 
                             let Ok(request) = ServerRequest {
                                 route_method: method,
-                                parts,
+                                parts: *parts,
                                 path: path_params,
                                 body: ServerRequestBody {
                                     body: Rc::new(RefCell::new(Some(body))),
@@ -1155,7 +1155,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
                     headers.map(|h| h.headers.clone()).unwrap_or_default(),
                     match body {
                         LuaValue::String(s) => s.to_str()?.to_string(),
-                        _ => format!("{:#?}", body),
+                        _ => format!("{body:#?}"),
                     },
                 )
                     .into_response();

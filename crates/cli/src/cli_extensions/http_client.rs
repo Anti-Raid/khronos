@@ -200,7 +200,7 @@ impl LuaUserData for Request {
         fields.add_field_method_get("version", |_, this| {
             let req_guard = this.request.borrow();
             let version = req_guard.version();
-            Ok(format!("{:?}", version))
+            Ok(format!("{version:?}"))
         });
 
         fields.add_field_method_set("version", |_, this, version: String| {

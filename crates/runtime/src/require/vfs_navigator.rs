@@ -35,13 +35,16 @@ impl VfsNavigator {
             absolute_real_path: "/".to_string(),
             absolute_path_prefix: "".to_string(),
             module_path: "/".to_string(),
-            absolute_module_path: "/".to_string()
+            absolute_module_path: "/".to_string(),
         }
     }
 }
 
 impl VfsNavigator {
-    pub(super) fn get_real_path(&self, module_path: String) -> Result<ResolvedRealPath, crate::Error> {
+    pub(super) fn get_real_path(
+        &self,
+        module_path: String,
+    ) -> Result<ResolvedRealPath, crate::Error> {
         let mut found = false;
         let mut suffix = "";
 
@@ -53,15 +56,18 @@ impl VfsNavigator {
             ""
         };
 
-        log::trace!("Get_real_path: {}", module_path);
-        
+        log::trace!("Get_real_path: {module_path}");
+
         if last_component != "init" {
             for potential_suffix in SUFFIXES.iter() {
-                if self.fs.is_file(format!("{}{}", module_path, potential_suffix))? {
+                if self
+                    .fs
+                    .is_file(format!("{module_path}{potential_suffix}"))?
+                {
                     if found {
                         return Ok(ResolvedRealPath {
                             status: NavigationStatus::Ambiguous,
-                            real_path: None
+                            real_path: None,
                         });
                     }
 
@@ -75,16 +81,19 @@ impl VfsNavigator {
             if found {
                 return Ok(ResolvedRealPath {
                     status: NavigationStatus::Ambiguous,
-                    real_path: None
+                    real_path: None,
                 });
             }
 
             for potential_suffix in INIT_SUFFIXES.iter() {
-                if self.fs.is_file(format!("{}{}", module_path, potential_suffix))? {
+                if self
+                    .fs
+                    .is_file(format!("{module_path}{potential_suffix}"))?
+                {
                     if found {
                         return Ok(ResolvedRealPath {
                             status: NavigationStatus::Ambiguous,
-                            real_path: None
+                            real_path: None,
                         });
                     }
 
@@ -99,13 +108,13 @@ impl VfsNavigator {
         if !found {
             return Ok(ResolvedRealPath {
                 status: NavigationStatus::NotFound,
-                real_path: None
+                real_path: None,
             });
         }
 
         Ok(ResolvedRealPath {
             status: NavigationStatus::Success,
-            real_path: Some(format!("{}{}", module_path, suffix))
+            real_path: Some(format!("{module_path}{suffix}")),
         })
     }
 }
@@ -113,26 +122,23 @@ impl VfsNavigator {
 fn get_module_path(file_path: &mut String) -> String {
     // Normalize separators: replace '\\' with '/'
     // Iterate over the bytes of the string and replace '\\' (byte value 92)
-    // with '/' (byte value 47). This is safe because both are single-byte
-    // ASCII characters, and replacing one with the other does not affect
-    // the validity of surrounding UTF-8 sequences.
-    for c in unsafe { file_path.as_bytes_mut() } {
-        if *c == b'\\' {
-            *c = b'/';
-        }
-    }
+    // with '/' (byte value 47).
+    *file_path = file_path.replace('\\', "/");
 
     // Create a string view (slice) from the modified path
-    let mut path_view: &str = &file_path;
+    let mut path_view: &str = file_path;
 
-    log::trace!("path_view: {}", path_view);
+    log::trace!("path_view: {path_view}");
 
     // Handle absolute paths
     if is_absolute_path(path_view) {
         let first_slash_option = path_view.find('/');
 
         // Assert that a slash was found.
-        assert!(first_slash_option.is_some(), "Absolute path must contain a slash");
+        assert!(
+            first_slash_option.is_some(),
+            "Absolute path must contain a slash"
+        );
 
         let first_slash_index = first_slash_option.unwrap();
 
@@ -178,16 +184,21 @@ impl VfsNavigator {
     pub fn update_real_paths(&mut self) -> Result<NavigationStatus, crate::Error> {
         let result = self.get_real_path(self.module_path.clone())?;
         let absolute_result = self.get_real_path(self.absolute_module_path.clone())?;
-        if result.status != NavigationStatus::Success || absolute_result.status != NavigationStatus::Success {
+        if result.status != NavigationStatus::Success
+            || absolute_result.status != NavigationStatus::Success
+        {
             if self.module_path.is_empty() {
                 // DEVIATION: Support rooted init.luau
                 log::trace!("Deviation triggered: empty module_path");
             }
-            return Ok(result.status)
+            return Ok(result.status);
         }
 
         assert!(result.real_path.is_some(), "result.real_path is none!");
-        assert!(absolute_result.real_path.is_some(), "result.real_path is none!");
+        assert!(
+            absolute_result.real_path.is_some(),
+            "result.real_path is none!"
+        );
         let result_real_path = result.real_path.unwrap();
         let absolute_result_real_path = absolute_result.real_path.unwrap();
         self.real_path = if is_absolute_path(&result_real_path) {
@@ -195,11 +206,12 @@ impl VfsNavigator {
         } else {
             result_real_path
         };
-        self.absolute_real_path = format!("{}{}", self.absolute_path_prefix, absolute_result_real_path);
-        return Ok(NavigationStatus::Success);
+        self.absolute_real_path =
+            format!("{}{}", self.absolute_path_prefix, absolute_result_real_path);
+        Ok(NavigationStatus::Success)
     }
 
-    pub fn reset_to_stdin(&mut self) -> Result<NavigationStatus, crate::Error>{
+    pub fn reset_to_stdin(&mut self) -> Result<NavigationStatus, crate::Error> {
         self.real_path = "./stdin".to_string();
         self.absolute_real_path = "/stdin".to_string();
         self.module_path = "./stdin".to_string();
@@ -211,7 +223,7 @@ impl VfsNavigator {
     pub fn reset_to_path(&mut self, path: &Path) -> Result<NavigationStatus, crate::Error> {
         let mut normalized_path = normalize_path(path).to_string_lossy().to_string();
 
-        log::trace!("Normalized path: {}", normalized_path);
+        log::trace!("Normalized path: {normalized_path}");
 
         if is_absolute_path(&normalized_path) {
             self.module_path = get_module_path(&mut normalized_path);
@@ -224,11 +236,14 @@ impl VfsNavigator {
 
             self.module_path = get_module_path(&mut normalized_path);
 
-            let mut joined_path = normalize_path(&PathBuf::from(cwd.to_string() + "/" + &normalized_path)).to_string_lossy().to_string();
+            let mut joined_path =
+                normalize_path(&PathBuf::from(cwd.to_string() + "/" + &normalized_path))
+                    .to_string_lossy()
+                    .to_string();
             self.absolute_module_path = get_module_path(&mut joined_path);
-            
+
             let first_slash = joined_path.find('/').unwrap_or(0);
-            
+
             self.absolute_path_prefix = joined_path[0..first_slash].to_string();
         }
 
@@ -244,6 +259,7 @@ impl VfsNavigator {
         self.update_real_paths()
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_parent(&mut self) -> Result<NavigationStatus, crate::Error> {
         log::trace!("AbsModPath: {}", self.absolute_module_path);
 
@@ -276,16 +292,28 @@ impl VfsNavigator {
             return self.update_real_paths();
         }
 
-        self.module_path = normalize_path(&PathBuf::from(self.module_path.clone() + "/..")).to_string_lossy().to_string();
+        self.module_path = normalize_path(&PathBuf::from(self.module_path.clone() + "/.."))
+            .to_string_lossy()
+            .to_string();
         log::trace!("NewModPath: {}", self.module_path);
-        self.absolute_module_path = normalize_path(&PathBuf::from(self.absolute_module_path.clone() + "/..")).to_string_lossy().to_string();
+        self.absolute_module_path =
+            normalize_path(&PathBuf::from(self.absolute_module_path.clone() + "/.."))
+                .to_string_lossy()
+                .to_string();
         log::trace!("NewAbsModPath: {}", self.absolute_module_path);
         self.update_real_paths()
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_child(&mut self, name: &str) -> Result<NavigationStatus, crate::Error> {
-        self.module_path = normalize_path(&PathBuf::from(self.module_path.clone() + "/" + name)).to_string_lossy().to_string();
-        self.absolute_module_path = normalize_path(&PathBuf::from(self.absolute_module_path.clone() + "/" + name)).to_string_lossy().to_string();
+        self.module_path = normalize_path(&PathBuf::from(self.module_path.clone() + "/" + name))
+            .to_string_lossy()
+            .to_string();
+        self.absolute_module_path = normalize_path(&PathBuf::from(
+            self.absolute_module_path.clone() + "/" + name,
+        ))
+        .to_string_lossy()
+        .to_string();
 
         self.update_real_paths()
     }
@@ -305,15 +333,15 @@ impl VfsNavigator {
         for suffix in INIT_SUFFIXES.iter() {
             if directory.ends_with(suffix) {
                 directory = &directory[..directory.len() - suffix.len()];
-                return format!("{}/.luaurc", directory);
+                return format!("{directory}/.luaurc");
             }
         }
         for suffix in SUFFIXES.iter() {
             if directory.ends_with(suffix) {
                 directory = &directory[..directory.len() - suffix.len()];
-                return format!("{}/.luaurc", directory);
+                return format!("{directory}/.luaurc");
             }
         }
-        return format!("{}/.luaurc", directory);
+        format!("{directory}/.luaurc")
     }
 }

@@ -8,8 +8,8 @@ use crate::traits::kvprovider::KVProvider;
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
 use chrono::Utc;
-use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
+use mluau::prelude::*;
 
 /// An kv executor is used to execute key-value ops from Lua
 /// templates
@@ -109,9 +109,7 @@ impl<T: KhronosContext> KvExecutor<T> {
         }
 
         for scope in scopes {
-            if !self
-                .limitations
-                .has_cap(&format!("kv.meta[{}]:keys", scope))
+            if !self.limitations.has_cap(&format!("kv.meta[{scope}]:keys"))
             // kv.meta[{scope}]:keys means that the action can be performed on any key
             {
                 return Err(
@@ -139,40 +137,37 @@ impl<T: KhronosContext> KvExecutor<T> {
         }
 
         if self.limitations.has_cap("kv:*") // KV:* means all KV operations are allowed
-        || self.limitations.has_cap(&format!("kv:{}:*", action)) // kv:{action} means that the action can be performed on any key
+        || self.limitations.has_cap(&format!("kv:{action}:*")) // kv:{action} means that the action can be performed on any key
         ||  self
             .limitations
-            .has_cap(&format!("kv:{}:{}", action, key))
+            .has_cap(&format!("kv:{action}:{key}"))
         // kv:{action}:{key} means that the action can only be performed on said key
         {
+            self.kv_provider.attempt_action(scopes, &action)?; // Check rate limits
             return Ok(()); // No need to check scopes if the action is allowed globally or for the specific key
         }
 
         for scope in scopes {
             if self
             .limitations
-            .has_cap(&format!("kv[{}]:*", scope)) // kv[{scopes}]:* means that the action can be performed on any key in the scope
+            .has_cap(&format!("kv[{scope}]:*")) // kv[{scopes}]:* means that the action can be performed on any key in the scope
             || self
                 .limitations
-                .has_cap(&format!("kv[{}]:{}", scope, action)) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
+                .has_cap(&format!("kv[{scope}]:{action}")) // kv[{scopes}]:{action} means that the action can be performed on any key in the scope
             || self
                 .limitations
-                .has_cap(&format!("kv[{}]:{}:{}", scope, action, key))
+                .has_cap(&format!("kv[{scope}]:{action}:{key}"))
             // kv[{scopes}]:{action}:{key} means that the action can only be performed on said key in the scope
             {
+                self.kv_provider.attempt_action(scopes, &action)?; // Check rate limits
                 return Ok(()); // allow if any scope succeeds
             }
-
-            return Err(format!(
-                "KV operation `{}` not allowed in this template context for key '{}' in scope '{}'",
-                action, key, scope
-            )
-            .into());
         }
 
-        self.kv_provider.attempt_action(&scopes, &action)?; // Check rate limits
-
-        Ok(())
+        Err(format!(
+            "KV operation `{action}` not allowed in this template context for key '{key}'",
+        )
+        .into())
     }
 
     pub fn id_check(&self, action: &str) -> Result<(), crate::Error> {
@@ -182,7 +177,7 @@ impl<T: KhronosContext> KvExecutor<T> {
             );
         }
 
-        self.kv_provider.attempt_action(&[], &action)?; // Check rate limits
+        self.kv_provider.attempt_action(&[], action)?; // Check rate limits
 
         Ok(())
     }
@@ -210,9 +205,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_meta_field(LuaMetaMethod::Type, "KvExecutor");
 
-        fields.add_field_method_get("unscoped_allowed", |_, this| {
-            Ok(this.unscoped_allowed)
-        });
+        fields.add_field_method_get("unscoped_allowed", |_, this| Ok(this.unscoped_allowed));
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
@@ -284,8 +277,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "get".to_string(), key.clone())
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                log::info!("Getting key: {}", key);
 
                 let record = this
                     .kv_provider
@@ -385,21 +376,18 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             Ok(v)
         });
 
-        methods.add_scheduler_async_method(
-            "keys",
-            async move |_, this, scopes: Vec<String>| {
-                this.check_keys(&scopes)
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+        methods.add_scheduler_async_method("keys", async move |_, this, scopes: Vec<String>| {
+            this.check_keys(&scopes)
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                let keys = this
-                    .kv_provider
-                    .keys(&scopes)
-                    .await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
+            let keys = this
+                .kv_provider
+                .keys(&scopes)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-                Ok(keys)
-            },
-        );
+            Ok(keys)
+        });
 
         methods.add_scheduler_async_method(
             "set",
@@ -453,13 +441,13 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 let value = KhronosValue::from_lua(value, &lua)?;
                 let expires_at = this.validate_expiry(expires_at)?;
 
-                let rec = this
+                this
                     .kv_provider
                     .set_by_id(id, value, expires_at)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-                Ok(rec)
+                Ok(())
             },
         );
 

@@ -52,10 +52,7 @@ impl<T: for<'a> serde::Deserialize<'a> + serde::Serialize> MultiOption<T> {
 
     /// Returns true if the value is Some(Some(_))
     pub fn is_deep_some(&self) -> bool {
-        match &self.inner {
-            Some(Some(_)) => true,
-            _ => false,
-        }
+        matches!(self.inner, Some(Some(_)))
     }
 
     pub fn as_inner_ref(&self) -> Option<&T> {

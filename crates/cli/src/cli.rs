@@ -332,14 +332,10 @@ impl Cli {
 
         let current_dir = std::env::current_dir().expect("Failed to get current dir");
 
-        println!("Current dir: {:?}", current_dir);
+        println!("Current dir: {current_dir:?}");
 
-        let file_asset_manager = {
-            let fs =
-                khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
-
-            fs
-        };
+        let file_asset_manager =
+            khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
 
         let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
             .expect("Failed to create main isolate");
@@ -398,7 +394,7 @@ impl Cli {
         match action {
             CliEntrypointAction::RunScripts { scripts } => {
                 if self.verbose {
-                    println!("Running script: {:?}", scripts);
+                    println!("Running script: {scripts:?}");
                 }
 
                 for path in &scripts {
@@ -409,7 +405,7 @@ impl Cli {
                             .try_exists()
                             .expect("Failed to look for init.luau")
                         {
-                            eprintln!("Failed to find init.luau in directory: {:?}", path);
+                            eprintln!("Failed to find init.luau in directory: {path:?}");
                             continue;
                         }
 
@@ -427,7 +423,7 @@ impl Cli {
                     let contents = match fs::read_to_string(&path).await {
                         Ok(c) => c,
                         Err(e) => {
-                            eprintln!("Failed to read script: {:?}", e);
+                            eprintln!("Failed to read script: {e:?}");
                             continue;
                         }
                     };
@@ -438,7 +434,7 @@ impl Cli {
                     {
                         Ok(values) => values,
                         Err(e) => {
-                            eprintln!("error: {}", e);
+                            eprintln!("error: {e}");
                             continue;
                         }
                     };
@@ -451,7 +447,7 @@ impl Cli {
                                 .map(|value| {
                                     match value {
                                         LuaValue::String(s) => format!("\"{}\"", s.display()),
-                                        _ => format!("{:#?}", value),
+                                        _ => format!("{value:#?}"),
                                     }
                                 })
                                 .collect::<Vec<_>>()
@@ -518,7 +514,7 @@ impl Cli {
                                                     LuaValue::String(s) => {
                                                         format!("\"{}\"", s.display())
                                                     }
-                                                    _ => format!("{:#?}", value),
+                                                    _ => format!("{value:#?}"),
                                                 }
                                             })
                                             .collect::<Vec<_>>()
@@ -552,7 +548,7 @@ impl Cli {
                             }
                             Err(e) => {
                                 editor.add_history_entry(line).unwrap();
-                                eprintln!("error: {}", e);
+                                eprintln!("error: {e}");
                                 break;
                             }
                         }
@@ -572,7 +568,7 @@ impl Cli {
                                 .map(|value| {
                                     match value {
                                         LuaValue::String(s) => format!("\"{}\"", s.display()),
-                                        _ => format!("{:#?}", value),
+                                        _ => format!("{value:#?}"),
                                     }
                                 })
                                 .collect::<Vec<_>>()
@@ -594,7 +590,7 @@ impl Cli {
                     }
                 }
                 Err(e) => {
-                    eprintln!("error: {}", e);
+                    eprintln!("error: {e}");
                 }
             },
         }
@@ -605,7 +601,7 @@ impl Cli {
     ///
     /// Used internally for the REPL
     async fn try_spawn_as(&mut self, name: &str, code: &str) -> LuaResult<LuaMultiValue> {
-        let ret_code = format!("return {}", code);
+        let ret_code = format!("return {code}");
         match self.spawn_script(&ret_code, name, &ret_code).await {
             Ok(result) => return Ok(result),
             Err(LuaError::SyntaxError { .. }) => {}

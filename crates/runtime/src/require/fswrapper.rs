@@ -1,6 +1,6 @@
+use std::rc::Rc;
 use vfs::path::VfsFileType;
 use vfs::{FileSystem, VfsResult};
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 /// A wrapper around a VFS file system
@@ -20,7 +20,7 @@ impl FilesystemWrapper {
         if path.starts_with("./") {
             return format!("/{}", path.trim_start_matches("./"));
         } else if !path.starts_with('/') {
-            return format!("/{}", path);
+            return format!("/{path}");
         }
 
         path
@@ -29,9 +29,9 @@ impl FilesystemWrapper {
     pub fn is_file(&self, path: String) -> VfsResult<bool> {
         let path = Self::path_fix(path);
 
-        log::trace!("Checking if {:#?} is a file", path);
+        log::trace!("Checking if {path:#?} is a file");
         if !self.exists(&path)? {
-            log::trace!("File {:#?} does not exist", path);
+            log::trace!("File {path:#?} does not exist");
             return Ok(false);
         }
 
@@ -49,18 +49,18 @@ impl FilesystemWrapper {
     pub fn is_dir(&self, path: String) -> VfsResult<bool> {
         let path = Self::path_fix(path);
 
-        log::trace!("Checking if {:#?} is a directory", path);
+        log::trace!("Checking if {path:#?} is a directory");
         if path.is_empty() || path == "/" {
             return Ok(true);
         }
 
         if !self.exists(&path)? {
-            log::trace!("Directory {:#?} does not exist", path);
+            log::trace!("Directory {path:#?} does not exist");
             return Ok(false);
         }
 
         let metadata = self.0.metadata(&path)?;
-        log::trace!("Metadata: {:#?}", metadata);
+        log::trace!("Metadata: {metadata:#?}");
         Ok(metadata.file_type == VfsFileType::Directory)
     }
 }
@@ -72,4 +72,3 @@ impl std::ops::Deref for FilesystemWrapper {
         self.0.as_ref()
     }
 }
-

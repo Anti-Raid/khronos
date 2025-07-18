@@ -210,8 +210,7 @@ impl<'de> serde::Deserialize<'de> for CreateInteractionResponse {
             12 => Ok(Self::LaunchActivity),
             _ => {
                 return Err(D::Error::custom(format!(
-                    "Unknown interaction response type: {}",
-                    ty
+                    "Unknown interaction response type: {ty}",
                 )));
             }
         }

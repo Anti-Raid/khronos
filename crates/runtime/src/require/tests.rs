@@ -205,6 +205,5 @@ resolved = true
         }
     };
 
-    assert_eq!(l, true);
+    assert!(l);
 }
-

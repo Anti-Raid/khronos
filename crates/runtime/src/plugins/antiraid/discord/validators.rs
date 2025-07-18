@@ -15,7 +15,7 @@ pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
             return Ok(()); // validate_string_offensive is a subset of validate_string_safe
         }
 
-        Err(format!("Input contains offensive words: {:?} {:?}", input, analysis).into())
+        Err(format!("Input contains offensive words: {input:?} {analysis:?}").into())
     } else {
         Ok(())
     }
@@ -34,7 +34,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
     }
 
     for word in replaced_input.split_whitespace() {
-        if word.is_empty() || ensure_safe::is_safe_word(&word) {
+        if word.is_empty() || ensure_safe::is_safe_word(word) {
             continue;
         }
 
@@ -54,7 +54,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
         }
 
         if !current_buf.is_empty() {
-            return Err(format!("Input contains disallowed words: {:?} {}", input, word).into());
+            return Err(format!("Input contains disallowed words: {input:?} {word}").into());
         }
     }
 
@@ -68,7 +68,7 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
     const MAX_POSSIBLE_COMPONENTS: usize = 5; // 5 action rows, each with 5 components
 
     if rows.len() > MAX_POSSIBLE_COMPONENTS {
-        return Err(format!("Too many components, limit is {}", MAX_POSSIBLE_COMPONENTS).into());
+        return Err(format!("Too many components, limit is {MAX_POSSIBLE_COMPONENTS}").into());
     }
 
     for row in rows.iter() {
@@ -89,8 +89,7 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
 
                     if num_buttons >= MAX_BUTTONS_PER_ACTION_ROW {
                         return Err(format!(
-                            "Too many buttons in action row, limit is {}",
-                            MAX_BUTTONS_PER_ACTION_ROW
+                            "Too many buttons in action row, limit is {MAX_BUTTONS_PER_ACTION_ROW}",
                         )
                         .into());
                     }
@@ -110,8 +109,7 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
 
                     if num_selects >= MAX_SELECTS_PER_ACTION_ROW {
                         return Err(format!(
-                            "Too many select menus in action row, limit is {}",
-                            MAX_SELECTS_PER_ACTION_ROW
+                            "Too many select menus in action row, limit is {MAX_SELECTS_PER_ACTION_ROW}",
                         )
                         .into());
                     }
@@ -152,7 +150,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
         //validate_string(title)?;
 
         if title.len() > EMBED_TITLE_LIMIT {
-            return Err(format!("Embed title is too long, limit is {}", EMBED_TITLE_LIMIT).into());
+            return Err(format!("Embed title is too long, limit is {EMBED_TITLE_LIMIT}").into());
         }
 
         total_chars += title.len();
@@ -168,8 +166,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
 
         if description.len() > EMBED_DESCRIPTION_LIMIT {
             return Err(format!(
-                "Embed description is too long, limit is {}",
-                EMBED_DESCRIPTION_LIMIT
+                "Embed description is too long, limit is {EMBED_DESCRIPTION_LIMIT}",
             )
             .into());
         }
@@ -187,8 +184,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
 
         if footer.text.len() > EMBED_FOOTER_TEXT_LIMIT {
             return Err(format!(
-                "Embed footer text is too long, limit is {}",
-                EMBED_FOOTER_TEXT_LIMIT
+                "Embed footer text is too long, limit is {EMBED_FOOTER_TEXT_LIMIT}",
             )
             .into());
         }
@@ -206,8 +202,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
 
         if author.name.len() > EMBED_AUTHOR_NAME_LIMIT {
             return Err(format!(
-                "Embed author name is too long, limit is {}",
-                EMBED_AUTHOR_NAME_LIMIT
+                "Embed author name is too long, limit is {EMBED_AUTHOR_NAME_LIMIT}",
             )
             .into());
         }
@@ -224,11 +219,9 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
         //validate_string(&field.name)?;
 
         if field.name.len() > EMBED_FIELD_NAME_LIMIT {
-            return Err(format!(
-                "Embed field name is too long, limit is {}",
-                EMBED_FIELD_NAME_LIMIT
-            )
-            .into());
+            return Err(
+                format!("Embed field name is too long, limit is {EMBED_FIELD_NAME_LIMIT}",).into(),
+            );
         }
 
         total_chars += field.name.len();
@@ -241,8 +234,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
 
         if field.value.len() > EMBED_FIELD_VALUE_LIMIT {
             return Err(format!(
-                "Embed field value is too long, limit is {}",
-                EMBED_FIELD_VALUE_LIMIT
+                "Embed field value is too long, limit is {EMBED_FIELD_VALUE_LIMIT}",
             )
             .into());
         }
@@ -290,11 +282,9 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
         //validate_string(content)?;
 
         if content.len() > MESSAGE_CONTENT_LIMIT {
-            return Err(format!(
-                "Message content is too long, limit is {}",
-                MESSAGE_CONTENT_LIMIT
-            )
-            .into());
+            return Err(
+                format!("Message content is too long, limit is {MESSAGE_CONTENT_LIMIT}",).into(),
+            );
         }
     }
 
@@ -306,8 +296,7 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
 
         if total_embed_chars > MAX_EMBED_CHARACTERS_LIMIT {
             return Err(format!(
-                "Total embed characters is too long, limit is {}",
-                MAX_EMBED_CHARACTERS_LIMIT
+                "Total embed characters is too long, limit is {MAX_EMBED_CHARACTERS_LIMIT}",
             )
             .into());
         }
@@ -427,17 +416,13 @@ pub fn validate_name_option_chatinput(name: &str) -> Result<(), crate::Error> {
         Ok(())
     } else {
         // Return an error if it doesn't match
-        Err(format!(
-            "Name '{}' does not match Discord's regex for CHAT_INPUT commands",
-            name
-        )
-        .into())
+        Err(format!("Name '{name}' does not match Discord's regex for CHAT_INPUT commands",).into())
     }
 }
 
 #[allow(dead_code)]
 pub fn validate_image_links(input: &str) -> Result<(), crate::Error> {
-    let valid_link_urls = vec![
+    let valid_link_urls = [
         "https://discord.com",
         "https://cdn.discordapp.com",
         "https://media.discordapp.net",

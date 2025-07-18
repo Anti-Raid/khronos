@@ -7,8 +7,8 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
-use mluau::prelude::*;
 use mlua_scheduler::{ReturnTracker, TaskManager};
+use mluau::prelude::*;
 
 /// A wrapper around the Lua vm that cannot be cloned
 pub struct KhronosLuaRef<'a>(&'a Lua);
@@ -86,7 +86,7 @@ impl KhronosRuntime {
     pub fn new<
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
-        ThreadDestructionCallbackFunc: Fn() -> () + 'static,
+        ThreadDestructionCallbackFunc: Fn() + 'static,
     >(
         opts: RuntimeCreateOpts,
         on_interrupt: Option<OnInterruptFunc>,
@@ -277,9 +277,9 @@ impl KhronosRuntime {
 
     /// Returns the lua vm
     ///
-    /// The use of this function is *highly* discouraged. Do *not* hold the returned value across await points
-    /// as it is internally a RefCell
-    #[deprecated(since = "0.0.1", note = "Avoid directly using the lua vm.")]
+    /// The use of this function is discouraged where possible. Do *not* hold the returned value across await points
+    /// as it is internally a RefCell. Do not clone the Lua VM as it may impact closing the runtime and lead to memory
+    /// leaks
     pub fn lua(&'_ self) -> std::cell::Ref<'_, Option<Lua>> {
         log::debug!("Getting lua vm");
         self.lua.borrow()
@@ -423,13 +423,11 @@ impl KhronosRuntime {
 
     /// Returns the maximum number of threads allowed in the runtime
     pub fn max_threads(&self) -> i64 {
-        log::debug!("Getting max threads");
         self.max_threads.get()
     }
 
     /// Sets the maximum number of threads allowed in the runtime
     pub fn set_max_threads(&self, max_threads: i64) {
-        log::debug!("Setting max threads to {}", max_threads);
         // Ensure we don't set a negative value
         if max_threads < 0 {
             self.max_threads.set(0);
@@ -442,7 +440,6 @@ impl KhronosRuntime {
     ///
     /// The current number of threads is immutable and cannot be directly modified by the user.
     pub fn current_threads(&self) -> i64 {
-        log::debug!("Getting current threads");
         self.current_threads.get()
     }
 
@@ -450,7 +447,6 @@ impl KhronosRuntime {
     ///
     /// Returns `0` if the lua vm is not valid
     pub fn memory_usage(&self) -> usize {
-        log::debug!("Getting memory usage");
         let Some(ref lua) = *self.lua.borrow() else {
             return 0;
         };
@@ -462,7 +458,6 @@ impl KhronosRuntime {
     /// The memory limit is set in bytes and will be enforced by the lua vm itself
     /// (e.g. using mlua)
     pub fn set_memory_limit(&self, limit: usize) -> Result<usize, LuaError> {
-        log::debug!("Setting memory limit to {}", limit);
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
@@ -494,7 +489,7 @@ impl KhronosRuntime {
                             .map(|value| {
                                 match value {
                                     LuaValue::String(s) => format!("{}", s.display()),
-                                    _ => format!("{:#?}", value),
+                                    _ => format!("{value:#?}"),
                                 }
                             })
                             .collect::<Vec<_>>()

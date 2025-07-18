@@ -24,14 +24,11 @@ pub trait DiscordProvider: 'static + Clone {
         input: I,
         f: impl FnOnce(I, &serenity::all::Guild) -> R + 'static,
     ) -> Option<R> {
-        let Some(cache) = self.serenity_cache() else {
-            return None;
-        };
+        let cache = self.serenity_cache()?;
 
-        match self.guild_id().to_guild_cached(cache) {
-            Some(guild) => Some(f(input, &guild)),
-            None => None,
-        }
+        self.guild_id()
+            .to_guild_cached(cache)
+            .map(|guild| f(input, &guild))
     }
 
     /// Returns the guild ID
@@ -50,7 +47,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_audit_logs(self.guild_id(), action_type, user_id, before, limit)
             .await
-            .map_err(|e| format!("Failed to fetch audit logs: {}", e).into())
+            .map_err(|e| format!("Failed to fetch audit logs: {e}").into())
     }
 
     // Auto Moderation
@@ -61,7 +58,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_automod_rules(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to fetch automod rules: {}", e).into())
+            .map_err(|e| format!("Failed to fetch automod rules: {e}").into())
     }
 
     async fn get_auto_moderation_rule(
@@ -71,7 +68,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_automod_rule(self.guild_id(), rule_id)
             .await
-            .map_err(|e| format!("Failed to fetch automod rule: {}", e).into())
+            .map_err(|e| format!("Failed to fetch automod rule: {e}").into())
     }
 
     async fn create_auto_moderation_rule(
@@ -82,7 +79,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_automod_rule(self.guild_id(), &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to create automod rule: {}", e).into())
+            .map_err(|e| format!("Failed to create automod rule: {e}").into())
     }
 
     async fn edit_auto_moderation_rule(
@@ -94,7 +91,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_automod_rule(self.guild_id(), rule_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit automod rule: {}", e).into())
+            .map_err(|e| format!("Failed to edit automod rule: {e}").into())
     }
 
     async fn delete_auto_moderation_rule(
@@ -105,7 +102,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_automod_rule(self.guild_id(), rule_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to delete automod rule: {}", e).into())
+            .map_err(|e| format!("Failed to delete automod rule: {e}").into())
     }
 
     // Channel
@@ -123,15 +120,13 @@ pub trait DiscordProvider: 'static + Clone {
         match chan {
             Ok(serenity::all::Channel::Guild(chan)) => {
                 if chan.guild_id != self.guild_id() {
-                    return Err(
-                        format!("Channel {} does not belong to the guild", channel_id).into(),
-                    );
+                    return Err(format!("Channel {channel_id} does not belong to the guild").into());
                 }
 
                 Ok(chan)
             }
-            Ok(_) => Err(format!("Channel {} does not belong to a guild", channel_id).into()),
-            Err(e) => Err(format!("Failed to fetch channel: {}", e).into()),
+            Ok(_) => Err(format!("Channel {channel_id} does not belong to a guild").into()),
+            Err(e) => Err(format!("Failed to fetch channel: {e}").into()),
         }
     }
 
@@ -145,7 +140,7 @@ pub trait DiscordProvider: 'static + Clone {
             .serenity_http()
             .edit_channel(channel_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit channel: {}", e))?;
+            .map_err(|e| format!("Failed to edit channel: {e}"))?;
 
         Ok(chan)
     }
@@ -159,7 +154,7 @@ pub trait DiscordProvider: 'static + Clone {
             .serenity_http()
             .delete_channel(channel_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to delete channel: {}", e))?;
+            .map_err(|e| format!("Failed to delete channel: {e}"))?;
 
         Ok(chan)
     }
@@ -174,7 +169,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_permission(channel_id, target_id, &data, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit channel permissions: {}", e).into())
+            .map_err(|e| format!("Failed to edit channel permissions: {e}").into())
     }
 
     async fn get_channel_invites(
@@ -184,7 +179,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_channel_invites(channel_id)
             .await
-            .map_err(|e| format!("Failed to get channel invites: {}", e).into())
+            .map_err(|e| format!("Failed to get channel invites: {e}").into())
     }
 
     async fn create_channel_invite(
@@ -196,7 +191,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_invite(channel_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to create channel invite: {}", e).into())
+            .map_err(|e| format!("Failed to create channel invite: {e}").into())
     }
 
     async fn delete_channel_permission(
@@ -208,7 +203,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_permission(channel_id, target_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to delete channel permission: {}", e).into())
+            .map_err(|e| format!("Failed to delete channel permission: {e}").into())
     }
 
     async fn follow_announcement_channel(
@@ -217,6 +212,12 @@ pub trait DiscordProvider: 'static + Clone {
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::FollowedChannel, crate::Error> {
+        let headers = if let Some(reason) = audit_log_reason {
+            Some(reason_into_header(reason)?)
+        } else {
+            None
+        };
+
         Ok(self
             .serenity_http()
             .fire(
@@ -225,10 +226,10 @@ pub trait DiscordProvider: 'static + Clone {
                     serenity::all::LightMethod::Post,
                 )
                 .body(Some(serde_json::to_vec(&map)?))
-                .headers(audit_log_reason.map(reason_into_header)),
+                .headers(headers),
             )
             .await
-            .map_err(|e| format!("Failed to follow announcement channel: {}", e))?)
+            .map_err(|e| format!("Failed to follow announcement channel: {e}"))?)
     }
 
     // Guild
@@ -240,7 +241,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_with_counts(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to fetch guild: {}", e).into())
+            .map_err(|e| format!("Failed to fetch guild: {e}").into())
     }
 
     /// Fetches a guild preview
@@ -248,7 +249,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_preview(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to fetch guild preview: {}", e).into())
+            .map_err(|e| format!("Failed to fetch guild preview: {e}").into())
     }
 
     // Modify Guild
@@ -260,7 +261,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_guild(self.guild_id(), &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to modify guild: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild: {e}").into())
     }
 
     // Delete guild will not be implemented as we can't really use it
@@ -271,7 +272,7 @@ pub trait DiscordProvider: 'static + Clone {
             .serenity_http()
             .get_channels(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to fetch guild channels: {:?}", e))?
+            .map_err(|e| format!("Failed to fetch guild channels: {e:?}"))?
             .into_iter()
             .collect::<Vec<_>>())
     }
@@ -285,7 +286,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_channel(self.guild_id(), &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to create guild channel: {}", e).into())
+            .map_err(|e| format!("Failed to create guild channel: {e}").into())
     }
 
     /// Modify Guild Channel Positions
@@ -296,7 +297,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_guild_channel_positions(self.guild_id(), map)
             .await
-            .map_err(|e| format!("Failed to modify guild channel positions: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild channel positions: {e}").into())
     }
 
     /// List Active Guild Threads
@@ -304,7 +305,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_active_threads(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to list active threads: {}", e).into())
+            .map_err(|e| format!("Failed to list active threads: {e}").into())
     }
 
     /// Returns a member from the guild.
@@ -324,10 +325,10 @@ pub trait DiscordProvider: 'static + Clone {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
                     Ok(None)
                 } else {
-                    Err(format!("Failed to fetch member: {:?}", e).into())
+                    Err(format!("Failed to fetch member: {e:?}").into())
                 }
             }
-            Err(e) => Err(format!("Failed to fetch member: {:?}", e).into()),
+            Err(e) => Err(format!("Failed to fetch member: {e:?}").into()),
         }
     }
 
@@ -340,7 +341,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_members(self.guild_id(), limit, after)
             .await
-            .map_err(|e| format!("Failed to list guild members: {}", e).into())
+            .map_err(|e| format!("Failed to list guild members: {e}").into())
     }
 
     /// Search Guild Members
@@ -352,7 +353,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .search_guild_members(self.guild_id(), query, limit)
             .await
-            .map_err(|e| format!("Failed to search guild members: {}", e).into())
+            .map_err(|e| format!("Failed to search guild members: {e}").into())
     }
 
     // Add Guild Member is intentionally not supported as it needs OAuth2 to work
@@ -368,7 +369,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to modify guild member: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild member: {e}").into())
     }
 
     // Modify Current Member and Modify Current Member Nick are intentionally not supported due to our current self-modification position
@@ -382,7 +383,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .add_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to add role to member: {}", e).into())
+            .map_err(|e| format!("Failed to add role to member: {e}").into())
     }
 
     async fn remove_guild_member_role(
@@ -394,7 +395,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .remove_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to remove role from member: {}", e).into())
+            .map_err(|e| format!("Failed to remove role from member: {e}").into())
     }
 
     async fn remove_guild_member(
@@ -405,7 +406,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .kick_member(self.guild_id(), user_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to remove member: {}", e).into())
+            .map_err(|e| format!("Failed to remove member: {e}").into())
     }
 
     async fn get_guild_bans(
@@ -416,7 +417,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_bans(self.guild_id(), target, limit)
             .await
-            .map_err(|e| format!("Failed to get guild bans: {}", e).into())
+            .map_err(|e| format!("Failed to get guild bans: {e}").into())
     }
 
     async fn get_guild_ban(
@@ -439,10 +440,10 @@ pub trait DiscordProvider: 'static + Clone {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
                     Ok(None)
                 } else {
-                    Err(format!("Failed to get guild ban: {:?}", e).into())
+                    Err(format!("Failed to get guild ban: {e:?}").into())
                 }
             }
-            Err(e) => Err(format!("Failed to get guild ban: {:?}", e).into()),
+            Err(e) => Err(format!("Failed to get guild ban: {e:?}").into()),
         }
     }
 
@@ -458,11 +459,11 @@ pub trait DiscordProvider: 'static + Clone {
                 user_id,
                 (delete_message_seconds / 86400)
                     .try_into()
-                    .map_err(|e| format!("Failed to convert ban duration to days: {}", e))?,
+                    .map_err(|e| format!("Failed to convert ban duration to days: {e}"))?,
                 reason,
             )
             .await
-            .map_err(|e| format!("Failed to ban user: {}", e).into())
+            .map_err(|e| format!("Failed to ban user: {e}").into())
     }
 
     async fn remove_guild_ban(
@@ -473,7 +474,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .remove_ban(self.guild_id(), user_id, reason)
             .await
-            .map_err(|e| format!("Failed to unban user: {}", e).into())
+            .map_err(|e| format!("Failed to unban user: {e}").into())
     }
 
     // Bulk Guild Ban is intentionally super-disabled (both Khronos + infra wide endpoint ban)
@@ -486,7 +487,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_roles(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to get guild roles: {}", e).into())
+            .map_err(|e| format!("Failed to get guild roles: {e}").into())
     }
 
     async fn get_guild_role(
@@ -496,7 +497,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_role(self.guild_id(), role_id)
             .await
-            .map_err(|e| format!("Failed to get guild role: {}", e).into())
+            .map_err(|e| format!("Failed to get guild role: {e}").into())
     }
 
     async fn create_guild_role(
@@ -507,7 +508,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_role(self.guild_id(), &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to create guild role: {}", e).into())
+            .map_err(|e| format!("Failed to create guild role: {e}").into())
     }
 
     async fn modify_guild_role_positions(
@@ -518,7 +519,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_role_positions(self.guild_id(), map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to modify guild role positions: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild role positions: {e}").into())
     }
 
     async fn modify_guild_role(
@@ -530,7 +531,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_role(self.guild_id(), role_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to modify guild role: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild role: {e}").into())
     }
 
     async fn delete_guild_role(
@@ -541,7 +542,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_role(self.guild_id(), role_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to modify guild role: {}", e).into())
+            .map_err(|e| format!("Failed to modify guild role: {e}").into())
     }
 
     // Invites
@@ -557,7 +558,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_invite(code, member_counts, expiration, event_id)
             .await
-            .map_err(|e| format!("Failed to get invite: {}", e).into())
+            .map_err(|e| format!("Failed to get invite: {e}").into())
     }
 
     async fn delete_invite(
@@ -568,7 +569,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_invite(code, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to delete invite: {}", e).into())
+            .map_err(|e| format!("Failed to delete invite: {e}").into())
     }
 
     // Messages
@@ -582,7 +583,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_messages(channel_id, target, limit)
             .await
-            .map_err(|e| format!("Failed to get messages: {}", e).into())
+            .map_err(|e| format!("Failed to get messages: {e}").into())
     }
 
     async fn get_channel_message(
@@ -593,7 +594,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_message(channel_id, message_id)
             .await
-            .map_err(|e| format!("Failed to get message: {}", e).into())
+            .map_err(|e| format!("Failed to get message: {e}").into())
     }
 
     async fn create_message(
@@ -605,7 +606,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .send_message(channel_id, files, &data)
             .await
-            .map_err(|e| format!("Failed to send message: {}", e).into())
+            .map_err(|e| format!("Failed to send message: {e}").into())
     }
 
     // Interactions
@@ -620,7 +621,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_interaction_response(interaction_id, interaction_token, &response, files)
             .await
-            .map_err(|e| format!("Failed to create interaction response: {}", e).into())
+            .map_err(|e| format!("Failed to create interaction response: {e}").into())
     }
 
     async fn get_original_interaction_response(
@@ -630,7 +631,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_original_interaction_response(interaction_token)
             .await
-            .map_err(|e| format!("Failed to get original interaction response: {}", e).into())
+            .map_err(|e| format!("Failed to get original interaction response: {e}").into())
     }
 
     // https://discord.com/developers/docs/interactions/receiving-and-responding#edit-original-interaction-response
@@ -643,7 +644,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_original_interaction_response(interaction_token, &map, new_files)
             .await
-            .map_err(|e| format!("Failed to edit original interaction response: {}", e).into())
+            .map_err(|e| format!("Failed to edit original interaction response: {e}").into())
     }
 
     async fn delete_original_interaction_response(
@@ -653,7 +654,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_original_interaction_response(interaction_token)
             .await
-            .map_err(|e| format!("Failed to delete original interaction response: {}", e).into())
+            .map_err(|e| format!("Failed to delete original interaction response: {e}").into())
     }
 
     async fn get_followup_message(
@@ -664,7 +665,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_followup_message(interaction_token, message_id)
             .await
-            .map_err(|e| format!("Failed to get interaction followup: {}", e).into())
+            .map_err(|e| format!("Failed to get interaction followup: {e}").into())
     }
 
     async fn create_followup_message(
@@ -676,7 +677,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_followup_message(interaction_token, &response, files)
             .await
-            .map_err(|e| format!("Failed to create interaction followup: {}", e).into())
+            .map_err(|e| format!("Failed to create interaction followup: {e}").into())
     }
 
     async fn edit_followup_message(
@@ -689,7 +690,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .edit_followup_message(interaction_token, message_id, &map, new_files)
             .await
-            .map_err(|e| format!("Failed to edit interaction followup: {}", e).into())
+            .map_err(|e| format!("Failed to edit interaction followup: {e}").into())
     }
 
     async fn delete_followup_message(
@@ -700,7 +701,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .delete_followup_message(interaction_token, message_id)
             .await
-            .map_err(|e| format!("Failed to delete interaction followup: {}", e).into())
+            .map_err(|e| format!("Failed to delete interaction followup: {e}").into())
     }
 
     // Uncategorized (for now)
@@ -709,7 +710,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_commands(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to get guild commands: {}", e).into())
+            .map_err(|e| format!("Failed to get guild commands: {e}").into())
     }
 
     async fn get_guild_command(
@@ -719,7 +720,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .get_guild_command(self.guild_id(), command_id)
             .await
-            .map_err(|e| format!("Failed to get guild command: {}", e).into())
+            .map_err(|e| format!("Failed to get guild command: {e}").into())
     }
 
     async fn create_guild_command(
@@ -729,7 +730,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_guild_command(self.guild_id(), &map)
             .await
-            .map_err(|e| format!("Failed to create guild command: {}", e).into())
+            .map_err(|e| format!("Failed to create guild command: {e}").into())
     }
 
     async fn create_guild_commands(
@@ -739,11 +740,11 @@ pub trait DiscordProvider: 'static + Clone {
         self.serenity_http()
             .create_guild_commands(self.guild_id(), &map)
             .await
-            .map_err(|e| format!("Failed to create guild commands: {}", e).into())
+            .map_err(|e| format!("Failed to create guild commands: {e}").into())
     }
 }
 
-fn reason_into_header(reason: &str) -> Headers {
+fn reason_into_header(reason: &str) -> Result<Headers, crate::Error> {
     let mut headers = Headers::new();
 
     // "The X-Audit-Log-Reason header supports 1-512 URL-encoded UTF-8 characters."
@@ -753,8 +754,8 @@ fn reason_into_header(reason: &str) -> Headers {
             std::borrow::Cow::Borrowed(value) => HeaderValue::from_str(value),
             std::borrow::Cow::Owned(value) => HeaderValue::try_from(value),
         }
-        .expect("Invalid header value even after percent encode");
+        .map_err(|_| format!("Failed to convert audit log reason to header value: {reason:?}"))?;
 
     headers.insert("X-Audit-Log-Reason", header_value);
-    headers
+    Ok(headers)
 }

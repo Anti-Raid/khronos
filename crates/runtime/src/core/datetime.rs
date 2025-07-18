@@ -312,7 +312,7 @@ impl LuaUserData for Timezone {
         methods.add_method("fromString", |_, this, date: String| {
             let dt = date
                 .parse::<chrono::DateTime<chrono::FixedOffset>>()
-                .map_err(|e| mluau::Error::RuntimeError(format!("Invalid date: {}", e)))?;
+                .map_err(|e| mluau::Error::RuntimeError(format!("Invalid date: {e}")))?;
 
             Ok(DateTime {
                 dt: dt.with_timezone(&this.tz),

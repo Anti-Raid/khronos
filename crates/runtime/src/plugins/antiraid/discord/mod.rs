@@ -42,10 +42,9 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
     }
 
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.limitations.has_cap(&format!("discord:{}", action)) {
+        if !self.limitations.has_cap(&format!("discord:{action}")) {
             return Err(LuaError::runtime(format!(
-                "Discord action `{}` not allowed in this template context",
-                action
+                "Discord action `{action}` not allowed in this template context",
             )));
         }
 
@@ -124,8 +123,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         let member_perms = serenity_backports::member_permissions(&guild, &member);
         if !member_perms.contains(needed_permissions) {
             return Err(LuaError::runtime(format!(
-                "User does not have the required permissions: {:?}: user_id={}, target_id={}",
-                needed_permissions, user_id, target_id
+                "User does not have the required permissions: {needed_permissions:?}: user_id={user_id}, target_id={target_id}",
             )));
         }
 
@@ -142,15 +140,13 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
             .greater_member_hierarchy(&member, &target_member)
             .ok_or_else(|| {
                 LuaError::runtime(format!(
-                    "User does not have a higher role than the target user: user_id={}, target_id={}",
-                    user_id, target_id
+                    "User does not have a higher role than the target user: user_id={user_id}, target_id={target_id}",
                 ))
             })?;
 
         if higher_id != member.user.id {
             return Err(LuaError::runtime(format!(
-                "User does not have a higher role than the target user: user_id={}, target_id={}",
-                user_id, target_id
+                "User does not have a higher role than the target user: user_id={user_id}, target_id={target_id}",
             )));
         }
 
@@ -193,8 +189,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
 
         if !perms.contains(needed_permissions) {
             return Err(LuaError::runtime(format!(
-                "User does not have the required permissions: {:?}: {}",
-                needed_permissions, user_id
+                "User does not have the required permissions: {needed_permissions:?}: {user_id}",
             )));
         }
 
@@ -686,7 +681,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 for perm in allow_permissions.iter() {
                     if !perms.contains(perm) {
                         return Err(LuaError::external(
-                            format!("Bot does not have permission to deny: {:?}", perm),
+                            format!("Bot does not have permission to allow: {perm:?}"),
                         ));
                     }
                 }
@@ -696,7 +691,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 for perm in deny_permissions.iter() {
                     if !perms.contains(perm) {
                         return Err(LuaError::external(
-                            format!("Bot does not have permission to deny: {:?}", perm),
+                            format!("Bot does not have permission to deny: {perm:?}"),
                         ));
                     }
                 }
@@ -869,7 +864,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
             }
 
-            if let Some(ref icon) = data.data.icon.as_inner_ref() {
+            if let Some(icon) = data.data.icon.as_inner_ref() {
                 let format = get_format_from_image_data(icon)
                 .map_err(LuaError::external)?;
 
@@ -881,7 +876,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }
 
             let splash_format = {
-                if let Some(ref splash) = data.data.splash.as_inner_ref() {
+                if let Some(splash) = data.data.splash.as_inner_ref() {
                     let format = get_format_from_image_data(splash)
                     .map_err(LuaError::external)?;
 
@@ -898,7 +893,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             };
 
             let discovery_splash_format = {
-                if let Some(ref discovery_splash) = data.data.discovery_splash.as_inner_ref() {
+                if let Some(discovery_splash) = data.data.discovery_splash.as_inner_ref() {
                     let format = get_format_from_image_data(discovery_splash)
                     .map_err(LuaError::external)?;
 
@@ -915,7 +910,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             };
 
             let banner_format = {
-                if let Some(ref banner) = data.data.banner.as_inner_ref() {
+                if let Some(banner) = data.data.banner.as_inner_ref() {
                     let format = get_format_from_image_data(banner)
                     .map_err(LuaError::external)?;
 
@@ -1221,7 +1216,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
                 if nick.len() > MAX_NICKNAME_LENGTH {
                     return Err(LuaError::external(
-                        format!("Nickname must be less than {} characters", MAX_NICKNAME_LENGTH),
+                        format!("Nickname must be less than {MAX_NICKNAME_LENGTH} characters"),
                     ));
                 }
 
@@ -1496,7 +1491,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Should be documented
         methods.add_scheduler_async_method("get_guild_ban", async move |_, this, user_id: String| {
             let user_id = user_id.parse::<serenity::all::UserId>()
-            .map_err(|e| LuaError::external(format!("Error while parsing user id: {}", e)))?;
+            .map_err(|e| LuaError::external(format!("Error while parsing user id: {e}")))?;
 
             this.check_action("get_guild_ban".to_string())
                 .map_err(LuaError::external)?;
@@ -1657,9 +1652,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             let mut guild_has_role_icons = false;
             for feature in guild.features.iter() {
-                match feature.as_str() {
-                    "ROLE_ICONS" => guild_has_role_icons = true,
-                    _ => {}
+                if feature.as_str() == "ROLE_ICONS" { 
+                    guild_has_role_icons = true 
                 }
             }
             
@@ -1671,7 +1665,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
             }
 
-            if let Some(ref icon) = data.data.icon.as_inner_ref() {
+            if let Some(icon) = data.data.icon.as_inner_ref() {
                 if !guild_has_role_icons {
                     return Err(LuaError::external("Guild does not have the Role Icons feature and as such cannot create a role with a role_icon field"));
                 }
@@ -1793,9 +1787,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             let mut guild_has_role_icons = false;
             for feature in guild.features.iter() {
-                match feature.as_str() {
-                    "ROLE_ICONS" => guild_has_role_icons = true,
-                    _ => {}
+                if feature.as_str() == "ROLE_ICONS" { 
+                    guild_has_role_icons = true 
                 }
             }
             
@@ -1807,7 +1800,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
             }
 
-            if let Some(ref icon) = data.data.icon.as_inner_ref() {
+            if let Some(icon) = data.data.icon.as_inner_ref() {
                 if !guild_has_role_icons {
                     return Err(LuaError::external("Guild does not have the Role Icons feature and as such cannot create a role with a role_icon field"));
                 }
@@ -2251,7 +2244,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Should be documented
         methods.add_scheduler_async_method("get_guild_command", async move |_, this, cmd_id: String| {
             let command_id: serenity::all::CommandId = cmd_id.parse().map_err(|e| {
-                LuaError::external(format!("Invalid command id: {}", e))
+                LuaError::external(format!("Invalid command id: {e}"))
             })?;
             this.check_action("get_guild_command".to_string())
                 .map_err(LuaError::external)?;

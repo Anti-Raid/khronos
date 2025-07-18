@@ -302,10 +302,7 @@ impl Completer for LuaStatementCompleter {
         let (pos, mut str) = Self::prepare_str(line, pos);
 
         let mut candidates = self.get_candidates(&str).map_err(|e| {
-            rustyline::error::ReadlineError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            ))
+            rustyline::error::ReadlineError::Io(std::io::Error::other(e.to_string()))
         })?;
 
         // Remove everything from the string after the last '.'
@@ -314,7 +311,7 @@ impl Completer for LuaStatementCompleter {
             str = str[..last_dot].to_string();
             candidates = candidates
                 .into_iter()
-                .map(|c| format!("{}.{}", str, c))
+                .map(|c| format!("{str}.{c}"))
                 .collect();
         }
 
@@ -324,7 +321,7 @@ impl Completer for LuaStatementCompleter {
             str = str[..last_colon].to_string();
             candidates = candidates
                 .into_iter()
-                .map(|c| format!("{}:{}", str, c))
+                .map(|c| format!("{str}:{c}"))
                 .collect();
         }
 

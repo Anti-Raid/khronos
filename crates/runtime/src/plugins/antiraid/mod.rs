@@ -2,7 +2,6 @@ pub mod datastores;
 pub mod discord;
 pub mod img_captcha;
 pub mod kv;
-pub mod lockdowns;
 pub mod objectstorage;
 
 use mluau::prelude::*;

@@ -1,22 +1,21 @@
-use std::path::{Component, Path, PathBuf};
 use std::collections::VecDeque;
+use std::path::{Component, Path, PathBuf};
 
 // From https://github.com/luau-lang/luau/blob/master/CLI/src/FileUtils.cpp#L49
 pub(super) fn is_absolute_path(path: &str) -> bool {
     #[cfg(windows)]
     {
         // Must either begin with "X:/", "X:\", "/", or "\", where X is a drive letter
-        (path.len() >= 3 &&
-         path.as_bytes()[0].is_ascii_alphabetic() &&
-         path.as_bytes()[1] == b':' &&
-         (path.as_bytes()[2] == b'/' || path.as_bytes()[2] == b'\\')) ||
-        (path.len() >= 1 &&
-         (path.as_bytes()[0] == b'/' || path.as_bytes()[0] == b'\\'))
+        (path.len() >= 3
+            && path.as_bytes()[0].is_ascii_alphabetic()
+            && path.as_bytes()[1] == b':'
+            && (path.as_bytes()[2] == b'/' || path.as_bytes()[2] == b'\\'))
+            || (path.len() >= 1 && (path.as_bytes()[0] == b'/' || path.as_bytes()[0] == b'\\'))
     }
     #[cfg(not(windows))]
     {
         // Must begin with '/'
-        path.len() >= 1 && path.as_bytes()[0] == b'/'
+        !path.starts_with('/')
     }
 }
 

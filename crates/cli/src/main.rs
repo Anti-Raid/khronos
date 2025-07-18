@@ -417,7 +417,7 @@ impl CliArgs {
         }
 
         if self.verbose {
-            println!("Config: {:#?}", self);
+            println!("Config: {self:#?}");
         }
 
         let aux_opts = CliAuxOpts {
@@ -571,10 +571,10 @@ fn main() {
     let cli_args = CliArgs::parse();
 
     if cli_args.spawn_test {
-        let TOTAL_THREADS_TO_SPAWN = 1000;
+        let num_threads_total = 1000;
         let mut threads = Vec::new();
-        for i in 0..TOTAL_THREADS_TO_SPAWN {
-            println!("Thread {} spawned", i);
+        for i in 0..num_threads_total {
+            println!("Thread {i} spawned");
 
             let cli_args_ref = cli_args.clone();
             let th = std::thread::spawn(move || {

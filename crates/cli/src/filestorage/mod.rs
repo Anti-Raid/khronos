@@ -42,7 +42,6 @@ pub trait FileStorageProvider: Debug {
     async fn list_files(
         &self,
         path: &[String],
-        pattern: Option<String>,
         limit_offset: Option<(usize, usize)>,
     ) -> Result<Vec<AssetEntry>, Error>;
 
@@ -56,18 +55,6 @@ pub trait FileStorageProvider: Debug {
 
     /// Delete the file with the given filename
     async fn delete_file(&self, file_path: &[String], key: &str) -> Result<(), Error>;
-}
-
-#[allow(dead_code)]
-/// Returns true if the filename matches the pattern based on PostgreSQL ILIKE pattern matching rules
-fn does_file_match_pattern(filename: &str, pattern: &str) -> Result<bool, khronos_runtime::Error> {
-    // An underscore (_) in pattern stands for (matches) any single character; a percent sign (%) matches any sequence of zero or more characters.
-    let pattern = pattern
-        .replace('.', "\\.")
-        .replace("_", ".")
-        .replace("%", ".*");
-    let regex = regex::Regex::new(&format!("(?i)^{}$", pattern))?;
-    Ok(regex.is_match(filename))
 }
 
 #[derive(Debug, Clone)]
@@ -139,8 +126,7 @@ impl FileStorageProvider for LocalFileStorageProvider {
 
         if self.verbose {
             println!(
-                "[LocalFileStorageProvider] Checking if file exists: path={:?}, key={:?}",
-                file_path, key
+                "[LocalFileStorageProvider] Checking if file exists: path={file_path:?}, key={key:?}",
             );
         }
 
@@ -154,17 +140,13 @@ impl FileStorageProvider for LocalFileStorageProvider {
     async fn list_files(
         &self,
         file_path: &[String],
-        pattern: Option<String>,
         limit_offset: Option<(usize, usize)>,
     ) -> Result<Vec<AssetEntry>, Error> {
         let _g = self.lock.read().await;
 
         if self.verbose {
             println!(
-                "[LocalFileStorageProvider] Listing files: {:?} with pattern: {:?} and limit_offset: {:?}",
-                file_path,
-                pattern,
-                limit_offset
+                "[LocalFileStorageProvider] Listing files: {file_path:?} with limit_offset: {limit_offset:?}",
             );
         }
 
@@ -193,22 +175,10 @@ impl FileStorageProvider for LocalFileStorageProvider {
                     let key = match Self::parse_fs_file_to_key(&filename) {
                         Ok(key) => key,
                         Err(err) => {
-                            eprintln!("Error in list_files when parsing filename: {:?}", err);
+                            eprintln!("Error in list_files when parsing filename: {err:?}");
                             filename
                         }
                     };
-
-                    if let Some(pattern) = &pattern {
-                        println!(
-                            "Checking if file matches pattern: {} {} -> {}",
-                            key,
-                            pattern,
-                            does_file_match_pattern(&key, pattern)?
-                        );
-                        if !does_file_match_pattern(&key, pattern)? {
-                            continue;
-                        }
-                    }
 
                     key
                 },
@@ -235,7 +205,6 @@ impl FileStorageProvider for LocalFileStorageProvider {
                 let sub_files = self
                     .list_files(
                         &[entry.file_name().to_string_lossy().to_string()],
-                        pattern.clone(),
                         limit_offset,
                     )
                     .await?;
@@ -250,10 +219,7 @@ impl FileStorageProvider for LocalFileStorageProvider {
         let _g = self.lock.read().await;
 
         if self.verbose {
-            println!(
-                "[LocalFileStorageProvider] Getting file: path={:?}, key={:?}",
-                file_path, key
-            );
+            println!("[LocalFileStorageProvider] Getting file: path={file_path:?}, key={key:?}",);
         }
 
         let mut path = self.base_path.clone();
@@ -294,10 +260,7 @@ impl FileStorageProvider for LocalFileStorageProvider {
         let _g = self.lock.write().await;
 
         if self.verbose {
-            println!(
-                "[LocalFileStorageProvider] Saving file: path={:?}, key={:?}",
-                file_path, key
-            );
+            println!("[LocalFileStorageProvider] Saving file: path={file_path:?}, key={key:?}",);
         }
 
         let mut path = self.base_path.clone();
@@ -315,10 +278,7 @@ impl FileStorageProvider for LocalFileStorageProvider {
         let _g = self.lock.write().await;
 
         if self.verbose {
-            println!(
-                "[LocalFileStorageProvider] Deleting file: path={:?}, key={:?}",
-                file_path, key
-            );
+            println!("[LocalFileStorageProvider] Deleting file: path={file_path:?}, key={key:?}",);
         }
 
         let mut path = self.base_path.clone();
@@ -378,7 +338,7 @@ mod filestorage_test {
             let time_now = std::time::Instant::now();
             test_provider(provider).await;
             let time_elapsed = time_now.elapsed();
-            eprintln!("=> Time elapsed in local fs provider: {:?}", time_elapsed);
+            eprintln!("=> Time elapsed in local fs provider: {time_elapsed:?}");
 
             // Remove test_files directory if it exists
             tokio::fs::remove_dir_all("test_files").await.ok();
@@ -386,7 +346,7 @@ mod filestorage_test {
     }
 
     async fn test_provider(provider: impl FileStorageProvider + Clone + 'static) {
-        eprintln!("Testing provider: {:?}", provider);
+        eprintln!("Testing provider: {provider:?}");
 
         let file_path = vec![];
         let key = "test.txt".to_string();
@@ -436,83 +396,16 @@ mod filestorage_test {
         println!("At the list files test");
 
         // List files test
-        let files = provider.list_files(&file_path, None, None).await.unwrap();
+        let files = provider.list_files(&file_path, None).await.unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].name, key);
         provider
             .save_file(&file_path, "test2.txt", b"")
             .await
             .unwrap();
-        let files = provider.list_files(&file_path, None, None).await.unwrap();
+        let files = provider.list_files(&file_path, None).await.unwrap();
         assert_eq!(files.len(), 2);
-        let files = provider
-            .list_files(&file_path, Some("%txt".to_string()), None)
-            .await
-            .unwrap();
-        assert_eq!(files.len(), 2);
-        println!("At the list files test 2: {:?}", files);
-        let files = provider
-            .list_files(&file_path, Some("test.%".to_string()), None)
-            .await
-            .unwrap();
-        assert_eq!(files.len(), 1);
     }
 
     use super::LocalFileStorageProvider;
-
-    #[test]
-    fn test_local_fs_does_file_match_pattern() {
-        assert!(
-            does_file_match_pattern("test", "test").unwrap(),
-            "test should match test"
-        );
-
-        // Postgres docs cases
-        assert!(
-            does_file_match_pattern("abc", "abc").unwrap(),
-            "abc should match abc"
-        );
-        assert!(
-            does_file_match_pattern("abc", "a%").unwrap(),
-            "abc should match a%"
-        );
-        assert!(
-            does_file_match_pattern("abc", "%a%").unwrap(),
-            "abc should match %a%"
-        );
-        assert!(
-            does_file_match_pattern("abcde", "%c%").unwrap(),
-            "abcde should match %c%"
-        );
-        assert!(
-            does_file_match_pattern("abc", "_b_").unwrap(),
-            "abc should match _b_"
-        );
-        assert!(
-            !does_file_match_pattern("abc", "c").unwrap(),
-            "abc should not match c"
-        );
-
-        assert!(
-            does_file_match_pattern("abc", "a_c").unwrap(),
-            "abc should match a_c"
-        );
-
-        assert!(
-            does_file_match_pattern("test.txt", "test%").unwrap(),
-            "test.txt should match test%"
-        );
-
-        for _ in 0..10 {
-            assert!(
-                does_file_match_pattern("test.txt", "test.%").unwrap(),
-                "test.txt should match test.%"
-            );
-
-            assert!(
-                !does_file_match_pattern("test2.txt", "test.%").unwrap(),
-                "test2.txt should not match test.%"
-            );
-        }
-    }
 }

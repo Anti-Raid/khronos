@@ -5,8 +5,8 @@ use crate::{
     TemplateContext,
 };
 use captcha::filters::Filter;
-use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
+use mluau::prelude::*;
 
 pub const CREATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 pub const MAX_CHAR_COUNT: u8 = 10;
@@ -59,29 +59,25 @@ impl CaptchaConfig {
         }
 
         if self.char_count > MAX_CHAR_COUNT {
-            return Err(format!(
-                "char_count must be less than or equal to {}",
-                MAX_CHAR_COUNT
-            )
-            .into());
+            return Err(
+                format!("char_count must be less than or equal to {MAX_CHAR_COUNT}").into(),
+            );
         }
 
         if self.filters.len() > MAX_FILTERS {
-            return Err(format!("filters must be less than or equal to {}", MAX_FILTERS).into());
+            return Err(format!("filters must be less than or equal to {MAX_FILTERS}").into());
         }
 
         if self.viewbox_size.0 == 0 || self.viewbox_size.0 >= MAX_VIEWBOX_X {
             return Err(format!(
-                "viewbox_size.0 must be greater than 0 and less than {}",
-                MAX_VIEWBOX_X
+                "viewbox_size.0 must be greater than 0 and less than {MAX_VIEWBOX_X}",
             )
             .into());
         }
 
         if self.viewbox_size.1 == 0 || self.viewbox_size.1 >= MAX_VIEWBOX_Y {
             return Err(format!(
-                "viewbox_size.1 must be greater than 0 and less than {}",
-                MAX_VIEWBOX_Y
+                "viewbox_size.1 must be greater than 0 and less than {MAX_VIEWBOX_Y}",
             )
             .into());
         }
@@ -117,8 +113,7 @@ impl CaptchaConfig {
                     // Check if we've exceeded the timeout
                     if start_time - std::time::Instant::now() > timeout {
                         return Err(format!(
-                            "Timeout exceeded when rendering captcha: {:?}",
-                            timeout
+                            "Timeout exceeded when rendering captcha: {timeout:?}",
                         )
                         .into());
                     }
@@ -131,7 +126,7 @@ impl CaptchaConfig {
                 // Check if we've exceeded the timeout
                 if start_time - std::time::Instant::now() > timeout {
                     return Err(
-                        format!("Timeout exceeded when rendering captcha: {:?}", timeout).into(),
+                        format!("Timeout exceeded when rendering captcha: {timeout:?}").into(),
                     );
                 }
 
@@ -139,8 +134,7 @@ impl CaptchaConfig {
                     // Check if we've exceeded the timeout
                     if start_time - std::time::Instant::now() > timeout {
                         return Err(format!(
-                            "Timeout exceeded when rendering captcha: {:?}",
-                            timeout
+                            "Timeout exceeded when rendering captcha: {timeout:?}",
                         )
                         .into());
                     }
@@ -154,8 +148,7 @@ impl CaptchaConfig {
                     // Check if we've exceeded the timeout
                     if start_time - std::time::Instant::now() > timeout {
                         return Err(format!(
-                            "Timeout exceeded when rendering captcha: {:?}",
-                            timeout
+                            "Timeout exceeded when rendering captcha: {timeout:?}",
                         )
                         .into());
                     }
@@ -181,9 +174,9 @@ pub async fn new(lua: &Lua, config: CaptchaConfig) -> LuaResult<LuaValue> {
         image: KhronosBuffer::new(image),
     }
     .try_into()
-    .map_err(|e| LuaError::runtime(format!("Failed to convert captcha: {}", e)))?;
+    .map_err(|e| LuaError::runtime(format!("Failed to convert captcha: {e}")))?;
 
-    Ok(kv.into_lua(lua)?)
+    kv.into_lua(lua)
 }
 
 pub fn init_plugin<T: KhronosContext>(lua: &Lua, _: &TemplateContext<T>) -> LuaResult<LuaTable> {

@@ -13,7 +13,6 @@ use khronos_runtime::traits::context::ScriptData;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use khronos_runtime::traits::discordprovider::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
-use khronos_runtime::traits::lockdownprovider::LockdownProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 
 /// Internal short-lived channel cache
@@ -23,164 +22,6 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all
             .time_to_idle(std::time::Duration::from_secs(30))
             .build()
     });
-
-#[derive(Clone)]
-pub struct CliLockdownDataStore {
-    file_storage_provider: Rc<dyn FileStorageProvider>,
-    http: Arc<serenity::all::Http>,
-    cache: Option<Arc<serenity::cache::Cache>>,
-}
-
-impl lockdowns::LockdownDataStore for CliLockdownDataStore {
-    async fn get_guild_lockdown_settings(
-        &self,
-        guild_id: serenity::all::GuildId,
-    ) -> Result<lockdowns::GuildLockdownSettings, lockdowns::Error> {
-        let Some(file_contents) = self
-            .file_storage_provider
-            .get_file(&["lockdown_settings".to_string()], &guild_id.to_string())
-            .await
-            .map_err(|e| format!("Failed to get file: {}", e))?
-        else {
-            return Ok(lockdowns::GuildLockdownSettings::default());
-        };
-
-        let record: lockdowns::GuildLockdownSettings =
-            serde_json::from_slice(&file_contents.contents)
-                .map_err(|e| format!("Failed to parse record: {}", e))?;
-
-        Ok(record)
-    }
-
-    async fn get_lockdowns(
-        &self,
-        guild_id: serenity::all::GuildId,
-    ) -> Result<Vec<lockdowns::Lockdown>, lockdowns::Error> {
-        let Some(file_contents) = self
-            .file_storage_provider
-            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
-            .await
-            .map_err(|e| format!("Failed to get file: {}", e))?
-        else {
-            return Ok(vec![]);
-        };
-
-        let record: Vec<lockdowns::Lockdown> = serde_json::from_slice(&file_contents.contents)
-            .map_err(|e| format!("Failed to parse record: {}", e))?;
-
-        Ok(record)
-    }
-
-    async fn insert_lockdown(
-        &self,
-        guild_id: serenity::all::GuildId,
-        lockdown: lockdowns::CreateLockdown,
-    ) -> Result<lockdowns::Lockdown, lockdowns::Error> {
-        let file_contents = match self
-            .file_storage_provider
-            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
-            .await
-            .map_err(|e| format!("Failed to get file: {}", e))?
-        {
-            Some(file_contents) => file_contents.contents,
-            None => "[]".as_bytes().to_vec(),
-        };
-
-        let mut record: Vec<lockdowns::Lockdown> = serde_json::from_slice(&file_contents)
-            .map_err(|e| format!("Failed to parse record: {}", e))?;
-
-        let new_lockdown = lockdowns::Lockdown {
-            id: uuid::Uuid::new_v4(),
-            reason: lockdown.reason,
-            r#type: lockdown.r#type,
-            data: lockdown.data,
-            created_at: chrono::Utc::now(),
-        };
-
-        record.push(new_lockdown.clone());
-        let value = serde_json::to_string(&record)
-            .map_err(|e| format!("Failed to serialize value: {}", e))?;
-        self.file_storage_provider
-            .save_file(
-                &["lockdowns".to_string()],
-                &guild_id.to_string(),
-                value.as_bytes(),
-            )
-            .await
-            .map_err(|e| format!("Failed to save file: {}", e))?;
-
-        Ok(new_lockdown)
-    }
-
-    async fn remove_lockdown(
-        &self,
-        guild_id: serenity::all::GuildId,
-        id: uuid::Uuid,
-    ) -> Result<(), lockdowns::Error> {
-        let Some(file_contents) = self
-            .file_storage_provider
-            .get_file(&["lockdowns".to_string()], &guild_id.to_string())
-            .await
-            .map_err(|e| format!("Failed to get file: {}", e))?
-        else {
-            return Ok(());
-        };
-
-        let mut record: Vec<lockdowns::Lockdown> = serde_json::from_slice(&file_contents.contents)
-            .map_err(|e| format!("Failed to parse record: {}", e))?;
-
-        record.retain(|l| l.id != id);
-        let value = serde_json::to_string(&record)
-            .map_err(|e| format!("Failed to serialize value: {}", e))?;
-        self.file_storage_provider
-            .save_file(
-                &["lockdowns".to_string()],
-                &guild_id.to_string(),
-                value.as_bytes(),
-            )
-            .await
-            .map_err(|e| format!("Failed to save file: {}", e))?;
-
-        Ok(())
-    }
-
-    async fn guild(
-        &self,
-        guild_id: serenity::all::GuildId,
-    ) -> Result<serenity::all::PartialGuild, lockdowns::Error> {
-        {
-            if let Some(cache) = &self.cache {
-                if let Some(guild) = cache.guild(guild_id) {
-                    return Ok(guild.clone().into());
-                }
-            }
-        }
-
-        // Fetch from HTTP
-        self.http
-            .get_guild(guild_id)
-            .await
-            .map_err(|e| format!("Failed to fetch guild: {}", e).into())
-    }
-
-    async fn guild_channels(
-        &self,
-        guild_id: serenity::all::GuildId,
-    ) -> Result<Vec<serenity::all::GuildChannel>, lockdowns::Error> {
-        // Fetch from HTTP
-        let channels = self.http.get_channels(guild_id).await?;
-
-        Ok(channels.into_iter().collect())
-    }
-
-    fn cache(&self) -> Option<&serenity::all::Cache> {
-        self.cache.as_ref().map(|v| &**v)
-    }
-
-    fn http(&self) -> &serenity::all::Http {
-        &self.http
-    }
-}
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
@@ -217,8 +58,6 @@ pub(crate) fn default_script_data(allowed_caps: Vec<String>) -> ScriptData {
 impl KhronosContext for CliKhronosContext {
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
-    type LockdownDataStore = CliLockdownDataStore;
-    type LockdownProvider = CliLockdownProvider;
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
 
@@ -281,29 +120,10 @@ impl KhronosContext for CliKhronosContext {
             default_global_guild_id()
         };
 
-        if let Some(http) = &self.http {
-            Some(CliDiscordProvider {
-                http: http.clone(),
-                cache: self.cache.clone(),
-                guild_id,
-            })
-        } else {
-            return None;
-        }
-    }
-
-    fn lockdown_provider(&self) -> Option<Self::LockdownProvider> {
-        let Some(http) = &self.http else {
-            return None;
-        };
-
-        Some(CliLockdownProvider {
-            lockdown_data_store: CliLockdownDataStore {
-                file_storage_provider: self.file_storage_provider.clone(),
-                http: http.clone(),
-                cache: self.cache.clone(),
-            },
+        self.http.as_ref().map(|http| CliDiscordProvider {
             http: http.clone(),
+            cache: self.cache.clone(),
+            guild_id,
         })
     }
 
@@ -330,7 +150,7 @@ ORDER BY scope;
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| format!("Failed to list scopes: {}", e))?
+        .map_err(|e| format!("Failed to list scopes: {e}"))?
         .iter()
         .map(|row| row.get::<String, _>("scope"))
         .collect::<Vec<_>>();
@@ -357,7 +177,7 @@ ORDER BY scope;
         .bind(scopes)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?
+        .map_err(|e| format!("Failed to get key: {e}"))?
         else {
             return Ok(None);
         };
@@ -395,7 +215,7 @@ ORDER BY scope;
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?
+        .map_err(|e| format!("Failed to get key: {e}"))?
         else {
             return Ok(None);
         };
@@ -438,16 +258,16 @@ ORDER BY scope;
         .bind(scopes)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get existing keys: {}", e))?
+        .map_err(|e| format!("Failed to get existing keys: {e}"))?
         {
             let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
             sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
                 .bind(value.into_serde_json_value(1, true)?)
                 .bind(expires_at)
-                .bind(&key)
+                .bind(key)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| format!("Failed to set key: {}", e))?;
+                .map_err(|e| format!("Failed to set key: {e}"))?;
 
             return Ok((true, key.to_string()));
         }
@@ -460,9 +280,9 @@ ORDER BY scope;
             .bind(expires_at)
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| format!("Failed to set key: {}", e))?
+            .map_err(|e| format!("Failed to set key: {e}"))?
             .try_get::<sqlx::types::uuid::Uuid, _>("id")
-            .map_err(|e| format!("Failed to get ID: {}", e))?;
+            .map_err(|e| format!("Failed to get ID: {e}"))?;
 
         Ok((false, id.to_string()))
     }
@@ -474,15 +294,15 @@ ORDER BY scope;
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), khronos_runtime::Error> {
         let key = sqlx::types::uuid::Uuid::parse_str(&id)
-            .map_err(|e| format!("Failed to parse ID: {}", e))?;
+            .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
         sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
             .bind(value.into_serde_json_value(1, true)?)
             .bind(expires_at)
-            .bind(&key)
+            .bind(key)
             .execute(&self.pool)
             .await
-            .map_err(|e| format!("Failed to set key: {}", e))?;
+            .map_err(|e| format!("Failed to set key: {e}"))?;
 
         Ok(())
     }
@@ -508,7 +328,7 @@ ORDER BY scope;
         .bind(scopes)
         .execute(&self.pool)
         .await
-        .map_err(|e| format!("Failed to set expiry: {}", e))?;
+        .map_err(|e| format!("Failed to set expiry: {e}"))?;
 
         Ok(())
     }
@@ -519,7 +339,7 @@ ORDER BY scope;
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), khronos_runtime::Error> {
         let key = sqlx::types::uuid::Uuid::parse_str(&id)
-            .map_err(|e| format!("Failed to parse ID: {}", e))?;
+            .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
         sqlx::query(
             "UPDATE kv_table
@@ -531,10 +351,10 @@ ORDER BY scope;
         )
         .bind(expires_at)
         .bind(self.guild_id.to_string())
-        .bind(&key)
+        .bind(key)
         .execute(&self.pool)
         .await
-        .map_err(|e| format!("Failed to set expiry: {}", e))?;
+        .map_err(|e| format!("Failed to set expiry: {e}"))?;
 
         Ok(())
     }
@@ -553,7 +373,7 @@ ORDER BY scope;
         .bind(scopes)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?;
+        .map_err(|e| format!("Failed to get key: {e}"))?;
 
         Ok(())
     }
@@ -570,7 +390,7 @@ ORDER BY scope;
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?;
+        .map_err(|e| format!("Failed to get key: {e}"))?;
 
         Ok(())
     }
@@ -588,21 +408,38 @@ ORDER BY scope;
         scopes: &[String],
         query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        let entries = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
-            FROM kv_table
-            WHERE 
-            guild_id = $1 
-            AND key ILIKE $2
-            AND scopes @> $3
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(query)
-        .bind(scopes)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {}", e))?;
+        let entries = if query == "%%" {
+            // Fast path for querying all keys
+            sqlx::query(
+                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
+                FROM kv_table
+                WHERE 
+                guild_id = $1 
+                AND scopes @> $2
+            ",
+            )
+            .bind(self.guild_id.to_string())
+            .bind(scopes)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| format!("Failed to get key: {e}"))?
+        } else {
+            sqlx::query(
+                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
+                FROM kv_table
+                WHERE 
+                guild_id = $1 
+                AND key ILIKE $2
+                AND scopes @> $3
+            ",
+            )
+            .bind(self.guild_id.to_string())
+            .bind(query)
+            .bind(scopes)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| format!("Failed to get key: {e}"))?
+        };
 
         let mut records = Vec::new();
         for data in entries {
@@ -644,7 +481,7 @@ ORDER BY scope;
         .bind(scopes)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?;
+        .map_err(|e| format!("Failed to get key: {e}"))?;
 
         let count = data.get::<i64, _>(0);
 
@@ -664,7 +501,7 @@ ORDER BY scope;
         .bind(scopes)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| format!("Failed to get key: {}", e))?;
+        .map_err(|e| format!("Failed to get key: {e}"))?;
 
         let keys = data
             .iter()
@@ -728,7 +565,7 @@ impl DiscordProvider for CliDiscordProvider {
         self.http
             .get_guild(self.guild_id)
             .await
-            .map_err(|e| format!("Failed to fetch guild: {}", e).into())
+            .map_err(|e| format!("Failed to fetch guild: {e}").into())
     }
 
     async fn get_guild_member(
@@ -749,7 +586,7 @@ impl DiscordProvider for CliDiscordProvider {
         self.http
             .get_member(self.guild_id, user_id)
             .await
-            .map_err(|e| format!("Failed to fetch member: {}", e).into())
+            .map_err(|e| format!("Failed to fetch member: {e}").into())
             .map(Some)
     }
 
@@ -802,7 +639,7 @@ impl DiscordProvider for CliDiscordProvider {
             .http
             .edit_channel(channel_id, &map, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit channel: {}", e))?;
+            .map_err(|e| format!("Failed to edit channel: {e}"))?;
 
         // Update cache
         CHANNEL_CACHE.insert(channel_id, chan.clone()).await;
@@ -819,7 +656,7 @@ impl DiscordProvider for CliDiscordProvider {
             .http
             .delete_channel(channel_id, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to delete channel: {}", e))?;
+            .map_err(|e| format!("Failed to delete channel: {e}"))?;
 
         // Remove from cache
         CHANNEL_CACHE.remove(&channel_id).await;
@@ -837,31 +674,11 @@ impl DiscordProvider for CliDiscordProvider {
         self.http
             .create_permission(channel_id, target_id, &data, audit_log_reason)
             .await
-            .map_err(|e| format!("Failed to edit channel permissions: {}", e))?;
+            .map_err(|e| format!("Failed to edit channel permissions: {e}"))?;
 
         CHANNEL_CACHE.remove(&channel_id).await;
 
         Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct CliLockdownProvider {
-    lockdown_data_store: CliLockdownDataStore,
-    http: Arc<serenity::all::Http>,
-}
-
-impl LockdownProvider<CliLockdownDataStore> for CliLockdownProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    fn lockdown_data_store(&self) -> &CliLockdownDataStore {
-        &self.lockdown_data_store
-    }
-
-    fn serenity_http(&self) -> &serenity::http::Http {
-        &self.http
     }
 }
 
@@ -893,7 +710,7 @@ impl ObjectStorageProvider for CliObjectStorageProvider {
         }
         let files = self
             .file_storage_provider
-            .list_files(&fsp_vec, None, None)
+            .list_files(&fsp_vec, None)
             .await?;
 
         let mut objects = Vec::new();

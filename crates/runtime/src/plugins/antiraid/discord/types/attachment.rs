@@ -67,11 +67,9 @@ impl CreateMessageAttachment {
         pub const MESSAGE_MAX_ATTACHMENT_COUNT: usize = 3;
 
         if self.new_and_existing_attachments.len() > MESSAGE_MAX_ATTACHMENT_COUNT {
-            return Err(format!(
-                "Too many attachments, limit is {}",
-                MESSAGE_MAX_ATTACHMENT_COUNT
-            )
-            .into());
+            return Err(
+                format!("Too many attachments, limit is {MESSAGE_MAX_ATTACHMENT_COUNT}",).into(),
+            );
         }
 
         let mut attachments = Vec::new();
@@ -82,8 +80,7 @@ impl CreateMessageAttachment {
 
                 if desc.len() > MESSAGE_ATTACHMENT_DESCRIPTION_LIMIT {
                     return Err(format!(
-                        "Attachment description exceeds limit of {}",
-                        MESSAGE_ATTACHMENT_DESCRIPTION_LIMIT
+                        "Attachment description exceeds limit of {MESSAGE_ATTACHMENT_DESCRIPTION_LIMIT}",
                     )
                     .into());
                 }
@@ -96,8 +93,7 @@ impl CreateMessageAttachment {
 
                 if content.len() > MESSAGE_ATTACHMENT_CONTENT_BYTES_LIMIT {
                     return Err(format!(
-                        "Attachment content exceeds limit of {} bytes",
-                        MESSAGE_ATTACHMENT_CONTENT_BYTES_LIMIT
+                        "Attachment content exceeds limit of {MESSAGE_ATTACHMENT_CONTENT_BYTES_LIMIT} bytes",
                     )
                     .into());
                 }

@@ -4,8 +4,8 @@ use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::datastoreprovider::{DataStoreImpl, DataStoreMethod, DataStoreProvider};
 use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
-use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsync;
+use mluau::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -19,23 +19,22 @@ pub struct DataStore<T: KhronosContext> {
 
 impl<T: KhronosContext> DataStore<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if self.ds_impl.need_caps(&action) {
-            if !self
+        if self.ds_impl.need_caps(&action)
+            && !self
                 .executor
                 .limitations
                 .has_cap(&format!("datastore:{}", self.ds_impl.name()))
-                && !self.executor.limitations.has_cap(&format!(
-                    "datastore:{}:{}",
-                    self.ds_impl.name(),
-                    action
-                ))
-            {
-                return Err(LuaError::runtime(format!(
-                    "Datastore action is not allowed in this template context: data store: {}, action: {}",
-                    self.ds_impl.name(),
-                    action
-                )));
-            }
+            && !self.executor.limitations.has_cap(&format!(
+                "datastore:{}:{}",
+                self.ds_impl.name(),
+                action
+            ))
+        {
+            return Err(LuaError::runtime(format!(
+                "Datastore action is not allowed in this template context: data store: {}, action: {}",
+                self.ds_impl.name(),
+                action
+            )));
         }
 
         self.executor
@@ -58,7 +57,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
         });
 
         methods.add_method("methods", |lua, this, _: ()| {
-            Ok(lua.to_value_with(&this.ds_impl.methods(), LUA_SERIALIZE_OPTIONS)?)
+            lua.to_value_with(&this.ds_impl.methods(), LUA_SERIALIZE_OPTIONS)
         });
 
         methods.add_meta_method(LuaMetaMethod::Index, |lua, this, key: LuaValue| {
@@ -75,9 +74,7 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                 .map_err(|_| LuaError::external("Failed to borrow method cache"))?;
 
             match methods_cache.get(&key) {
-                Some(cached_method) => {
-                    return Ok(Some(cached_method.clone()));
-                }
+                Some(cached_method) => Ok(Some(cached_method.clone())),
                 None => {
                     if let Some(method_impl) = this.ds_impl.get_method(key.clone()) {
                         let this_ref = this.clone();
@@ -112,13 +109,13 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                                     lua.create_function(move |lua, data: LuaMultiValue| {
                                         let mut args = Vec::with_capacity(data.len());
                                         for value in data {
-                                            args.push(KhronosValue::from_lua(value, &lua)?);
+                                            args.push(KhronosValue::from_lua(value, lua)?);
                                         }
 
                                         this_ref.check_action(key_ref.clone())?;
                                         let result = (method_impl)(args)
                                             .map_err(|e| LuaError::external(e.to_string()))?;
-                                        Ok(result.into_lua(lua)?)
+                                        result.into_lua(lua)
                                     })?
                                 }
                             }
@@ -127,9 +124,9 @@ impl<T: KhronosContext> LuaUserData for DataStore<T> {
                         let method = LuaValue::Function(method);
 
                         methods_cache.insert(key.to_string(), method.clone());
-                        return Ok(Some(method));
+                        Ok(Some(method))
                     } else {
-                        return Ok(None);
+                        Ok(None)
                     }
                 }
             }

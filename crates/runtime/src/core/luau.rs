@@ -1,6 +1,6 @@
 use crate::primitives::create_userdata_iterator_with_fields;
-use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
+use mluau::prelude::*;
 
 #[derive(Clone)]
 /// An lockdown executor is used to manage AntiRaid lockdowns from Lua
@@ -59,7 +59,7 @@ impl LuaUserData for Chunk {
             this.optimization_level = Some(level);
             Ok(())
         });
-        fields.add_field_method_get("code", |lua, this| Ok(lua.create_string(&this.code)?));
+        fields.add_field_method_get("code", |lua, this| lua.create_string(&this.code));
         fields.add_field_method_set("code", |_, this, code: String| {
             this.code = code;
             Ok(())
@@ -148,7 +148,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             if !values.is_empty() {
                 Ok(values
                     .iter()
-                    .map(|value| format!("{:#?}", value))
+                    .map(|value| format!("{value:#?}"))
                     .collect::<Vec<_>>()
                     .join("\t"))
             } else {

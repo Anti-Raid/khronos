@@ -27,7 +27,7 @@ pub fn user_permissions(
         everyone_permissions: if let Some(role) = guild_roles.get(&RoleId::new(guild_id.get())) {
             role.permissions
         } else {
-            error!("@everyone role missing in {}", guild_id);
+            error!("@everyone role missing in {guild_id}");
             Permissions::empty()
         },
         user_roles_permissions: member_roles
@@ -36,10 +36,7 @@ pub fn user_permissions(
                 if let Some(role) = guild_roles.get(role_id) {
                     role.permissions
                 } else {
-                    warn!(
-                        "{} on {} has non-existent role {:?}",
-                        member_user_id, guild_id, role_id
-                    );
+                    warn!("{member_user_id} on {guild_id} has non-existent role {role_id:?}",);
                     Permissions::empty()
                 }
             })

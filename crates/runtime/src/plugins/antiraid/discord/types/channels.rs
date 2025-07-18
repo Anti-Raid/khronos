@@ -3,11 +3,6 @@ use nonmax::NonMaxU16;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
-pub struct GetChannelOptions {
-    pub channel_id: serenity::all::ChannelId,
-}
-
 /// A builder for creating a new [`GuildChannel`] in a [`Guild`].
 ///
 /// Except [`Self::name`], all fields are optional.

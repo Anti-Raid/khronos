@@ -41,7 +41,7 @@ impl<T: KhronosContext> TemplateContext<T> {
 
         Ok(Self {
             limitations: Rc::new(context.limitations()),
-            context: context,
+            context,
             store_table: store.0.clone(),
             cached_data: RefCell::default(),
             current_discord_user: RefCell::default(),
@@ -137,10 +137,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "UnscopedKV", antiraid::kv::init_plugin_unscoped)
         });
 
-        fields.add_field_method_get("Lockdowns", |lua, this| {
-            this.get_plugin(lua, "Lockdowns", antiraid::lockdowns::init_plugin)
-        });
-
         fields.add_field_method_get("ObjectStorage", |lua, this| {
             this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
         });
@@ -199,13 +195,13 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         methods.add_method("withlimits", |_lua, this, limits: KhronosValue| {
             let limits: Limitations = limits.try_into().map_err(|e| {
-                mluau::Error::external(format!("Failed to convert LuaValue to Limitations: {}", e))
+                mluau::Error::external(format!("Failed to convert LuaValue to Limitations: {e}"))
             })?;
 
             // Ensure that the new limitations are a subset of the current limitations
             limits
                 .subset_of(&this.limitations)
-                .map_err(|e| mluau::Error::external(e))?;
+                .map_err(mluau::Error::external)?;
 
             // Create a new context with the given limitations
             let new_context = TemplateContext {

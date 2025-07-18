@@ -89,6 +89,7 @@ impl<'de> serde::Deserialize<'de> for SafeString {
 }
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub enum DataStoreMethod {
     Async(
         Rc<
@@ -180,30 +181,30 @@ impl DataStoreImpl for CopyDataStore {
             Some(DataStoreMethod::Async(Rc::new(|v| {
                 Box::pin(async {
                     let mut v = v;
-                    if v.len() == 0 {
-                        return Ok(KhronosValue::Null);
+                    if v.is_empty() {
+                        Ok(KhronosValue::Null)
                     } else if v.len() == 1 {
                         let Some(v) = v.pop() else {
                             return Ok(KhronosValue::Null);
                         };
-                        return Ok(v);
+                        Ok(v)
                     } else {
-                        return Ok(KhronosValue::List(v));
+                        Ok(KhronosValue::List(v))
                     }
                 })
             })))
         } else if key == "copySync" {
             Some(DataStoreMethod::Sync(Rc::new(|v| {
                 let mut v = v;
-                if v.len() == 0 {
-                    return Ok(KhronosValue::Null);
+                if v.is_empty() {
+                    Ok(KhronosValue::Null)
                 } else if v.len() == 1 {
                     let Some(v) = v.pop() else {
                         return Ok(KhronosValue::Null);
                     };
-                    return Ok(v);
+                    Ok(v)
                 } else {
-                    return Ok(KhronosValue::List(v));
+                    Ok(KhronosValue::List(v))
                 }
             })))
         } else {

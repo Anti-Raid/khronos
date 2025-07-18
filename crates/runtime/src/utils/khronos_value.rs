@@ -133,7 +133,7 @@ impl TryFrom<KhronosValue> for i32 {
 impl TryFrom<i64> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        Ok(KhronosValue::Integer(value.into()))
+        Ok(KhronosValue::Integer(value))
     }
 }
 
@@ -207,7 +207,7 @@ impl TryFrom<KhronosValue> for u32 {
 impl TryFrom<u64> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: u64) -> Result<Self, Self::Error> {
-        Ok(KhronosValue::UnsignedInteger(value.into()))
+        Ok(KhronosValue::UnsignedInteger(value))
     }
 }
 
@@ -255,7 +255,7 @@ impl TryFrom<KhronosValue> for f32 {
                     return Err("KhronosValue is not a f32".into());
                 }
 
-                return Ok(f as f32);
+                Ok(f as f32)
             }
             _ => Err("KhronosValue is not a f32".into()),
         }
@@ -505,7 +505,7 @@ impl TryFrom<Lazy<serde_json::Value>> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: Lazy<serde_json::Value>) -> Result<Self, Self::Error> {
         Ok(KhronosValue::LazyValue(KhronosLazyValue {
-            data: value.data
+            data: value.data,
         }))
     }
 }
@@ -518,7 +518,7 @@ impl TryFrom<KhronosValue> for Lazy<serde_json::Value> {
             _ => {
                 let serde_json_value = value.into_serde_json_value(0, false)?;
                 Ok(Lazy::new(serde_json_value))
-            },
+            }
         }
     }
 }
@@ -664,7 +664,7 @@ impl<T: Serialize + for<'de> Deserialize<'de>> TryFrom<KhronosValue> for SerdeBl
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         let serde_json_value = value.into_serde_json_value(0, false)?;
         let value = T::deserialize(serde_json_value)
-            .map_err(|e| crate::Error::from(format!("Failed to deserialize SerdeBlob: {}", e)))?;
+            .map_err(|e| crate::Error::from(format!("Failed to deserialize SerdeBlob: {e}")))?;
         Ok(SerdeBlob(value))
     }
 }
@@ -695,11 +695,12 @@ macro_rules! value {
     };
     ($valuea:expr, $($value:expr),+) => {
         {
-            let mut list = Vec::new();
-            list.push(($valuea).try_into()?);
-            $(
-                list.push(($value).try_into()?);
-            )*
+            let list = vec![
+                ($valuea).try_into()?,
+                $(
+                    ($value).try_into()?,
+                )*
+            ];
             $crate::utils::khronos_value::KhronosValue::List(list)
         }
     };
@@ -891,7 +892,7 @@ impl KhronosValue {
                     }));
                 }
 
-                return Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) });
+                Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) })
             }
             _ => Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -968,7 +969,7 @@ impl KhronosValue {
         }
 
         match self {
-            KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(&s)?)),
+            KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(s)?)),
             KhronosValue::Integer(i) => {
                 let i = *i; // Dereference to get the value
 
@@ -1038,24 +1039,24 @@ impl KhronosValue {
             KhronosValue::Buffer(buf) => {
                 if !preserve_types {
                     serde_json::to_value(buf)
-                        .map_err(|e| format!("Failed to serialize Buffer: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Buffer: {e}"))?
                 } else {
                     serde_json::json!({
                         KHRONOS_VALUE_TYPE_KEY: "buffer",
                         "value": serde_json::to_value(buf)
-                        .map_err(|e| format!("Failed to serialize Buffer: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Buffer: {e}"))?
                     })
                 }
             }
             KhronosValue::Vector(v) => {
                 if !preserve_types {
                     serde_json::to_value(v)
-                        .map_err(|e| format!("Failed to serialize Vector: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Vector: {e}"))?
                 } else {
                     serde_json::json!({
                         KHRONOS_VALUE_TYPE_KEY: "vector",
                         "value": serde_json::to_value(v)
-                        .map_err(|e| format!("Failed to serialize Vector: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Vector: {e}"))?
                     })
                 }
             }
@@ -1064,8 +1065,7 @@ impl KhronosValue {
                 for (k, v) in m.into_iter() {
                     if k == KHRONOS_VALUE_TYPE_KEY {
                         return Err(format!(
-                            "Cannot use reserved key `{}` in map",
-                            KHRONOS_VALUE_TYPE_KEY
+                            "Cannot use reserved key `{KHRONOS_VALUE_TYPE_KEY}` in map",
                         )
                         .into());
                     }
@@ -1076,7 +1076,7 @@ impl KhronosValue {
             KhronosValue::LazyValue(lazy) => {
                 // There is no point in preserving types for LazyValue,
                 serde_json::to_value(lazy.data)
-                    .map_err(|e| format!("Failed to serialize LazyValue: {}", e))?
+                    .map_err(|e| format!("Failed to serialize LazyValue: {e}"))?
             }
             KhronosValue::List(l) => {
                 let mut list = Vec::with_capacity(l.len());
@@ -1089,36 +1089,36 @@ impl KhronosValue {
             KhronosValue::Timestamptz(dt) => {
                 if !preserve_types {
                     serde_json::to_value(dt)
-                        .map_err(|e| format!("Failed to serialize DateTime: {}", e))?
+                        .map_err(|e| format!("Failed to serialize DateTime: {e}"))?
                 } else {
                     serde_json::json!({
                         KHRONOS_VALUE_TYPE_KEY: "timestamptz",
                         "value": serde_json::to_value(dt)
-                        .map_err(|e| format!("Failed to serialize DateTime: {}", e))?
+                        .map_err(|e| format!("Failed to serialize DateTime: {e}"))?
                     })
                 }
             }
             KhronosValue::Interval(i) => {
                 if !preserve_types {
                     serde_json::to_value(i)
-                        .map_err(|e| format!("Failed to serialize Interval: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Interval: {e}"))?
                 } else {
                     serde_json::json!({
                         KHRONOS_VALUE_TYPE_KEY: "interval",
                         "value": serde_json::to_value(i)
-                        .map_err(|e| format!("Failed to serialize Interval: {}", e))?
+                        .map_err(|e| format!("Failed to serialize Interval: {e}"))?
                     })
                 }
             }
             KhronosValue::TimeZone(tz) => {
                 if !preserve_types {
                     serde_json::to_value(tz)
-                        .map_err(|e| format!("Failed to serialize TimeZone: {}", e))?
+                        .map_err(|e| format!("Failed to serialize TimeZone: {e}"))?
                 } else {
                     serde_json::json!({
                         KHRONOS_VALUE_TYPE_KEY: "timezone",
                         "value": serde_json::to_value(tz)
-                        .map_err(|e| format!("Failed to serialize TimeZone: {}", e))?
+                        .map_err(|e| format!("Failed to serialize TimeZone: {e}"))?
                     })
                 }
             }
@@ -1156,7 +1156,7 @@ impl KhronosValue {
                                 let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Buffer(
                                     serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Buffer: {}", e)
+                                        format!("Failed to deserialize Buffer: {e}")
                                     })?,
                                 ));
                             }
@@ -1164,7 +1164,7 @@ impl KhronosValue {
                                 let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Vector(
                                     serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Vector: {}", e)
+                                        format!("Failed to deserialize Vector: {e}")
                                     })?,
                                 ));
                             }
@@ -1172,7 +1172,7 @@ impl KhronosValue {
                                 let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Timestamptz(
                                     serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize DateTime: {}", e)
+                                        format!("Failed to deserialize DateTime: {e}")
                                     })?,
                                 ));
                             }
@@ -1180,7 +1180,7 @@ impl KhronosValue {
                                 let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::Interval(
                                     serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Interval: {}", e)
+                                        format!("Failed to deserialize Interval: {e}")
                                     })?,
                                 ));
                             }
@@ -1188,7 +1188,7 @@ impl KhronosValue {
                                 let value = m.remove("value").ok_or("Missing value field")?;
                                 return Ok(KhronosValue::TimeZone(
                                     serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize TimeZone: {}", e)
+                                        format!("Failed to deserialize TimeZone: {e}")
                                     })?,
                                 ));
                             }
@@ -1217,17 +1217,15 @@ impl KhronosValue {
     /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
     pub fn into_value<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
         let value = self.into_serde_json_value(0, true)?;
-        Ok(T::deserialize(&value).map_err(|e| {
-            crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
-        })?)
+        T::deserialize(&value)
+            .map_err(|e| crate::Error::from(format!("Failed to deserialize KhronosValue: {e}")))
     }
 
     /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
     pub fn into_value_untyped<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
         let value = self.into_serde_json_value(0, false)?;
-        Ok(T::deserialize(&value).map_err(|e| {
-            crate::Error::from(format!("Failed to deserialize KhronosValue: {}", e))
-        })?)
+        T::deserialize(&value)
+            .map_err(|e| crate::Error::from(format!("Failed to deserialize KhronosValue: {e}")))
     }
 }
 
@@ -1511,7 +1509,7 @@ mod test_to_struct {
         let my_data: MyData = kv.try_into().unwrap();
         assert_eq!(my_data.name, "test");
         assert_eq!(my_data.value, 42);
-        assert_eq!(my_data.is_active, true);
+        assert!(my_data.is_active);
         assert_eq!(my_data.maybe_float, Some(3.244));
         assert_eq!(my_data.a_list, vec![1, 2, 3]);
         println!("{:?}", value!(my_data));
