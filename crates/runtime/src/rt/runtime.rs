@@ -229,9 +229,6 @@ impl KhronosRuntime {
         let store_table = lua.create_table()?;
         lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()));
 
-        lua.globals()
-            .set("__kanalytics_memusagebeforeregister", lua.used_memory())?;
-
         // Load core modules
         lua.register_module(
             "@antiraid/datetime",
@@ -241,7 +238,6 @@ impl KhronosRuntime {
             "@antiraid/interop",
             crate::core::interop::init_plugin(&lua)?,
         )?;
-        lua.register_module("@antiraid/lazy", crate::core::lazy::init_plugin(&lua)?)?;
         lua.register_module("@antiraid/luau", crate::core::luau::init_plugin(&lua)?)?;
         lua.register_module(
             "@antiraid/typesext",
@@ -392,9 +388,6 @@ impl KhronosRuntime {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
-
-        lua.globals()
-            .set("__kanalytics_memusagebeforesandbox", lua.used_memory())?;
 
         lua.sandbox(true)?;
         lua.globals().set_readonly(true);

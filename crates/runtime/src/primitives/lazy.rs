@@ -55,9 +55,7 @@ impl<T: serde::Serialize + Clone> Clone for Lazy<T> {
 
 impl<T: serde::Serialize + std::fmt::Debug> std::fmt::Debug for Lazy<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Lazy")
-            .field("data", &self.data)
-            .finish()
+        f.debug_struct("Lazy").field("data", &self.data).finish()
     }
 }
 
@@ -83,9 +81,6 @@ impl<T: serde::Serialize + 'static> LuaUserData for Lazy<T> {
             Ok(v)
         });
 
-        // Always returns true. Allows the user to check if the data is a lazy or not
-        fields.add_field_method_get("lazy", |_lua, _this| Ok(true));
-
         fields.add_meta_field(LuaMetaMethod::Type, "Lazy");
     }
 
@@ -100,28 +95,9 @@ impl<T: serde::Serialize + 'static> LuaUserData for Lazy<T> {
                 ud,
                 [
                     // Fields
-                    "lazy", "data",
+                    "data",
                 ],
             )
         });
     }
-}
-
-pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
-    let module = lua.create_table()?;
-
-    // For the cases where you want to just make your own lazy data. Might be more useful
-    // in the future as well.
-    module.set(
-        "new",
-        lua.create_function(|lua, (data,): (LuaValue,)| {
-            let val: serde_json::Value = lua.from_value(data).map_err(LuaError::external)?;
-
-            Ok(Lazy::new(val))
-        })?,
-    )?;
-
-    module.set_readonly(true); // Block any attempt to modify this table
-
-    Ok(module)
 }

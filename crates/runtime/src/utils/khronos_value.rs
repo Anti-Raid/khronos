@@ -2,7 +2,7 @@ use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::core::lazy::Lazy;
+use crate::primitives::lazy::Lazy;
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
