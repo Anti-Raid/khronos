@@ -6,21 +6,18 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
-serde_yaml = "0.9"
 strum = { version = "0.26", features = ["derive"] }
-tokio = { version = "1", features = ["rt"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 clap = { version = "4.5.20", features = ["derive", "string"] }
 env_logger = "0.11"
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-extract_map = { version = "0.1.0", features = ["serde", "iter_mut"] }
 indexmap = { version = "2", features = ["serde"] }
 rustyline = "15"
 dotenvy = { git = "https://github.com/allan2/dotenvy" }
 moka = { version = "0.12", features = ["future", "futures-util", "sync"] }
 tch = { version = "0.19", features = ["download-libtorch"], optional = true }
 dirs = "6"
-regex = "1"
 data-encoding = "2"
 reqwest = "0.12"
 axum = { version = "0.8", features = ["macros"] }
@@ -40,22 +37,11 @@ sqlx = { version = "0.8", features = [
 khronos_runtime = { path = "../runtime" }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
 gwevent = { git = "https://github.com/Anti-Raid/gwevent" }
-lockdowns = { git = "https://github.com/Anti-Raid/lockdowns" }
-futures-util = "0.3.31"
-bitflags = "2.9.1"
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"
 branch = "next"
 features = ["model", "http", "cache", "rustls_backend", "unstable"]
-
-[dependencies.botox]
-git = "https://github.com/anti-raid/botox"
-branch = "main"
-
-[dependencies.uuid]
-version = "1"
-features = ["v4", "fast-rng", "serde"]
 
 [features]
 default = []

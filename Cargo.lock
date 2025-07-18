@@ -472,19 +472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "botox"
-version = "0.1.0"
-source = "git+https://github.com/anti-raid/botox?branch=main#d4c87b9131a69ea4544a699563ccc9302075fdc7"
-dependencies = [
- "extract_map",
- "futures",
- "log",
- "rand 0.8.5",
- "serenity",
- "tokio",
-]
-
-[[package]]
 name = "brotli"
 version = "8.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -789,16 +776,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-foundation"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2a6cd9ae233e7f62ba4e9353e81a88df7fc8a5987b8d445b4d90c879bd156f6"
-dependencies = [
- "core-foundation-sys",
- "libc",
-]
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -956,7 +933,6 @@ dependencies = [
  "lock_api",
  "once_cell",
  "parking_lot_core",
- "rayon",
  "serde",
 ]
 
@@ -1694,7 +1670,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "rustls 0.23.28",
- "rustls-native-certs",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.2",
@@ -2100,30 +2075,23 @@ version = "1.0.0"
 dependencies = [
  "antiraid-types",
  "axum",
- "bitflags 2.9.1",
- "botox",
  "chrono",
  "clap",
  "data-encoding",
  "dirs",
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "env_logger",
- "extract_map",
- "futures-util",
  "gwevent",
  "hyper",
  "hyper-util",
  "indexmap",
  "khronos_runtime",
- "lockdowns",
  "log",
  "moka",
- "regex",
  "reqwest",
  "rustyline",
  "serde",
  "serde_json",
- "serde_yaml",
  "serenity",
  "sqlx",
  "strum",
@@ -2131,7 +2099,6 @@ dependencies = [
  "termcolor",
  "tokio",
  "tower",
- "uuid",
  "vfs",
 ]
 
@@ -2139,7 +2106,6 @@ dependencies = [
 name = "khronos_runtime"
 version = "1.0.0"
 dependencies = [
- "antiraid-types",
  "arrayvec",
  "async-compression",
  "bitflags 2.9.1",
@@ -2155,7 +2121,6 @@ dependencies = [
  "hmac",
  "indexmap",
  "linkify",
- "lockdowns",
  "log",
  "lz4",
  "md-5",
@@ -2276,23 +2241,6 @@ checksum = "96936507f153605bddfcda068dd804796c84324ed2510809e5b2a624c81da765"
 dependencies = [
  "autocfg",
  "scopeguard",
-]
-
-[[package]]
-name = "lockdowns"
-version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/lockdowns#7a315ab8d1c0cf16260af571c9e0e2a4f71738cc"
-dependencies = [
- "async-trait",
- "chrono",
- "dashmap 6.1.0",
- "indexmap",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "serenity",
- "uuid",
 ]
 
 [[package]]
@@ -2540,7 +2488,7 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework 2.11.1",
+ "security-framework",
  "security-framework-sys",
  "tempfile",
 ]
@@ -3432,7 +3380,6 @@ dependencies = [
  "pin-project-lite",
  "quinn",
  "rustls 0.23.28",
- "rustls-native-certs",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -3560,18 +3507,6 @@ dependencies = [
  "rustls-webpki 0.103.3",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rustls-native-certs"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcff2dd52b58a8d98a70243663a0d234c4e2b79235637849d15913394a247d3"
-dependencies = [
- "openssl-probe",
- "rustls-pki-types",
- "schannel",
- "security-framework 3.2.0",
 ]
 
 [[package]]
@@ -3722,20 +3657,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "897b2245f0b511c87893af39b033e5ca9cce68824c4d7e7630b5a1d339658d02"
 dependencies = [
  "bitflags 2.9.1",
- "core-foundation 0.9.4",
- "core-foundation-sys",
- "libc",
- "security-framework-sys",
-]
-
-[[package]]
-name = "security-framework"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271720403f46ca04f7ba6f55d438f8bd878d6b8ca0a1046e8228c4145bcbb316"
-dependencies = [
- "bitflags 2.9.1",
- "core-foundation 0.10.1",
+ "core-foundation",
  "core-foundation-sys",
  "libc",
  "security-framework-sys",
@@ -3942,15 +3864,6 @@ name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
-
-[[package]]
-name = "signal-hook-registry"
-version = "1.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "signature"
@@ -4351,7 +4264,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
 dependencies = [
  "bitflags 2.9.1",
- "core-foundation 0.9.4",
+ "core-foundation",
  "system-configuration-sys",
 ]
 
@@ -4567,9 +4480,7 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "slab",
  "socket2",
  "tokio-macros",

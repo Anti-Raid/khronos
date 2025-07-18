@@ -11,5 +11,4 @@ pub mod objectstorage;
 
 pub use datastores::*;
 pub use kv::*;
-pub use lockdowns::*;
 pub use objectstorage::*;
