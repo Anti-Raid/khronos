@@ -527,13 +527,13 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
         "band",
         lua.create_function(|lua, values: LuaMultiValue| {
             if values.is_empty() {
-                // Return all 1s
-                return Ok(U64(u64::MAX));
+                // Return
+                return Ok(U64(0));
             }
 
-            let mut result = u64::MAX;
+            let mut result = U64::from_lua(values[0].clone(), lua)?.0;
 
-            for value in values {
+            for value in values.into_iter().skip(1) {
                 let u64_value = U64::from_lua(value, lua)?;
                 result &= u64_value.0;
             }
@@ -558,9 +558,9 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
                 return Ok(U64(0));
             }
 
-            let mut result = u64::MAX;
+            let mut result = U64::from_lua(values[0].clone(), lua)?.0;
 
-            for value in values {
+            for value in values.into_iter().skip(1) {
                 let u64_value = U64::from_lua(value, lua)?;
                 result |= u64_value.0;
             }
@@ -577,9 +577,9 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
                 return Ok(U64(0));
             }
 
-            let mut result = u64::MAX;
+            let mut result = U64::from_lua(values[0].clone(), lua)?.0;
 
-            for value in values {
+            for value in values.into_iter().skip(1) {
                 let u64_value = U64::from_lua(value, lua)?;
                 result ^= u64_value.0;
             }
@@ -596,9 +596,9 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
                 return Ok(true);
             }
 
-            let mut result = u64::MAX;
+            let mut result = U64::from_lua(values[0].clone(), lua)?.0;
 
-            for value in values {
+            for value in values.into_iter().skip(1) {
                 let u64_value = U64::from_lua(value, lua)?;
                 result &= u64_value.0;
             }
