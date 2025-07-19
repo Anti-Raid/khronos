@@ -1,5 +1,6 @@
 use khronos_runtime::traits::context::CompatibilityFlags;
 use khronos_runtime::traits::context::Limitations;
+use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use moka::future::Cache;
 use sqlx::Row;
 use std::rc::Rc;
@@ -60,6 +61,7 @@ impl KhronosContext for CliKhronosContext {
     type DiscordProvider = CliDiscordProvider;
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
+    type HTTPClientProvider = CliHttpClientProvider;
 
     fn data(&self) -> &ScriptData {
         &self.script_data
@@ -131,6 +133,10 @@ impl KhronosContext for CliKhronosContext {
         Some(CliObjectStorageProvider {
             file_storage_provider: self.file_storage_provider.clone(),
         })
+    }
+
+    fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider> {
+        Some(CliHttpClientProvider)
     }
 }
 
@@ -830,5 +836,18 @@ impl ObjectStorageProvider for CliObjectStorageProvider {
         }
 
         self.file_storage_provider.delete_file(&fsp_vec, &key).await
+    }
+}
+
+#[derive(Clone)]
+pub struct CliHttpClientProvider;
+
+impl HTTPClientProvider for CliHttpClientProvider {
+    fn allow_localhost(&self) -> bool {
+        false // CLI mode does not allow localhost access for testing purposes
+    }
+
+    fn attempt_action(&self, _bucket: &str, _url: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
     }
 }

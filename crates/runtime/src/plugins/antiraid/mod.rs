@@ -1,5 +1,6 @@
 pub mod datastores;
 pub mod discord;
+pub mod httpclient;
 pub mod img_captcha;
 pub mod kv;
 pub mod objectstorage;

@@ -26,6 +26,8 @@ vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
 
+hickory-resolver = { version = "0.25", features = ["tokio"] }
+
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }

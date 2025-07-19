@@ -1,12 +1,20 @@
 //! HTTP Client Extensions (cli.httpclient)
 
-use khronos_runtime::core::datetime::TimeDelta;
-use khronos_runtime::rt::mlua::prelude::*;
-use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
-use khronos_runtime::{
+mod dns;
+
+use std::sync::Arc;
+
+use crate::core::datetime::TimeDelta;
+use crate::primitives::context::TemplateContext;
+use crate::traits::context::KhronosContext;
+use crate::traits::httpclientprovider::HTTPClientProvider;
+use crate::{
     plugins::antiraid::LUA_SERIALIZE_OPTIONS, primitives::create_userdata_iterator_with_fields,
 };
-use std::{cell::RefCell, rc::Rc};
+use mlua_scheduler::LuaSchedulerAsyncUserData;
+use mluau::prelude::*;
+
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub struct Url {
     pub(crate) url: reqwest::Url,
@@ -91,54 +99,135 @@ impl LuaUserData for Headers {
     }
 }
 
-#[derive(Clone)]
-pub struct Request {
+pub struct Request<T: KhronosContext> {
     pub(crate) client: reqwest::Client,
-    pub(crate) request: Rc<RefCell<reqwest::Request>>,
+    pub(crate) request: reqwest::Request,
+    pub(crate) httpclient_provider: T::HTTPClientProvider,
 }
 
-impl LuaUserData for Request {
+impl<T: KhronosContext> Request<T> {
+    /// Given a domain `domain`, returns a vector of every 'domain' in the domain
+    ///
+    /// E.g. discord.com would return ["discord.com"]
+    /// www.discord.com would return ["www.discord.com", "discord.com"]
+    /// cdn.blah.discord.com would return ["cdn.blah.discord.com", "blah.discord.com", "discord.com"]
+    fn extract_domain_parts(domain: &str) -> Vec<String> {
+        let mut domains = vec![domain.to_string()];
+        let mut parts: Vec<&str> = domain.split('.').collect();
+        while parts.len() > 1 {
+            parts.remove(0);
+            domains.push(parts.join("."));
+        }
+        domains
+    }
+
+    /// Validates the URL against the HTTP client provider's rules
+    fn check_url(&self, url: &reqwest::Url) -> Result<(), LuaError> {
+        let base = url.scheme();
+
+        let Some(host) = url.host_str() else {
+            return Err(LuaError::external("URL does not have a valid host"));
+        };
+
+        const LOCALHOSTS: [&str; 5] = [
+            "localhost",
+            "127.0.0.1",
+            "[::1]",   // IPv6 localhost
+            "::1",     // IPv6 localhost without brackets
+            "0.0.0.0", // IPv4 wildcard address
+        ];
+
+        if self.httpclient_provider.allow_localhost() && LOCALHOSTS.contains(&host) {
+            if base != "http" && base != "https" {
+                return Err(LuaError::external(
+                    "Localhost requests must use http or https",
+                ));
+            }
+
+            return Ok(()); // Allow localhost if configured
+        } else {
+            if LOCALHOSTS.contains(&host) {
+                return Err(LuaError::external("Localhost requests are not allowed"));
+            }
+
+            if base != "https" {
+                return Err(LuaError::external("Only HTTPS requests are allowed"));
+            }
+        }
+
+        let domain = url
+            .domain()
+            .ok_or_else(|| LuaError::external("URL does not have a valid domain"))?;
+
+        // Check if the domain is whitelisted (whitelist only applies if there is a whitelist)
+        if !self.httpclient_provider.domain_whitelist().is_empty()
+            && !self
+                .httpclient_provider
+                .domain_whitelist()
+                .contains(&domain.to_string())
+        {
+            return Err(LuaError::external(format!(
+                "Domain {domain} is not whitelisted",
+            )));
+        }
+
+        // Check if the domain is blacklisted
+        let domain_parts = Self::extract_domain_parts(domain);
+
+        for part in &domain_parts {
+            if self.httpclient_provider.domain_blacklist().contains(part) {
+                return Err(LuaError::external(format!("Domain {part} is blacklisted",)));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<T: KhronosContext> LuaUserData for Request<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_meta_field(LuaMetaMethod::Type, "Request");
+
         fields.add_field_method_get("method", |_, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
             Ok(req_guard.method().as_str().to_string())
         });
 
         fields.add_field_method_set("method", |_, this, method: String| {
             let method =
                 reqwest::Method::from_bytes(method.as_bytes()).map_err(LuaError::external)?;
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             *req_guard.method_mut() = method;
             Ok(())
         });
 
         fields.add_field_method_get("url", |_, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
             Ok(Url {
                 url: req_guard.url().clone(),
             })
         });
 
         fields.add_field_method_set("url", |_, this, url: LuaUserDataRef<Url>| {
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             *req_guard.url_mut() = url.url.clone();
             Ok(())
         });
 
         fields.add_field_method_get("headers", |_, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
             let headers = req_guard.headers().clone();
             Ok(Headers { headers })
         });
 
         fields.add_field_method_set("headers", |_, this, headers: LuaUserDataRef<Headers>| {
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             *req_guard.headers_mut() = headers.headers.clone();
             Ok(())
         });
 
         fields.add_field_method_get("body_bytes", |lua, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
 
             let Some(body) = req_guard.body() else {
                 return Ok(LuaValue::Nil);
@@ -151,7 +240,7 @@ impl LuaUserData for Request {
         });
 
         fields.add_field_method_set("body_bytes", |lua, this, body: LuaValue| {
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             match body {
                 LuaValue::Nil => {
                     req_guard.body_mut().take();
@@ -178,7 +267,7 @@ impl LuaUserData for Request {
         });
 
         fields.add_field_method_get("timeout", |_, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
             let timeout = req_guard.timeout();
 
             if let Some(timeout) = timeout {
@@ -191,14 +280,14 @@ impl LuaUserData for Request {
         });
 
         fields.add_field_method_set("timeout", |_, this, timeout: LuaUserDataRef<TimeDelta>| {
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             *req_guard.timeout_mut() =
                 Some(timeout.timedelta.to_std().map_err(LuaError::external)?);
             Ok(())
         });
 
         fields.add_field_method_get("version", |_, this| {
-            let req_guard = this.request.borrow();
+            let req_guard = &this.request;
             let version = req_guard.version();
             Ok(format!("{version:?}"))
         });
@@ -213,22 +302,27 @@ impl LuaUserData for Request {
                 _ => return Err(LuaError::external("Invalid version")),
             };
 
-            let mut req_guard = this.request.borrow_mut();
+            let req_guard = &mut this.request;
             *req_guard.version_mut() = version;
             Ok(())
         });
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_scheduler_async_method("send", async |_lua, this, _g: ()| {
-            let builder = {
-                let mut req_guard = this.request.borrow_mut();
+        methods.add_scheduler_async_method_mut("send", async |_lua, mut this, _g: ()| {
+            this.httpclient_provider
+                .attempt_action("send", this.request.url().as_str())
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let method = req_guard.method().clone();
-                let url = req_guard.url().clone();
-                let headers = req_guard.headers().clone();
-                let body = req_guard.body_mut().take();
-                let timeout = req_guard.timeout();
+            this.check_url(this.request.url())
+                .map_err(LuaError::external)?;
+
+            let builder = {
+                let method = this.request.method().clone();
+                let url = this.request.url().clone();
+                let headers = this.request.headers().clone();
+                let body = this.request.body_mut().take();
+                let timeout = this.request.timeout();
 
                 let mut builder = this.client.request(method, url).headers(headers);
 
@@ -238,6 +332,8 @@ impl LuaUserData for Request {
 
                 if let Some(timeout) = timeout {
                     builder = builder.timeout(*timeout);
+                } else {
+                    builder = builder.timeout(DEFAULT_TIMEOUT);
                 }
 
                 builder
@@ -249,7 +345,7 @@ impl LuaUserData for Request {
         });
 
         methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Request>() {
+            if !ud.is::<Request<T>>() {
                 return Err(LuaError::external("Invalid userdata type"));
             }
 
@@ -272,15 +368,14 @@ impl LuaUserData for Request {
     }
 }
 
-#[derive(Clone)]
 pub struct Response {
-    pub(crate) response: Rc<RefCell<Option<reqwest::Response>>>,
+    pub(crate) response: Option<reqwest::Response>,
 }
 
 impl Response {
     fn new(response: reqwest::Response) -> Self {
         Self {
-            response: Rc::new(RefCell::new(Some(response))),
+            response: Some(response),
         }
     }
 }
@@ -288,8 +383,7 @@ impl Response {
 impl LuaUserData for Response {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("url", |_, this| {
-            let re_guard = this.response.borrow();
-            let Some(response) = re_guard.as_ref() else {
+            let Some(response) = this.response.as_ref() else {
                 return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(Url {
@@ -298,24 +392,21 @@ impl LuaUserData for Response {
         });
 
         fields.add_field_method_get("status", |_, this| {
-            let re_guard = this.response.borrow();
-            let Some(response) = re_guard.as_ref() else {
+            let Some(response) = this.response.as_ref() else {
                 return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(response.status().as_u16())
         });
 
         fields.add_field_method_get("content_length", |_, this| {
-            let re_guard = this.response.borrow();
-            let Some(response) = re_guard.as_ref() else {
+            let Some(response) = this.response.as_ref() else {
                 return Err(LuaError::external("Response has been exhausted"));
             };
             Ok(response.content_length().map(|l| l as i64).unwrap_or(-1))
         });
 
         fields.add_field_method_get("headers", |_, this| {
-            let re_guard = this.response.borrow();
-            let Some(response) = re_guard.as_ref() else {
+            let Some(response) = this.response.as_ref() else {
                 return Err(LuaError::external("Response has been exhausted"));
             };
 
@@ -325,10 +416,9 @@ impl LuaUserData for Response {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_scheduler_async_method("text", async |_lua, this, _g: ()| {
+        methods.add_scheduler_async_method_mut("text", async |_lua, mut this, _g: ()| {
             let response = {
-                let mut re_guard = this.response.borrow_mut();
-                let Some(response) = re_guard.take() else {
+                let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
                 };
                 response
@@ -338,10 +428,9 @@ impl LuaUserData for Response {
             Ok(text)
         });
 
-        methods.add_scheduler_async_method("json", async |lua, this, _g: ()| {
+        methods.add_scheduler_async_method_mut("json", async |lua, mut this, _g: ()| {
             let response = {
-                let mut re_guard = this.response.borrow_mut();
-                let Some(response) = re_guard.take() else {
+                let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
                 };
                 response
@@ -357,10 +446,9 @@ impl LuaUserData for Response {
             Ok(lua_value)
         });
 
-        methods.add_scheduler_async_method("bytes", async |lua, this, _g: ()| {
+        methods.add_scheduler_async_method_mut("bytes", async |lua, mut this, _g: ()| {
             let response = {
-                let mut re_guard = this.response.borrow_mut();
-                let Some(response) = re_guard.take() else {
+                let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
                 };
                 response
@@ -394,10 +482,29 @@ impl LuaUserData for Response {
     }
 }
 
-pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
+pub fn init_plugin<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaTable> {
+    let Some(httpclient_provider) = token.context.httpclient_provider() else {
+        return Err(LuaError::external(
+            "The httpclient plugin is not supported in this context",
+        ));
+    };
+
     let http_client = lua.create_table()?;
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .user_agent("Anti-Raid/Khronos (v7.0.0)")
+        .redirect(reqwest::redirect::Policy::none()) // We want to handle redirects manually
+        .timeout(DEFAULT_TIMEOUT)
+        .https_only(!httpclient_provider.allow_localhost()) // Enforce HTTPS
+        .dns_resolver(Arc::new(
+            dns::HickoryDnsResolver::new(httpclient_provider.allow_localhost())
+                .map_err(LuaError::external)?,
+        ))
+        .build()
+        .map_err(LuaError::external)?;
 
     http_client.set(
         "new_request",
@@ -405,9 +512,10 @@ pub fn http_client(lua: &Lua) -> LuaResult<LuaTable> {
             let url = reqwest::Url::parse(&url).map_err(LuaError::external)?;
             let method =
                 reqwest::Method::from_bytes(method.as_bytes()).map_err(LuaError::external)?;
-            Ok(Request {
+            Ok(Request::<T> {
                 client: client.clone(),
-                request: Rc::new(RefCell::new(reqwest::Request::new(method, url))),
+                request: reqwest::Request::new(method, url),
+                httpclient_provider: httpclient_provider.clone(),
             })
         })?,
     )?;

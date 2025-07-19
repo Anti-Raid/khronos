@@ -12,7 +12,60 @@ use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::http_client::Headers;
+pub struct Headers {
+    pub(crate) headers: reqwest::header::HeaderMap,
+}
+
+impl Headers {
+    fn to_headers_list(&self) -> Vec<(String, String, Vec<u8>)> {
+        self.headers
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.as_str().to_string(),
+                    v.to_str().unwrap_or_default().to_string(),
+                    v.as_bytes().to_vec(),
+                )
+            })
+            .collect()
+    }
+}
+
+impl LuaUserData for Headers {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method_mut("get", |_, this, key: String| {
+            let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
+                .map_err(LuaError::external)?;
+            let value = this
+                .headers
+                .get(&key)
+                .map(|v| v.to_str().unwrap().to_string());
+            Ok(value)
+        });
+
+        methods.add_method_mut("set", |_, this, (key, value): (String, String)| {
+            let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
+                .map_err(LuaError::external)?;
+            let value =
+                reqwest::header::HeaderValue::from_str(&value).map_err(LuaError::external)?;
+            this.headers.insert(key, value);
+            Ok(())
+        });
+
+        methods.add_method_mut("remove", |_, this, key: String| {
+            let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
+                .map_err(LuaError::external)?;
+            this.headers.remove(&key);
+            Ok(())
+        });
+
+        methods.add_method("headers", |lua, this, _: ()| {
+            let headers = this.to_headers_list();
+            let value = lua.to_value_with(&headers, LUA_SERIALIZE_OPTIONS)?;
+            Ok(value)
+        });
+    }
+}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
