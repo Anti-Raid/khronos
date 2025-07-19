@@ -113,8 +113,6 @@ impl KhronosRuntime {
 
         scheduler.attach()?;
 
-        scheduler.run_in_task();
-
         if !opts.disable_task_lib {
             lua.globals()
                 .set("task", mlua_scheduler::userdata::task_lib(&lua)?)?;
