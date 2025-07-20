@@ -6,11 +6,6 @@ pub trait HTTPClientProvider: 'static + Clone {
     /// This should return an error if ratelimited
     fn attempt_action(&self, bucket: &str, url: &str) -> Result<(), crate::Error>;
 
-    /// Returns the maximum number of redirects allowed for the HTTP client.
-    fn max_redirects(&self) -> usize {
-        10 // Default value, can be overridden by implementations
-    }
-
     /// Returns a domain whitelist for the HTTP client.
     fn domain_whitelist(&self) -> Vec<String> {
         Vec::with_capacity(0) // No domains = no whitelist

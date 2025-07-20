@@ -496,7 +496,7 @@ pub fn init_plugin<T: KhronosContext>(
 
     let client = reqwest::Client::builder()
         .user_agent("Anti-Raid/Khronos (v7.0.0)")
-        .redirect(reqwest::redirect::Policy::none()) // We want to handle redirects manually
+        .redirect(reqwest::redirect::Policy::none()) // No redirects due to security concerns + code maintainability, the user should manually follow them if they want to
         .timeout(DEFAULT_TIMEOUT)
         .https_only(!httpclient_provider.allow_localhost()) // Enforce HTTPS
         .dns_resolver(Arc::new(
