@@ -496,6 +496,12 @@ where
                 .into_iter()
                 .map(|(k, v)| Ok((k, T::try_from(v)?)))
                 .collect(),
+            KhronosValue::LazyValue(lazy) => {
+                let serde_json_value = lazy.data;
+                let kv: KhronosValue =
+                    KhronosValue::from_serde_json_value(serde_json_value, 0, true)?;
+                Ok(kv.try_into()?)
+            }
             _ => Err("KhronosValue is not a map".into()),
         }
     }
@@ -543,9 +549,10 @@ impl TryFrom<KhronosValue> for KhronosLazyValue {
 impl TryFrom<serde_json::Value> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
-        KhronosValue::from_serde_json_value(value, 0)
+        KhronosValue::from_serde_json_value(value, 0, true)
     }
 }
+
 impl TryFrom<KhronosValue> for serde_json::Value {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
@@ -618,6 +625,12 @@ where
                 }
                 Ok(map)
             }
+            KhronosValue::LazyValue(lazy) => {
+                let serde_json_value = lazy.data;
+                let kv: KhronosValue =
+                    KhronosValue::from_serde_json_value(serde_json_value, 0, true)?;
+                Ok(kv.try_into()?)
+            }
             _ => Err("KhronosValue is not a map".into()),
         }
     }
@@ -654,7 +667,7 @@ impl<T: Serialize + for<'de> Deserialize<'de>> TryFrom<SerdeBlob<T>> for Khronos
     type Error = crate::Error;
     fn try_from(value: SerdeBlob<T>) -> Result<Self, Self::Error> {
         let value = serde_json::to_value(value.0)?;
-        let value = KhronosValue::from_serde_json_value(value, 0)?;
+        let value = KhronosValue::from_serde_json_value(value, 0, false)?;
         Ok(value)
     }
 }
@@ -1129,6 +1142,7 @@ impl KhronosValue {
     pub fn from_serde_json_value(
         value: serde_json::Value,
         depth: usize,
+        preserve_types: bool,
     ) -> Result<Self, crate::Error> {
         if depth > 10 {
             return Err("Recursion limit exceeded".into());
@@ -1149,64 +1163,69 @@ impl KhronosValue {
             }
             serde_json::Value::Bool(b) => KhronosValue::Boolean(b),
             serde_json::Value::Object(mut m) => {
-                if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
-                    if let Some(khronos_value_type) = khronos_value_type.as_str() {
-                        match khronos_value_type {
-                            "buffer" => {
-                                let value = m.remove("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Buffer(
-                                    serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Buffer: {e}")
-                                    })?,
-                                ));
+                if preserve_types {
+                    if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
+                        if let Some(khronos_value_type) = khronos_value_type.as_str() {
+                            match khronos_value_type {
+                                "buffer" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::Buffer(
+                                        serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize Buffer: {e}")
+                                        })?,
+                                    ));
+                                }
+                                "vector" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::Vector(
+                                        serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize Vector: {e}")
+                                        })?,
+                                    ));
+                                }
+                                "timestamptz" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::Timestamptz(
+                                        serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize DateTime: {e}")
+                                        })?,
+                                    ));
+                                }
+                                "interval" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::Interval(
+                                        serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize Interval: {e}")
+                                        })?,
+                                    ));
+                                }
+                                "timezone" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::TimeZone(
+                                        serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize TimeZone: {e}")
+                                        })?,
+                                    ));
+                                }
+                                _ => {}
                             }
-                            "vector" => {
-                                let value = m.remove("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Vector(
-                                    serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Vector: {e}")
-                                    })?,
-                                ));
-                            }
-                            "timestamptz" => {
-                                let value = m.remove("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Timestamptz(
-                                    serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize DateTime: {e}")
-                                    })?,
-                                ));
-                            }
-                            "interval" => {
-                                let value = m.remove("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::Interval(
-                                    serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize Interval: {e}")
-                                    })?,
-                                ));
-                            }
-                            "timezone" => {
-                                let value = m.remove("value").ok_or("Missing value field")?;
-                                return Ok(KhronosValue::TimeZone(
-                                    serde_json::from_value(value).map_err(|e| {
-                                        format!("Failed to deserialize TimeZone: {e}")
-                                    })?,
-                                ));
-                            }
-                            _ => {}
                         }
                     }
                 }
 
                 let mut map = indexmap::IndexMap::new();
                 for (k, v) in m.into_iter() {
-                    map.insert(k, Self::from_serde_json_value(v, depth + 1)?);
+                    map.insert(
+                        k,
+                        Self::from_serde_json_value(v, depth + 1, preserve_types)?,
+                    );
                 }
                 KhronosValue::Map(map)
             }
             serde_json::Value::Array(l) => {
                 let mut list = Vec::with_capacity(l.len());
                 for v in l.into_iter() {
-                    list.push(Self::from_serde_json_value(v, depth + 1)?);
+                    list.push(Self::from_serde_json_value(v, depth + 1, preserve_types)?);
                 }
                 KhronosValue::List(list)
             }
@@ -1327,7 +1346,7 @@ impl<'de> Deserialize<'de> for KhronosValue {
         // First deserialize to a serde_json::Value
         let value = serde_json::Value::deserialize(deserializer)?;
         // Then convert to KhronosValue
-        KhronosValue::from_serde_json_value(value, 0).map_err(serde::de::Error::custom)
+        KhronosValue::from_serde_json_value(value, 0, true).map_err(serde::de::Error::custom)
     }
 }
 
