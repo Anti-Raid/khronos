@@ -312,8 +312,7 @@ impl KhronosIsolate {
         {
             if !self.inner.scheduler().is_running() {
                 log::info!("Scheduler not running, running it now");
-                self.inner.scheduler().run_in_task();
-                self.inner.scheduler().wait_for_start().await.map_err(|e| {
+                self.inner.scheduler().run_in_task().await.map_err(|e| {
                     LuaError::RuntimeError(format!("Failed to start scheduler: {e}"))
                 })?;
             }
