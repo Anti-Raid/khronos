@@ -83,7 +83,7 @@ impl KhronosRuntime {
     /// Creates a new Khronos runtime from scratch
     ///
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
-    pub fn new<
+    pub async fn new<
         OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn() + 'static,
@@ -117,6 +117,12 @@ impl KhronosRuntime {
             lua.globals()
                 .set("task", mlua_scheduler::userdata::task_lib(&lua)?)?;
         }
+
+        scheduler
+            .run_in_task()
+            .await
+            .map_err(|e| LuaError::RuntimeError(format!("Failed to start scheduler: {e}")))?;
+        log::debug!("Khronos runtime created successfully");
 
         let broken = Rc::new(Cell::new(false));
         let broken_ref = broken.clone();

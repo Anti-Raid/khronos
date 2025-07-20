@@ -272,6 +272,7 @@ impl Cli {
             }),
             None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn() -> ())>,
         )
+        .await
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());
 

@@ -309,15 +309,6 @@ impl KhronosIsolate {
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
-        {
-            if !self.inner.scheduler().is_running() {
-                log::info!("Scheduler not running, running it now");
-                self.inner.scheduler().run_in_task().await.map_err(|e| {
-                    LuaError::RuntimeError(format!("Failed to start scheduler: {e}"))
-                })?;
-            }
-        }
-
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError(

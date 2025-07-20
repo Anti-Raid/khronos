@@ -2260,9 +2260,9 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1580801010e535496706ba011c15f8532df6b42297d2e471fec38ceadd8c0638"
+checksum = "4488594b9328dee448adb906d8b126d9b7deb7cf5c22161ee591610bb1be83c0"
 dependencies = [
  "bitflags 2.9.1",
  "libc",
@@ -2468,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "mlua-sys"
 version = "0.8.2"
-source = "git+https://github.com/mluau/mluau#ab729e134901b64eabeb8f3f9fa21ed22fdd7caf"
+source = "git+https://github.com/mluau/mluau#08f5aa19be5cea39cd664e98cc0eadba776db436"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2479,7 +2479,7 @@ dependencies = [
 [[package]]
 name = "mlua_scheduler"
 version = "1.0.0"
-source = "git+https://github.com/mluau/scheduler#659e25b39380c1ad366070055182fc1740ed937b"
+source = "git+https://github.com/mluau/scheduler#400738e762dd85be596cb8cc805f84fe797c802b"
 dependencies = [
  "futures-util",
  "log",
@@ -2491,7 +2491,7 @@ dependencies = [
 [[package]]
 name = "mluau"
 version = "0.11.1"
-source = "git+https://github.com/mluau/mluau#ab729e134901b64eabeb8f3f9fa21ed22fdd7caf"
+source = "git+https://github.com/mluau/mluau#08f5aa19be5cea39cd664e98cc0eadba776db436"
 dependencies = [
  "bstr",
  "either",
@@ -3331,9 +3331,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.13"
+version = "0.5.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d04b7d0ee6b4a0207a0a7adb104d23ecb0b47d6beae7152d0fa34b692b29fd6"
+checksum = "de3a5d9f0aba1dbcec1cc47f0ff94a4b778fe55bca98a6dfa92e4e094e57b1c4"
 dependencies = [
  "bitflags 2.9.1",
 ]
