@@ -34,3 +34,21 @@ pub struct CreateMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<CreateMessageAttachment>,
 }
+
+/// [Discord docs](https://discord.com/developers/docs/resources/channel#edit-message)
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[must_use]
+pub struct EditMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embeds: Option<Vec<CreateEmbed>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<MessageFlags>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_mentions: Option<CreateAllowedMentions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<Vec<ActionRow>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<CreateMessageAttachment>,
+}

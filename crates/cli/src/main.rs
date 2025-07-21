@@ -103,6 +103,15 @@ struct CliArgs {
     #[clap(long, default_value = "false")]
     disable_task_lib: bool,
 
+    /// Enables safeenv for the global table
+    /// 
+    /// This is a optimization that makes the global table
+    /// readonly in exchange for more performance
+    /// 
+    /// Environment variable: `SAFEENV`
+    #[clap(long, default_value = "false")]
+    safeenv: bool,
+
     /// Sets the repl wait mode.
     ///
     /// Environment variable: `REPL_WAIT_MODE`
@@ -389,6 +398,12 @@ impl CliArgs {
             self.kv_store_connection_string = Some(kv_store_connection_string);
         }
 
+        if let Ok(safeenv) = src.var("SAFEENV") {
+            self.safeenv = safeenv
+                .parse()
+                .expect("Failed to parse safeenv");
+        }
+
         if let Ok(config_file) = src.var("CONFIG_FILE") {
             self.config_file = Some(PathBuf::from(config_file));
         } else if !src.keep_config_file() {
@@ -435,6 +450,7 @@ impl CliArgs {
                     vec![]
                 }
             },
+            safeenv: self.safeenv,
             max_threads: self.max_threads,
             memory_limit: self.memory_limit,
         };

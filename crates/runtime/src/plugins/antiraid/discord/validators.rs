@@ -310,6 +310,73 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
     Ok(())
 }
 
+/// Validates all messages
+pub fn validate_message_edit(message: &super::types::EditMessage) -> Result<(), crate::Error> {
+    pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
+    pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
+
+    let has_content = message.content.is_some();
+    let has_embed = if let Some(embeds) = message.embeds.as_ref() {
+        !embeds.is_empty()
+    } else {
+        false
+    };
+    let has_attachments = message.attachments.is_some()
+        && !message
+            .attachments
+            .as_ref()
+            .unwrap()
+            .new_and_existing_attachments
+            .is_empty();
+    let has_components =
+        message.components.is_some() && !message.components.as_ref().unwrap().is_empty();
+
+    if !has_content
+        && !has_embed
+        && !has_attachments
+        && !has_components
+    {
+        return Err("No content/embeds/attachments/components set".into());
+    }
+
+    if let Some(content) = message.content.as_ref() {
+        if content.is_empty() {
+            return Err("Message content cannot be empty".into());
+        }
+
+        //validate_string(content)?;
+
+        if content.len() > MESSAGE_CONTENT_LIMIT {
+            return Err(
+                format!("Message content is too long, limit is {MESSAGE_CONTENT_LIMIT}",).into(),
+            );
+        }
+    }
+
+    // Validate all embeds
+    let mut total_embed_chars = 0;
+
+    if let Some(embeds) = message.embeds.as_ref() {
+        for embed in embeds.iter() {
+            total_embed_chars += validate_embed(embed)?;
+
+            if total_embed_chars > MAX_EMBED_CHARACTERS_LIMIT {
+                return Err(format!(
+                    "Total embed characters is too long, limit is {MAX_EMBED_CHARACTERS_LIMIT}",
+                )
+                .into());
+            }
+        }
+    }
+
+    // Validate components
+    if let Some(components) = message.components.as_ref() {
+        validate_components(components)?
+    }
+
+    Ok(())
+}
+
 fn validate_option(
     option: &super::types::CreateCommandOption,
     kind: serenity::all::CommandType,

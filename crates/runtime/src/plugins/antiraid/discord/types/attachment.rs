@@ -1,6 +1,8 @@
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use serenity::all::*;
 
+const ALLOW_NEW_ATTACHMENTS: bool = false;
+
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct SingleCreateMessageAttachment {
     pub filename: String,
@@ -75,6 +77,10 @@ impl CreateMessageAttachment {
         let mut attachments = Vec::new();
         for attachment in &self.new_and_existing_attachments {
             if let NewOrExisting::New(new_attachment) = attachment {
+                if !ALLOW_NEW_ATTACHMENTS {
+                    return Err("Message attachments are disabled right now due to ongoing maintenance and security improvements".into());
+                }
+
                 let desc = new_attachment.description.clone();
                 let desc = desc.unwrap_or_default();
 

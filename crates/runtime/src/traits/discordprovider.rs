@@ -1,6 +1,6 @@
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::{HeaderMap as Headers, HeaderValue};
-use serenity::all::InteractionId;
+use serenity::all::{InteractionId, ReactionType};
 
 /// A discord provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
@@ -607,6 +607,158 @@ pub trait DiscordProvider: 'static + Clone {
             .send_message(channel_id, files, &data)
             .await
             .map_err(|e| format!("Failed to send message: {e}").into())
+    }
+
+    async fn crosspost_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        self.serenity_http()
+            .crosspost_message(channel_id, message_id)
+            .await
+            .map_err(|e| format!("Failed to crosspost message: {e}").into())
+    }
+
+    async fn create_reaction(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        reaction: &ReactionType,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .create_reaction(channel_id, message_id, reaction)
+            .await
+            .map_err(|e| format!("Failed to create reaction: {e}").into())
+    }
+
+    async fn delete_own_reaction(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        reaction: &ReactionType,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_reaction_me(channel_id, message_id, reaction)
+            .await
+            .map_err(|e| format!("Failed to delete own reaction: {e}").into())
+    }
+
+    async fn delete_user_reaction(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        user_id: serenity::all::UserId,
+        reaction: &ReactionType,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_reaction(channel_id, message_id, user_id, reaction)
+            .await
+            .map_err(|e| format!("Failed to delete reaction: {e}").into())
+    }
+
+    async fn get_reactions(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        reaction: &ReactionType,
+        is_burst: Option<bool>,
+        after: Option<serenity::all::UserId>,
+        limit: Option<serenity::nonmax::NonMaxU8>,
+    ) -> Result<Vec<serenity::all::User>, crate::Error> {
+        let mut params= vec![];
+
+        let after = after.map(|x| x.to_string());
+        if let Some(ref after_str) = after {
+            let after_str = after_str.as_str();
+            params.push(("after", after_str));
+        }
+
+        let limit = limit.map(|x| x.to_string());
+        if let Some(ref limit) = limit {
+            let limit_str = limit.as_str();
+            params.push(("limit", limit_str));
+        }
+
+        if let Some(burst) = is_burst {
+            if burst {
+                params.push(("type", "1"));
+            } else {
+                params.push(("type", "0"));
+            }
+        }
+
+        Ok(self
+            .serenity_http()
+            .fire(
+                serenity::all::Request::new(
+                    serenity::all::Route::ChannelMessageReactionEmoji { channel_id, message_id, reaction: &reaction.as_data() },
+                    serenity::all::LightMethod::Get,
+                )
+                .params(&params),
+            )
+            .await
+            .map_err(|e| format!("Failed to get reactions: {e}"))?)
+    }
+
+    async fn delete_all_reactions(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_message_reactions(channel_id, message_id)
+            .await
+            .map_err(|e| format!("Failed to delete all reactions: {e}").into())
+    }
+
+    async fn delete_all_reactions_for_emoji(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        reaction: &ReactionType,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_message_reaction_emoji(channel_id, message_id, reaction)
+            .await
+            .map_err(|e| format!("Failed to delete all reactions for emoji: {e}").into())
+    }
+
+    async fn edit_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        files: Vec<serenity::all::CreateAttachment<'_>>,
+        data: impl serde::Serialize,
+    ) -> Result<serenity::model::channel::Message, crate::Error> {
+        self.serenity_http()
+            .edit_message(channel_id, message_id, &data, files)
+            .await
+            .map_err(|e| format!("Failed to send message: {e}").into())
+    }
+
+    async fn delete_message(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        message_id: serenity::all::MessageId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_message(channel_id, message_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete message: {e}").into())
+    }
+
+    async fn bulk_delete_messages(
+        &self,
+        channel_id: serenity::all::ChannelId,
+        data: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_messages(channel_id, &data, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to bulk delete messages: {e}").into())
     }
 
     // Interactions

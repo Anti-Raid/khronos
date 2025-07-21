@@ -76,6 +76,7 @@ pub struct CliAuxOpts {
     pub disable_scheduler_lib: bool,
     pub disable_task_lib: bool,
     pub use_custom_print: bool,
+    pub safeenv: bool,
     pub experiments: Vec<String>,
     pub max_threads: Option<i64>,
     pub memory_limit: Option<usize>,
@@ -338,7 +339,7 @@ impl Cli {
         let file_asset_manager =
             khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
 
-        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
+        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager, aux_opts.safeenv)
             .expect("Failed to create main isolate");
 
         if !aux_opts.use_custom_print {

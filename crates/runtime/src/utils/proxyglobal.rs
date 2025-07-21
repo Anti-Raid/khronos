@@ -5,7 +5,7 @@ use std::rc::Rc;
 /// Creates a proxy global table that forwards reads to the global table if the key is in the global table
 ///
 /// The resulting proxied global table includes
-pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
+pub fn proxy_global(lua: &Lua, safeenv: bool) -> LuaResult<LuaTable> {
     // Setup the global table using a metatable
     //
     // SAFETY: This works because the global table will not change in the VM
@@ -97,6 +97,7 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
     global_mt.set("__metatable", false)?;
 
     global_tab.set_metatable(Some(global_mt))?;
+    global_tab.set_safeenv(safeenv);
 
     Ok(global_tab)
 }

@@ -485,14 +485,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Channel
 
         // Should be documented
-        methods.add_scheduler_async_method("get_channel", async move |lua, this, data: LuaValue| {
-            let data = lua.from_value::<structs::GetChannelOptions>(data)?;
+        methods.add_scheduler_async_method("get_channel", async move |_lua, this, channel_id: String| {
+            let channel_id: serenity::all::ChannelId = channel_id
+                .parse()
+                .map_err(|e: ParseIdError| LuaError::external(e.to_string()))?;
 
             this.check_action("get_channel".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
-            let guild_channel = this.discord_provider.get_channel(data.channel_id).await
+            let guild_channel = this.discord_provider.get_channel(channel_id).await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
             Ok(Lazy::new(guild_channel))
@@ -792,6 +794,33 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(())
+        });
+
+        methods.add_scheduler_async_method("follow_announcement_channel", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::FollowAnnouncementChannel>(data)?;
+
+            this.check_action("follow_announcement_channel".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_reason(&data.reason)
+            .map_err(LuaError::external)?;
+
+            this.check_channel_permissions(bot_user.id, data.data.webhook_channel_id, serenity::all::Permissions::MANAGE_WEBHOOKS)
+            .await
+            .map_err(LuaError::external)?;
+
+            let data = this
+            .discord_provider
+            .follow_announcement_channel(data.channel_id, data.data, Some(data.reason.as_str()))
+            .await
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(data))
         });
 
         // Guild
@@ -2061,31 +2090,13 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .map_err(LuaError::external)?;
 
             // Perform required checks
-            let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
             let Some(bot_user) = this.context.current_user() else {
                 return Err(LuaError::runtime("Internal error: Current user not found"));
             };
 
-            let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
-
-            let guild = this.discord_provider.get_guild().await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            // Check if the bot has permissions to send messages in the given channel
-            if !guild
-                .user_permissions_in(&guild_channel, &bot_member)
-                .send_messages()
-            {
-                return Err(LuaError::external(
-                    "Bot does not have permission to send messages in the given channel",
-                ));
-            }
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::SEND_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
 
             let files = if let Some(ref attachments) = data.data.attachments {
                 attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
@@ -2094,11 +2105,285 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             };
 
             let msg = this.discord_provider
-                .create_message(guild_channel.id, files, &data.data)
+                .create_message(data.channel_id, files, &data.data)
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(Lazy::new(msg))
+        });
+
+        methods.add_scheduler_async_method("crosspost_message", async move |_lua, this, (channel_id, message_id): (String, String)| {
+            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
+
+            let message_id = message_id.parse::<serenity::all::MessageId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
+
+            this.check_action("crosspost_message".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            // While discord technically allows just send if the message author is the same as the bot user, this takes an extra API call to check. Not worth it
+            this.check_channel_permissions(bot_user.id, channel_id, serenity::all::Permissions::SEND_MESSAGES | serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            let msg = this.discord_provider
+                .crosspost_message(channel_id, message_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(msg))
+        });
+
+        methods.add_scheduler_async_method("create_reaction", async move |lua, this, data: LuaValue| {
+            let data: structs::CreateReactionOptions = lua.from_value(data)?;
+
+            this.check_action("create_reaction".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            // While discord technically allows just read message history if the reaction already exists, this takes an extra API call to check and might not be desirable either. Not worth it
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::READ_MESSAGE_HISTORY | serenity::all::Permissions::ADD_REACTIONS)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .create_reaction(data.channel_id, data.message_id, &data.reaction.into_serenity())
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("delete_own_reaction", async move |lua, this, data: LuaValue| {
+            let data: structs::DeleteOwnReactionOptions = lua.from_value(data)?;
+
+            this.check_action("delete_own_reaction".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            // While discord technically allows just read message history if the reaction already exists, this takes an extra API call to check and might not be desirable either. Not worth it
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::READ_MESSAGE_HISTORY | serenity::all::Permissions::ADD_REACTIONS)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .delete_own_reaction(data.channel_id, data.message_id, &data.reaction.into_serenity())
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("delete_user_reaction", async move |lua, this, data: LuaValue| {
+            let data: structs::DeleteUserReactionOptions = lua.from_value(data)?;
+
+            this.check_action("delete_user_reaction".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .delete_user_reaction(data.channel_id, data.message_id, data.user_id, &data.reaction.into_serenity())
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("get_reactions", async move |lua, this, data: LuaValue| {
+            let data: structs::GetReactionsOptions = lua.from_value(data)?;
+
+            this.check_action("get_reactions".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::empty())
+                .await
+                .map_err(LuaError::external)?;
+
+            let users = this.discord_provider
+                .get_reactions(
+                    data.channel_id, 
+                    data.message_id,
+                    &data.reaction.into_serenity(),
+                    data.r#type.map(|x| {
+                        matches!(x, structs::ReactionTypeEnum::Burst)
+                    }),
+                    data.after,
+                    data.limit,
+                )
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(users))
+        });
+
+        methods.add_scheduler_async_method("delete_all_reactions", async move |_lua, this, (channel_id, message_id): (String, String)| {
+            let channel_id: serenity::all::ChannelId = channel_id.parse()
+                .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
+
+            let message_id: serenity::all::MessageId = message_id.parse()
+                .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
+
+            this.check_action("delete_all_reactions".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            // While discord technically allows just read message history if the reaction already exists, this takes an extra API call to check and might not be desirable either. Not worth it
+            this.check_channel_permissions(bot_user.id, channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .delete_all_reactions(channel_id, message_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("delete_all_reactions_for_emoji", async move |lua, this, data: LuaValue| {
+            let data: structs::DeleteAllReactionsForEmojiOptions = lua.from_value(data)?;
+
+            this.check_action("delete_all_reactions_for_emoji".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            // While discord technically allows just read message history if the reaction already exists, this takes an extra API call to check and might not be desirable either. Not worth it
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .delete_all_reactions_for_emoji(data.channel_id, data.message_id, &data.reaction.into_serenity())
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("edit_message", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::EditMessageOptions>(data)?;
+
+            validators::validate_message_edit(&data.data)
+                .map_err(|x| LuaError::external(x.to_string()))?;
+
+            this.check_action("edit_message".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            let files = if let Some(ref attachments) = data.data.attachments {
+                attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+            } else {
+                Vec::new()
+            };
+
+            let msg = this.discord_provider
+                .edit_message(data.channel_id, data.message_id, files, &data.data)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(msg))
+        });
+
+        methods.add_scheduler_async_method("delete_message", async move |_lua, this, (channel_id, message_id, reason): (String, String, String)| {
+            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
+
+            let message_id = message_id.parse::<serenity::all::MessageId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
+
+            this.check_action("delete_message".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(bot_user.id, channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .delete_message(channel_id, message_id, Some(reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        methods.add_scheduler_async_method("bulk_delete_messages", async move |_lua, this, (channel_id, messages, reason): (String, Vec<String>, String)| {
+            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
+
+            let mut message_ids = Vec::with_capacity(messages.len());
+            for message_id in messages {
+                message_ids.push(
+                    message_id.parse::<serenity::all::MessageId>()
+                        .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?
+                );
+            }
+
+            this.check_action("bulk_delete_messages".to_string())
+                .map_err(LuaError::external)?;
+
+            // Perform required checks
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(bot_user.id, channel_id, serenity::all::Permissions::MANAGE_MESSAGES)
+                .await
+                .map_err(LuaError::external)?;
+
+            this.discord_provider
+                .bulk_delete_messages(channel_id, serde_json::json!({"messages": message_ids}), Some(reason.as_str()))
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
         });
 
         // Interactions

@@ -209,3 +209,10 @@ pub struct CreateInvite {
     #[serde(skip_serializing_if = "Option::is_none")]
     target_application_id: Option<ApplicationId>,
 }
+
+/// Discord docs: https://discord.com/developers/docs/resources/channel#follow-announcement-channel
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[must_use]
+pub struct FollowAnnouncementChannelData {
+    pub webhook_channel_id: ChannelId,
+}

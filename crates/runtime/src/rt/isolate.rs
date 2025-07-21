@@ -70,12 +70,16 @@ pub struct KhronosIsolate {
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
+
+    /// Whether or not the global table is safeenv
+    safeenv: bool,
 }
 
 impl KhronosIsolate {
     pub fn new_isolate(
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
+        safeenv: bool,
     ) -> Result<Self, LuaError> {
         if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -83,7 +87,7 @@ impl KhronosIsolate {
             ));
         }
 
-        let mut isolate = Self::new(inner, asset_manager, false)?;
+        let mut isolate = Self::new(inner, asset_manager, false, safeenv)?;
 
         isolate.inner_mut().sandbox()?; // Sandbox the runtime
 
@@ -93,6 +97,7 @@ impl KhronosIsolate {
     pub fn new_subisolate(
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
+        safeenv: bool,
     ) -> Result<Self, LuaError> {
         if !inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -100,7 +105,7 @@ impl KhronosIsolate {
             ));
         }
 
-        Self::new(inner, asset_manager, true)
+        Self::new(inner, asset_manager, true, safeenv)
     }
 
     /// Helper method to make the core isolate
@@ -108,6 +113,7 @@ impl KhronosIsolate {
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
         is_subisolate: bool,
+        safeenv: bool,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new isolate");
         let id = Alphanumeric.sample_string(&mut rand::rng(), 16);
@@ -119,7 +125,7 @@ impl KhronosIsolate {
                 ));
             };
 
-            let global_table = proxy_global(lua)?;
+            let global_table = proxy_global(lua, safeenv)?;
 
             global_table.set("__kanalytics_memusageafterisolateproxy", lua.used_memory())?;
 
@@ -151,6 +157,7 @@ impl KhronosIsolate {
             inner,
             global_table,
             function_cache: Rc::new(FunctionCache::new()),
+            safeenv
         })
     }
 
@@ -188,6 +195,12 @@ impl KhronosIsolate {
     #[inline]
     pub fn id(&self) -> &str {
         &self.id
+    }
+
+    /// Returns if safeenv is enabled for the global table
+    #[inline]
+    pub fn is_safeenv(&self) -> bool {
+        self.safeenv
     }
 
     /// Creates a new TemplateContext with the given KhronosContext
@@ -322,9 +335,6 @@ impl KhronosIsolate {
             } else {
                 let compiler = self.inner.compiler();
                 let bytecode = compiler.compile(code)?;
-
-                self.global_table
-                    .set("__kanalytics_memusagebeforefn", lua.used_memory())?;
 
                 let function = match lua
                     .load(&bytecode)

@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 
 use super::types::{
     CreateAutoModRule, CreateChannel, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditAutoModRule, EditChannel,
-    EditGuild, EditMember, EditRole, EditWebhookMessage,
+    CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditMessage, EditAutoModRule, EditChannel,
+    EditGuild, EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -26,10 +26,7 @@ impl Default for GetAuditLogOptions {
     }
 }
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
-pub struct GetChannelOptions {
-    pub channel_id: serenity::all::ChannelId,
-}
+// Channel
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateChannelOptions {
@@ -50,6 +47,8 @@ pub struct DeleteChannelOptions {
     pub reason: String,
 }
 
+// Message
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetMessagesOptions {
     pub channel_id: serenity::all::ChannelId,
@@ -68,6 +67,61 @@ pub struct CreateMessageOptions {
     pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
     pub data: CreateMessage,
 }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CreateReactionOptions {
+    pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
+    pub message_id: serenity::all::MessageId,
+    pub reaction: ReactionType,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteOwnReactionOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub message_id: serenity::all::MessageId,
+    pub reaction: ReactionType,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteUserReactionOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub message_id: serenity::all::MessageId,
+    pub reaction: ReactionType,
+    pub user_id: serenity::all::UserId,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum ReactionTypeEnum {
+    Normal,
+    Burst
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetReactionsOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub message_id: serenity::all::MessageId,
+    pub reaction: ReactionType,
+    pub r#type: Option<ReactionTypeEnum>,
+    pub after: Option<serenity::all::UserId>,
+    pub limit: Option<serenity::nonmax::NonMaxU8>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteAllReactionsForEmojiOptions {
+    pub channel_id: serenity::all::ChannelId,
+    pub message_id: serenity::all::MessageId,
+    pub reaction: ReactionType,
+}
+
+#[derive(serde::Serialize, Default, serde::Deserialize)]
+pub struct EditMessageOptions {
+    pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
+    pub message_id: serenity::all::MessageId,
+    pub data: EditMessage,
+}
+
+// Interactions
+
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateCommandOptions {
@@ -182,6 +236,13 @@ pub struct CreateChannelInviteOptions {
 pub struct DeleteChannelPermissionOptions {
     pub channel_id: serenity::all::ChannelId,
     pub overwrite_id: serenity::all::TargetId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FollowAnnouncementChannel {
+    pub channel_id: serenity::all::ChannelId,
+    pub data: FollowAnnouncementChannelData,
     pub reason: String,
 }
 

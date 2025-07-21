@@ -8,6 +8,7 @@ pub mod guilds;
 pub mod interactions;
 pub mod message;
 pub mod poll;
+pub mod reaction;
 
 pub use app_commands::*;
 pub use auto_moderation::*;
@@ -16,3 +17,4 @@ pub use embed::*;
 pub use guilds::*;
 pub use interactions::*;
 pub use message::*;
+pub use reaction::*;

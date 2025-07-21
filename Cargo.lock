@@ -2205,6 +2205,7 @@ dependencies = [
  "sha1",
  "sha2",
  "sha3",
+ "small-fixed-array",
  "thiserror 1.0.69",
  "tokio",
  "toml",
