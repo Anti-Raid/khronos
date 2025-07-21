@@ -1,7 +1,6 @@
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use std::borrow::Cow;
 
 use crate::primitives::lazy::Lazy;
 
@@ -1261,51 +1260,13 @@ impl IntoLua for KhronosValue {
     }
 }
 
-/// Wrapper struct to allow for serializing KhronosValue with serde
-pub struct SerdeKhronosValue<'a>(pub Cow<'a, KhronosValue>);
-
-impl<'a> SerdeKhronosValue<'a> {
-    pub fn new_owned(kv: KhronosValue) -> Self {
-        SerdeKhronosValue(Cow::Owned(kv))
-    }
-
-    pub fn new_ref(kv: &'a KhronosValue) -> Self {
-        SerdeKhronosValue(Cow::Borrowed(kv))
-    }
-}
-
-impl TryFrom<SerdeKhronosValue<'_>> for KhronosValue {
-    type Error = crate::Error;
-    fn try_from(value: SerdeKhronosValue<'_>) -> Result<Self, Self::Error> {
-        // Convert the Cow to a reference and then to a KhronosValue
-        match value.0 {
-            Cow::Borrowed(kv) => Ok(kv.clone()),
-            Cow::Owned(kv) => Ok(kv),
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a KhronosValue> for SerdeKhronosValue<'a> {
-    type Error = crate::Error;
-    fn try_from(value: &'a KhronosValue) -> Result<Self, Self::Error> {
-        Ok(SerdeKhronosValue(Cow::Borrowed(value)))
-    }
-}
-
-impl TryFrom<KhronosValue> for SerdeKhronosValue<'_> {
-    type Error = crate::Error;
-    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
-        Ok(SerdeKhronosValue(Cow::Owned(value)))
-    }
-}
-
-impl Serialize for SerdeKhronosValue<'_> {
+impl Serialize for KhronosValue {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ::serde::Serializer,
     {
-        match self.0.as_ref() {
+        match self {
             KhronosValue::Null => serializer.serialize_unit(),
             KhronosValue::Boolean(b) => serializer.serialize_bool(*b),
             KhronosValue::Buffer(buf) => {
@@ -1360,7 +1321,7 @@ impl Serialize for SerdeKhronosValue<'_> {
                 use serde::ser::SerializeMap;
                 let mut map = serializer.serialize_map(Some(m.len()))?;
                 for (k, v) in m {
-                    map.serialize_entry(k, &SerdeKhronosValue(Cow::Borrowed(v)))?;
+                    map.serialize_entry(k, v)?;
                 }
                 map.end()
             }
@@ -1368,7 +1329,7 @@ impl Serialize for SerdeKhronosValue<'_> {
                 use serde::ser::SerializeSeq;
                 let mut seq = serializer.serialize_seq(Some(v.len()))?;
                 for value in v {
-                    seq.serialize_element(&SerdeKhronosValue(Cow::Borrowed(value)))?;
+                    seq.serialize_element(value)?;
                 }
                 seq.end()
             }
@@ -1376,7 +1337,7 @@ impl Serialize for SerdeKhronosValue<'_> {
     }
 }
 
-impl<'de> Deserialize<'de> for SerdeKhronosValue<'_> {
+impl<'de> Deserialize<'de> for KhronosValue {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1385,9 +1346,7 @@ impl<'de> Deserialize<'de> for SerdeKhronosValue<'_> {
         // First deserialize to a serde_json::Value
         let value = serde_json::Value::deserialize(deserializer)?;
         // Then convert to KhronosValue
-        let kv = KhronosValue::from_serde_json_value(value, 0, true).map_err(serde::de::Error::custom);
-        // Wrap it in SerdeKhronosValue
-        kv.map(|v| SerdeKhronosValue(Cow::Owned(v)))
+        KhronosValue::from_serde_json_value(value, 0, true).map_err(serde::de::Error::custom)
     }
 }
 
@@ -1533,10 +1492,14 @@ mod test_value_macro {
 
 #[cfg(test)]
 mod test_to_struct {
+    use serde::Deserialize;
+    use serde::Serialize;
+
     use crate::utils::khronos_value::KhronosValue;
 
     to_struct!(
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
         pub struct MyData {
             pub name: String,
             pub value: i64,
