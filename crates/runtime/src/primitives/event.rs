@@ -1,15 +1,28 @@
 use mluau::prelude::*;
 use std::sync::Arc;
-use crate::utils::khronos_value::KhronosValue;
+use crate::utils::khronos_value::{SerdeKhronosValue, KhronosValue};
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 enum InnerEventData {
     /// The inner data of the object
     Json(serde_json::Value),
     /// The inner data of the object, as a KhronosValue
     Khronos(KhronosValue),
+}
+
+impl serde::Serialize for InnerEventData {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        match self {
+            InnerEventData::Json(value) => value.serialize(serializer),
+            InnerEventData::Khronos(khronos_value) => SerdeKhronosValue::new_ref(khronos_value).serialize(serializer),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for InnerEventData {
