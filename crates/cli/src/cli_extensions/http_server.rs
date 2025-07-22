@@ -2,7 +2,6 @@ use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
 use khronos_runtime::core::datetime::TimeDelta;
 use khronos_runtime::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-use khronos_runtime::primitives::create_userdata_iterator_with_fields;
 use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
 use std::cell::RefCell;
@@ -64,6 +63,13 @@ impl LuaUserData for Headers {
             let value = lua.to_value_with(&headers, LUA_SERIALIZE_OPTIONS)?;
             Ok(value)
         });
+    }
+
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -152,6 +158,13 @@ impl LuaUserData for ServerUrl {
             Ok(this.url.to_string())
         });
     }
+
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
+    }
 }
 
 pub struct ServerResponse {
@@ -216,22 +229,11 @@ impl LuaUserData for ServerResponse {
         });
     }
 
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<ServerResponse>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "status", "headers", "body", "version",
-                    // Methods
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -293,22 +295,13 @@ impl LuaUserData for ServerRequestBody {
 
             lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<ServerRequestBody>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    // Methods
-                    "bytes", "tobuffer", "json",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -423,21 +416,13 @@ impl LuaUserData for BindAddr {
             BindAddr::Unix { path } => Ok(path.to_string_lossy().to_string()),
             BindAddr::Tcp { addr } => Ok(addr.to_string()),
         });
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<BindAddr>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
+    }
 
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "type", "path", "addr", "port",
-                    // Methods
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -475,21 +460,13 @@ impl LuaUserData for ServerRequest {
             }
             Err(e) => Err(LuaError::external(e.to_string())),
         });
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<ServerRequest>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
+    }
 
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "method", "url", "headers", "body",
-                    // Methods
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -1075,39 +1052,13 @@ impl LuaUserData for Router {
 
             Ok(())
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Router>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "routes",
-                    "bind_addr",
-                    // Methods
-                    "route",
-                    "timeout",
-                    "any",
-                    "get",
-                    "post",
-                    "put",
-                    "patch",
-                    "delete",
-                    "options",
-                    "head",
-                    "trace",
-                    "connect",
-                    "clone",
-                    "stop",
-                    "is_running",
-                    "serve",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 

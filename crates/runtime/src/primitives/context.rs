@@ -6,8 +6,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::create_userdata_iterator_with_fields;
-
 pub struct TemplateContext<T: KhronosContext> {
     pub context: T,
 
@@ -219,38 +217,12 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
             Ok(new_context)
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<TemplateContext<T>>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "DataStores",
-                    "Discord",
-                    "ImageCaptcha",
-                    "KV",
-                    "Lockdowns",
-                    "ObjectStorage",
-                    "Pages",
-                    "ScheduledExecution",
-                    "UserInfo",
-                    // Fields (raw)
-                    "data",
-                    "guild_id",
-                    "owner_guild_id",
-                    "allowed_caps",
-                    "current_user",
-                    // Methods
-                    "has_cap",
-                    "has_any_cap",
-                    "withlimits",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }

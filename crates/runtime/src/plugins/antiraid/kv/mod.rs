@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use crate::core::datetime::DateTimeRef;
-use crate::primitives::create_userdata_iterator_with_fields;
 use crate::to_struct;
 use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::kvprovider::KVProvider;
@@ -515,35 +514,13 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
             Ok(())
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<KvExecutor<T>>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    // Methods
-                    "list_scopes",
-                    "find",
-                    "exists",
-                    "get",
-                    "getbyid",
-                    "getrecord",
-                    "getrecordbyid",
-                    "keys",
-                    "set",
-                    "setbyid",
-                    "setexpiry",
-                    "setexpirybyid",
-                    "delete",
-                    "deletebyid",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 

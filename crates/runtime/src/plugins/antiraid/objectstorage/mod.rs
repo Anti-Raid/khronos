@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use crate::core::datetime::TimeDelta;
-use crate::primitives::create_userdata_iterator_with_fields;
 use crate::to_struct;
 use crate::traits::context::KhronosContext;
 use crate::traits::context::Limitations;
@@ -212,28 +211,13 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
 
             Ok(())
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Bucket<T>>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "bucket_name",
-                    // Methods
-                    "list_files",
-                    "file_exists",
-                    "download_file",
-                    "get_file_url",
-                    "upload_file",
-                    "delete_file",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 

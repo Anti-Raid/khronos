@@ -2,6 +2,7 @@
 
 mod dns;
 
+use std::error::Error;
 use std::sync::Arc;
 
 use crate::core::datetime::TimeDelta;
@@ -9,7 +10,7 @@ use crate::primitives::context::TemplateContext;
 use crate::traits::context::KhronosContext;
 use crate::traits::httpclientprovider::HTTPClientProvider;
 use crate::{
-    plugins::antiraid::LUA_SERIALIZE_OPTIONS, primitives::create_userdata_iterator_with_fields,
+    plugins::antiraid::LUA_SERIALIZE_OPTIONS,
 };
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
@@ -150,8 +151,12 @@ impl<T: KhronosContext> Request<T> {
                 return Err(LuaError::external("Localhost requests are not allowed"));
             }
 
-            if base != "https" {
-                return Err(LuaError::external("Only HTTPS requests are allowed"));
+            if base != "https" && base != "http" {
+                return Err(LuaError::external("Only HTTP/HTTPS requests are allowed"));
+            }
+
+            if url.port().is_some() {
+                return Err(LuaError::external("Ports are not allowed in URLs"));
             }
         }
 
@@ -339,32 +344,19 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
                 builder
             };
 
-            let response = builder.send().await.map_err(LuaError::external)?;
+            let response = builder.send().await.map_err(|e| {
+                LuaError::external(format!("{}: {:?}", e, e.source()))
+            })?;
 
             Ok(Response::new(response))
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Request<T>>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "method",
-                    "url",
-                    "headers",
-                    "body_bytes",
-                    "timeout",
-                    "version",
-                    // Methods
-                    "send",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -457,28 +449,13 @@ impl LuaUserData for Response {
             let bytes = response.bytes().await.map_err(LuaError::external)?;
             lua.create_buffer(bytes)
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Response>() {
-                return Err(LuaError::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "url",
-                    "status",
-                    "content_length",
-                    "headers",
-                    // Methods
-                    "text",
-                    "json",
-                    "bytes",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -498,7 +475,7 @@ pub fn init_plugin<T: KhronosContext>(
         .user_agent("Anti-Raid/Khronos (v7.0.0)")
         .redirect(reqwest::redirect::Policy::none()) // No redirects due to security concerns + code maintainability, the user should manually follow them if they want to
         .timeout(DEFAULT_TIMEOUT)
-        .https_only(!httpclient_provider.allow_localhost()) // Enforce HTTPS
+        //.https_only(!httpclient_provider.allow_localhost()) // Enforce HTTPS
         .dns_resolver(Arc::new(
             dns::HickoryDnsResolver::new(httpclient_provider.allow_localhost())
                 .map_err(LuaError::external)?,

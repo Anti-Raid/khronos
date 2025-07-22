@@ -40,8 +40,8 @@ impl Resolve for HickoryDnsResolver {
     fn resolve(&self, name: Name) -> Resolving {
         let resolver = self.clone();
         Box::pin(async move {
+            // TODO: Check CNAME as well
             let lookup = resolver.state.lookup_ip(name.as_str()).await?;
-
             // Avoid localhost rebind attacks
             if !resolver.allow_localhost {
                 for addr in lookup.iter() {
@@ -94,7 +94,7 @@ impl std::error::Error for HickoryDnsSystemConfError {
 const fn is_not_allowed(addr: &IpAddr) -> bool {
     match addr {
         IpAddr::V4(addr) => {
-            !(addr.octets()[0] == 0 // "This network"
+            addr.octets()[0] == 0 // "This network"
             || addr.is_private()
             || addr.is_unspecified()
             || addr.is_loopback()
@@ -106,14 +106,14 @@ const fn is_not_allowed(addr: &IpAddr) -> bool {
                 && addr.octets()[3] != 9 && addr.octets()[3] != 10
             )
             || addr.is_documentation()
-            || addr.is_broadcast())
+            || addr.is_broadcast()
         }
         IpAddr::V6(addr) => {
-            !(addr.is_unicast_link_local()
+            addr.is_unicast_link_local()
                 || addr.is_loopback()
                 || addr.is_unique_local()
                 || addr.is_unicast_link_local()
-                || addr.is_unspecified())
+                || addr.is_unspecified()
         }
     }
 }

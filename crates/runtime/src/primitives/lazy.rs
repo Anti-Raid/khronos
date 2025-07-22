@@ -4,8 +4,6 @@ use std::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
 
-use crate::primitives::create_userdata_iterator_with_fields;
-
 /// Represents data that is only serialized to Lua upon first access
 ///
 /// This can be much more efficient than serializing the data every time it is accessed
@@ -84,20 +82,10 @@ impl<T: serde::Serialize + 'static> LuaUserData for Lazy<T> {
         fields.add_meta_field(LuaMetaMethod::Type, "Lazy");
     }
 
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<Lazy<T>>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Fields
-                    "data",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }

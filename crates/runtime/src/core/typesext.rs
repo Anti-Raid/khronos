@@ -1,4 +1,3 @@
-use crate::primitives::create_userdata_iterator_with_fields;
 use mluau::prelude::*;
 use rand::distr::{Alphanumeric, SampleString};
 
@@ -269,27 +268,13 @@ impl LuaUserData for U64 {
 
             Ok(I64(this.0 as i64))
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<U64>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Methods
-                    "to_ne_bytes",
-                    "from_ne_bytes",
-                    "to_le_bytes",
-                    "from_le_bytes",
-                    "to_be_bytes",
-                    "from_be_bytes",
-                    "to_i64",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
@@ -473,27 +458,13 @@ impl LuaUserData for I64 {
 
             Ok(U64(this.0 as u64))
         });
+    }
 
-        methods.add_meta_function(LuaMetaMethod::Iter, |lua, ud: LuaAnyUserData| {
-            if !ud.is::<I64>() {
-                return Err(mluau::Error::external("Invalid userdata type"));
-            }
-
-            create_userdata_iterator_with_fields(
-                lua,
-                ud,
-                [
-                    // Methods
-                    "to_ne_bytes",
-                    "from_ne_bytes",
-                    "to_le_bytes",
-                    "from_le_bytes",
-                    "to_be_bytes",
-                    "from_be_bytes",
-                    "to_u64",
-                ],
-            )
-        });
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 

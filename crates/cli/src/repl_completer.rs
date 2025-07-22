@@ -134,6 +134,17 @@ impl LuaStatementCompleter {
         match value {
             LuaValue::UserData(ud) => {
                 if let Ok(mt) = ud.metatable() {
+                    // If static __ud_fields is set, use it to get fields
+                    if let Ok(ud_fields) = mt.get::<Vec<String>>("__ud_fields") {
+                        for field in ud_fields {
+                            if let Ok(v) = ud.get::<LuaValue>(field.clone()) {
+                                map.insert(field, v);
+                            }
+                        }
+
+                        return Ok(map);
+                    }
+
                     let Ok(iter) = mt.get::<LuaFunction>(LuaMetaMethod::Iter) else {
                         return Ok(map);
                     };

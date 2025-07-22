@@ -2589,8 +2589,13 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             Ok(Lazy::new(resp))
         });
+    }
 
-        // TODO: Iter metamethod
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
     }
 }
 
