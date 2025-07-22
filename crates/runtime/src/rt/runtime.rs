@@ -560,7 +560,6 @@ impl KhronosRuntime {
     pub fn close(&self) -> Result<(), crate::Error> {
         self.broken.set(true); // Mark the runtime as broken if it is closed
 
-        #[cfg(feature = "strong_count_supported")]
         {
             if let Some(ref lua) = *self.lua.borrow_mut() {
                 {

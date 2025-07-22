@@ -90,6 +90,7 @@ impl LuaUserData for TimeDelta {
         fields.add_field_method_get("as_secs", |_, this| Ok(this.timedelta.as_seconds_f64()));
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -230,6 +231,7 @@ where
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -435,6 +437,7 @@ impl LuaUserData for Timezone {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);

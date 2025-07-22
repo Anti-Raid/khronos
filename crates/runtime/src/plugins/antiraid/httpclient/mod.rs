@@ -352,6 +352,7 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -451,6 +452,7 @@ impl LuaUserData for Response {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);

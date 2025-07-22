@@ -65,6 +65,7 @@ impl LuaUserData for Headers {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -159,6 +160,7 @@ impl LuaUserData for ServerUrl {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -229,6 +231,7 @@ impl LuaUserData for ServerResponse {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -297,6 +300,7 @@ impl LuaUserData for ServerRequestBody {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -418,6 +422,7 @@ impl LuaUserData for BindAddr {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -462,6 +467,7 @@ impl LuaUserData for ServerRequest {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -1054,6 +1060,7 @@ impl LuaUserData for Router {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);

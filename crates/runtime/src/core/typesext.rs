@@ -270,6 +270,7 @@ impl LuaUserData for U64 {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
@@ -460,6 +461,7 @@ impl LuaUserData for I64 {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);

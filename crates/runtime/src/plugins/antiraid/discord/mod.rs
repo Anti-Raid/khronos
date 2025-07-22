@@ -2591,6 +2591,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
     }
 
+    #[cfg(feature = "repl")]
     fn register(registry: &mut LuaUserDataRegistry<Self>) {
         Self::add_fields(registry);
         Self::add_methods(registry);
