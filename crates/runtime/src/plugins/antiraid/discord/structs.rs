@@ -36,14 +36,14 @@ pub struct CreateChannelOptions {
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct EditChannelOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub reason: String,
     pub data: EditChannel,
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct DeleteChannelOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub reason: String,
 }
 
@@ -51,40 +51,40 @@ pub struct DeleteChannelOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetMessagesOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub target: Option<MessagePagination>,
     pub limit: Option<serenity::nonmax::NonMaxU8>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetMessageOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateMessageOptions {
-    pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
+    pub channel_id: serenity::all::GenericChannelId, // Channel *must* be in the same guild
     pub data: CreateMessage,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateReactionOptions {
-    pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
+    pub channel_id: serenity::all::GenericChannelId, // Channel *must* be in the same guild
     pub message_id: serenity::all::MessageId,
     pub reaction: ReactionType,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeleteOwnReactionOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,
     pub reaction: ReactionType,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeleteUserReactionOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,
     pub reaction: ReactionType,
     pub user_id: serenity::all::UserId,
@@ -98,7 +98,7 @@ pub enum ReactionTypeEnum {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetReactionsOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,
     pub reaction: ReactionType,
     pub r#type: Option<ReactionTypeEnum>,
@@ -108,14 +108,14 @@ pub struct GetReactionsOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeleteAllReactionsForEmojiOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,
     pub reaction: ReactionType,
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
 pub struct EditMessageOptions {
-    pub channel_id: serenity::all::ChannelId, // Channel *must* be in the same guild
+    pub channel_id: serenity::all::GenericChannelId, // Channel *must* be in the same guild
     pub message_id: serenity::all::MessageId,
     pub data: EditMessage,
 }
@@ -216,7 +216,7 @@ pub struct DeleteAutoModerationRuleOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct EditChannelPermissionsOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub target_id: serenity::all::TargetId,
     pub allow: MultiOption<serenity::all::Permissions>,
     pub deny: MultiOption<serenity::all::Permissions>,
@@ -227,21 +227,21 @@ pub struct EditChannelPermissionsOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateChannelInviteOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub data: CreateInvite,
     pub reason: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeleteChannelPermissionOptions {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub overwrite_id: serenity::all::TargetId,
     pub reason: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct FollowAnnouncementChannel {
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub data: FollowAnnouncementChannelData,
     pub reason: String,
 }
@@ -288,10 +288,10 @@ pub struct CreateGuildBanOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ModifyChannelPosition {
-    pub id: serenity::all::ChannelId,
+    pub id: serenity::all::GenericChannelId,
     pub position: u16,
     pub lock_permissions: Option<bool>,
-    pub parent_id: Option<serenity::all::ChannelId>,
+    pub parent_id: Option<serenity::all::GenericChannelId>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -336,7 +336,7 @@ pub struct AntiRaidCheckPermissionsResponse {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckChannelPermissionsOptions {
     pub user_id: serenity::all::UserId,
-    pub channel_id: serenity::all::ChannelId,
+    pub channel_id: serenity::all::GenericChannelId,
     pub needed_permissions: serenity::all::Permissions,
 }
 

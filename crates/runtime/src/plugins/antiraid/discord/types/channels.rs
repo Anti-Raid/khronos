@@ -27,7 +27,7 @@ pub struct CreateChannel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent_id: Option<ChannelId>,
+    pub parent_id: Option<GenericChannelId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nsfw: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -99,7 +99,7 @@ pub struct EditChannel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
     #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
-    pub parent_id: MultiOption<ChannelId>,
+    pub parent_id: MultiOption<GenericChannelId>,
     #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
     pub rtc_region: MultiOption<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,7 +143,7 @@ impl Default for EditChannel {
             rate_limit_per_user: Some(serenity::nonmax::NonMaxU16::new(5).unwrap()),
             bitrate: None,
             permission_overwrites: None,
-            parent_id: MultiOption::new(Some(serenity::all::ChannelId::default())),
+            parent_id: MultiOption::new(Some(GenericChannelId::default())),
             rtc_region: MultiOption::new(Some("us-west".into())),
             video_quality_mode: Some(serenity::all::VideoQualityMode::Auto),
             default_auto_archive_duration: Some(serenity::all::AutoArchiveDuration::OneDay),
@@ -214,5 +214,5 @@ pub struct CreateInvite {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[must_use]
 pub struct FollowAnnouncementChannelData {
-    pub webhook_channel_id: ChannelId,
+    pub webhook_channel_id: GenericChannelId,
 }

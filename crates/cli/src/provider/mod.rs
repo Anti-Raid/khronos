@@ -18,7 +18,7 @@ use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 
 /// Internal short-lived channel cache
-pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::ChannelId, serenity::all::GuildChannel>> =
+pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, serenity::all::Channel>> =
     LazyLock::new(|| {
         Cache::builder()
             .time_to_idle(std::time::Duration::from_secs(30))
@@ -604,14 +604,18 @@ impl DiscordProvider for CliDiscordProvider {
 
     async fn get_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
-    ) -> serenity::Result<serenity::all::GuildChannel, khronos_runtime::Error> {
+        channel_id: serenity::all::GenericChannelId,
+    ) -> serenity::Result<serenity::all::Channel, khronos_runtime::Error> {
         {
             // Check cache first
             let cached_channel = CHANNEL_CACHE.get(&channel_id).await;
 
             if let Some(cached_channel) = cached_channel {
-                if cached_channel.guild_id != self.guild_id {
+                let Some(guild_id) = cached_channel.guild_id() else {
+                    return Err("Channel not in guild".into());
+                };
+
+                if guild_id != self.guild_id {
                     return Err("Channel not in guild".into());
                 }
 
@@ -622,15 +626,15 @@ impl DiscordProvider for CliDiscordProvider {
         // Fetch from HTTP
         let channel = self.http.get_channel(channel_id).await?;
 
-        let Some(guild_channel) = channel.guild() else {
+        let Some(guild_id) = channel.guild_id() else {
             return Err("Channel not in guild".into());
         };
 
-        if guild_channel.guild_id != self.guild_id {
+        if guild_id != self.guild_id {
             return Err("Channel not in guild".into());
         }
 
-        Ok(guild_channel)
+        Ok(channel)
     }
 
     fn guild_id(&self) -> serenity::all::GuildId {
@@ -643,10 +647,10 @@ impl DiscordProvider for CliDiscordProvider {
 
     async fn edit_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::GuildChannel, khronos_runtime::Error> {
+    ) -> Result<serenity::model::channel::Channel, khronos_runtime::Error> {
         let chan = self
             .http
             .edit_channel(channel_id, &map, audit_log_reason)
@@ -661,7 +665,7 @@ impl DiscordProvider for CliDiscordProvider {
 
     async fn delete_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::model::channel::Channel, khronos_runtime::Error> {
         let chan = self
@@ -678,13 +682,13 @@ impl DiscordProvider for CliDiscordProvider {
 
     async fn edit_channel_permissions(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         target_id: serenity::all::TargetId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<(), khronos_runtime::Error> {
         self.http
-            .create_permission(channel_id, target_id, &data, audit_log_reason)
+            .create_permission(channel_id.expect_channel(), target_id, &data, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to edit channel permissions: {e}"))?;
 

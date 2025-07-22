@@ -29,7 +29,7 @@ pub struct ScriptData {
     /// The events that this template listens to
     pub events: Vec<String>,
     /// The channel to send errors to
-    pub error_channel: Option<serenity::all::ChannelId>,
+    pub error_channel: Option<serenity::all::GenericChannelId>,
     /// The language of the template
     pub lang: String,
     /// The allowed capabilities the template has access to

@@ -54,7 +54,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn list_auto_moderation_rules(
         &self,
-    ) -> Result<Vec<serenity::model::guild::automod::Rule>, crate::Error> {
+    ) -> Result<Vec<serenity::all::AutoModRule>, crate::Error> {
         self.serenity_http()
             .get_automod_rules(self.guild_id())
             .await
@@ -64,7 +64,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+    ) -> Result<serenity::all::AutoModRule, crate::Error> {
         self.serenity_http()
             .get_automod_rule(self.guild_id(), rule_id)
             .await
@@ -75,7 +75,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+    ) -> Result<serenity::all::AutoModRule, crate::Error> {
         self.serenity_http()
             .create_automod_rule(self.guild_id(), &map, audit_log_reason)
             .await
@@ -87,7 +87,7 @@ pub trait DiscordProvider: 'static + Clone {
         rule_id: serenity::all::RuleId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::guild::automod::Rule, crate::Error> {
+    ) -> Result<serenity::all::AutoModRule, crate::Error> {
         self.serenity_http()
             .edit_automod_rule(self.guild_id(), rule_id, &map, audit_log_reason)
             .await
@@ -113,29 +113,27 @@ pub trait DiscordProvider: 'static + Clone {
     /// or does not belong to the guild
     async fn get_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
-    ) -> Result<serenity::all::GuildChannel, crate::Error> {
-        let chan = self.serenity_http().get_channel(channel_id).await;
+        channel_id: serenity::all::GenericChannelId,
+    ) -> Result<serenity::all::Channel, crate::Error> {
+        let chan = self.serenity_http().get_channel(channel_id).await?;
 
-        match chan {
-            Ok(serenity::all::Channel::Guild(chan)) => {
-                if chan.guild_id != self.guild_id() {
-                    return Err(format!("Channel {channel_id} does not belong to the guild").into());
-                }
+        let Some(guild_id) = chan.guild_id() else {
+            return Err(format!("Channel {channel_id} does not belong to a guild").into());
+        };
 
-                Ok(chan)
-            }
-            Ok(_) => Err(format!("Channel {channel_id} does not belong to a guild").into()),
-            Err(e) => Err(format!("Failed to fetch channel: {e}").into()),
+        if guild_id != self.guild_id() {
+            return Err(format!("Channel {channel_id} does not belong to the guild").into());
         }
+
+        Ok(chan)
     }
 
     async fn edit_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::GuildChannel, crate::Error> {
+    ) -> Result<serenity::model::channel::Channel, crate::Error> {
         let chan = self
             .serenity_http()
             .edit_channel(channel_id, &map, audit_log_reason)
@@ -147,7 +145,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::model::channel::Channel, crate::Error> {
         let chan = self
@@ -161,54 +159,54 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn edit_channel_permissions(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         target_id: serenity::all::TargetId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .create_permission(channel_id, target_id, &data, audit_log_reason)
+            .create_permission(channel_id.expect_channel(), target_id, &data, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to edit channel permissions: {e}").into())
     }
 
     async fn get_channel_invites(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
     ) -> Result<Vec<serenity::all::RichInvite>, crate::Error> {
         self.serenity_http()
-            .get_channel_invites(channel_id)
+            .get_channel_invites(channel_id.expect_channel())
             .await
             .map_err(|e| format!("Failed to get channel invites: {e}").into())
     }
 
     async fn create_channel_invite(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::RichInvite, crate::Error> {
         self.serenity_http()
-            .create_invite(channel_id, &map, audit_log_reason)
+            .create_invite(channel_id.expect_channel(), &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to create channel invite: {e}").into())
     }
 
     async fn delete_channel_permission(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         target_id: serenity::all::TargetId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .delete_permission(channel_id, target_id, audit_log_reason)
+            .delete_permission(channel_id.expect_channel(), target_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to delete channel permission: {e}").into())
     }
 
     async fn follow_announcement_channel(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<serenity::all::FollowedChannel, crate::Error> {
@@ -222,7 +220,7 @@ pub trait DiscordProvider: 'static + Clone {
             .serenity_http()
             .fire(
                 serenity::all::Request::new(
-                    serenity::all::Route::ChannelFollowNews { channel_id },
+                    serenity::all::Route::ChannelFollowNews { channel_id: channel_id.expect_channel() },
                     serenity::all::LightMethod::Post,
                 )
                 .body(Some(serde_json::to_vec(&map)?))
@@ -576,7 +574,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_channel_messages(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         target: Option<serenity::all::MessagePagination>,
         limit: Option<serenity::nonmax::NonMaxU8>,
     ) -> Result<Vec<serenity::all::Message>, crate::Error> {
@@ -588,7 +586,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_channel_message(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
     ) -> Result<serenity::all::Message, crate::Error> {
         self.serenity_http()
@@ -599,7 +597,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn create_message(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
     ) -> Result<serenity::model::channel::Message, crate::Error> {
@@ -611,18 +609,18 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn crosspost_message(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
     ) -> Result<serenity::all::Message, crate::Error> {
         self.serenity_http()
-            .crosspost_message(channel_id, message_id)
+            .crosspost_message(channel_id.expect_channel(), message_id)
             .await
             .map_err(|e| format!("Failed to crosspost message: {e}").into())
     }
 
     async fn create_reaction(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
@@ -634,7 +632,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_own_reaction(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
@@ -646,7 +644,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_user_reaction(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         user_id: serenity::all::UserId,
         reaction: &ReactionType,
@@ -659,7 +657,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_reactions(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         reaction: &ReactionType,
         is_burst: Option<bool>,
@@ -703,7 +701,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_all_reactions(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
@@ -714,7 +712,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_all_reactions_for_emoji(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
@@ -726,7 +724,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn edit_message(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
@@ -739,7 +737,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_message(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
@@ -751,7 +749,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn bulk_delete_messages(
         &self,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {

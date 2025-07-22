@@ -153,10 +153,13 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         Ok((guild, target_member, member_perms))
     }
 
+    /// Returns the channel permissions
+    /// 
+    /// The returned GuildChannel will either be the GuildChannel or the parent GuildChannel of a thread (if the channel id is one for a thread)
     pub async fn check_channel_permissions(
         &self,
         user_id: serenity::all::UserId,
-        channel_id: serenity::all::ChannelId,
+        channel_id: serenity::all::GenericChannelId,
         needed_permissions: serenity::all::Permissions,
     ) -> LuaResult<(
         serenity::all::PartialGuild,
@@ -164,7 +167,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         serenity::all::GuildChannel,
         serenity::all::Permissions,
     )> {
-        let guild_channel = self
+        let channel = self
             .discord_provider
             .get_channel(channel_id)
             .await
@@ -185,15 +188,26 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
             .await
             .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-        let perms = guild.user_permissions_in(&guild_channel, &member);
+        match channel {
+            serenity::all::Channel::Private(_) => {
+                return Err(LuaError::runtime("Private channels are not supported by check_channel_permissions"));
+            },
+            serenity::all::Channel::Guild(guild_channel) => {
+                let perms = guild.user_permissions_in(&guild_channel, &member);
 
-        if !perms.contains(needed_permissions) {
-            return Err(LuaError::runtime(format!(
-                "User does not have the required permissions: {needed_permissions:?}: {user_id}",
-            )));
+                if !perms.contains(needed_permissions) {
+                    return Err(LuaError::runtime(format!(
+                        "User does not have the required permissions: {needed_permissions:?}: {user_id}",
+                    )));
+                }
+
+                return Ok((guild, member, guild_channel, perms))
+            }
+            serenity::all::Channel::GuildThread(gt) => return self.check_channel_permissions(gt.owner_id, gt.parent_id.widen(), needed_permissions).await,
+            _ => {
+                return Err(LuaError::runtime("Unsupported channel type in check_channel_permissions"));
+            }
         }
-
-        Ok((guild, member, guild_channel, perms))
     }
 }
 
@@ -486,7 +500,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         // Should be documented
         methods.add_scheduler_async_method("get_channel", async move |_lua, this, channel_id: String| {
-            let channel_id: serenity::all::ChannelId = channel_id
+            let channel_id: serenity::all::GenericChannelId = channel_id
                 .parse()
                 .map_err(|e: ParseIdError| LuaError::external(e.to_string()))?;
 
@@ -518,7 +532,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             .await
             .map_err(LuaError::external)?;
 
-            match guild_channel.kind {
+            match guild_channel.base.kind {
                 serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
                     // Check if the bot has permissions to manage threads
                     if !perms
@@ -628,7 +642,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             .await
             .map_err(LuaError::external)?;
 
-            match guild_channel.kind {
+            match guild_channel.base.kind {
                 serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
                     // Check if the bot has permissions to manage threads
                     if !perms
@@ -718,7 +732,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("get_channel_invites", async move |_, this, channel_id: String| {
-            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+            let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
             .map_err(|e| LuaError::external(e.to_string()))?;
 
             this.check_action("get_channel_invites".to_string())
@@ -1950,23 +1964,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
             }
 
-            let (partial_guild, bot_member, perms) = this.check_permissions(bot_user.id, serenity::all::Permissions::empty())
+            let (_partial_guild, _bot_member, _channel, perms) = this.check_channel_permissions(bot_user.id, invite.channel.id.widen(), serenity::all::Permissions::empty())
                 .await
                 .map_err(LuaError::external)?;    
 
-            let has_perms = perms.manage_guild();
+            let has_perms = perms.manage_guild() || perms.manage_channels();
 
             if !has_perms {
-                let channel = this.discord_provider.get_channel(invite.channel.id).await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let channel_perms = partial_guild.user_permissions_in(&channel, &bot_member);
-
-                if !channel_perms.manage_channels() {
-                    return Err(LuaError::external(
-                        "Bot does not have permission to manage channels (either Manage Server globally or Manage Channels on the channel level)",
-                    ));
-                }
+                return Err(LuaError::external(
+                    "Bot does not have permission to manage channels (either Manage Server globally or Manage Channels on the channel level)",
+                ));
             }
 
             let invite = this.discord_provider
@@ -1986,35 +1993,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             this.check_action("get_channel_messages".to_string())
                 .map_err(LuaError::external)?;
 
-            // Perform required checks
-            let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
             let Some(bot_user) = this.context.current_user() else {
                 return Err(LuaError::runtime("Internal error: Current user not found"));
             };
 
-            let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
-
-            let guild = this.discord_provider.get_guild().await
+            // Perform required checks
+            let (_, _, guild_channel, perms) = this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::VIEW_CHANNEL).await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-            // Check if the bot has permissions to send messages in the given channel
-            if !guild
-                .user_permissions_in(&guild_channel, &bot_member)
-                .view_channel()
-            {
-                return Err(LuaError::external(
-                    "Bot does not have permission to send messages in the given channel",
-                ));
-            }
-
-            if guild_channel.kind == serenity::all::ChannelType::Voice && !guild
-            .user_permissions_in(&guild_channel, &bot_member)
+            if guild_channel.base.kind == serenity::all::ChannelType::Voice 
+            && !perms
             .connect() {
                 return Err(LuaError::external(
                     "Bot does not have permission to connect to the given voice channel",
@@ -2037,34 +2025,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .map_err(LuaError::external)?;
 
             // Perform required checks
-            let guild_channel = this.discord_provider.get_channel(data.channel_id).await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
             let Some(bot_user) = this.context.current_user() else {
                 return Err(LuaError::runtime("Internal error: Current user not found"));
             };
 
-            let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
-
-            let guild = this.discord_provider.get_guild().await
+            // Perform required checks
+            let (_, _, guild_channel, perms) = this.check_channel_permissions(bot_user.id, data.channel_id, serenity::all::Permissions::VIEW_CHANNEL).await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-            // Check if the bot has permissions to send messages in the given channel
-            if !guild
-                .user_permissions_in(&guild_channel, &bot_member)
-                .view_channel()
-            {
-                return Err(LuaError::external(
-                    "Bot does not have permission to send messages in the given channel",
-                ));
-            }
-
-            if guild_channel.kind == serenity::all::ChannelType::Voice && !guild
-            .user_permissions_in(&guild_channel, &bot_member)
+            if guild_channel.base.kind == serenity::all::ChannelType::Voice 
+            && !perms
             .connect() {
                 return Err(LuaError::external(
                     "Bot does not have permission to connect to the given voice channel",
@@ -2113,7 +2083,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("crosspost_message", async move |_lua, this, (channel_id, message_id): (String, String)| {
-            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+            let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id = message_id.parse::<serenity::all::MessageId>()
@@ -2244,7 +2214,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("delete_all_reactions", async move |_lua, this, (channel_id, message_id): (String, String)| {
-            let channel_id: serenity::all::ChannelId = channel_id.parse()
+            let channel_id: serenity::all::GenericChannelId = channel_id.parse()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id: serenity::all::MessageId = message_id.parse()
@@ -2328,7 +2298,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("delete_message", async move |_lua, this, (channel_id, message_id, reason): (String, String, String)| {
-            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+            let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id = message_id.parse::<serenity::all::MessageId>()
@@ -2355,7 +2325,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("bulk_delete_messages", async move |_lua, this, (channel_id, messages, reason): (String, Vec<String>, String)| {
-            let channel_id = channel_id.parse::<serenity::all::ChannelId>()
+            let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let mut message_ids = Vec::with_capacity(messages.len());

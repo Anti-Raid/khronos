@@ -106,9 +106,9 @@ pub struct CreateInteractionResponseMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub flags: Option<InteractionResponseFlags>,
+    pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,7 +268,7 @@ pub struct CreateInteractionResponseFollowup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -288,7 +288,7 @@ pub struct EditWebhookMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<CreateMessageAttachment>,
 }

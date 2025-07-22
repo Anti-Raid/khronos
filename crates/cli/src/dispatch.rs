@@ -21,7 +21,6 @@ pub const RESERVED_COMMAND_NAMES: &[&str] = &[
 const fn not_audit_loggable_event() -> &'static [&'static str] {
     &[
         "CACHE_READY",         // Internal
-        "RATELIMIT",           // Internal
         "GUILD_CREATE",        // Internal
         "GUILD_MEMBERS_CHUNK", // Internal
     ]
@@ -36,7 +35,7 @@ pub async fn parse_discord_event(
         return Ok(None);
     };
 
-    let event_snake_name = event.snake_case_name();
+    let event_snake_name = event.into();
     if not_audit_loggable_event().contains(&event_snake_name) {
         return Ok(None);
     }
@@ -94,11 +93,13 @@ pub async fn parse_discord_event(
             serde_json::to_value(event)?
         }
     };
+    
+    let event_name: &'static str = event_snake_name.into();
 
     Ok(Some((
         CreateEvent::new(
             "Discord".to_string(),
-            event.snake_case_name().to_uppercase(),
+            event_name.to_uppercase(),
             event_data,
             user_id.map(|u| u.to_string()),
         ),
