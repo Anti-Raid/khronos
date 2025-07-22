@@ -2139,7 +2139,6 @@ name = "khronos_cli"
 version = "1.0.0"
 dependencies = [
  "antiraid-types",
- "axum",
  "chrono",
  "clap",
  "data-encoding",
@@ -2147,8 +2146,6 @@ dependencies = [
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "env_logger",
  "gwevent",
- "hyper",
- "hyper-util",
  "indexmap",
  "khronos_runtime",
  "log",
@@ -2163,7 +2160,6 @@ dependencies = [
  "tch",
  "termcolor",
  "tokio",
- "tower",
  "vfs",
 ]
 
@@ -2173,6 +2169,7 @@ version = "1.0.0"
 dependencies = [
  "arrayvec",
  "async-compression",
+ "axum",
  "bitflags 2.9.1",
  "blake3",
  "bstr",
@@ -2185,6 +2182,8 @@ dependencies = [
  "governor",
  "hickory-resolver",
  "hmac",
+ "hyper",
+ "hyper-util",
  "indexmap",
  "linkify",
  "log",
@@ -2209,6 +2208,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "toml",
+ "tower",
  "uuid",
  "vfs",
 ]

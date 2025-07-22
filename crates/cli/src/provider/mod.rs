@@ -1,6 +1,7 @@
 use khronos_runtime::traits::context::CompatibilityFlags;
 use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
+use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
 use moka::future::Cache;
 use sqlx::Row;
 use std::rc::Rc;
@@ -62,6 +63,7 @@ impl KhronosContext for CliKhronosContext {
     type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
+    type HTTPServerProvider = CliHttpServerProvider;
 
     fn data(&self) -> &ScriptData {
         &self.script_data
@@ -137,6 +139,10 @@ impl KhronosContext for CliKhronosContext {
 
     fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider> {
         Some(CliHttpClientProvider)
+    }
+
+    fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider> {
+        Some(CliHttpServerProvider)
     }
 }
 
@@ -848,6 +854,15 @@ impl HTTPClientProvider for CliHttpClientProvider {
     }
 
     fn attempt_action(&self, _bucket: &str, _url: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct CliHttpServerProvider;
+
+impl HTTPServerProvider for CliHttpServerProvider {
+    fn attempt_action(&self, _bucket: &str, _path: String) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
 }

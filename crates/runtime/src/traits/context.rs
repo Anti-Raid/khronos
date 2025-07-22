@@ -2,8 +2,8 @@ use crate::to_struct;
 
 use super::{
     datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider,
-    httpclientprovider::HTTPClientProvider, kvprovider::KVProvider,
-    objectstorageprovider::ObjectStorageProvider,
+    httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
+    kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
 };
 use bitflags::bitflags;
 
@@ -88,6 +88,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type DataStoreProvider: DataStoreProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
+    type HTTPServerProvider: HTTPServerProvider;
 
     /// Returns context-specific data that will be exposed in context.data
     fn data(&self) -> &ScriptData;
@@ -143,6 +144,9 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a HTTP client provider
     fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider>;
+
+    /// Returns a HTTP server provider
+    fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider>;
 
     /// Returns the contexts memory limit, if any
     fn memory_limit(&self) -> Option<usize> {

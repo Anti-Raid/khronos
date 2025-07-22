@@ -20,10 +20,6 @@ tch = { version = "0.19", features = ["download-libtorch"], optional = true }
 dirs = "6"
 data-encoding = "2"
 reqwest = "0.12"
-axum = { version = "0.8", features = ["macros"] }
-hyper = "1"
-hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
-tower = "0.5"
 termcolor = "1"
 vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 sqlx = { version = "0.8", features = [

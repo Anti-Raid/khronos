@@ -1,9 +1,14 @@
+mod http_binder;
+
 use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
-use khronos_runtime::core::datetime::TimeDelta;
-use khronos_runtime::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-use khronos_runtime::rt::mlua::prelude::*;
-use khronos_runtime::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
+use crate::core::datetime::TimeDelta;
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+use crate::traits::context::KhronosContext;
+use crate::traits::httpserverprovider::HTTPServerProvider;
+use crate::TemplateContext;
+use mluau::prelude::*;
+use crate::rt::mlua_scheduler::LuaSchedulerAsyncUserData;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -11,11 +16,11 @@ use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::time::Duration;
 
-pub struct Headers {
+pub struct ServerHeaders {
     pub(crate) headers: reqwest::header::HeaderMap,
 }
 
-impl Headers {
+impl ServerHeaders {
     fn to_headers_list(&self) -> Vec<(String, String, Vec<u8>)> {
         self.headers
             .iter()
@@ -30,7 +35,7 @@ impl Headers {
     }
 }
 
-impl LuaUserData for Headers {
+impl LuaUserData for ServerHeaders {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("get", |_, this, key: String| {
             let key = reqwest::header::HeaderName::from_bytes(key.as_bytes())
@@ -184,12 +189,12 @@ impl LuaUserData for ServerResponse {
         });
 
         fields.add_field_method_get("headers", |_lua, this| {
-            Ok(Headers {
+            Ok(ServerHeaders {
                 headers: this.response.headers().clone(),
             })
         });
 
-        fields.add_field_method_set("headers", |_lua, this, headers: LuaUserDataRef<Headers>| {
+        fields.add_field_method_set("headers", |_lua, this, headers: LuaUserDataRef<ServerHeaders>| {
             *this.response.headers_mut() = headers.headers.clone();
             Ok(())
         });
@@ -445,7 +450,7 @@ impl LuaUserData for ServerRequest {
         fields.add_field_method_get("method", |_lua, this| Ok(this.parts.method.to_string()));
         fields.add_field_method_get("url", |_lua, this| Ok(this.parts.uri.to_string()));
         fields.add_field_method_get("headers", |_lua, this| {
-            Ok(Headers {
+            Ok(ServerHeaders {
                 headers: this.parts.headers.clone(),
             })
         });
@@ -512,9 +517,9 @@ pub struct Router {
 impl Router {
     pub async fn start_routing(
         match_routes: Vec<(Method, String, Duration)>,
-        bind: crate::http_binder::CreateRpcServerOptions,
+        bind: http_binder::CreateRpcServerOptions,
         stop_chan: tokio::sync::watch::Receiver<()>,
-    ) -> Result<tokio::sync::mpsc::UnboundedReceiver<RoutedRequest>, khronos_runtime::Error> {
+    ) -> Result<tokio::sync::mpsc::UnboundedReceiver<RoutedRequest>, crate::Error> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let (startup_status_tx, startup_status_rx) = tokio::sync::oneshot::channel();
@@ -604,7 +609,7 @@ impl Router {
                 }
 
                 // Start the server
-                crate::http_binder::start_rpc_server(bind, app, startup_status_tx, stop_chan).await;
+                http_binder::start_rpc_server(bind, app, startup_status_tx, stop_chan).await;
 
                 // Send stop signal
                 let _ = tx.send(RoutedRequest::StopServer {});
@@ -944,14 +949,14 @@ impl LuaUserData for Router {
 
             let rx = Router::start_routing(
                 routes,
-                crate::http_binder::CreateRpcServerOptions {
+                http_binder::CreateRpcServerOptions {
                     bind: match &this.bind_addr {
                         #[cfg(unix)]
                         BindAddr::Unix { path } => {
-                            crate::http_binder::CreateRpcServerBind::UnixSocket(path.clone())
+                            http_binder::CreateRpcServerBind::UnixSocket(path.clone())
                         }
                         BindAddr::Tcp { addr } => {
-                            crate::http_binder::CreateRpcServerBind::Address(*addr)
+                            http_binder::CreateRpcServerBind::Address(*addr)
                         }
                     },
                 },
@@ -972,7 +977,7 @@ impl LuaUserData for Router {
                 }
             };
 
-            let taskmgr = khronos_runtime::rt::mlua_scheduler::taskmgr::get(&lua);
+            let taskmgr = mlua_scheduler::taskmgr::get(&lua);
 
             while let Some(req) = rx.recv().await {
                 match req {
@@ -1069,7 +1074,16 @@ impl LuaUserData for Router {
     }
 }
 
-pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
+pub fn init_plugin<T: KhronosContext>(
+    lua: &Lua,
+    token: &TemplateContext<T>,
+) -> LuaResult<LuaTable> {
+    let Some(httpserver_provider) = token.context.httpserver_provider() else {
+        return Err(LuaError::external(
+            "The httpserver plugin is not supported in this context",
+        ));
+    };
+
     let http_server = lua.create_table()?;
 
     http_server.set(
@@ -1088,7 +1102,17 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
 
     http_server.set(
         "new_router",
-        lua.create_function(|_lua, bind_addr: BindAddr| {
+        lua.create_function(move |_lua, bind_addr: BindAddr| {
+            httpserver_provider.attempt_action("new_router", match &bind_addr {
+                #[cfg(unix)]
+                BindAddr::Unix { path } => {
+                    format!("unix:{}", path.display())
+                }
+                BindAddr::Tcp { addr } => {
+                    format!("tcp:{}", addr)
+                }
+            })
+            .map_err(|e| LuaError::external(e.to_string()))?;
             Ok(Router {
                 stop: Rc::new(RefCell::new(None)), // serve sets this up
                 bind_addr,
@@ -1135,7 +1159,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
                 }
             }
 
-            Ok(Headers {
+            Ok(ServerHeaders {
                 headers: header_map,
             })
         })?,
@@ -1144,7 +1168,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     http_server.set(
         "jsonresponse",
         lua.create_function(
-            |lua, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<Headers>>)| {
+            |lua, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<ServerHeaders>>)| {
                 let resp = (
                     axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
                     headers.map(|h| h.headers.clone()).unwrap_or_default(),
@@ -1160,7 +1184,7 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
     http_server.set(
         "fmtresponse",
         lua.create_function(
-            |_, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<Headers>>)| {
+            |_, (status, body, headers): (u16, LuaValue, Option<LuaUserDataRef<ServerHeaders>>)| {
                 let resp = (
                     axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,
                     headers.map(|h| h.headers.clone()).unwrap_or_default(),
@@ -1182,8 +1206,8 @@ pub fn http_server(lua: &Lua) -> LuaResult<LuaTable> {
             |_,
              (status, body, headers): (
                 u16,
-                LuaEither<Vec<u8>, khronos_runtime::rt::mlua::Buffer>,
-                Option<LuaUserDataRef<Headers>>,
+                LuaEither<Vec<u8>, mluau::Buffer>,
+                Option<LuaUserDataRef<ServerHeaders>>,
             )| {
                 let resp = (
                     axum::http::StatusCode::from_u16(status).map_err(LuaError::external)?,

@@ -27,7 +27,14 @@ vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
 
+# httpclient
 hickory-resolver = { version = "0.25", features = ["tokio"] }
+
+# httpserver
+axum = { version = "0.8", features = ["macros"] }
+hyper = "1"
+hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
+tower = "0.5"
 
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"] }
