@@ -19,12 +19,15 @@ use mlua_scheduler::LuaSchedulerAsyncUserData;
 const MAX_NICKNAME_LENGTH: usize = 32;
 const MINIMUM_BULK_OP_WAIT_PERIOD: std::time::Duration = std::time::Duration::from_millis(2500);
 const DEFAULT_BULK_OP_MAX_OPS: usize = 1;
+const DEFAULT_BULK_OP_MAX_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub struct BulkOpData {
     /// Number of operations that has been performed before a call to antiraid_bulk_op_wait
     pub op_performed: RefCell<usize>,
     /// Total number of operations that can be performed before a call to antiraid_bulk_op_wait
     pub max_ops: usize,
+    /// When the bulk operation was last waited on
+    pub last_waited: RefCell<std::time::Instant>,
 }
 
 #[derive(Clone)]
@@ -59,6 +62,11 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         }
 
         if let Some(bulk_op) = &self.bulk_op {
+            // Check expiry
+            if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
+                return Err(LuaError::runtime("Bulk operation maximum wait period has passed"));
+            }
+
             if *bulk_op.op_performed.try_borrow().map_err(LuaError::external)? >= bulk_op.max_ops {
                 return Err(LuaError::runtime(format!(
                     "Bulk operation limit reached: {action}. A call to `antiraid_bulk_op_wait` is required before performing more operations",
@@ -245,6 +253,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         // Bulk operation support
         methods.add_method("antiraid_bulk_op", |_, this, _: ()| {
+            this.check_action("antiraid_bulk_op".to_string())
+                .map_err(LuaError::external)?;
+
             if this.bulk_op.is_some() {
                 return Err(LuaError::runtime("Cannot start a bulk operation if the DiscordActionExecutor itself is setup for bulk operations"));
             }
@@ -252,6 +263,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             let bulk_op = Rc::new(BulkOpData {
                 op_performed: RefCell::new(0), // Any op which calls check_action will increment this
                 max_ops: DEFAULT_BULK_OP_MAX_OPS, // Default max ops
+                last_waited: RefCell::new(std::time::Instant::now()), // Last waited time
             });
 
             let executor = DiscordActionExecutor {
@@ -267,9 +279,17 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method(
             "antiraid_bulk_op_wait",
             async move |_, this, _: ()| {
+                this.check_action("antiraid_bulk_op_wait".to_string())
+                .map_err(LuaError::external)?;
+
                 let Some(bulk_op) = &this.bulk_op else {
                     return Err(LuaError::runtime("This DiscordActionExecutor is not set up for bulk operations"));
                 };
+
+                // Check expiry
+                if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
+                    return Err(LuaError::runtime("antiraid_bulk_op_wait called after the maximum wait period"));
+                }
 
                 if *bulk_op.op_performed.try_borrow().map_err(|_| LuaError::runtime("Failed to borrow op_performed"))? == 0 {
                     return Ok(()); // No-op if no operation was performed
@@ -287,6 +307,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
 
                 *bulk_op.op_performed.try_borrow_mut().map_err(|_| LuaError::runtime("Failed to borrow op_performed"))? = 0; // Reset the op_performed counter
+                *bulk_op.last_waited.try_borrow_mut().map_err(|_| LuaError::runtime("Failed to borrow last_waited"))? = std::time::Instant::now(); // Update the last waited time
 
                 Ok(())
             },

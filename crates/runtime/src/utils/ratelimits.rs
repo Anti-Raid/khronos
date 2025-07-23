@@ -25,18 +25,20 @@ impl LuaRatelimits {
 
     pub fn check(&self, bucket: &str) -> Result<(), crate::Error> {
         // Check global ratelimits
-        for global_lim in self.global.iter() {
-            match global_lim.check_key(&()) {
-                Ok(()) => continue,
-                Err(wait) => {
-                    return Err(format!(
-                        "Global ratelimit hit for bucket '{}', wait time: {:?}",
-                        bucket,
-                        wait.wait_time_from(self.clock.now())
-                    )
-                    .into());
-                }
-            };
+        if bucket != "antiraid_bulk_op" && bucket != "antiraid_bulk_op_wait" {
+            for global_lim in self.global.iter() {
+                match global_lim.check_key(&()) {
+                    Ok(()) => continue,
+                    Err(wait) => {
+                        return Err(format!(
+                            "Global ratelimit hit for bucket '{}', wait time: {:?}",
+                            bucket,
+                            wait.wait_time_from(self.clock.now())
+                        )
+                        .into());
+                    }
+                };
+            }
         }
 
         // Check per bucket ratelimits
