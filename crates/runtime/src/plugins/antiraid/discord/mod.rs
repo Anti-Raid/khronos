@@ -202,46 +202,53 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         serenity::all::GuildChannel,
         serenity::all::Permissions,
     )> {
-        // This call should do access control checks (channel in guild) etc.
-        let channel = self
-            .discord_provider
-            .get_channel(channel_id)
-            .await
-            .map_err(|e| LuaError::runtime(e.to_string()))?;
+        let mut id = channel_id;
+        loop {
+            // This call should do access control checks (channel in guild) etc.
+            let channel = self
+                .discord_provider
+                .get_channel(id)
+                .await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-        let Some(member) = self
-            .discord_provider
-            .get_guild_member(user_id)
-            .await
-            .map_err(|e| LuaError::external(e.to_string()))?
-        else {
-            return Err(LuaError::runtime("Bot user not found in guild"));
-        };
+            let Some(member) = self
+                .discord_provider
+                .get_guild_member(user_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?
+            else {
+                return Err(LuaError::runtime("Bot user not found in guild"));
+            };
 
-        let guild = self
-            .discord_provider
-            .get_guild()
-            .await
-            .map_err(|e| LuaError::runtime(e.to_string()))?;
+            let guild = self
+                .discord_provider
+                .get_guild()
+                .await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-        match channel {
-            serenity::all::Channel::Private(_) => {
-                return Err(LuaError::runtime("Private channels are not supported by check_channel_permissions"));
-            },
-            serenity::all::Channel::Guild(guild_channel) => {
-                let perms = guild.user_permissions_in(&guild_channel, &member);
+            match channel {
+                serenity::all::Channel::Private(_) => {
+                    return Err(LuaError::runtime("Private channels are not supported by check_channel_permissions"));
+                },
+                serenity::all::Channel::Guild(guild_channel) => {
+                    let perms = guild.user_permissions_in(&guild_channel, &member);
 
-                if !perms.contains(needed_permissions) {
-                    return Err(LuaError::runtime(format!(
-                        "User does not have the required permissions: {needed_permissions:?}: {user_id}",
-                    )));
+                    if !perms.contains(needed_permissions) {
+                        return Err(LuaError::runtime(format!(
+                            "User does not have the required permissions: {needed_permissions:?}: {user_id}",
+                        )));
+                    }
+
+                    return Ok((guild, member, guild_channel, perms))
                 }
-
-                return Ok((guild, member, guild_channel, perms))
-            }
-            serenity::all::Channel::GuildThread(gt) => return self.check_channel_permissions(gt.owner_id, gt.parent_id.widen(), needed_permissions).await,
-            _ => {
-                return Err(LuaError::runtime("Unsupported channel type in check_channel_permissions"));
+                serenity::all::Channel::GuildThread(gt) => {
+                    // Threads are always under a parent channel, so we need to get the parent channel
+                    id = gt.parent_id.widen();
+                    continue; // Loop again with the parent channel id
+                },
+                _ => {
+                    return Err(LuaError::runtime("Unsupported channel type in check_channel_permissions"));
+                }
             }
         }
     }
