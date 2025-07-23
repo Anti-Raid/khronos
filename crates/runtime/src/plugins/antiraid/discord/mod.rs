@@ -167,6 +167,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         serenity::all::GuildChannel,
         serenity::all::Permissions,
     )> {
+        // This call should do access control checks (channel in guild) etc.
         let channel = self
             .discord_provider
             .get_channel(channel_id)
@@ -193,11 +194,6 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Private channels are not supported by check_channel_permissions"));
             },
             serenity::all::Channel::Guild(guild_channel) => {
-                // Should never happen, but just in case
-                if guild_channel.base.guild_id != guild.id {
-                    return Err(LuaError::runtime("Internal Error: Guild channel does not belong to the current guild"));
-                }
-
                 let perms = guild.user_permissions_in(&guild_channel, &member);
 
                 if !perms.contains(needed_permissions) {
@@ -512,11 +508,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             this.check_action("get_channel".to_string())
                 .map_err(LuaError::external)?;
 
-            // Perform required checks
-            let guild_channel = this.discord_provider.get_channel(channel_id).await
+            // Perform required checks. Note that get_channel does access control
+            let channel = this.discord_provider.get_channel(channel_id).await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-            Ok(Lazy::new(guild_channel))
+            Ok(Lazy::new(channel))
         });
 
         // Should be documented
