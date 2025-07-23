@@ -62,7 +62,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
 }
 
 /// Validates a set of components
-pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crate::Error> {
+pub fn validate_components(rows: &[serenity::all::Component]) -> Result<(), crate::Error> {
     const MAX_BUTTONS_PER_ACTION_ROW: usize = 5;
     const MAX_SELECTS_PER_ACTION_ROW: usize = 1;
     const MAX_POSSIBLE_COMPONENTS: usize = 5; // 5 action rows, each with 5 components
@@ -72,6 +72,11 @@ pub fn validate_components(rows: &[serenity::all::ActionRow]) -> Result<(), crat
     }
 
     for row in rows.iter() {
+        let row = match row {
+            serenity::all::Component::ActionRow(ar) => ar,
+            _ => continue // Ignore non-action row components
+        };
+
         if row.kind != serenity::all::ComponentType::ActionRow {
             return Err("Invalid component type, must be an action row".into());
         }

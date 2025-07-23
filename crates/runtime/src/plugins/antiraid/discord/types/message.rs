@@ -22,7 +22,7 @@ pub struct CreateMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_reference: Option<MessageReference>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
     #[serde(default)]
     pub sticker_ids: Vec<StickerId>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -48,7 +48,7 @@ pub struct EditMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<ActionRow>>,
+    pub components: Option<Vec<Component>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<CreateMessageAttachment>,
 }
