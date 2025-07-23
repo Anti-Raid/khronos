@@ -28,6 +28,8 @@ pub struct BulkOpData {
     pub max_ops: usize,
     /// When the bulk operation was last waited on
     pub last_waited: RefCell<std::time::Instant>,
+    /// The lua thread which initiated the bulk operation
+    pub thread: LuaThread, // This is used to ensure that the bulk operation is only used by the thread that initiated it
 }
 
 #[derive(Clone)]
@@ -54,7 +56,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         Ok(())
     }
 
-    pub fn check_action(&self, action: String) -> LuaResult<()> {
+    pub fn check_action(&self, lua: &Lua, action: String) -> LuaResult<()> {
         if !self.limitations.has_cap(&format!("discord:{action}")) {
             return Err(LuaError::runtime(format!(
                 "Discord action `{action}` not allowed in this template context",
@@ -62,6 +64,10 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         }
 
         if let Some(bulk_op) = &self.bulk_op {
+            if lua.current_thread() != bulk_op.thread {
+                return Err(LuaError::runtime("Bulk operations can only be performed from the thread that initiated the bulk operation"));
+            }
+
             // Check expiry
             if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
                 return Err(LuaError::runtime("Bulk operation maximum wait period has passed"));
@@ -252,8 +258,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Bulk operation support
-        methods.add_method("antiraid_bulk_op", |_, this, _: ()| {
-            this.check_action("antiraid_bulk_op".to_string())
+        methods.add_method("antiraid_bulk_op", |lua, this, _: ()| {
+            this.check_action(&lua, "antiraid_bulk_op".to_string())
                 .map_err(LuaError::external)?;
 
             if this.bulk_op.is_some() {
@@ -264,6 +270,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 op_performed: RefCell::new(0), // Any op which calls check_action will increment this
                 max_ops: DEFAULT_BULK_OP_MAX_OPS, // Default max ops
                 last_waited: RefCell::new(std::time::Instant::now()), // Last waited time
+                thread: lua.current_thread()
             });
 
             let executor = DiscordActionExecutor {
@@ -278,13 +285,17 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         methods.add_scheduler_async_method(
             "antiraid_bulk_op_wait",
-            async move |_, this, _: ()| {
-                this.check_action("antiraid_bulk_op_wait".to_string())
+            async move |lua, this, _: ()| {
+                this.check_action(&lua, "antiraid_bulk_op_wait".to_string())
                 .map_err(LuaError::external)?;
 
                 let Some(bulk_op) = &this.bulk_op else {
                     return Err(LuaError::runtime("This DiscordActionExecutor is not set up for bulk operations"));
                 };
+
+                if lua.current_thread() != bulk_op.thread {
+                    return Err(LuaError::runtime("antiraid_bulk_op_wait can only be called from the thread that initiated the bulk operation"));
+                }
 
                 // Check expiry
                 if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
@@ -430,7 +441,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_audit_logs", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetAuditLogOptions>(data)?;
 
-            this.check_action("get_audit_logs".to_string())
+            this.check_action(&lua, "get_audit_logs".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -458,8 +469,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Auto Moderation
 
         // Should be documented.
-        methods.add_scheduler_async_method("list_auto_moderation_rules", async move |_, this, _: ()| {
-            this.check_action("list_auto_moderation_rules".to_string())
+        methods.add_scheduler_async_method("list_auto_moderation_rules", async move |lua, this, _: ()| {
+            this.check_action(&lua, "list_auto_moderation_rules".to_string())
             .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -483,7 +494,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_auto_moderation_rule", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetAutoModerationRuleOptions>(data)?;
 
-            this.check_action("get_auto_moderation_rule".to_string())
+            this.check_action(&lua, "get_auto_moderation_rule".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -507,7 +518,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_auto_moderation_rule", async move |lua, this, data: LuaValue| {
             let data: CreateAutoModerationRuleOptions = lua.from_value(data)?;
 
-            this.check_action("create_auto_moderation_rule".to_string())
+            this.check_action(&lua, "create_auto_moderation_rule".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -536,7 +547,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("edit_auto_moderation_rule", async move |lua, this, data: LuaValue| {
             let data: EditAutoModerationRuleOptions = lua.from_value(data)?;
 
-            this.check_action("edit_auto_moderation_rule".to_string())
+            this.check_action(&lua, "edit_auto_moderation_rule".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -565,7 +576,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_auto_moderation_rule", async move |lua, this, data: LuaValue| {
             let data: DeleteAutoModerationRuleOptions = lua.from_value(data)?;
 
-            this.check_action("delete_auto_moderation_rule".to_string())
+            this.check_action(&lua, "delete_auto_moderation_rule".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -591,12 +602,12 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Channel
 
         // Should be documented
-        methods.add_scheduler_async_method("get_channel", async move |_lua, this, channel_id: String| {
+        methods.add_scheduler_async_method("get_channel", async move |lua, this, channel_id: String| {
             let channel_id: serenity::all::GenericChannelId = channel_id
                 .parse()
                 .map_err(|e: ParseIdError| LuaError::external(e.to_string()))?;
 
-            this.check_action("get_channel".to_string())
+            this.check_action(&lua, "get_channel".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks. Note that get_channel does access control
@@ -610,7 +621,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("edit_channel", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::EditChannelOptions>(data)?;
 
-            this.check_action("edit_channel".to_string())
+            this.check_action(&lua, "edit_channel".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -719,7 +730,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_channel", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::DeleteChannelOptions>(data)?;
 
-            this.check_action("delete_channel".to_string())
+            this.check_action(&lua, "delete_channel".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -770,7 +781,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("edit_channel_permissions", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::EditChannelPermissionsOptions>(data)?;
 
-            this.check_action("edit_channel_permissions".to_string())
+            this.check_action(&lua, "edit_channel_permissions".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -823,11 +834,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(())
         });
 
-        methods.add_scheduler_async_method("get_channel_invites", async move |_, this, channel_id: String| {
+        methods.add_scheduler_async_method("get_channel_invites", async move |lua, this, channel_id: String| {
             let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
             .map_err(|e| LuaError::external(e.to_string()))?;
 
-            this.check_action("get_channel_invites".to_string())
+            this.check_action(&lua, "get_channel_invites".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -851,7 +862,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_channel_invite", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateChannelInviteOptions>(data)?;
 
-            this.check_action("create_channel_invite".to_string())
+            this.check_action(&lua, "create_channel_invite".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -878,7 +889,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_channel_permission", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::DeleteChannelPermissionOptions>(data)?;
 
-            this.check_action("delete_channel_permission".to_string())
+            this.check_action(&lua, "delete_channel_permission".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -905,7 +916,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("follow_announcement_channel", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::FollowAnnouncementChannel>(data)?;
 
-            this.check_action("follow_announcement_channel".to_string())
+            this.check_action(&lua, "follow_announcement_channel".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -932,8 +943,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Guild
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild", async move |_, this, _: ()| {
-            this.check_action("get_guild".to_string())
+        methods.add_scheduler_async_method("get_guild", async move |lua, this, _: ()| {
+            this.check_action(&lua, "get_guild".to_string())
             .map_err(LuaError::external)?;
 
             let guild = this.discord_provider
@@ -945,7 +956,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_method("antiraid_guild_member_count", move |lua, this, _: ()| {
-            this.check_action("get_cached_guild".to_string())
+            this.check_action(&lua, "get_cached_guild".to_string())
             .map_err(LuaError::external)?;
 
             let guild = this.discord_provider
@@ -958,8 +969,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_preview", async move |_, this, _: ()| {
-            this.check_action("get_guild_preview".to_string())
+        methods.add_scheduler_async_method("get_guild_preview", async move |lua, this, _: ()| {
+            this.check_action(&lua, "get_guild_preview".to_string())
             .map_err(LuaError::external)?;
 
             let guild_preview = this.discord_provider
@@ -973,7 +984,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("modify_guild", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::ModifyGuildOptions>(data)?;
 
-            this.check_action("modify_guild".to_string())
+            this.check_action(&lua, "modify_guild".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -1129,8 +1140,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Delete guild will not be implemented as we can't really use it
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_channels", async move |_, this, _: ()| {
-            this.check_action("get_guild_channels".to_string())
+        methods.add_scheduler_async_method("get_guild_channels", async move |lua, this, _: ()| {
+            this.check_action(&lua, "get_guild_channels".to_string())
             .map_err(LuaError::external)?;
 
             let chans = this.discord_provider
@@ -1145,7 +1156,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_guild_channel", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateChannelOptions>(data)?;
 
-            this.check_action("create_guild_channel".to_string())
+            this.check_action(&lua, "create_guild_channel".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1235,7 +1246,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             async move |lua, this, data: LuaValue| {
                 let data = lua.from_value::<Vec<structs::ModifyChannelPosition>>(data)?;
 
-                this.check_action("modify_guild_channel_positions".to_string())
+                this.check_action(&lua, "modify_guild_channel_positions".to_string())
                     .map_err(LuaError::external)?;
 
                 let Some(bot_user) = this.context.current_user() else {
@@ -1256,8 +1267,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         );
 
         // Should be documented
-        methods.add_scheduler_async_method("list_active_guild_threads", async move |_, this, _: ()| {
-            this.check_action("list_active_guild_threads".to_string())
+        methods.add_scheduler_async_method("list_active_guild_threads", async move |lua, this, _: ()| {
+            this.check_action(&lua, "list_active_guild_threads".to_string())
             .map_err(LuaError::external)?;
 
             let data = this.discord_provider
@@ -1269,11 +1280,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_member", async move |_, this, user_id: String| {
+        methods.add_scheduler_async_method("get_guild_member", async move |lua, this, user_id: String| {
             let user_id = user_id.parse()
             .map_err(LuaError::external)?;
 
-            this.check_action("get_guild_member".to_string())
+            this.check_action(&lua, "get_guild_member".to_string())
                 .map_err(LuaError::external)?;
 
             let data = this.discord_provider
@@ -1288,7 +1299,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("list_guild_members", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetGuildMembersOptions>(data)?;
 
-            this.check_action("list_guild_members".to_string())
+            this.check_action(&lua, "list_guild_members".to_string())
                 .map_err(LuaError::external)?;
 
             if let Some(limit) = data.limit {
@@ -1309,7 +1320,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("search_guild_members", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::SearchGuildMembersOptions>(data)?;
 
-            this.check_action("search_guild_members".to_string())
+            this.check_action(&lua, "search_guild_members".to_string())
                 .map_err(LuaError::external)?;
 
             if let Some(limit) = data.limit {
@@ -1330,7 +1341,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("modify_guild_member", async move |lua, this, data: LuaValue| {
             let mut data = lua.from_value::<structs::ModifyGuildMemberOptions>(data)?;
 
-            this.check_action("modify_guild_member".to_string())
+            this.check_action(&lua, "modify_guild_member".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1449,7 +1460,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("add_guild_member_role", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::AddGuildMemberRoleOptions>(data)?;
 
-            this.check_action("add_guild_member_role".to_string())
+            this.check_action(&lua, "add_guild_member_role".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1504,7 +1515,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("remove_guild_member_role", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::RemoveGuildMemberRoleOptions>(data)?;
 
-            this.check_action("remove_guild_member_role".to_string())
+            this.check_action(&lua, "remove_guild_member_role".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1559,7 +1570,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("remove_guild_member", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::RemoveGuildMemberOptions>(data)?;
 
-            this.check_action("remove_guild_member".to_string())
+            this.check_action(&lua, "remove_guild_member".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1589,7 +1600,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_guild_bans", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetGuildBansOptions>(data)?;
 
-            this.check_action("get_guild_bans".to_string())
+            this.check_action(&lua, "get_guild_bans".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1624,11 +1635,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_ban", async move |_, this, user_id: String| {
+        methods.add_scheduler_async_method("get_guild_ban", async move |lua, this, user_id: String| {
             let user_id = user_id.parse::<serenity::all::UserId>()
             .map_err(|e| LuaError::external(format!("Error while parsing user id: {e}")))?;
 
-            this.check_action("get_guild_ban".to_string())
+            this.check_action(&lua, "get_guild_ban".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1651,7 +1662,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_guild_ban", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateGuildBanOptions>(data)?;
 
-            this.check_action("create_guild_ban".to_string())
+            this.check_action(&lua, "create_guild_ban".to_string())
                 .map_err(LuaError::external)?;
 
             let delete_message_seconds = {
@@ -1699,7 +1710,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("remove_guild_ban", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::RemoveGuildBanOptions>(data)?;
 
-            this.check_action("remove_guild_ban".to_string())
+            this.check_action(&lua, "remove_guild_ban".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -1728,8 +1739,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_roles", async move |_, this, _g: ()| {
-            this.check_action("get_guild_roles".to_string())
+        methods.add_scheduler_async_method("get_guild_roles", async move |lua, this, _g: ()| {
+            this.check_action(&lua, "get_guild_roles".to_string())
             .map_err(LuaError::external)?;
 
             let roles = this.discord_provider
@@ -1741,11 +1752,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_role", async move |_, this, role_id: String| {
+        methods.add_scheduler_async_method("get_guild_role", async move |lua, this, role_id: String| {
             let role_id = role_id.parse::<serenity::all::RoleId>()
             .map_err(LuaError::external)?;
 
-            this.check_action("get_guild_role".to_string())
+            this.check_action(&lua, "get_guild_role".to_string())
                 .map_err(LuaError::external)?;
 
             let role = this.discord_provider
@@ -1760,7 +1771,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_guild_role", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateGuildRoleOptions>(data)?;
 
-            this.check_action("create_guild_role".to_string())
+            this.check_action(&lua, "create_guild_role".to_string())
                 .map_err(LuaError::external)?;
 
             if let Some(ref name) = data.data.name {
@@ -1827,7 +1838,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("modify_guild_role_positions", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::ModifyRolePositionOptions>(data)?;
 
-            this.check_action("modify_guild_role_positions".to_string())
+            this.check_action(&lua, "modify_guild_role_positions".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -1870,7 +1881,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("modify_guild_role", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::EditGuildRoleOptions>(data)?;
 
-            this.check_action("modify_guild_role".to_string())
+            this.check_action(&lua, "modify_guild_role".to_string())
                 .map_err(LuaError::external)?;
 
             if let Some(ref name) = data.data.name {
@@ -1966,7 +1977,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Cannot remove the default @everyone role"));
             }
 
-            this.check_action("delete_guild_role".to_string())
+            this.check_action(&lua, "delete_guild_role".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -2020,7 +2031,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_invite", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetInviteOptions>(data)?;
 
-            this.check_action("get_invite".to_string())
+            this.check_action(&lua, "get_invite".to_string())
                 .map_err(LuaError::external)?;
 
             let invite = this.discord_provider
@@ -2034,7 +2045,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_invite", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::DeleteInviteOptions>(data)?;
 
-            this.check_action("delete_invite".to_string())
+            this.check_action(&lua, "delete_invite".to_string())
                 .map_err(LuaError::external)?;
 
             this.check_reason(&data.reason)
@@ -2082,7 +2093,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_channel_messages", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetMessagesOptions>(data)?;
 
-            this.check_action("get_channel_messages".to_string())
+            this.check_action(&lua, "get_channel_messages".to_string())
                 .map_err(LuaError::external)?;
 
             let Some(bot_user) = this.context.current_user() else {
@@ -2113,7 +2124,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_channel_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetMessageOptions>(data)?;
 
-            this.check_action("get_channel_message".to_string())
+            this.check_action(&lua, "get_channel_message".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2148,7 +2159,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             validators::validate_message(&data.data)
                 .map_err(|x| LuaError::external(x.to_string()))?;
 
-            this.check_action("create_message".to_string())
+            this.check_action(&lua, "create_message".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2174,14 +2185,14 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(msg))
         });
 
-        methods.add_scheduler_async_method("crosspost_message", async move |_lua, this, (channel_id, message_id): (String, String)| {
+        methods.add_scheduler_async_method("crosspost_message", async move |lua, this, (channel_id, message_id): (String, String)| {
             let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id = message_id.parse::<serenity::all::MessageId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
 
-            this.check_action("crosspost_message".to_string())
+            this.check_action(&lua, "crosspost_message".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2205,7 +2216,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_reaction", async move |lua, this, data: LuaValue| {
             let data: structs::CreateReactionOptions = lua.from_value(data)?;
 
-            this.check_action("create_reaction".to_string())
+            this.check_action(&lua, "create_reaction".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2229,7 +2240,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_own_reaction", async move |lua, this, data: LuaValue| {
             let data: structs::DeleteOwnReactionOptions = lua.from_value(data)?;
 
-            this.check_action("delete_own_reaction".to_string())
+            this.check_action(&lua, "delete_own_reaction".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2253,7 +2264,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_user_reaction", async move |lua, this, data: LuaValue| {
             let data: structs::DeleteUserReactionOptions = lua.from_value(data)?;
 
-            this.check_action("delete_user_reaction".to_string())
+            this.check_action(&lua, "delete_user_reaction".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2276,7 +2287,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_reactions", async move |lua, this, data: LuaValue| {
             let data: structs::GetReactionsOptions = lua.from_value(data)?;
 
-            this.check_action("get_reactions".to_string())
+            this.check_action(&lua, "get_reactions".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2305,14 +2316,14 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(users))
         });
 
-        methods.add_scheduler_async_method("delete_all_reactions", async move |_lua, this, (channel_id, message_id): (String, String)| {
+        methods.add_scheduler_async_method("delete_all_reactions", async move |lua, this, (channel_id, message_id): (String, String)| {
             let channel_id: serenity::all::GenericChannelId = channel_id.parse()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id: serenity::all::MessageId = message_id.parse()
                 .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
 
-            this.check_action("delete_all_reactions".to_string())
+            this.check_action(&lua, "delete_all_reactions".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2336,7 +2347,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_all_reactions_for_emoji", async move |lua, this, data: LuaValue| {
             let data: structs::DeleteAllReactionsForEmojiOptions = lua.from_value(data)?;
 
-            this.check_action("delete_all_reactions_for_emoji".to_string())
+            this.check_action(&lua, "delete_all_reactions_for_emoji".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2363,7 +2374,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             validators::validate_message_edit(&data.data)
                 .map_err(|x| LuaError::external(x.to_string()))?;
 
-            this.check_action("edit_message".to_string())
+            this.check_action(&lua, "edit_message".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2389,14 +2400,14 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(msg))
         });
 
-        methods.add_scheduler_async_method("delete_message", async move |_lua, this, (channel_id, message_id, reason): (String, String, String)| {
+        methods.add_scheduler_async_method("delete_message", async move |lua, this, (channel_id, message_id, reason): (String, String, String)| {
             let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
             let message_id = message_id.parse::<serenity::all::MessageId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing message id: {e}")))?;
 
-            this.check_action("delete_message".to_string())
+            this.check_action(&lua, "delete_message".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2416,7 +2427,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(())
         });
 
-        methods.add_scheduler_async_method("bulk_delete_messages", async move |_lua, this, (channel_id, messages, reason): (String, Vec<String>, String)| {
+        methods.add_scheduler_async_method("bulk_delete_messages", async move |lua, this, (channel_id, messages, reason): (String, Vec<String>, String)| {
             let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
                 .map_err(|e| LuaError::external(format!("Error while parsing channel id: {e}")))?;
 
@@ -2428,7 +2439,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 );
             }
 
-            this.check_action("bulk_delete_messages".to_string())
+            this.check_action(&lua, "bulk_delete_messages".to_string())
                 .map_err(LuaError::external)?;
 
             // Perform required checks
@@ -2452,7 +2463,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_interaction_response", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateInteractionResponseOptions>(data)?;
 
-            this.check_action("create_interaction_response".to_string())
+            this.check_action(&lua, "create_interaction_response".to_string())
                 .map_err(LuaError::external)?;
 
             let files = data.data.take_files().map_err(|e| LuaError::external(e.to_string()))?;
@@ -2467,8 +2478,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         methods.add_scheduler_async_method(
             "get_original_interaction_response",
-            async move |_, this, interaction_token: String| {
-                this.check_action("get_original_interaction_response".to_string())
+            async move |lua, this, interaction_token: String| {
+                this.check_action(&lua, "get_original_interaction_response".to_string())
                 .map_err(LuaError::external)?;
 
                 let resp = this.discord_provider
@@ -2483,7 +2494,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("edit_original_interaction_response", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::EditInteractionResponseOptions>(data)?;
 
-            this.check_action("edit_original_interaction_response".to_string())
+            this.check_action(&lua, "edit_original_interaction_response".to_string())
                 .map_err(LuaError::external)?;
 
             let files = if let Some(ref attachments) = data.data.attachments {
@@ -2503,8 +2514,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         methods.add_scheduler_async_method(
             "delete_original_interaction_response",
-            async move |_, this, interaction_token: String| {
-                this.check_action("delete_original_interaction_response".to_string())
+            async move |lua, this, interaction_token: String| {
+                this.check_action(&lua, "delete_original_interaction_response".to_string())
                 .map_err(LuaError::external)?;
 
                 this.discord_provider
@@ -2519,7 +2530,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("get_followup_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetFollowupMessageOptions>(data)?;
 
-            this.check_action("get_followup_message".to_string())
+            this.check_action(&lua, "get_followup_message".to_string())
                 .map_err(LuaError::external)?;
 
             let msg = this.discord_provider
@@ -2533,7 +2544,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("create_followup_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateFollowupMessageOptions>(data)?;
 
-            this.check_action("create_followup_message".to_string())
+            this.check_action(&lua, "create_followup_message".to_string())
                 .map_err(LuaError::external)?;
 
             let files = if let Some(ref attachments) = data.data.attachments {
@@ -2554,7 +2565,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("edit_followup_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::EditFollowupMessageOptions>(data)?;
 
-            this.check_action("edit_followup_message".to_string())
+            this.check_action(&lua, "edit_followup_message".to_string())
                 .map_err(LuaError::external)?;
 
             let files = if let Some(ref attachments) = data.data.attachments {
@@ -2575,7 +2586,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         methods.add_scheduler_async_method("delete_followup_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::DeleteFollowupMessageOptions>(data)?;
 
-            this.check_action("delete_followup_message".to_string())
+            this.check_action(&lua, "delete_followup_message".to_string())
                 .map_err(LuaError::external)?;
 
             this.discord_provider
@@ -2589,11 +2600,11 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Uncategorized
 
         // Should be documented
-        methods.add_scheduler_async_method("get_guild_command", async move |_, this, cmd_id: String| {
+        methods.add_scheduler_async_method("get_guild_command", async move |lua, this, cmd_id: String| {
             let command_id: serenity::all::CommandId = cmd_id.parse().map_err(|e| {
                 LuaError::external(format!("Invalid command id: {e}"))
             })?;
-            this.check_action("get_guild_command".to_string())
+            this.check_action(&lua, "get_guild_command".to_string())
                 .map_err(LuaError::external)?;
 
             let resp = this.discord_provider
@@ -2604,8 +2615,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(resp))
         });
 
-        methods.add_scheduler_async_method("get_guild_commands", async move |_, this, _g: ()| {
-            this.check_action("get_guild_commands".to_string())
+        methods.add_scheduler_async_method("get_guild_commands", async move |lua, this, _g: ()| {
+            this.check_action(&lua, "get_guild_commands".to_string())
             .map_err(LuaError::external)?;
 
             let resp = this.discord_provider
@@ -2617,7 +2628,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("create_guild_command", async move |lua, this, data: LuaValue| {
-            this.check_action("create_guild_command".to_string())
+            this.check_action(&lua, "create_guild_command".to_string())
             .map_err(LuaError::external)?;
 
             let data = lua.from_value::<structs::CreateCommandOptions>(data)?;
@@ -2634,7 +2645,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         methods.add_scheduler_async_method("create_guild_commands", async move |lua, this, data: LuaValue| {
-            this.check_action("create_guild_commands".to_string())
+            this.check_action(&lua, "create_guild_commands".to_string())
             .map_err(LuaError::external)?;
 
             let data = lua.from_value::<structs::CreateCommandsOptions>(data)?;
