@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use rustrict::{Censor, Type};
 
 use crate::utils::ensure_safe;
+use super::types::serenity_component::{ComponentType, Component, ActionRowComponent};
 
 /// Checks if a string isn't offensive
 pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
@@ -62,7 +63,7 @@ pub fn validate_string_safe(input: &str) -> Result<(), crate::Error> {
 }
 
 /// Validates a set of components
-pub fn validate_components(rows: &[serenity::all::Component]) -> Result<(), crate::Error> {
+pub fn validate_components(rows: &[Component]) -> Result<(), crate::Error> {
     const MAX_BUTTONS_PER_ACTION_ROW: usize = 5;
     const MAX_SELECTS_PER_ACTION_ROW: usize = 1;
     const MAX_POSSIBLE_COMPONENTS: usize = 5; // 5 action rows, each with 5 components
@@ -73,11 +74,11 @@ pub fn validate_components(rows: &[serenity::all::Component]) -> Result<(), crat
 
     for row in rows.iter() {
         let row = match row {
-            serenity::all::Component::ActionRow(ar) => ar,
+            Component::ActionRow(ar) => ar,
             _ => continue // Ignore non-action row components
         };
 
-        if row.kind != serenity::all::ComponentType::ActionRow {
+        if row.kind != ComponentType::ActionRow {
             return Err("Invalid component type, must be an action row".into());
         }
 
@@ -87,7 +88,7 @@ pub fn validate_components(rows: &[serenity::all::Component]) -> Result<(), crat
 
         for component in row.components.iter() {
             match component {
-                serenity::all::ActionRowComponent::Button(b) => {
+                ActionRowComponent::Button(b) => {
                     if let Some(label) = b.label.as_ref() {
                         validate_string_offensive(label.as_str())?;
                     }
@@ -103,7 +104,7 @@ pub fn validate_components(rows: &[serenity::all::Component]) -> Result<(), crat
                     }
                     num_buttons += 1;
                 }
-                serenity::all::ActionRowComponent::SelectMenu(sm) => {
+                ActionRowComponent::SelectMenu(sm) => {
                     if let Some(placeholder) = sm.placeholder.as_ref() {
                         validate_string_offensive(placeholder.as_str())?;
                     }

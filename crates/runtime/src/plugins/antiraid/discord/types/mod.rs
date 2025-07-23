@@ -9,6 +9,7 @@ pub mod interactions;
 pub mod message;
 pub mod poll;
 pub mod reaction;
+pub mod serenity_component;
 
 pub use app_commands::*;
 pub use auto_moderation::*;

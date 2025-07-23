@@ -1,5 +1,5 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serenity::all::*;
 
 /// A builder to create an embed in a message
 ///
@@ -17,10 +17,10 @@ pub struct CreateEmbed {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<Timestamp>,
+    pub timestamp: Option<DateTime<Utc>>,
     #[serde(rename = "color")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub colour: Option<Colour>,
+    pub colour: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub footer: Option<CreateEmbedFooter>,
     #[serde(skip_serializing_if = "Option::is_none")]

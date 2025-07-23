@@ -6,6 +6,7 @@ use serde::de::Error;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 use std::collections::HashMap;
+use super::serenity_component::Component as SerenityComponent;
 
 /// [Discord docs](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object).
 #[derive(Clone, Debug)]
@@ -108,7 +109,7 @@ pub struct CreateInteractionResponseMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<Component>>,
+    pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -268,7 +269,7 @@ pub struct CreateInteractionResponseFollowup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<Component>>,
+    pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -288,7 +289,32 @@ pub struct EditWebhookMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<Vec<Component>>,
+    pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<CreateMessageAttachment>,
+}
+
+#[cfg(test)]
+mod test {
+    use mluau::LuaSerdeExt;
+    use crate::plugins::antiraid::discord::types::serenity_component;
+    #[test]
+    fn test_comp_serde() {
+        let src = serde_json::json!({
+            "type": 1,
+            "components": [
+                {
+                    "type": 2,
+                    "style": 1,
+                    "label": "Support Server",
+                    "url": "https://discord.gg/9BJWSrEBBJ"
+                }
+            ]
+        });
+        println!("{:?}", src);
+        let _src_comp: serenity_component::ActionRow = serde_json::from_value(src.clone()).unwrap();
+        let lua = mluau::Lua::new();
+        let data = lua.to_value(&src).unwrap();
+        let _comp: serenity_component::Component = lua.from_value(data).unwrap();
+    }
 }
