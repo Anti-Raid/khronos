@@ -193,6 +193,11 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Private channels are not supported by check_channel_permissions"));
             },
             serenity::all::Channel::Guild(guild_channel) => {
+                // Should never happen, but just in case
+                if guild_channel.base.guild_id != guild.id {
+                    return Err(LuaError::runtime("Internal Error: Guild channel does not belong to the current guild"));
+                }
+
                 let perms = guild.user_permissions_in(&guild_channel, &member);
 
                 if !perms.contains(needed_permissions) {
