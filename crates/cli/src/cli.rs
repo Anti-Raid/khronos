@@ -229,7 +229,6 @@ impl Cli {
             "AntiRaid".to_string(),
             event.to_string(),
             event.to_value().expect("Failed to convert event to value"),
-            event.author(),
         );
 
         Event::from_create_event(&create_event)
