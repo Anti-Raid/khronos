@@ -312,7 +312,9 @@ mod test {
             ]
         });
         println!("{:?}", src);
-        let _src_comp: serenity_component::ActionRow = serde_json::from_value(src.clone()).unwrap();
+        let src_comp: serenity_component::Component = serde_json::from_value(src.clone()).unwrap();
+        let json_ser = serde_json::to_string(&src_comp).unwrap();
+        let _src_comp: serenity_component::Component = serde_json::from_str(&json_ser).unwrap();
         let lua = mluau::Lua::new();
         let data = lua.to_value(&src).unwrap();
         let _comp: serenity_component::Component = lua.from_value(data).unwrap();

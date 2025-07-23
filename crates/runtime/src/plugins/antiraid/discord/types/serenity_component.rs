@@ -90,6 +90,7 @@ internal_enum_number! {
 ///   other message limitations are applied.
 #[derive(Clone, Debug, Serialize)]
 #[non_exhaustive]
+#[serde(untagged)]
 pub enum Component {
     ActionRow(ActionRow),
     Button(Button),
