@@ -32,7 +32,6 @@ pub struct CliKhronosContext {
     pub guild_id: Option<serenity::all::GuildId>,
     pub owner_guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
-    pub cache: Option<Arc<serenity::cache::Cache>>,
     pub template_name: String,
     pub script_data: ScriptData,
     pub pool: Option<sqlx::PgPool>,
@@ -86,7 +85,7 @@ impl KhronosContext for CliKhronosContext {
     }
 
     fn current_user(&self) -> Option<serenity::all::CurrentUser> {
-        self.cache.as_ref().map(|c| c.current_user().clone())
+        None // CLI mode does not have a current user yet
     }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {
@@ -126,7 +125,6 @@ impl KhronosContext for CliKhronosContext {
 
         self.http.as_ref().map(|http| CliDiscordProvider {
             http: http.clone(),
-            cache: self.cache.clone(),
             guild_id,
         })
     }
@@ -554,7 +552,6 @@ impl DataStoreProvider for CliDataStoreProvider {
 pub struct CliDiscordProvider {
     guild_id: serenity::all::GuildId,
     http: Arc<serenity::all::Http>,
-    cache: Option<Arc<serenity::cache::Cache>>,
 }
 
 impl DiscordProvider for CliDiscordProvider {
@@ -565,14 +562,6 @@ impl DiscordProvider for CliDiscordProvider {
     async fn get_guild(
         &self,
     ) -> serenity::Result<serenity::model::prelude::PartialGuild, khronos_runtime::Error> {
-        {
-            if let Some(cache) = &self.cache {
-                if let Some(guild) = cache.guild(self.guild_id) {
-                    return Ok(guild.clone().into());
-                }
-            }
-        }
-
         // Fetch from HTTP
         self.http
             .get_guild(self.guild_id)
@@ -584,16 +573,6 @@ impl DiscordProvider for CliDiscordProvider {
         &self,
         user_id: serenity::all::UserId,
     ) -> serenity::Result<Option<serenity::all::Member>, khronos_runtime::Error> {
-        {
-            if let Some(cache) = &self.cache {
-                if let Some(guild) = cache.guild(self.guild_id) {
-                    if let Some(member) = guild.members.get(&user_id).cloned() {
-                        return Ok(Some(member));
-                    }
-                }
-            }
-        }
-
         // Fetch from HTTP
         self.http
             .get_member(self.guild_id, user_id)

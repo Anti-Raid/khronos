@@ -962,17 +962,16 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(Lazy::new(guild))
         });
 
-        methods.add_method("antiraid_guild_member_count", move |lua, this, _: ()| {
+        methods.add_scheduler_async_method("antiraid_guild_member_count", async move |lua, this, _: ()| {
             this.check_action(&lua, "get_cached_guild".to_string())
             .map_err(LuaError::external)?;
 
             let guild = this.discord_provider
-                .get_cached_guild(
-                    lua,
-                    |_, g| g.member_count
-                );
+                .get_guild()
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-            Ok(Lazy::new(guild))
+            Ok(guild.approximate_member_count.map(|x| x.get()).unwrap_or(0))
         });
 
         // Should be documented

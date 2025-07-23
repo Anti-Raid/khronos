@@ -1478,15 +1478,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gwevent"
-version = "0.0.1"
-source = "git+https://github.com/Anti-Raid/gwevent#2b620bbdb42619b75db5788a9d3359b503d1bc31"
-dependencies = [
- "serenity",
- "strum",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1728,9 +1719,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66d5bd4c6f02bf0542fad85d626775bab9258cf795a4256dcaf3161114d1df"
+checksum = "8d9b05277c7e8da2c93a568989bb6207bef0112e8d17df7a6eda4a3cf143bc5e"
 dependencies = [
  "base64",
  "bytes",
@@ -1744,7 +1735,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2",
+ "socket2 0.6.0",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2003,7 +1994,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b58db92f96b720de98181bbbe63c831e87005ab460c1bf306eb2622b4707997f"
 dependencies = [
- "socket2",
+ "socket2 0.5.10",
  "widestring",
  "windows-sys 0.48.0",
  "winreg",
@@ -2125,7 +2116,6 @@ dependencies = [
  "dirs",
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
  "env_logger",
- "gwevent",
  "indexmap",
  "khronos_runtime",
  "log",
@@ -3080,7 +3070,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls",
- "socket2",
+ "socket2 0.5.10",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
@@ -3117,7 +3107,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -3797,7 +3787,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.4"
-source = "git+https://github.com/Anti-Raid/serenity?branch=next#a1255e8d8ebf1f1fd73e74105674030cf03d9ced"
+source = "git+https://github.com/Anti-Raid/serenity?branch=next#5791edcc636cebd9e958ba0989decc2a8d153854"
 dependencies = [
  "aformat",
  "arrayvec",
@@ -3810,7 +3800,6 @@ dependencies = [
  "dashmap 6.1.0",
  "extract_map",
  "flate2",
- "foldhash",
  "futures",
  "mime_guess",
  "nonmax",
@@ -3822,7 +3811,6 @@ dependencies = [
  "serde_cow",
  "serde_json",
  "small-fixed-array",
- "strum",
  "time",
  "to-arraystring",
  "tokio",
@@ -3957,6 +3945,16 @@ checksum = "e22376abed350d73dd1cd119b57ffccad95b4e585a7cda43e286245ce23c0678"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "socket2"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
+dependencies = [
+ "libc",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4498,7 +4496,7 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "slab",
- "socket2",
+ "socket2 0.5.10",
  "tokio-macros",
  "windows-sys 0.52.0",
 ]

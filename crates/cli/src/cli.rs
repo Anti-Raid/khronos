@@ -1,4 +1,3 @@
-use crate::dispatch::parse_event;
 use crate::experiments::load_experiments;
 use crate::filestorage::FileStorageProvider;
 use crate::presets::impls::CreateEventFromPresetType;
@@ -6,6 +5,7 @@ use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
 use crate::repl_completer;
 use antiraid_types::ar_event::AntiraidEvent;
+use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::CreatedKhronosContext;
@@ -215,7 +215,6 @@ impl Cli {
             guild_id: self.guild_id,
             owner_guild_id: self.owner_guild_id,
             http: self.http.clone(),
-            cache: None, // Not yet implemented
             file_storage_provider: self.file_storage_provider.clone(),
             template_name: self.template_name.clone(),
             pool: self.pool.clone(),
@@ -225,7 +224,14 @@ impl Cli {
     /// Create an event from the parsed event args
     fn create_event(&self) -> Event {
         let event = self.parse_event_args();
-        let create_event = parse_event(&event).expect("Failed to parse event");
+
+        let create_event = CreateEvent::new(
+            "AntiRaid".to_string(),
+            event.to_string(),
+            event.to_value().expect("Failed to convert event to value"),
+            event.author(),
+        );
+
         Event::from_create_event(&create_event)
     }
 

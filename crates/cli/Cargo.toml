@@ -32,7 +32,6 @@ sqlx = { version = "0.8", features = [
 # Antiraid
 khronos_runtime = { path = "../runtime", features = ["repl"] }
 antiraid-types = { git = "https://github.com/Anti-Raid/antiraid-types" }
-gwevent = { git = "https://github.com/Anti-Raid/gwevent" }
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"
