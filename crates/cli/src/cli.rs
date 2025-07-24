@@ -231,7 +231,8 @@ impl Cli {
             event.to_value().expect("Failed to convert event to value"),
         );
 
-        Event::from_create_event(&create_event)
+        Event::from_create_event_with_runtime(&self.setup_data.main_isolate.inner(), create_event)
+        .expect("Failed to create event from CreateEvent")
     }
 
     pub async fn spawn_script(
