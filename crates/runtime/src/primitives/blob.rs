@@ -33,6 +33,7 @@ impl FromLua for BlobTaker {
                 let mut ud = ud.borrow_mut::<Blob>()?;
                 Ok(BlobTaker(std::mem::take(&mut ud.data)))
             },
+            LuaValue::String(str) => Ok(BlobTaker(str.as_bytes().to_vec())),
             _ => Err(LuaError::FromLuaConversionError {
                 from: "Blob | buffer",
                 to: "BlobTaker".to_string(),

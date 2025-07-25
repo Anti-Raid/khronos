@@ -4,7 +4,7 @@ use bstr::BString;
 use mluau::prelude::*;
 use bstr::ByteSlice;
 
-use crate::primitives::blob::Blob;
+use crate::primitives::blob::{Blob, BlobTaker};
 
 pub struct TarArchive {
     pub entries: HashMap<BString, Blob>,
@@ -18,15 +18,24 @@ impl TarArchive {
         }
     }
 
-    /// Reads a entry by name 
-    pub fn get_entry(&self, name: &str) -> Option<&Blob> {
-        self.entries.get(&BString::from(name))
+    /// Adds an entry to the tar archive
+    pub fn add_entry(&mut self, name: LuaString, blob: BlobTaker) {
+        self.entries.insert(BString::new(name.as_bytes().to_vec()), Blob { data: blob.0 });
+    }
+
+    /// Takes an entry by name, removing it from the archive
+    pub fn take_entry(&mut self, name: &str) -> Option<Blob> {
+        self.entries.remove(&BString::from(name))
     }
 
     /// Given a Blob, attempts to read it as a tar archive
     pub fn from_blob(blob: Blob) -> LuaResult<Self> {
+        Self::from_array(blob.data)
+    }
+
+    pub fn from_array(arr: Vec<u8>) -> LuaResult<Self> {
         let mut entries = HashMap::new();
-        let mut archive = tar::Archive::new(blob.data.as_slice());
+        let mut archive = tar::Archive::new(arr.as_slice());
 
         for entry in archive.entries()? {
             let mut entry = entry?;
@@ -66,14 +75,64 @@ impl TarArchive {
     }
 }
 
+impl LuaUserData for TarArchive {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(LuaMetaMethod::Len, |_, this, ()| {
+            Ok(this.entries.len())
+        });
+
+        methods.add_method_mut("take_entry", |lua, this, name: String| {
+            if let Some(blob) = this.take_entry(&name) {
+                let blob = blob.into_lua(lua)?;
+                Ok(blob)
+            } else {
+                Ok(LuaNil)
+            }
+        });
+
+        methods.add_method_mut("add_entry", |_, this, (name, blob): (LuaString, BlobTaker)| {
+            this.add_entry(name, blob);
+            Ok(())
+        });
+
+        methods.add_function("blob", |_, this: LuaAnyUserData| {
+            let this = this.take::<Self>()?;
+            this.to_blob()
+        });
+
+        methods.add_method("entries", |lua, this, ()| {
+            let mut entries = Vec::with_capacity(this.entries.len());
+            for section in this.entries.keys() {
+                entries.push(lua.create_string(section)?);   
+            }
+            Ok(entries)
+        });
+    }
+
+    #[cfg(feature = "repl")]
+    fn register(registry: &mut LuaUserDataRegistry<Self>) {
+        Self::add_fields(registry);
+        Self::add_methods(registry);
+        let fields = registry.fields(false).iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        registry.add_meta_field("__ud_fields", fields);
+    }
+}
+
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    // Null
     module.set("newblob", lua.create_function(|_, buf: mluau::Buffer| {
         Ok(Blob {
             data: buf.to_vec(),
         })
+    })?)?;
+
+    module.set("TarArchive", lua.create_function(|_, blob: Option<BlobTaker>| {
+        if let Some(blob) = blob {
+            TarArchive::from_array(blob.0).map_err(LuaError::external)
+        } else {
+            Ok(TarArchive::new())
+        }
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
@@ -95,7 +154,7 @@ mod tests {
             },
         );
         let blob = archive.to_blob().unwrap();
-        let tar_archive = TarArchive::from_blob(blob).expect("Failed to read tar archive");
-        assert_eq!(tar_archive.get_entry("foo/test.txt").unwrap().data, b"Hello, world!".as_bytes());
+        let mut tar_archive = TarArchive::from_blob(blob).expect("Failed to read tar archive");
+        assert_eq!(tar_archive.take_entry("foo/test.txt").unwrap().data, b"Hello, world!".as_bytes());
     }
 }
