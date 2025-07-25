@@ -44,6 +44,9 @@ aes-gcm = "0.10"
 argon2 = "0.5"
 zeroize = "1"
 
+# storage deps
+tar = "0.4"
+
 # @lune/datetime
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
