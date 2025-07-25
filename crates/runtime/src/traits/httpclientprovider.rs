@@ -8,14 +8,16 @@ pub trait HTTPClientProvider: 'static + Clone {
 
     /// Returns a domain whitelist for the HTTP client.
     fn domain_whitelist(&self) -> Vec<String> {
-        Vec::with_capacity(0) // No domains = no whitelist
+        //Vec::with_capacity(0) // No domains = no whitelist
+        vec![
+            "cdn.discordapp.com".to_string(), // Discord CDN only for now
+        ]
     }
 
     /// Returns a domain blacklist for the HTTP client.
     fn domain_blacklist(&self) -> Vec<String> {
         vec![
-            "discord.com".to_string(),
-            "discordapp.com".to_string(), // This should also block cdn.discordapp.com etc automatically
+            "discord.com".to_string(), // Discord uses cdn.discordapp.com, which won't be blocked by this
             "discord.gg".to_string(),
             "imgur.com".to_string(), // This should also block i.imgur.com etc automatically
             "tenor.com".to_string(), // This should also block i.tenor.com etc automatically

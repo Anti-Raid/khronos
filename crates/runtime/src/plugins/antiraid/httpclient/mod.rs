@@ -2,6 +2,7 @@
 
 mod dns;
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -36,6 +37,10 @@ impl LuaUserData for Url {
         fields.add_field_method_get("query", |_, this| {
             Ok(this.url.query().map(|q| q.to_string()))
         });
+
+        fields.add_field_method_get("fragment", |_, this| {
+            Ok(this.url.fragment().map(|f| f.to_string()))
+        });
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
@@ -50,17 +55,28 @@ pub struct Headers {
 }
 
 impl Headers {
-    fn to_headers_list(&self) -> Vec<(String, String, Vec<u8>)> {
-        self.headers
-            .iter()
-            .map(|(k, v)| {
-                (
-                    k.as_str().to_string(),
-                    v.to_str().unwrap_or_default().to_string(),
-                    v.as_bytes().to_vec(),
-                )
-            })
-            .collect()
+    fn to_headers_bytes(&self) -> HashMap<String, Vec<u8>> {
+        let mut headers = HashMap::new();
+        for (key, value) in self.headers.iter() {
+            headers.insert(
+                key.as_str().to_string(),
+                value.as_bytes().to_vec()
+            );
+        }
+
+        headers
+    }
+
+    fn to_headers_str(&self) -> HashMap<String, String> {
+        let mut headers = HashMap::new();
+        for (key, value) in self.headers.iter() {
+            headers.insert(
+                key.as_str().to_string(),
+                value.to_str().unwrap_or("").to_string(),
+            );
+        }
+
+        headers
     }
 }
 
@@ -92,8 +108,14 @@ impl LuaUserData for Headers {
             Ok(())
         });
 
-        methods.add_method("headers", |lua, this, _: ()| {
-            let headers = this.to_headers_list();
+        methods.add_method("headers_bytes", |lua, this, _: ()| {
+            let headers = this.to_headers_bytes();
+            let value = lua.to_value_with(&headers, LUA_SERIALIZE_OPTIONS)?;
+            Ok(value)
+        });
+
+        methods.add_method("headers_str", |lua, this, _: ()| {
+            let headers = this.to_headers_str();
             let value = lua.to_value_with(&headers, LUA_SERIALIZE_OPTIONS)?;
             Ok(value)
         });
@@ -165,12 +187,13 @@ impl<T: KhronosContext> Request<T> {
             .ok_or_else(|| LuaError::external("URL does not have a valid domain"))?;
 
         // Check if the domain is whitelisted (whitelist only applies if there is a whitelist)
-        if !self.httpclient_provider.domain_whitelist().is_empty()
-            && !self
-                .httpclient_provider
-                .domain_whitelist()
-                .contains(&domain.to_string())
-        {
+        if !self.httpclient_provider.domain_whitelist().is_empty() {
+            let domain_parts = Self::extract_domain_parts(domain);
+            for part in &domain_parts {
+                if self.httpclient_provider.domain_whitelist().contains(part) {
+                    return Ok(()); // Domain is whitelisted, which overrides the blacklist
+                }
+            }
             return Err(LuaError::external(format!(
                 "Domain {domain} is not whitelisted",
             )));
@@ -239,9 +262,12 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
             };
 
             let bytes = body.as_bytes();
-
-            let value = lua.to_value_with(&bytes, LUA_SERIALIZE_OPTIONS)?;
-            Ok(value)
+            if let Some(bytes) = bytes {
+                return lua.create_buffer(bytes.to_vec())
+                    .map_err(LuaError::external)
+                    .map(LuaValue::Buffer);
+            }
+            Ok(LuaValue::Nil)
         });
 
         fields.add_field_method_set("body_bytes", |lua, this, body: LuaValue| {
@@ -256,8 +282,12 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
                     *req_guard.body_mut() = Some(body);
                 }
                 LuaValue::Table(_) => {
-                    let body: Vec<u8> = lua.from_value(body)?;
-                    let body = reqwest::Body::from(body);
+                    let body: serde_json::Value = lua
+                        .from_value(body)
+                        .map_err(LuaError::external)?;
+                    let body_bytes = serde_json::to_vec(&body)
+                        .map_err(|e| LuaError::external(format!("Failed to serialize body: {}", e)))?;
+                    let body = reqwest::Body::from(body_bytes);
                     *req_guard.body_mut() = Some(body);
                 }
                 LuaValue::Buffer(b) => {
@@ -285,9 +315,15 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
         });
 
         fields.add_field_method_set("timeout", |_, this, timeout: LuaUserDataRef<TimeDelta>| {
+            let timeout = timeout.timedelta.to_std()
+                .map_err(LuaError::external)?;
+
+            if timeout > DEFAULT_TIMEOUT {
+                return Err(LuaError::external("Timeout cannot be greater than the default timeout"));
+            }
+
             let req_guard = &mut this.request;
-            *req_guard.timeout_mut() =
-                Some(timeout.timedelta.to_std().map_err(LuaError::external)?);
+            *req_guard.timeout_mut() = Some(timeout);
             Ok(())
         });
 
@@ -328,6 +364,7 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
                 let headers = this.request.headers().clone();
                 let body = this.request.body_mut().take();
                 let timeout = this.request.timeout();
+                let version = this.request.version();
 
                 let mut builder = this.client.request(method, url).headers(headers);
 
@@ -340,6 +377,8 @@ impl<T: KhronosContext> LuaUserData for Request<T> {
                 } else {
                     builder = builder.timeout(DEFAULT_TIMEOUT);
                 }
+
+                builder = builder.version(version);
 
                 builder
             };
@@ -409,7 +448,7 @@ impl LuaUserData for Response {
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_scheduler_async_method_mut("text", async |_lua, mut this, _g: ()| {
+        methods.add_scheduler_async_method_mut("text", async |lua, mut this, _g: ()| {
             let response = {
                 let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
@@ -417,8 +456,10 @@ impl LuaUserData for Response {
                 response
             };
 
-            let text = response.text().await.map_err(LuaError::external)?;
-            Ok(text)
+            let text = response.bytes().await.map_err(LuaError::external)?;
+            let lua_string = lua.create_string(text)
+                .map_err(LuaError::external)?;
+            Ok(lua_string)
         });
 
         methods.add_scheduler_async_method_mut("json", async |lua, mut this, _g: ()| {
@@ -505,6 +546,14 @@ pub fn init_plugin<T: KhronosContext>(
             Ok(Headers {
                 headers: reqwest::header::HeaderMap::new(),
             })
+        })?,
+    )?;
+
+    http_client.set(
+        "new_url",
+        lua.create_function(|_, url: String| {
+            let url = reqwest::Url::parse(&url).map_err(LuaError::external)?;
+            Ok(Url { url })
         })?,
     )?;
 
