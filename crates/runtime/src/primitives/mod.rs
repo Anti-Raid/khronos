@@ -1,6 +1,7 @@
 pub mod context;
 pub mod event;
 pub mod lazy;
+pub mod blob;
 
 use mluau::prelude::*;
 use std::cell::RefCell;

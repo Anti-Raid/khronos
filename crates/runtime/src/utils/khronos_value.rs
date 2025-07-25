@@ -2,7 +2,7 @@ use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::primitives::lazy::Lazy;
+use crate::primitives::{blob::Blob, lazy::Lazy};
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
@@ -903,6 +903,11 @@ impl KhronosValue {
                     return Ok(KhronosValue::LazyValue(KhronosLazyValue {
                         data: lazy.data.clone(),
                     }));
+                }
+                if let Ok(mut blob) = ud.borrow_mut::<Blob>() {
+                    // Take out the contents of the blob 
+                    let data = std::mem::take(&mut blob.data);
+                    return Ok(KhronosValue::Buffer(KhronosBuffer::new(data)));
                 }
 
                 Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) })

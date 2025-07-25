@@ -29,6 +29,9 @@ rand = { version = "0.9", features = ["std"] }
 
 # httpclient
 hickory-resolver = { version = "0.25", features = ["tokio"] }
+pin-project-lite = "0.2"
+bytes = "1.2"
+futures-core = "0.3"
 
 # httpserver
 axum = { version = "0.8", features = ["macros"] }

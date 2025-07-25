@@ -1,12 +1,15 @@
 //! HTTP Client Extensions (cli.httpclient)
 
 mod dns;
+mod reqwest_shim;
 
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
 use crate::core::datetime::TimeDelta;
+use crate::plugins::antiraid::httpclient::reqwest_shim::ResponseExt;
+use crate::primitives::blob::Blob;
 use crate::primitives::context::TemplateContext;
 use crate::traits::context::KhronosContext;
 use crate::traits::httpclientprovider::HTTPClientProvider;
@@ -410,6 +413,35 @@ impl Response {
             response: Some(response),
         }
     }
+
+    fn get_content_length_from_headers(&self) -> LuaResult<Option<i64>> {
+        let Some(response) = self.response.as_ref() else {
+            return Err(LuaError::external("Response has been exhausted"));
+        };
+
+        let content_length_header = response.headers().get(reqwest::header::CONTENT_LENGTH);
+        if content_length_header.is_none() {
+            return Ok(None);
+        }
+
+        let content_length = content_length_header.unwrap();
+        if content_length.is_empty() {
+            return Ok(None);
+        }
+
+        let content_length = content_length
+            .to_str()
+            .map_err(LuaError::external)?
+            .parse::<i64>()
+            .map_err(LuaError::external)?;
+
+        Ok(Some(content_length))
+    }
+
+    fn max_size(lua: &Lua) -> LuaResult<usize> {
+        let memory_limit = lua.memory_limit()?;
+        Ok(memory_limit / 2) // Use half of the memory limit for the response size limit
+    }
 }
 
 impl LuaUserData for Response {
@@ -431,10 +463,7 @@ impl LuaUserData for Response {
         });
 
         fields.add_field_method_get("content_length", |_, this| {
-            let Some(response) = this.response.as_ref() else {
-                return Err(LuaError::external("Response has been exhausted"));
-            };
-            Ok(response.content_length().map(|l| l as i64).unwrap_or(-1))
+            this.get_content_length_from_headers()
         });
 
         fields.add_field_method_get("headers", |_, this| {
@@ -449,6 +478,17 @@ impl LuaUserData for Response {
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_scheduler_async_method_mut("text", async |lua, mut this, _g: ()| {
+            if let Some(content_length) = this.get_content_length_from_headers()? {
+                if content_length > lua.memory_limit()?.try_into().unwrap_or(i64::MAX) {
+                    return Err(LuaError::external(format!(
+                        "Response size {} exceeds available memory ({} bytes / {} total bytes)",
+                        content_length,
+                        lua.memory_limit()? - lua.used_memory(),
+                        lua.memory_limit()?
+                    )));
+                }
+            }
+            
             let response = {
                 let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
@@ -456,8 +496,8 @@ impl LuaUserData for Response {
                 response
             };
 
-            let text = response.bytes().await.map_err(LuaError::external)?;
-            let lua_string = lua.create_string(text)
+            let bytes = response.bytes_limited(Self::max_size(&lua)?).await.map_err(|e| LuaError::external(e.to_string()))?;
+            let lua_string = lua.create_string(bytes)
                 .map_err(LuaError::external)?;
             Ok(lua_string)
         });
@@ -470,17 +510,16 @@ impl LuaUserData for Response {
                 response
             };
 
-            let json = response
-                .json::<serde_json::Value>()
-                .await
-                .map_err(LuaError::external)?;
+            let bytes = response.bytes_limited(Self::max_size(&lua)?).await.map_err(|e| LuaError::external(e.to_string()))?;
+            let json = serde_json::from_slice::<serde_json::Value>(&bytes)
+                .map_err(|e| LuaError::external(format!("Failed to parse JSON: {}", e)))?;
 
             let lua_value = lua.to_value_with(&json, LUA_SERIALIZE_OPTIONS)?;
 
             Ok(lua_value)
         });
 
-        methods.add_scheduler_async_method_mut("bytes", async |lua, mut this, _g: ()| {
+        methods.add_scheduler_async_method_mut("blob", async |lua, mut this, _g: ()| {
             let response = {
                 let Some(response) = this.response.take() else {
                     return Err(LuaError::external("Response has been exhausted"));
@@ -488,8 +527,11 @@ impl LuaUserData for Response {
                 response
             };
 
-            let bytes = response.bytes().await.map_err(LuaError::external)?;
-            lua.create_buffer(bytes)
+            let bytes = response.bytes_limited(Self::max_size(&lua)?).await.map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Blob {
+                data: bytes.to_vec()
+            })
         });
     }
 

@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
 use crate::core::datetime::TimeDelta;
+use crate::primitives::blob::Blob;
+use crate::primitives::blob::BlobTaker;
 use crate::to_struct;
 use crate::traits::context::KhronosContext;
 use crate::traits::context::Limitations;
@@ -9,8 +11,6 @@ use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
-use mluau::Buffer;
-use serde::{Deserialize, Serialize};
 
 to_struct! {
     pub struct ObjectMetadata {
@@ -21,22 +21,8 @@ to_struct! {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ObjectStorageReadRange {
-    #[serde(rename = "read_start")]
-    pub start: usize,
-    #[serde(rename = "read_end")]
-    pub end: usize,
-}
-
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
-pub struct DownloadFileOpts {
-    pub range: Option<ObjectStorageReadRange>,
-}
-
 #[derive(Clone)]
 pub struct Bucket<T: KhronosContext> {
-    context: T,
     limitations: Rc<Limitations>,
     objectstorage_provider: T::ObjectStorageProvider,
 }
@@ -127,13 +113,8 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
 
         methods.add_scheduler_async_method(
             "download_file",
-            async move |lua, this, (key, opts): (String, LuaValue)| {
+            async move |_, this, key: String| {
                 this.check_action("download_file".to_string())?;
-
-                let opts = lua
-                    .from_value::<Option<DownloadFileOpts>>(opts)
-                    .map_err(|e| LuaError::external(e.to_string()))?
-                    .unwrap_or_default();
 
                 // TODO: Support range at object storage level
 
@@ -143,30 +124,9 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let len = if let Some(ref range) = opts.range {
-                    range.end - range.start
-                } else {
-                    result.len()
-                };
-
-                if let Some(memory_limit) = this.context.memory_limit() {
-                    if memory_limit > lua.used_memory() && memory_limit - lua.used_memory() < len {
-                        return Err(LuaError::external(format!(
-                            "File size {} exceeds available memory ({} bytes / {} total bytes)",
-                            len,
-                            memory_limit - lua.used_memory(),
-                            memory_limit
-                        )));
-                    }
-                }
-
-                let buffer = if let Some(range) = opts.range {
-                    lua.create_buffer(&result[range.start..range.end])?
-                } else {
-                    lua.create_buffer(&result)?
-                };
-
-                Ok(buffer)
+                Ok(Blob {
+                    data: result
+                })
             },
         );
 
@@ -189,11 +149,11 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
 
         methods.add_scheduler_async_method(
             "upload_file",
-            async move |_, this, (key, data): (String, Buffer)| {
+            async move |_, this, (key, data): (String, BlobTaker)| {
                 this.check_action("upload_file".to_string())?;
 
                 this.objectstorage_provider
-                    .upload_file(key, data.to_vec())
+                    .upload_file(key, data.0)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -232,8 +192,7 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
 
-    let bucket = Bucket {
-        context: token.context.clone(),
+    let bucket = Bucket::<T> {
         limitations: token.limitations.clone(),
         objectstorage_provider,
     }
