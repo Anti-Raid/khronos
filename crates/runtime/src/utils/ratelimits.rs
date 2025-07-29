@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::num::NonZeroU32;
 use std::time::Duration;
 
@@ -9,6 +10,7 @@ pub struct LuaRatelimits {
     pub clock: QuantaClock,
     pub global: Vec<DefaultKeyedRateLimiter<()>>,
     pub per_bucket: indexmap::IndexMap<String, Vec<DefaultKeyedRateLimiter<()>>>,
+    pub global_ignore: HashSet<String>,
 }
 
 impl LuaRatelimits {
@@ -23,9 +25,18 @@ impl LuaRatelimits {
         Ok(quota)
     }
 
+    /// Creates a global_ignore set from a vector of strings.
+    pub fn create_global_ignore(
+        global_ignore: Vec<String>,
+    ) -> Result<HashSet<String>, crate::Error> {
+        let global_ignore_set: HashSet<String> = global_ignore.into_iter().collect();
+        Ok(global_ignore_set)
+    }
+
     pub fn check(&self, bucket: &str) -> Result<(), crate::Error> {
         // Check global ratelimits
-        if bucket != "antiraid_bulk_op" && bucket != "antiraid_bulk_op_wait" {
+        //if bucket != "antiraid_bulk_op" && bucket != "antiraid_bulk_op_wait" {
+        if !self.global_ignore.contains(bucket) {
             for global_lim in self.global.iter() {
                 match global_lim.check_key(&()) {
                     Ok(()) => continue,
