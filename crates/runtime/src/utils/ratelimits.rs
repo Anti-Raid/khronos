@@ -25,6 +25,11 @@ impl LuaRatelimits {
         Ok(quota)
     }
 
+    /// Creates a empty global_ignore set.
+    pub fn create_empty_global_ignore() -> Result<HashSet<String>, crate::Error> {
+        Ok(HashSet::new())
+    }
+
     /// Creates a global_ignore set from a vector of strings.
     pub fn create_global_ignore(
         global_ignore: Vec<String>,
@@ -35,7 +40,6 @@ impl LuaRatelimits {
 
     pub fn check(&self, bucket: &str) -> Result<(), crate::Error> {
         // Check global ratelimits
-        //if bucket != "antiraid_bulk_op" && bucket != "antiraid_bulk_op_wait" {
         if !self.global_ignore.contains(bucket) {
             for global_lim in self.global.iter() {
                 match global_lim.check_key(&()) {

@@ -2521,20 +2521,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             },
         );
 
-        methods.add_scheduler_async_method("get_followup_message", async move |lua, this, data: LuaValue| {
-            let data = lua.from_value::<structs::GetFollowupMessageOptions>(data)?;
-
-            this.check_action(&lua, "get_followup_message".to_string())
-                .map_err(LuaError::external)?;
-
-            let msg = this.discord_provider
-                .get_followup_message(&data.interaction_token, data.message_id)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            Ok(Lazy::new(msg))
-        });
-
         methods.add_scheduler_async_method("create_followup_message", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::CreateFollowupMessageOptions>(data)?;
 
@@ -2550,6 +2536,20 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             let msg = this.discord_provider
                 .create_followup_message(&data.interaction_token, &data.data, files)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(msg))
+        });
+
+        methods.add_scheduler_async_method("get_followup_message", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::GetFollowupMessageOptions>(data)?;
+
+            this.check_action(&lua, "get_followup_message".to_string())
+                .map_err(LuaError::external)?;
+
+            let msg = this.discord_provider
+                .get_followup_message(&data.interaction_token, data.message_id)
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
