@@ -1,8 +1,15 @@
+//! Does not support WASM contexts yet
+
 use std::collections::HashMap;
 use std::io::Read;
 use bstr::BString;
 use mluau::prelude::*;
 use bstr::ByteSlice;
+use argon2::Argon2;
+use aes_gcm::aead::Aead;
+use aes_gcm::KeyInit;
+use aes_gcm::{Aes256Gcm, Nonce};
+use rand::{Rng, RngCore};
 
 use crate::primitives::blob::{Blob, BlobTaker};
 
@@ -81,7 +88,7 @@ impl LuaUserData for TarArchive {
             Ok(this.entries.len())
         });
 
-        methods.add_method_mut("take_entry", |lua, this, name: String| {
+        methods.add_method_mut("takefile", |lua, this, name: String| {
             if let Some(blob) = this.take_entry(&name) {
                 let blob = blob.into_lua(lua)?;
                 Ok(blob)
@@ -90,12 +97,12 @@ impl LuaUserData for TarArchive {
             }
         });
 
-        methods.add_method_mut("add_entry", |_, this, (name, blob): (LuaString, BlobTaker)| {
+        methods.add_method_mut("addfile", |_, this, (name, blob): (LuaString, BlobTaker)| {
             this.add_entry(name, blob);
             Ok(())
         });
 
-        methods.add_function("blob", |_, this: LuaAnyUserData| {
+        methods.add_function("toblob", |_, this: LuaAnyUserData| {
             let this = this.take::<Self>()?;
             this.to_blob()
         });
@@ -118,12 +125,39 @@ impl LuaUserData for TarArchive {
     }
 }
 
+fn create_aes256_cipher(key: String, salt: &[u8]) -> LuaResult<Aes256Gcm> {
+    let argon2 = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        match argon2::ParamsBuilder::new()
+            .t_cost(1)
+            .m_cost(64 * 1024)
+            .p_cost(4)
+            .output_len(32)
+            .build()
+        {
+            Ok(params) => params,
+            Err(e) => return Err(LuaError::external(format!("Failed to create Argon2 parameters: {}", e))),
+        },
+    );
+
+    let mut hashed_key = vec![0u8; 32];
+    argon2
+        .hash_password_into(key.as_bytes(), salt, &mut hashed_key)
+        .map_err(|e| LuaError::external(format!("Failed to hash password: {e:?}")))?;
+
+    let cipher = Aes256Gcm::new_from_slice(&hashed_key)
+    .map_err(LuaError::external)?;
+
+    Ok(cipher)
+}
+
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    module.set("newblob", lua.create_function(|_, buf: mluau::Buffer| {
+    module.set("newblob", lua.create_function(|_, buf: BlobTaker| {
         Ok(Blob {
-            data: buf.to_vec(),
+            data: buf.0,
         })
     })?)?;
 
@@ -133,6 +167,66 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         } else {
             Ok(TarArchive::new())
         }
+    })?)?;
+
+    module.set("aes256encrypt", lua.create_function(|_, (blob, key): (BlobTaker, String)| {
+        let mut salt = [0u8; 8];
+        rand::rng().fill_bytes(&mut salt);
+
+        let cipher = create_aes256_cipher(key, &salt)?;
+
+        let random_slice = rand::rng().random::<[u8; 12]>();
+        let nonce = Nonce::from_slice(&random_slice);
+
+        let mut encrypted = cipher
+            .encrypt(nonce, &*blob.0)
+            .map_err(|e| LuaError::external(format!("Failed to encrypt: {:?}", e)))?;
+
+        // Format must be <salt><nonce><ciphertext>
+        let mut result = Vec::with_capacity(8 + 12 + encrypted.len());
+        result.extend_from_slice(&salt);
+        result.extend_from_slice(nonce.as_slice());
+        result.append(&mut encrypted);
+
+        Ok(Blob {
+            data: result,
+        })
+    })?)?;
+
+    module.set("aes256decrypt", lua.create_function(|_, (blob, key): (BlobTaker, String)| {
+        if blob.0.len() < 20 {
+            return Err(LuaError::external("Blob data is too short to decrypt".to_string()));
+        }
+
+        let salt = &blob.0[..8];
+        let nonce = &blob.0[8..20];
+        let ciphertext = &blob.0[20..]; 
+
+        let cipher = create_aes256_cipher(key, salt)?;
+
+        let nonce = Nonce::from_slice(nonce);
+
+        let result = cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
+
+        Ok(Blob {
+            data: result,
+        })
+    })?)?;
+
+    module.set("aes256decryptcustom", lua.create_function(|_, (salt, nonce, ciphertext, key): (BlobTaker, BlobTaker, BlobTaker, String)| {
+        let cipher = create_aes256_cipher(key, &salt.0)?;
+
+        let nonce = Nonce::from_slice(&nonce.0);
+
+        let result = cipher
+            .decrypt(nonce, &*ciphertext.0)
+            .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
+
+        Ok(Blob {
+            data: result,
+        })
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
