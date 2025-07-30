@@ -2,7 +2,9 @@ mod structs;
 mod types;
 mod validators;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 //use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::{KhronosContext, Limitations};
@@ -16,6 +18,35 @@ use structs::{
 };
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 
+#[derive(Debug, Clone)]
+struct BulkOpLimit {
+    /// Maximum number of operations that can be performed in a bulk operation
+    pub max_ops: usize,
+    /// Minimum wait period between bulk operations
+    pub min_wait: std::time::Duration,
+}
+
+static BULK_OP_LIMITS: LazyLock<HashMap<String, BulkOpLimit>> = LazyLock::new(|| {
+    let mut map = HashMap::new();
+    map.insert("create_message".to_string(), BulkOpLimit {
+        max_ops: 1,
+        min_wait: std::time::Duration::from_millis(1200),
+    });
+    map.insert("create_guild_role".to_string(), BulkOpLimit {
+        max_ops: 1,
+        min_wait: std::time::Duration::from_millis(2200),
+    });
+    map.insert("modify_guild_role".to_string(), BulkOpLimit {
+        max_ops: 1,
+        min_wait: std::time::Duration::from_millis(2000),
+    });
+    map.insert("delete_guild_role".to_string(), BulkOpLimit {
+        max_ops: 1,
+        min_wait: std::time::Duration::from_millis(2000),
+    });
+    map
+});
+
 const MAX_NICKNAME_LENGTH: usize = 32;
 const MINIMUM_BULK_OP_WAIT_PERIOD: std::time::Duration = std::time::Duration::from_millis(2500);
 const DEFAULT_BULK_OP_MAX_OPS: usize = 1;
@@ -28,8 +59,10 @@ pub struct BulkOpData {
     pub max_ops: usize,
     /// When the bulk operation was last waited on
     pub last_waited: RefCell<std::time::Instant>,
-    /// The lua thread which initiated the bulk operation
-    pub thread: LuaThread, // This is used to ensure that the bulk operation is only used by the thread that initiated it
+    /// The wait period for the bulk operation
+    pub min_wait: std::time::Duration,
+    /// What action this bulk operation can be used for
+    pub action: Option<String>,
 }
 
 #[derive(Clone)]
@@ -56,7 +89,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         Ok(())
     }
 
-    pub fn check_action(&self, lua: &Lua, action: String) -> LuaResult<()> {
+    pub fn check_action(&self, _lua: &Lua, action: String) -> LuaResult<()> {
         if !self.limitations.has_cap(&format!("discord:{action}")) {
             return Err(LuaError::runtime(format!(
                 "Discord action `{action}` not allowed in this template context",
@@ -64,8 +97,13 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         }
 
         if let Some(bulk_op) = &self.bulk_op {
-            if lua.current_thread() != bulk_op.thread {
-                return Err(LuaError::runtime("Bulk operations can only be performed from the thread that initiated the bulk operation"));
+            if let Some(ref b_action) = bulk_op.action {
+                if b_action != &action {
+                    return Err(LuaError::runtime(format!(
+                        "Bulk operation action mismatch: expected `{}`, got `{}`",
+                        b_action, action
+                    )));
+                }
             }
 
             // Check expiry
@@ -265,7 +303,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         });
 
         // Bulk operation support
-        methods.add_method("antiraid_bulk_op", |lua, this, _: ()| {
+        methods.add_method("antiraid_bulk_op", |lua, this, action: Option<String>| {
             this.check_action(&lua, "antiraid_bulk_op".to_string())
                 .map_err(LuaError::external)?;
 
@@ -273,11 +311,29 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Cannot start a bulk operation if the DiscordActionExecutor itself is setup for bulk operations"));
             }
 
+            let bulk_limits = if let Some(action) = action.as_ref() {
+                match BULK_OP_LIMITS.get(action.as_str()) {
+                    Some(limit) => limit.clone(),
+                    None => {
+                        BulkOpLimit {
+                            max_ops: DEFAULT_BULK_OP_MAX_OPS,
+                            min_wait: MINIMUM_BULK_OP_WAIT_PERIOD,
+                        }
+                    }
+                }
+            } else {
+                BulkOpLimit {
+                    max_ops: DEFAULT_BULK_OP_MAX_OPS,
+                    min_wait: MINIMUM_BULK_OP_WAIT_PERIOD,
+                }   
+            };
+
             let bulk_op = Rc::new(BulkOpData {
+                action: action.clone(),
                 op_performed: RefCell::new(0), // Any op which calls check_action will increment this
-                max_ops: DEFAULT_BULK_OP_MAX_OPS, // Default max ops
+                max_ops: bulk_limits.max_ops, // Default max ops
+                min_wait: bulk_limits.min_wait, // Default min wait
                 last_waited: RefCell::new(std::time::Instant::now()), // Last waited time
-                thread: lua.current_thread()
             });
 
             let executor = DiscordActionExecutor {
@@ -300,8 +356,9 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                     return Err(LuaError::runtime("This DiscordActionExecutor is not set up for bulk operations"));
                 };
 
-                if lua.current_thread() != bulk_op.thread {
-                    return Err(LuaError::runtime("antiraid_bulk_op_wait can only be called from the thread that initiated the bulk operation"));
+                // Check max ops performed
+                if *bulk_op.op_performed.try_borrow().map_err(LuaError::runtime)? < *bulk_op.op_performed.try_borrow().map_err(LuaError::runtime)? {
+                    return Ok(()); // No-op if the user can still perform operations
                 }
 
                 // Check expiry
@@ -314,7 +371,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 }
 
                 // Wait for the enforced wait period + random jitter between 10 and 500 millis
-                let wait_period = MINIMUM_BULK_OP_WAIT_PERIOD + std::time::Duration::from_millis(
+                let wait_period = bulk_op.min_wait + std::time::Duration::from_millis(
                     rand::random_range(10..500),
                 );
 
