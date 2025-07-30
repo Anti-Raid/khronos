@@ -26,6 +26,7 @@ captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
 bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
+base64 = "0.22"
 
 # httpclient
 hickory-resolver = { version = "0.25", features = ["tokio"] }

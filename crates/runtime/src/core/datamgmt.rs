@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::Read;
+use base64::Engine;
 use bstr::BString;
 use mluau::prelude::*;
 use bstr::ByteSlice;
@@ -159,6 +160,17 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         Ok(Blob {
             data: buf.0,
         })
+    })?)?;
+
+    module.set("base64encode", lua.create_function(|_, blob: BlobTaker| {
+        let encoded = base64::prelude::BASE64_STANDARD.encode(&blob.0);
+        Ok(encoded)
+    })?)?;
+
+    module.set("base64decode", lua.create_function(|_, str: LuaString| {
+        let decoded = base64::prelude::BASE64_STANDARD.decode(str.as_bytes())
+            .map_err(|e| LuaError::external(format!("Failed to decode base64: {e:?}")))?;
+        Ok(Blob { data: decoded })
     })?)?;
 
     module.set("TarArchive", lua.create_function(|_, blob: Option<BlobTaker>| {

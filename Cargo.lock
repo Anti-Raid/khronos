@@ -2208,6 +2208,7 @@ dependencies = [
  "arrayvec",
  "async-compression",
  "axum",
+ "base64",
  "bitflags 2.9.1",
  "blake3",
  "bstr",
