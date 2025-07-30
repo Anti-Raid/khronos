@@ -125,16 +125,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "KV", antiraid::kv::init_plugin)
         });
 
-        fields.add_field_method_get("UnscopedKV", |lua, this| {
-            if !this.limitations.has_cap("kv.meta:unscoped_allowed") {
-                return Err(LuaError::external(
-                    "The kv.meta:unscoped_allowed capability is required to create an UnscopedKV",
-                ));
-            }
-
-            this.get_plugin(lua, "UnscopedKV", antiraid::kv::init_plugin_unscoped)
-        });
-
         fields.add_field_method_get("ObjectStorage", |lua, this| {
             this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
         });

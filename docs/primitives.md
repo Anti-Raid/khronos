@@ -511,11 +511,6 @@ type TemplateContext = {
 	--- Key-Value plugin
 	KV: kvP.Plugin,
 
-	--- Unscoped Key-Value plugin
-	---
-	--- This requires the `kv.meta:unscoped_allowed` capability to index into/use
-	UnscopedKV: kvP.Plugin,
-
 	--- Lockdowns plugin
 	Lockdowns: lockdownsP.Plugin,
 

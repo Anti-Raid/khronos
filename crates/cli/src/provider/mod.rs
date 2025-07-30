@@ -154,7 +154,7 @@ impl KVProvider for CliKVProvider {
     async fn list_scopes(&self) -> Result<Vec<String>, khronos_runtime::Error> {
         let query = sqlx::query(
             "SELECT DISTINCT unnest_scope AS scope
-FROM kv_table, unnest(scopes) AS unnest_scope
+FROM kv_v2, unnest(scopes) AS unnest_scope
 ORDER BY scope;
         ",
         )
@@ -174,8 +174,8 @@ ORDER BY scope;
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
-            FROM kv_table
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+            FROM kv_v2
             WHERE 
             guild_id = $1 AND
             key = $2 AND
@@ -204,6 +204,7 @@ ORDER BY scope;
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
             scopes: data.get::<Vec<String>, _>("scopes"),
             expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
+            resume: data.get::<bool, _>("resume"),
         };
 
         Ok(Some(file_contents))
@@ -214,8 +215,8 @@ ORDER BY scope;
         id: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
-            FROM kv_table
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+            FROM kv_v2
             WHERE 
             guild_id = $1 AND
             id = $2
@@ -242,6 +243,7 @@ ORDER BY scope;
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
             scopes: data.get::<Vec<String>, _>("scopes"),
             expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
+            resume: data.get::<bool, _>("resume"),
         };
 
         Ok(Some(file_contents))
@@ -253,10 +255,11 @@ ORDER BY scope;
         key: String,
         value: khronos_runtime::utils::khronos_value::KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
+        resume: bool,
     ) -> Result<(bool, String), khronos_runtime::Error> {
         if let Some(existing) = sqlx::query(
             "SELECT id
-            FROM kv_table
+            FROM kv_v2
             WHERE 
             guild_id = $1 AND
             key = $2 AND
@@ -271,9 +274,10 @@ ORDER BY scope;
         .map_err(|e| format!("Failed to get existing keys: {e}"))?
         {
             let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
-            sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
+            sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2, resume = $3 WHERE id = $4")
                 .bind(value.into_serde_json_value(1, true)?)
                 .bind(expires_at)
+                .bind(resume)
                 .bind(key)
                 .execute(&self.pool)
                 .await
@@ -282,12 +286,13 @@ ORDER BY scope;
             return Ok((true, key.to_string()));
         }
 
-        let id = sqlx::query("INSERT INTO kv_table (guild_id, key, value, scopes, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING id")
+        let id = sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes, expires_at, resume) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id")
             .bind(self.guild_id.to_string())
             .bind(&key)
             .bind(value.into_serde_json_value(1, true)?)
             .bind(scopes)
             .bind(expires_at)
+            .bind(resume)
             .fetch_one(&self.pool)
             .await
             .map_err(|e| format!("Failed to set key: {e}"))?
@@ -302,13 +307,15 @@ ORDER BY scope;
         id: String,
         value: khronos_runtime::utils::khronos_value::KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
+        resume: bool,
     ) -> Result<(), khronos_runtime::Error> {
         let key = sqlx::types::uuid::Uuid::parse_str(&id)
             .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
-        sqlx::query("UPDATE kv_table SET value = $1, expires_at = $2 WHERE id = $3")
+        sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2, resume = $3 WHERE id = $4")
             .bind(value.into_serde_json_value(1, true)?)
             .bind(expires_at)
+            .bind(resume)
             .bind(key)
             .execute(&self.pool)
             .await
@@ -324,7 +331,7 @@ ORDER BY scope;
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), khronos_runtime::Error> {
         sqlx::query(
-            "UPDATE kv_table
+            "UPDATE kv_v2
             SET expires_at = $1
             WHERE 
             guild_id = $2 AND
@@ -352,7 +359,7 @@ ORDER BY scope;
             .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
         sqlx::query(
-            "UPDATE kv_table
+            "UPDATE kv_v2
             SET expires_at = $1
             WHERE
             guild_id = $2 AND
@@ -371,7 +378,7 @@ ORDER BY scope;
 
     async fn delete(&self, scopes: &[String], key: String) -> Result<(), khronos_runtime::Error> {
         sqlx::query(
-            "DELETE FROM kv_table
+            "DELETE FROM kv_v2
             WHERE 
             guild_id = $1 AND
             key = $2 AND
@@ -390,7 +397,7 @@ ORDER BY scope;
 
     async fn delete_by_id(&self, id: String) -> Result<(), khronos_runtime::Error> {
         sqlx::query(
-            "DELETE FROM kv_table
+            "DELETE FROM kv_v2
             WHERE 
             guild_id = $1 AND
             id = $2
@@ -422,7 +429,7 @@ ORDER BY scope;
             // Fast path for querying all keys
             sqlx::query(
                 "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
-                FROM kv_table
+                FROM kv_v2
                 WHERE 
                 guild_id = $1 
                 AND scopes @> $2
@@ -435,8 +442,8 @@ ORDER BY scope;
             .map_err(|e| format!("Failed to get key: {e}"))?
         } else {
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
-                FROM kv_table
+                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+                FROM kv_v2
                 WHERE 
                 guild_id = $1 
                 AND key ILIKE $2
@@ -467,6 +474,7 @@ ORDER BY scope;
                 ),
                 scopes: data.get::<Vec<String>, _>("scopes"),
                 expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
+                resume: data.get::<bool, _>("resume"),
             };
 
             records.push(file_contents);
@@ -478,7 +486,7 @@ ORDER BY scope;
     async fn exists(&self, scopes: &[String], key: String) -> Result<bool, khronos_runtime::Error> {
         let data = sqlx::query(
             "SELECT COUNT(*)
-            FROM kv_table
+            FROM kv_v2
             WHERE 
             guild_id = $1 
             AND key = $2
@@ -501,7 +509,7 @@ ORDER BY scope;
     async fn keys(&self, scopes: &[String]) -> Result<Vec<String>, khronos_runtime::Error> {
         let data = sqlx::query(
             "SELECT key
-            FROM kv_table
+            FROM kv_v2
             WHERE 
             guild_id = $1 
             AND scopes @> $2

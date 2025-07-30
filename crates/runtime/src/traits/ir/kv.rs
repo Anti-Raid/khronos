@@ -11,4 +11,7 @@ pub struct KvRecord {
 
     /// Returns when the key will expire, if set.
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Returns if the key is a resume key (will trigger a KeyResume event on startup of template worker/reload of a template)
+    pub resume: bool,
 }

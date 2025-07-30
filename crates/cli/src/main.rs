@@ -550,22 +550,23 @@ impl CliArgs {
 
                         sqlx::query(
                             "
-                            CREATE TABLE IF NOT EXISTS kv_table (
+                            CREATE TABLE IF NOT EXISTS kv_v2 (
                                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                                 key TEXT NOT NULL,
                                 value JSONB NOT NULL,
                                 scopes TEXT[] NOT NULL,
                                 guild_id TEXT NOT NULL,
                                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                                resume BOOLEAN NOT NULL DEFAULT FALSE,
                             )
                         ",
                         )
                         .execute(&pool)
                         .await
-                        .expect("Failed to create kv_table");
+                        .expect("Failed to create kv_v2");
 
-                        sqlx::query("CREATE INDEX IF NOT EXISTS idx_kv_scopes_gin ON kv_table USING gin (scopes)")
+                        sqlx::query("CREATE INDEX IF NOT EXISTS idx_kv_scopes_gin ON kv_v2 USING gin (scopes)")
                         .execute(&pool)
                         .await
                         .expect("Failed to create index");
