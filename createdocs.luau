@@ -71,14 +71,13 @@ for i, docfile in fs.readDir("types/@antiraid") do
 end
 
 local special = {
-    primitives = "types/@antiraid-core/primitives.luau",
+    Primitives = "types/@antiraid-core/primitives.luau",
     datastoresp = "types/@antiraid-core/plugins/datastores.luau",
     discordp = "types/@antiraid-core/plugins/discord.luau",
+    httpclientp = "types/@antiraid-core/plugins/httpclient.luau",
     imgcaptchap = "types/@antiraid-core/plugins/img_captcha.luau",
     kvp = "types/@antiraid-core/plugins/kv.luau",
-    lockdownsp = "types/@antiraid-core/plugins/lockdowns.luau",
     objectstoragep = "types/@antiraid-core/plugins/objectstorage.luau",
-    userinfop = "types/@antiraid-core/plugins/userinfo.luau",
 } :: {[string]: string}
 
 for doc, docfile in special do 

@@ -266,7 +266,9 @@ type LinksStore = DataStore & {
 		frontend_url: string,
 
 		docs_url: string
-	}
+	},
+
+	event_list: () -> {string}
 }
 ```
 
@@ -315,7 +317,28 @@ links: () -> {
 
 ##### ret1
 
-{support_server: [string](#string), api_url: [string](#string), frontend_url: [string](#string), docs_url: [string](#string)}</details>
+{support_server: [string](#string), api_url: [string](#string), frontend_url: [string](#string), docs_url: [string](#string)}<div id="event_list"></div>
+
+#### event_list
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+event_list: () -> {string}
+```
+
+</details>
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+{[string](#string)}</details>
 
 <div id="Spawn"></div>
 
@@ -943,6 +966,497 @@ delete: (id: string) -> nil
 
 [nil](#nil)</details>
 
+<div id="Template"></div>
+
+## Template
+
+A Template object.
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- A Template object.
+type Template = {
+	--- The name of the template
+	name: string,
+
+	--- The events that trigger the template
+	events: {string},
+
+	--- The channel to send errors to
+	error_channel: string?,
+
+	--- The content of the template
+	content: LazyContent,
+
+	--- The language of the template
+	language: string,
+
+	--- The capabilities allowed for this template
+	allowed_caps: {string},
+
+	--- The date and time when the template was created
+	created_at: datetime.DateTime,
+
+	--- The date and time when the template was last updated
+	updated_at: datetime.DateTime,
+
+	--- Whether or not the template is paused
+	paused: boolean
+}
+```
+
+</details>
+
+<div id="name"></div>
+
+### name
+
+The name of the template
+
+[string](#string)
+
+<div id="events"></div>
+
+### events
+
+The events that trigger the template
+
+{[string](#string)}
+
+<div id="error_channel"></div>
+
+### error_channel
+
+The channel to send errors to
+
+*This field is optional and may not be specified*
+
+[string](#string)?
+
+<div id="content"></div>
+
+### content
+
+The content of the template
+
+[LazyContent](#LazyContent)
+
+<div id="language"></div>
+
+### language
+
+The language of the template
+
+[string](#string)
+
+<div id="allowed_caps"></div>
+
+### allowed_caps
+
+The capabilities allowed for this template
+
+{[string](#string)}
+
+<div id="created_at"></div>
+
+### created_at
+
+The date and time when the template was created
+
+[datetime](./datetime.md).[DateTime](./datetime.md#DateTime)
+
+<div id="updated_at"></div>
+
+### updated_at
+
+The date and time when the template was last updated
+
+[datetime](./datetime.md).[DateTime](./datetime.md#DateTime)
+
+<div id="paused"></div>
+
+### paused
+
+Whether or not the template is paused
+
+[boolean](#boolean)
+
+<div id="CreateTemplate"></div>
+
+## CreateTemplate
+
+A CreateTemplate object.
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- A CreateTemplate object.
+type CreateTemplate = {
+	--- The name of the template
+	name: string,
+
+	--- The events that trigger the template
+	events: {string},
+
+	--- The channel to send errors to
+	error_channel: string?,
+
+	--- The content of the template
+	content: {
+		[string]: string
+	} | LazyContent,
+
+	--- The language of the template
+	language: string,
+
+	--- The capabilities allowed for this template
+	allowed_caps: {string},
+
+	--- Whether or not the template is paused
+	paused: boolean
+}
+```
+
+</details>
+
+<div id="name"></div>
+
+### name
+
+The name of the template
+
+[string](#string)
+
+<div id="events"></div>
+
+### events
+
+The events that trigger the template
+
+{[string](#string)}
+
+<div id="error_channel"></div>
+
+### error_channel
+
+The channel to send errors to
+
+*This field is optional and may not be specified*
+
+[string](#string)?
+
+<div id="content"></div>
+
+### content
+
+The content of the template
+
+Union with variants:
+
+<details>
+<summary>Variant 1</summary>
+
+*This is an inline table type with the following fields*
+
+<div id="[string]"></div>
+
+##### [string]
+
+[string](#string)
+
+</details>
+
+<details>
+<summary>Variant 2</summary>
+
+[LazyContent](#LazyContent)
+
+</details>
+
+<div id="language"></div>
+
+### language
+
+The language of the template
+
+[string](#string)
+
+<div id="allowed_caps"></div>
+
+### allowed_caps
+
+The capabilities allowed for this template
+
+{[string](#string)}
+
+<div id="paused"></div>
+
+### paused
+
+Whether or not the template is paused
+
+[boolean](#boolean)
+
+<div id="TemplateStore"></div>
+
+## TemplateStore
+
+A TemplateStore object.
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- A TemplateStore object.
+type TemplateStore = DataStore & {
+	--- @yields
+	---
+	--- Lists all templates
+	list: () -> {Template},
+
+	--- @yields
+	---
+	--- Gets a template by name
+	get: (name: string) -> Template?,
+
+	--- @yields
+	---
+	--- Creates a new template
+	create: (template: CreateTemplate) -> nil,
+
+	--- @yields
+	---
+	--- Updates an existing template
+	update: (template: CreateTemplate) -> nil,
+
+	--- @yields
+	---
+	--- Deletes a template by name
+	delete: (name: string) -> nil
+}
+```
+
+</details>
+
+Intersection with variants:
+
+<details>
+<summary>Variant 1</summary>
+
+[DataStore](#DataStore)
+
+</details>
+
+<details>
+<summary>Variant 2</summary>
+
+*This is an inline table type with the following fields*
+
+<div id="list"></div>
+
+#### list
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Lists all templates
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Lists all templates
+list: () -> {Template}
+```
+
+</details>
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+{[Template](#Template)}<div id="get"></div>
+
+#### get
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Gets a template by name
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Gets a template by name
+get: (name: string) -> Template?
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+##### Arguments
+
+<div id="name"></div>
+
+##### name
+
+[string](#string)
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[Template](#Template)?<div id="create"></div>
+
+#### create
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Creates a new template
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Creates a new template
+create: (template: CreateTemplate) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+##### Arguments
+
+<div id="template"></div>
+
+##### template
+
+[CreateTemplate](#CreateTemplate)
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="update"></div>
+
+#### update
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Updates an existing template
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Updates an existing template
+update: (template: CreateTemplate) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+##### Arguments
+
+<div id="template"></div>
+
+##### template
+
+[CreateTemplate](#CreateTemplate)
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="delete"></div>
+
+#### delete
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Deletes a template by name
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Deletes a template by name
+delete: (name: string) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+##### Arguments
+
+<div id="name"></div>
+
+##### name
+
+[string](#string)
+
+<div id="Returns"></div>
+
+##### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)</details>
+
 <div id="DataStoreExecutor"></div>
 
 ## DataStoreExecutor
@@ -964,7 +1478,10 @@ type DataStoreExecutor = {
 	LinksStore: LinksStore?,
 
 	-- AntiRaid bot only (CLI not supported)
-	JobServerStore: JobServerStore?
+	JobServerStore: JobServerStore?,
+
+	-- AntiRaid bot only (CLI not supported)
+	TemplateStore: TemplateStore?
 }
 ```
 
@@ -1007,6 +1524,16 @@ AntiRaid bot only (CLI not supported)
 *This field is optional and may not be specified*
 
 [JobServerStore](#JobServerStore)?
+
+<div id="TemplateStore"></div>
+
+### TemplateStore
+
+AntiRaid bot only (CLI not supported)
+
+*This field is optional and may not be specified*
+
+[TemplateStore](#TemplateStore)?
 
 <div id="Plugin"></div>
 

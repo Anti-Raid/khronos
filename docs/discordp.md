@@ -226,33 +226,6 @@ The reason for deleting the rule
 
 [string](#string)
 
-<div id="GetChannelOptions"></div>
-
-## GetChannelOptions
-
-Options for getting a channel in Discord
-
-<details>
-<summary>Raw Type</summary>
-
-```luau
---- Options for getting a channel in Discord
-type GetChannelOptions = {
-	--- The channel ID
-	channel_id: discord.Snowflake
-}
-```
-
-</details>
-
-<div id="channel_id"></div>
-
-### channel_id
-
-The channel ID
-
-[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
-
 <div id="EditChannelOptions"></div>
 
 ## EditChannelOptions
@@ -694,6 +667,436 @@ The channel ID
 The data to send the message with
 
 [discordRest](./discordrest.md).[CreateMessageRequest](./discordrest.md#CreateMessageRequest)
+
+<div id="ReactionType"></div>
+
+## ReactionType
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+type ReactionType = {
+	type: "Unicode",
+
+	data: string
+} | {
+	type: "Custom",
+
+	animated: boolean,
+
+	id: discord.Snowflake,
+
+	name: string?
+}
+```
+
+</details>
+
+Union with variants:
+
+<details>
+<summary>Variant 1</summary>
+
+*This is an inline table type with the following fields*
+
+<div id="type"></div>
+
+#### type
+
+```luau
+"Unicode"
+```
+
+<div id="data"></div>
+
+#### data
+
+[string](#string)
+
+</details>
+
+<details>
+<summary>Variant 2</summary>
+
+*This is an inline table type with the following fields*
+
+<div id="type"></div>
+
+#### type
+
+```luau
+"Custom"
+```
+
+<div id="animated"></div>
+
+#### animated
+
+[boolean](#boolean)
+
+<div id="id"></div>
+
+#### id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="name"></div>
+
+#### name
+
+*This field is optional and may not be specified*
+
+[string](#string)?
+
+</details>
+
+<div id="CreateReactionOptions"></div>
+
+## CreateReactionOptions
+
+Options for creating a reaction in Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for creating a reaction in Discord
+type CreateReactionOptions = {
+	--- The channel ID
+	channel_id: discord.Snowflake,
+
+	--- The message ID
+	message_id: discord.Snowflake,
+
+	--- The reaction to add
+	reaction: ReactionType
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+The channel ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+The message ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reaction"></div>
+
+### reaction
+
+The reaction to add
+
+[ReactionType](#ReactionType)
+
+<div id="DeleteOwnReactionOptions"></div>
+
+## DeleteOwnReactionOptions
+
+Options for deleting the reaction AntiRaid has made on Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for deleting the reaction AntiRaid has made on Discord
+type DeleteOwnReactionOptions = {
+	--- The channel ID
+	channel_id: discord.Snowflake,
+
+	--- The message ID
+	message_id: discord.Snowflake,
+
+	--- The reaction to add
+	reaction: ReactionType
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+The channel ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+The message ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reaction"></div>
+
+### reaction
+
+The reaction to add
+
+[ReactionType](#ReactionType)
+
+<div id="DeleteUserReactionOptions"></div>
+
+## DeleteUserReactionOptions
+
+Options for deleting the reaction of a user on Discord
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for deleting the reaction of a user on Discord
+type DeleteUserReactionOptions = {
+	--- The channel ID
+	channel_id: discord.Snowflake,
+
+	--- The message ID
+	message_id: discord.Snowflake,
+
+	--- The user ID
+	user_id: discord.Snowflake,
+
+	--- The reaction to add
+	reaction: ReactionType
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+The channel ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+The message ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="user_id"></div>
+
+### user_id
+
+The user ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reaction"></div>
+
+### reaction
+
+The reaction to add
+
+[ReactionType](#ReactionType)
+
+<div id="ReactionTypeEnum"></div>
+
+## ReactionTypeEnum
+
+Normal = normal reaction, burst is a super reaction
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Normal = normal reaction, burst is a super reaction
+type ReactionTypeEnum = "Normal" | "Burst"
+```
+
+</details>
+
+Union with variants:
+
+<details>
+<summary>Variant 1</summary>
+
+```luau
+"Normal"
+```
+
+</details>
+
+<details>
+<summary>Variant 2</summary>
+
+```luau
+"Burst"
+```
+
+</details>
+
+<div id="GetReactionsOptions"></div>
+
+## GetReactionsOptions
+
+Options for getting reactions on a message
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for getting reactions on a message
+type GetReactionsOptions = {
+	channel_id: discord.Snowflake,
+
+	message_id: discord.Snowflake,
+
+	reaction: ReactionType,
+
+	type: ReactionTypeEnum?,
+
+	-- Normal or burst/super reaction
+	after: discord.Snowflake?,
+
+	-- After which ID to use
+	limit: number?
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reaction"></div>
+
+### reaction
+
+[ReactionType](#ReactionType)
+
+<div id="type"></div>
+
+### type
+
+*This field is optional and may not be specified*
+
+[ReactionTypeEnum](#ReactionTypeEnum)?
+
+<div id="after"></div>
+
+### after
+
+Normal or burst/super reaction
+
+*This field is optional and may not be specified*
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)?
+
+<div id="limit"></div>
+
+### limit
+
+After which ID to use
+
+*This field is optional and may not be specified*
+
+[number](#number)?
+
+<div id="DeleteAllReactionsForEmojiOptions"></div>
+
+## DeleteAllReactionsForEmojiOptions
+
+Options for deleting all reactions on a message
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for deleting all reactions on a message
+type DeleteAllReactionsForEmojiOptions = {
+	channel_id: discord.Snowflake,
+
+	message_id: discord.Snowflake,
+
+	reaction: ReactionType
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reaction"></div>
+
+### reaction
+
+[ReactionType](#ReactionType)
+
+<div id="EditMessageOptions"></div>
+
+## EditMessageOptions
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+type EditMessageOptions = {
+	channel_id: discord.Snowflake,
+
+	message_id: discord.Snowflake,
+
+	data: discordRest.EditMessageRequest
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="data"></div>
+
+### data
+
+[discordRest](./discordrest.md).[EditMessageRequest](./discordrest.md#EditMessageRequest)
 
 <div id="CreateCommandOptions"></div>
 
@@ -1795,6 +2198,93 @@ The reason for the modification
 
 [string](#string)
 
+<div id="EditGuildRoleOptions"></div>
+
+## EditGuildRoleOptions
+
+Options for modifying a guild role
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for modifying a guild role
+type EditGuildRoleOptions = {
+	--- The reason for the creation
+	reason: string,
+
+	--- The data to create the role with
+	data: discordRest.ModifyGuildRoleRequest,
+
+	--- Role ID
+	role_id: discord.Snowflake
+}
+```
+
+</details>
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the creation
+
+[string](#string)
+
+<div id="data"></div>
+
+### data
+
+The data to create the role with
+
+[discordRest](./discordrest.md).[ModifyGuildRoleRequest](./discordrest.md#ModifyGuildRoleRequest)
+
+<div id="role_id"></div>
+
+### role_id
+
+Role ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="DeleteGuildRoleOptions"></div>
+
+## DeleteGuildRoleOptions
+
+Options for deleting a guild role
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+--- Options for deleting a guild role
+type DeleteGuildRoleOptions = {
+	--- The reason for the creation
+	reason: string,
+
+	--- Role ID
+	role_id: discord.Snowflake
+}
+```
+
+</details>
+
+<div id="reason"></div>
+
+### reason
+
+The reason for the creation
+
+[string](#string)
+
+<div id="role_id"></div>
+
+### role_id
+
+Role ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
 <div id="CreateChannelInviteOptions"></div>
 
 ## CreateChannelInviteOptions
@@ -1884,6 +2374,52 @@ The overwrite ID
 ### reason
 
 The reason for the deletion
+
+[string](#string)
+
+<div id="FollowAnnouncementChannelOptions"></div>
+
+## FollowAnnouncementChannelOptions
+
+<details>
+<summary>Raw Type</summary>
+
+```luau
+type FollowAnnouncementChannelOptions = {
+	--- The Channel ID
+	channel_id: discord.Snowflake,
+
+	--- Data
+	data: discordRest.FollowAnnouncementChannelRequest,
+
+	--- Reason
+	reason: string
+}
+```
+
+</details>
+
+<div id="channel_id"></div>
+
+### channel_id
+
+The Channel ID
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="data"></div>
+
+### data
+
+Data
+
+[discordRest](./discordrest.md).[FollowAnnouncementChannelRequest](./discordrest.md#FollowAnnouncementChannelRequest)
+
+<div id="reason"></div>
+
+### reason
+
+Reason
 
 [string](#string)
 
@@ -2028,6 +2564,31 @@ DiscordExecutor allows templates to access/use the Discord API in a sandboxed fo
 ```luau
 --- DiscordExecutor allows templates to access/use the Discord API in a sandboxed form.
 type DiscordExecutor = {
+	-- Bulk operations
+	--- When performing bulk operations, AntiRaid's standard GCRA based ratelimits might not work so well. 
+	---
+	--- For this, AntiRaid provides a ``antiraid_bulk_op`` which will return a discord ``Plugin`` that allows performing bulk operations. 
+	---
+	--- To do a bulk operation, your code must perform one operation at a time, and then call ``antiraid_bulk_op_wait`` to wait for the enforced wait period
+	--- between each operation (otherwise, AntiRaid will reject the operation).
+	---
+	--- Note that the calls to ``antiraid_bulk_op`` and ``antiraid_bulk_op_wait`` will respect AntiRaid's standard GCRA 
+	--- ratelimits (with the exception that global bucket will not be hit) to ensure user code cannot just keep creating 
+	--- new bulk operations.
+	---
+	--- A bulk operaction executor will expire 10 seconds after the last call to ``antiraid_bulk_op`` or ``antiraid_bulk_op_wait`` returns.
+	---
+	--- Also note that a bulk operation executor can only be used by the thread that created it, and will error if used in another thread.
+	antiraid_bulk_op: () -> DiscordExecutor,
+
+	--- @yields
+	---
+	--- Waits for the bulk operation executor to finish the enforced wait period
+	---
+	--- Errors if the executor has expired or if the executor is used in a different thread than the one that created it
+	--- or if the executor is not a bulk operation executor (the executor returned by ``antiraid_bulk_op``).
+	antiraid_bulk_op_wait: (self: DiscordExecutor) -> nil,
+
 	-- Antiraid helpers
 	--- @yields
 	---
@@ -2092,7 +2653,7 @@ type DiscordExecutor = {
 	--- @yields
 	---
 	--- Gets a channel
-	get_channel: (self: DiscordExecutor, data: GetChannelOptions) -> LazyChannelObject,
+	get_channel: (self: DiscordExecutor, channel_id: string) -> LazyChannelObject,
 
 	--- @yields
 	---
@@ -2123,6 +2684,11 @@ type DiscordExecutor = {
 	---
 	--- Deletes a channel permission
 	delete_channel_permission: (self: DiscordExecutor, data: DeleteChannelPermissionOptions) -> nil,
+
+	--- @yields
+	---
+	--- Follows a announcement channel
+	follow_announcement_channel: (self: DiscordExecutor, data: FollowAnnouncementChannelOptions) -> LazyChannelObject,
 
 	-- Guild
 	--- @yields
@@ -2235,6 +2801,16 @@ type DiscordExecutor = {
 	--- Modify guild role positions
 	modify_guild_role_positions: (self: DiscordExecutor, data: ModifyRolePositionOptions) -> LazyRolesObject,
 
+	--- @yields
+	---
+	--- Modifies a guild role
+	modify_guild_role: (self: DiscordExecutor, data: EditGuildRoleOptions) -> LazyRoleObject,
+
+	--- @yields
+	---
+	--- Deletes a guild role
+	delete_guild_role: (self: DiscordExecutor, data: DeleteGuildRoleOptions) -> (),
+
 	-- Invites
 	--- @yields
 	---
@@ -2261,6 +2837,55 @@ type DiscordExecutor = {
 	---
 	--- Creates a message
 	create_message: (self: DiscordExecutor, data: CreateMessageOptions) -> LazyMessageObject,
+
+	--- @yields
+	---
+	--- Crossposts a message to an announcement channel
+	crosspost_message: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake) -> LazyMessageObject,
+
+	--- @yields
+	---
+	--- Creates a reaction to a message
+	create_reaction: (self: DiscordExecutor, data: CreateReactionOptions) -> nil,
+
+	--- @yields
+	--- Deletes the reaction AntiRaid has made on a message
+	delete_own_reaction: (self: DiscordExecutor, data: DeleteOwnReactionOptions) -> nil,
+
+	--- @yields
+	--- Deletes a reaction another user has made on a message (see ``delete_own_reaction`` for AntiRaid's
+	--- reactions)
+	delete_user_reaction: (self: DiscordExecutor, data: DeleteUserReactionOptions) -> nil,
+
+	--- @yields
+	---
+	--- Gets all users who have reacted to awith the provided reaction based on provided criteria
+	get_reactions: (self: DiscordExecutor, data: GetReactionsOptions) -> LazyUsersObject,
+
+	--- @yields
+	---
+	--- Deletes all reactions on a message
+	delete_all_reactions: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake) -> nil,
+
+	--- @yields
+	---
+	--- Deletes all reactions for a specific emoji on a message
+	delete_all_reactions_for_emoji: (self: DiscordExecutor, data: DeleteAllReactionsForEmojiOptions) -> nil,
+
+	--- @yields
+	---
+	--- Edits a message
+	edit_message: (self: DiscordExecutor, data: EditMessageOptions) -> LazyMessageObject,
+
+	--- @yields
+	---
+	--- Deletes a message
+	delete_message: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake, reason: string) -> nil,
+
+	--- @yields
+	---
+	--- Bulk deletes messages in a channel
+	bulk_delete_messages: (self: DiscordExecutor, channel_id: discord.Snowflake, message_ids: {discord.Snowflake}, reason: string) -> nil,
 
 	-- Interactions
 	--- @yields
@@ -2323,7 +2948,114 @@ type DiscordExecutor = {
 
 </details>
 
-<div id="antiraid_check_reason"></div>
+<div id="antiraid_bulk_op"></div>
+
+### antiraid_bulk_op
+
+Bulk operations
+
+When performing bulk operations, AntiRaid's standard GCRA based ratelimits might not work so well.
+
+
+
+For this, AntiRaid provides a ``antiraid_bulk_op`` which will return a discord ``Plugin`` that allows performing bulk operations.
+
+
+
+To do a bulk operation, your code must perform one operation at a time, and then call ``antiraid_bulk_op_wait`` to wait for the enforced wait period
+
+between each operation (otherwise, AntiRaid will reject the operation).
+
+
+
+Note that the calls to ``antiraid_bulk_op`` and ``antiraid_bulk_op_wait`` will respect AntiRaid's standard GCRA
+
+ratelimits (with the exception that global bucket will not be hit) to ensure user code cannot just keep creating
+
+new bulk operations.
+
+
+
+A bulk operaction executor will expire 10 seconds after the last call to ``antiraid_bulk_op`` or ``antiraid_bulk_op_wait`` returns.
+
+
+
+Also note that a bulk operation executor can only be used by the thread that created it, and will error if used in another thread.
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+-- Bulk operations
+--- When performing bulk operations, AntiRaid's standard GCRA based ratelimits might not work so well. 
+---
+--- For this, AntiRaid provides a ``antiraid_bulk_op`` which will return a discord ``Plugin`` that allows performing bulk operations. 
+---
+--- To do a bulk operation, your code must perform one operation at a time, and then call ``antiraid_bulk_op_wait`` to wait for the enforced wait period
+--- between each operation (otherwise, AntiRaid will reject the operation).
+---
+--- Note that the calls to ``antiraid_bulk_op`` and ``antiraid_bulk_op_wait`` will respect AntiRaid's standard GCRA 
+--- ratelimits (with the exception that global bucket will not be hit) to ensure user code cannot just keep creating 
+--- new bulk operations.
+---
+--- A bulk operaction executor will expire 10 seconds after the last call to ``antiraid_bulk_op`` or ``antiraid_bulk_op_wait`` returns.
+---
+--- Also note that a bulk operation executor can only be used by the thread that created it, and will error if used in another thread.
+antiraid_bulk_op: () -> DiscordExecutor
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[DiscordExecutor](#DiscordExecutor)<div id="antiraid_bulk_op_wait"></div>
+
+### antiraid_bulk_op_wait
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Waits for the bulk operation executor to finish the enforced wait period
+
+
+
+Errors if the executor has expired or if the executor is used in a different thread than the one that created it
+
+or if the executor is not a bulk operation executor (the executor returned by ``antiraid_bulk_op``).
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Waits for the bulk operation executor to finish the enforced wait period
+---
+--- Errors if the executor has expired or if the executor is used in a different thread than the one that created it
+--- or if the executor is not a bulk operation executor (the executor returned by ``antiraid_bulk_op``).
+antiraid_bulk_op_wait: (self: DiscordExecutor) -> nil
+```
+
+</details>
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="antiraid_check_reason"></div>
 
 ### antiraid_check_reason
 
@@ -2812,7 +3544,7 @@ Gets a channel
 --- @yields
 ---
 --- Gets a channel
-get_channel: (self: DiscordExecutor, data: GetChannelOptions) -> LazyChannelObject
+get_channel: (self: DiscordExecutor, channel_id: string) -> LazyChannelObject
 ```
 
 </details>
@@ -2821,11 +3553,11 @@ get_channel: (self: DiscordExecutor, data: GetChannelOptions) -> LazyChannelObje
 
 #### Arguments
 
-<div id="data"></div>
+<div id="channel_id"></div>
 
-##### data
+##### channel_id
 
-[GetChannelOptions](#GetChannelOptions)
+[string](#string)
 
 <div id="Returns"></div>
 
@@ -3077,7 +3809,49 @@ delete_channel_permission: (self: DiscordExecutor, data: DeleteChannelPermission
 
 ##### ret1
 
-[nil](#nil)<div id="get_guild"></div>
+[nil](#nil)<div id="follow_announcement_channel"></div>
+
+### follow_announcement_channel
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Follows a announcement channel
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Follows a announcement channel
+follow_announcement_channel: (self: DiscordExecutor, data: FollowAnnouncementChannelOptions) -> LazyChannelObject
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[FollowAnnouncementChannelOptions](#FollowAnnouncementChannelOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LazyChannelObject](#LazyChannelObject)<div id="get_guild"></div>
 
 ### get_guild
 
@@ -3954,7 +4728,83 @@ modify_guild_role_positions: (self: DiscordExecutor, data: ModifyRolePositionOpt
 
 ##### ret1
 
-[LazyRolesObject](#LazyRolesObject)<div id="get_invite"></div>
+[LazyRolesObject](#LazyRolesObject)<div id="modify_guild_role"></div>
+
+### modify_guild_role
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Modifies a guild role
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Modifies a guild role
+modify_guild_role: (self: DiscordExecutor, data: EditGuildRoleOptions) -> LazyRoleObject
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[EditGuildRoleOptions](#EditGuildRoleOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LazyRoleObject](#LazyRoleObject)<div id="delete_guild_role"></div>
+
+### delete_guild_role
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Deletes a guild role
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Deletes a guild role
+delete_guild_role: (self: DiscordExecutor, data: DeleteGuildRoleOptions) -> ()
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[DeleteGuildRoleOptions](#DeleteGuildRoleOptions)
+
+<div id="get_invite"></div>
 
 ### get_invite
 
@@ -4170,7 +5020,460 @@ create_message: (self: DiscordExecutor, data: CreateMessageOptions) -> LazyMessa
 
 ##### ret1
 
-[LazyMessageObject](#LazyMessageObject)<div id="create_interaction_response"></div>
+[LazyMessageObject](#LazyMessageObject)<div id="crosspost_message"></div>
+
+### crosspost_message
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Crossposts a message to an announcement channel
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Crossposts a message to an announcement channel
+crosspost_message: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake) -> LazyMessageObject
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="channel_id"></div>
+
+##### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+##### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LazyMessageObject](#LazyMessageObject)<div id="create_reaction"></div>
+
+### create_reaction
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Creates a reaction to a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Creates a reaction to a message
+create_reaction: (self: DiscordExecutor, data: CreateReactionOptions) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[CreateReactionOptions](#CreateReactionOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="delete_own_reaction"></div>
+
+### delete_own_reaction
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+Deletes the reaction AntiRaid has made on a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+--- Deletes the reaction AntiRaid has made on a message
+delete_own_reaction: (self: DiscordExecutor, data: DeleteOwnReactionOptions) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[DeleteOwnReactionOptions](#DeleteOwnReactionOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="delete_user_reaction"></div>
+
+### delete_user_reaction
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+Deletes a reaction another user has made on a message (see ``delete_own_reaction`` for AntiRaid's
+
+reactions)
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+--- Deletes a reaction another user has made on a message (see ``delete_own_reaction`` for AntiRaid's
+--- reactions)
+delete_user_reaction: (self: DiscordExecutor, data: DeleteUserReactionOptions) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[DeleteUserReactionOptions](#DeleteUserReactionOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="get_reactions"></div>
+
+### get_reactions
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Gets all users who have reacted to awith the provided reaction based on provided criteria
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Gets all users who have reacted to awith the provided reaction based on provided criteria
+get_reactions: (self: DiscordExecutor, data: GetReactionsOptions) -> LazyUsersObject
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[GetReactionsOptions](#GetReactionsOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LazyUsersObject](#LazyUsersObject)<div id="delete_all_reactions"></div>
+
+### delete_all_reactions
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Deletes all reactions on a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Deletes all reactions on a message
+delete_all_reactions: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="channel_id"></div>
+
+##### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+##### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="delete_all_reactions_for_emoji"></div>
+
+### delete_all_reactions_for_emoji
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Deletes all reactions for a specific emoji on a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Deletes all reactions for a specific emoji on a message
+delete_all_reactions_for_emoji: (self: DiscordExecutor, data: DeleteAllReactionsForEmojiOptions) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[DeleteAllReactionsForEmojiOptions](#DeleteAllReactionsForEmojiOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="edit_message"></div>
+
+### edit_message
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Edits a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Edits a message
+edit_message: (self: DiscordExecutor, data: EditMessageOptions) -> LazyMessageObject
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="data"></div>
+
+##### data
+
+[EditMessageOptions](#EditMessageOptions)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[LazyMessageObject](#LazyMessageObject)<div id="delete_message"></div>
+
+### delete_message
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Deletes a message
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Deletes a message
+delete_message: (self: DiscordExecutor, channel_id: discord.Snowflake, message_id: discord.Snowflake, reason: string) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="channel_id"></div>
+
+##### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_id"></div>
+
+##### message_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="reason"></div>
+
+##### reason
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="bulk_delete_messages"></div>
+
+### bulk_delete_messages
+
+<div class="warning">
+This function yields the thread its executing in. This may cause issues in some contexts such as within metamethods (as Luau does not support yieldable metamethods).
+</div>
+
+
+
+Bulk deletes messages in a channel
+
+<details>
+<summary>Function Signature</summary>
+
+```luau
+--- @yields
+---
+--- Bulk deletes messages in a channel
+bulk_delete_messages: (self: DiscordExecutor, channel_id: discord.Snowflake, message_ids: {discord.Snowflake}, reason: string) -> nil
+```
+
+</details>
+
+<div id="Arguments"></div>
+
+#### Arguments
+
+<div id="channel_id"></div>
+
+##### channel_id
+
+[discord](./discord.md).[Snowflake](./discord.md#Snowflake)
+
+<div id="message_ids"></div>
+
+##### message_ids
+
+{[discord](./discord.md).[Snowflake](./discord.md#Snowflake)}
+
+<div id="reason"></div>
+
+##### reason
+
+[string](#string)
+
+<div id="Returns"></div>
+
+#### Returns
+
+<div id="ret1"></div>
+
+##### ret1
+
+[nil](#nil)<div id="create_interaction_response"></div>
 
 ### create_interaction_response
 

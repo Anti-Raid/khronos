@@ -61,7 +61,7 @@ type Bucket = {
 	--- @yields
 	---
 	--- Downloads a file. The resulting file must fit into the VM's memory limit
-	download_file: (self: Bucket, path: string, opts: DownloadFileOpts?) -> buffer,
+	download_file: (self: Bucket, path: string, opts: DownloadFileOpts?) -> blob.Blob,
 
 	--- @yields
 	---
@@ -71,7 +71,7 @@ type Bucket = {
 	--- @yields
 	---
 	--- Upload a file to a bucket
-	upload_file: (self: Bucket, path: string, data: buffer) -> nil,
+	upload_file: (self: Bucket, path: string, data: blob.BlobTaker) -> nil,
 
 	--- @yields
 	---
@@ -187,7 +187,7 @@ Downloads a file. The resulting file must fit into the VM's memory limit
 --- @yields
 ---
 --- Downloads a file. The resulting file must fit into the VM's memory limit
-download_file: (self: Bucket, path: string, opts: DownloadFileOpts?) -> buffer
+download_file: (self: Bucket, path: string, opts: DownloadFileOpts?) -> blob.Blob
 ```
 
 </details>
@@ -218,7 +218,7 @@ download_file: (self: Bucket, path: string, opts: DownloadFileOpts?) -> buffer
 
 ##### ret1
 
-[buffer](#buffer)<div id="get_file_url"></div>
+[blob](./blob.md).[Blob](./blob.md#Blob)<div id="get_file_url"></div>
 
 ### get_file_url
 
@@ -285,7 +285,7 @@ Upload a file to a bucket
 --- @yields
 ---
 --- Upload a file to a bucket
-upload_file: (self: Bucket, path: string, data: buffer) -> nil
+upload_file: (self: Bucket, path: string, data: blob.BlobTaker) -> nil
 ```
 
 </details>
@@ -304,7 +304,7 @@ upload_file: (self: Bucket, path: string, data: buffer) -> nil
 
 ##### data
 
-[buffer](#buffer)
+[blob](./blob.md).[BlobTaker](./blob.md#BlobTaker)
 
 <div id="Returns"></div>
 
