@@ -20,6 +20,7 @@ where
     T::deserialize(val).map_err(serde::de::Error::custom)
 }
 
+#[macro_export]
 macro_rules! internal_enum_number {
     (
         $(#[$outer:meta])*

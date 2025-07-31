@@ -3,6 +3,7 @@ use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
 use moka::future::Cache;
+use serde_json::Value;
 use sqlx::Row;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 
 /// Internal short-lived channel cache
-pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, serenity::all::Channel>> =
+pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, Value>> =
     LazyLock::new(|| {
         Cache::builder()
             .time_to_idle(std::time::Duration::from_secs(30))
@@ -569,7 +570,7 @@ impl DiscordProvider for CliDiscordProvider {
 
     async fn get_guild(
         &self,
-    ) -> serenity::Result<serenity::model::prelude::PartialGuild, khronos_runtime::Error> {
+    ) -> serenity::Result<Value, khronos_runtime::Error> {
         // Fetch from HTTP
         self.http
             .get_guild(self.guild_id)
@@ -577,33 +578,21 @@ impl DiscordProvider for CliDiscordProvider {
             .map_err(|e| format!("Failed to fetch guild: {e}").into())
     }
 
-    async fn get_guild_member(
-        &self,
-        user_id: serenity::all::UserId,
-    ) -> serenity::Result<Option<serenity::all::Member>, khronos_runtime::Error> {
-        // Fetch from HTTP
-        self.http
-            .get_member(self.guild_id, user_id)
-            .await
-            .map_err(|e| format!("Failed to fetch member: {e}").into())
-            .map(Some)
-    }
-
     async fn get_channel(
         &self,
         channel_id: serenity::all::GenericChannelId,
-    ) -> serenity::Result<serenity::all::Channel, khronos_runtime::Error> {
+    ) -> serenity::Result<Value, khronos_runtime::Error> {
         {
             // Check cache first
             let cached_channel = CHANNEL_CACHE.get(&channel_id).await;
 
             if let Some(cached_channel) = cached_channel {
-                let Some(guild_id) = cached_channel.guild_id() else {
-                    return Err("Channel not in guild".into());
+                let Some(Value::String(guild_id)) = cached_channel.get("guild_id") else {
+                    return Err(format!("Channel {channel_id} does not belong to a guild").into());
                 };
 
-                if guild_id != self.guild_id {
-                    return Err("Channel not in guild".into());
+                if guild_id != &self.guild_id.to_string() {
+                    return Err(format!("Channel {channel_id} does not belong to the guild").into());
                 }
 
                 return Ok(cached_channel);
@@ -613,12 +602,12 @@ impl DiscordProvider for CliDiscordProvider {
         // Fetch from HTTP
         let channel = self.http.get_channel(channel_id).await?;
 
-        let Some(guild_id) = channel.guild_id() else {
-            return Err("Channel not in guild".into());
+        let Some(Value::String(guild_id)) = channel.get("guild_id") else {
+            return Err(format!("Channel {channel_id} does not belong to a guild").into());
         };
 
-        if guild_id != self.guild_id {
-            return Err("Channel not in guild".into());
+        if guild_id != &self.guild_id.to_string() {
+            return Err(format!("Channel {channel_id} does not belong to the guild").into());
         }
 
         Ok(channel)
@@ -637,7 +626,7 @@ impl DiscordProvider for CliDiscordProvider {
         channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel, khronos_runtime::Error> {
+    ) -> Result<Value, khronos_runtime::Error> {
         let chan = self
             .http
             .edit_channel(channel_id, &map, audit_log_reason)
@@ -654,7 +643,7 @@ impl DiscordProvider for CliDiscordProvider {
         &self,
         channel_id: serenity::all::GenericChannelId,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel, khronos_runtime::Error> {
+    ) -> Result<Value, khronos_runtime::Error> {
         let chan = self
             .http
             .delete_channel(channel_id, audit_log_reason)

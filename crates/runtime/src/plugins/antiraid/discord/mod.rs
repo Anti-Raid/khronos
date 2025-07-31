@@ -138,20 +138,30 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         serenity::all::Permissions,
     )> {
         // Get the guild
-        let guild = self
+        let guild_json = self
             .discord_provider
             .get_guild()
             .await
             .map_err(|e| LuaError::external(e.to_string()))?;
 
-        let Some(member) = self
+        let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        let member_json = self
             .discord_provider
             .get_guild_member(user_id)
             .await
-            .map_err(|e| LuaError::external(e.to_string()))?
-        else {
-            return Err(LuaError::runtime("Bot user not found in guild"));
-        }; // Get the bot user
+            .map_err(|e| LuaError::external(e.to_string()))?; // Get the bot user
+
+        if member_json.is_null() {
+            return Err(LuaError::runtime(format!(
+                "User not found in guild: {}",
+                user_id.mention()
+            )));
+        }
+
+        let member: serenity::all::Member = serde_json::from_value(member_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
         let member_perms = serenity_backports::member_permissions(&guild, &member);
 
@@ -175,23 +185,30 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         serenity::all::Member,
         serenity::all::Permissions,
     )> {
-        let guild = self
+        let guild_json = self
             .discord_provider
             .get_guild()
             .await
             .map_err(|e| LuaError::external(e.to_string()))?;
 
-        let Some(member) = self
+        let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        let member_json = self
             .discord_provider
             .get_guild_member(user_id)
             .await
-            .map_err(|e| LuaError::external(e.to_string()))?
-        else {
+            .map_err(|e| LuaError::external(e.to_string()))?; // Get the bot user
+
+        if member_json.is_null() {
             return Err(LuaError::runtime(format!(
-                "User not found in guild: {}",
+                "Bot user not found in guild: {}",
                 user_id.mention()
             )));
-        }; // Get the bot user
+        }
+
+        let member: serenity::all::Member = serde_json::from_value(member_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
         let member_perms = serenity_backports::member_permissions(&guild, &member);
         if !member_perms.contains(needed_permissions) {
@@ -200,14 +217,21 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
             )));
         }
 
-        let Some(target_member) = self
+        let target_member_json = self
             .discord_provider
             .get_guild_member(target_id)
             .await
-            .map_err(|e| LuaError::external(e.to_string()))?
-        else {
-            return Err(LuaError::runtime("Target user not found in guild"));
-        }; // Get the target user
+            .map_err(|e| LuaError::external(e.to_string()))?; // Get the target user
+
+        if target_member_json.is_null() {
+            return Err(LuaError::runtime(format!(
+                "User not found in guild: {}",
+                user_id.mention()
+            )));
+        }
+
+        let target_member: serenity::all::Member = serde_json::from_value(target_member_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
         let higher_id = guild
             .greater_member_hierarchy(&member, &target_member)
@@ -243,25 +267,38 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         let mut id = channel_id;
         loop {
             // This call should do access control checks (channel in guild) etc.
-            let channel = self
+            let channel_val = self
                 .discord_provider
                 .get_channel(id)
                 .await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-            let Some(member) = self
+            let channel: serenity::all::Channel = serde_json::from_value(channel_val)
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let member_json = self
                 .discord_provider
                 .get_guild_member(user_id)
                 .await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let guild = self
+            if member_json.is_null() {
+                return Err(LuaError::runtime(format!(
+                    "User not found in guild: {}",
+                    user_id.mention()
+                )));
+            }
+
+            let member: serenity::all::Member = serde_json::from_value(member_json)
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let guild_json = self
                 .discord_provider
                 .get_guild()
                 .await
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
             match channel {
@@ -469,19 +506,31 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             }
 
             // Fetch the partial guild *once*
-            let partial_guild = this.discord_provider
+            let partial_guild_json = this.discord_provider
                 .get_guild()
                 .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let partial_guild: serenity::all::PartialGuild = serde_json::from_value(partial_guild_json)
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
             let mut member_and_resolved_perms = Vec::with_capacity(user_ids.len());
 
             for id in user_ids {
-                let member = this.discord_provider
+                let member_json = this.discord_provider
                 .get_guild_member(id)
                 .await
-                .map_err(|e| LuaError::external(e.to_string()))?
-                .ok_or_else(|| LuaError::runtime("Member not found"))?;
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+                if member_json.is_null() {
+                    return Err(LuaError::runtime(format!(
+                        "User not found in guild: {}",
+                        id.mention()
+                    )));
+                }
+
+                let member: serenity::all::Member = serde_json::from_value(member_json)
+                    .map_err(|e| LuaError::external(e.to_string()))?;
 
                 let resolved_perms = serenity_backports::member_permissions(&partial_guild, &member);
 
@@ -1518,14 +1567,21 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Internal error: Current user not found"));
             };
 
-            let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
+            let bot_member_json = this.discord_provider.get_guild_member(bot_user.id).await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let guild = this.discord_provider.get_guild().await
+            if bot_member_json.is_null() {
+                return Err(LuaError::runtime("Bot user not found in guild"));
+            }
+
+            let bot_member = serde_json::from_value::<serenity::all::Member>(bot_member_json)
+                .map_err(LuaError::external)?;
+
+            let guild_json = this.discord_provider.get_guild().await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let guild = serde_json::from_value::<serenity::all::PartialGuild>(guild_json)
+                .map_err(LuaError::external)?;
 
             let resolved = serenity_backports::member_permissions(&guild, &bot_member);
 
@@ -1573,14 +1629,21 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 return Err(LuaError::runtime("Internal error: Current user not found"));
             };
 
-            let Some(bot_member) = this.discord_provider.get_guild_member(bot_user.id).await
-                .map_err(|e| LuaError::external(e.to_string()))?
-            else {
-                return Err(LuaError::runtime("Bot user not found in guild"));
-            };
+            let bot_member_json = this.discord_provider.get_guild_member(bot_user.id).await
+                .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let guild = this.discord_provider.get_guild().await
+            if bot_member_json.is_null() {
+                return Err(LuaError::runtime("Bot user not found in guild"));
+            }
+
+            let bot_member = serde_json::from_value::<serenity::all::Member>(bot_member_json)
+                .map_err(LuaError::external)?;
+
+            let guild_json = this.discord_provider.get_guild().await
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+            let guild = serde_json::from_value::<serenity::all::PartialGuild>(guild_json)
+                .map_err(LuaError::external)?;
 
             let resolved = serenity_backports::member_permissions(&guild, &bot_member);
 
@@ -2107,10 +2170,13 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             };    
 
             // Call get_invite to find the channel id
-            let invite = this.discord_provider
+            let invite_json = this.discord_provider
                 .get_invite(&data.code, false, false, None)
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let invite = serde_json::from_value::<serenity::all::Invite>(invite_json)
+                .map_err(LuaError::external)?;
 
             if let Some(guild) = invite.guild {
                 if guild.id != this.discord_provider.guild_id() {
@@ -2820,12 +2886,12 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let Some(guild_id) = webhook.guild_id else {
+            let Some(serde_json::Value::String(guild_id)) = webhook.get("guild_id") else {
                 return Err(LuaError::runtime("Webhook does not belong to a guild"));
             };
 
-            if guild_id != this.discord_provider.guild_id() {
-                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            if guild_id != &this.discord_provider.guild_id().to_string() {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
             }
 
             Ok(Lazy::new(webhook))
@@ -2876,12 +2942,12 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let Some(guild_id) = webhook.guild_id else {
+            let Some(serde_json::Value::String(guild_id)) = webhook.get("guild_id") else {
                 return Err(LuaError::runtime("Webhook does not belong to a guild"));
             };
 
-            if guild_id != this.discord_provider.guild_id() {
-                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            if guild_id != &this.discord_provider.guild_id().to_string() {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
             }
             
             let webhook = this.discord_provider
@@ -2923,12 +2989,12 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let Some(guild_id) = webhook.guild_id else {
+            let Some(serde_json::Value::String(guild_id)) = webhook.get("guild_id") else {
                 return Err(LuaError::runtime("Webhook does not belong to a guild"));
             };
 
-            if guild_id != this.discord_provider.guild_id() {
-                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            if guild_id != &this.discord_provider.guild_id().to_string() {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
             }
             
             this.discord_provider
@@ -2959,12 +3025,12 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
-            let Some(guild_id) = webhook.guild_id else {
+            let Some(serde_json::Value::String(guild_id)) = webhook.get("guild_id") else {
                 return Err(LuaError::runtime("Webhook does not belong to a guild"));
             };
 
-            if guild_id != this.discord_provider.guild_id() {
-                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            if guild_id != &this.discord_provider.guild_id().to_string() {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
             }
 
             let files = if let Some(ref attachments) = data.data.attachments {

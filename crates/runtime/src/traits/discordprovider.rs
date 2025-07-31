@@ -1,5 +1,6 @@
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::header::{HeaderMap as Headers, HeaderValue};
+use serde_json::Value;
 use serenity::all::{InteractionId, ReactionType};
 
 /// A discord provider.
@@ -25,7 +26,7 @@ pub trait DiscordProvider: 'static + Clone {
         user_id: Option<serenity::model::prelude::UserId>,
         before: Option<serenity::model::prelude::AuditLogEntryId>,
         limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<serenity::model::prelude::AuditLogs, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_audit_logs(self.guild_id(), action_type, user_id, before, limit)
             .await
@@ -36,7 +37,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn list_auto_moderation_rules(
         &self,
-    ) -> Result<Vec<serenity::all::AutoModRule>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_automod_rules(self.guild_id())
             .await
@@ -46,7 +47,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_auto_moderation_rule(
         &self,
         rule_id: serenity::all::RuleId,
-    ) -> Result<serenity::all::AutoModRule, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_automod_rule(self.guild_id(), rule_id)
             .await
@@ -57,7 +58,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::AutoModRule, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_automod_rule(self.guild_id(), &map, audit_log_reason)
             .await
@@ -69,7 +70,7 @@ pub trait DiscordProvider: 'static + Clone {
         rule_id: serenity::all::RuleId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::AutoModRule, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_automod_rule(self.guild_id(), rule_id, &map, audit_log_reason)
             .await
@@ -96,14 +97,14 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_channel(
         &self,
         channel_id: serenity::all::GenericChannelId,
-    ) -> Result<serenity::all::Channel, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         let chan = self.serenity_http().get_channel(channel_id).await?;
 
-        let Some(guild_id) = chan.guild_id() else {
+        let Some(Value::String(guild_id)) = chan.get("guild_id") else {
             return Err(format!("Channel {channel_id} does not belong to a guild").into());
         };
 
-        if guild_id != self.guild_id() {
+        if guild_id != &self.guild_id().to_string() {
             return Err(format!("Channel {channel_id} does not belong to the guild").into());
         }
 
@@ -115,7 +116,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         let chan = self
             .serenity_http()
             .edit_channel(channel_id, &map, audit_log_reason)
@@ -129,7 +130,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::GenericChannelId,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::model::channel::Channel, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         let chan = self
             .serenity_http()
             .delete_channel(channel_id, audit_log_reason)
@@ -155,7 +156,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_channel_invites(
         &self,
         channel_id: serenity::all::GenericChannelId,
-    ) -> Result<Vec<serenity::all::RichInvite>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_channel_invites(channel_id.expect_channel())
             .await
@@ -167,7 +168,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::RichInvite, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_invite(channel_id.expect_channel(), &map, audit_log_reason)
             .await
@@ -191,7 +192,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::FollowedChannel, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         let headers = if let Some(reason) = audit_log_reason {
             Some(reason_into_header(reason)?)
         } else {
@@ -217,7 +218,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// Fetches the target guild.
     ///
     /// This should return an error if the guild does not exist
-    async fn get_guild(&self) -> Result<serenity::all::PartialGuild, crate::Error> {
+    async fn get_guild(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_with_counts(self.guild_id())
             .await
@@ -225,7 +226,7 @@ pub trait DiscordProvider: 'static + Clone {
     }
 
     /// Fetches a guild preview
-    async fn get_guild_preview(&self) -> Result<serenity::all::GuildPreview, crate::Error> {
+    async fn get_guild_preview(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_preview(self.guild_id())
             .await
@@ -237,7 +238,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::PartialGuild, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_guild(self.guild_id(), &map, audit_log_reason)
             .await
@@ -247,14 +248,12 @@ pub trait DiscordProvider: 'static + Clone {
     // Delete guild will not be implemented as we can't really use it
 
     /// Gets all guild channels
-    async fn get_guild_channels(&self) -> Result<Vec<serenity::all::GuildChannel>, crate::Error> {
+    async fn get_guild_channels(&self) -> Result<Value, crate::Error> {
         Ok(self
             .serenity_http()
             .get_channels(self.guild_id())
             .await
-            .map_err(|e| format!("Failed to fetch guild channels: {e:?}"))?
-            .into_iter()
-            .collect::<Vec<_>>())
+            .map_err(|e| format!("Failed to fetch guild channels: {e:?}"))?)
     }
 
     /// Create a guild channel
@@ -262,7 +261,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::GuildChannel, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_channel(self.guild_id(), &map, audit_log_reason)
             .await
@@ -281,7 +280,7 @@ pub trait DiscordProvider: 'static + Clone {
     }
 
     /// List Active Guild Threads
-    async fn list_active_guild_threads(&self) -> Result<serenity::all::ThreadsData, crate::Error> {
+    async fn list_active_guild_threads(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_active_threads(self.guild_id())
             .await
@@ -290,20 +289,20 @@ pub trait DiscordProvider: 'static + Clone {
 
     /// Returns a member from the guild.
     ///
-    /// This should return a Ok(None) if the member does not exist
+    /// This should return a Ok(Value::Null) if the member does not exist
     async fn get_guild_member(
         &self,
         user_id: serenity::all::UserId,
-    ) -> Result<Option<serenity::all::Member>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         match self
             .serenity_http()
             .get_member(self.guild_id(), user_id)
             .await
         {
-            Ok(member) => Ok(Some(member)),
+            Ok(member) => Ok(member),
             Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
-                    Ok(None)
+                    Ok(Value::Null)
                 } else {
                     Err(format!("Failed to fetch member: {e:?}").into())
                 }
@@ -317,7 +316,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         limit: Option<serenity::nonmax::NonMaxU16>,
         after: Option<serenity::all::UserId>,
-    ) -> Result<Vec<serenity::all::Member>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_members(self.guild_id(), limit, after)
             .await
@@ -329,7 +328,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         query: &str,
         limit: Option<serenity::nonmax::NonMaxU16>,
-    ) -> Result<Vec<serenity::all::Member>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .search_guild_members(self.guild_id(), query, limit)
             .await
@@ -345,7 +344,7 @@ pub trait DiscordProvider: 'static + Clone {
         user_id: serenity::all::UserId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Member, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
             .await
@@ -393,7 +392,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         target: Option<serenity::all::UserPagination>,
         limit: Option<serenity::nonmax::NonMaxU16>,
-    ) -> Result<Vec<serenity::all::Ban>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_bans(self.guild_id(), target, limit)
             .await
@@ -403,7 +402,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_guild_ban(
         &self,
         user_id: serenity::all::UserId,
-    ) -> Result<Option<serenity::all::Ban>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         match self
             .serenity_http()
             .fire(serenity::all::Request::new(
@@ -415,10 +414,10 @@ pub trait DiscordProvider: 'static + Clone {
             ))
             .await
         {
-            Ok(v) => Ok(Some(v)),
+            Ok(v) => Ok(v),
             Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
                 if e.status_code == serenity::all::StatusCode::NOT_FOUND {
-                    Ok(None)
+                    Ok(Value::Null)
                 } else {
                     Err(format!("Failed to get guild ban: {e:?}").into())
                 }
@@ -462,7 +461,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_guild_roles(
         &self,
-    ) -> Result<extract_map::ExtractMap<serenity::all::RoleId, serenity::all::Role>, crate::Error>
+    ) -> Result<Value, crate::Error>
     {
         self.serenity_http()
             .get_guild_roles(self.guild_id())
@@ -473,7 +472,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_guild_role(
         &self,
         role_id: serenity::all::RoleId,
-    ) -> Result<serenity::all::Role, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_role(self.guild_id(), role_id)
             .await
@@ -484,7 +483,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Role, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_role(self.guild_id(), &map, audit_log_reason)
             .await
@@ -495,7 +494,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl Iterator<Item: serde::Serialize>,
         audit_log_reason: Option<&str>,
-    ) -> Result<Vec<serenity::all::Role>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_role_positions(self.guild_id(), map, audit_log_reason)
             .await
@@ -507,7 +506,7 @@ pub trait DiscordProvider: 'static + Clone {
         role_id: serenity::all::RoleId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Role, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_role(self.guild_id(), role_id, &map, audit_log_reason)
             .await
@@ -534,7 +533,7 @@ pub trait DiscordProvider: 'static + Clone {
         member_counts: bool,
         expiration: bool,
         event_id: Option<serenity::all::ScheduledEventId>,
-    ) -> Result<serenity::all::Invite, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_invite(code, member_counts, expiration, event_id)
             .await
@@ -545,7 +544,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         code: &str,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Invite, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .delete_invite(code, audit_log_reason)
             .await
@@ -559,7 +558,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         target: Option<serenity::all::MessagePagination>,
         limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_messages(channel_id, target, limit)
             .await
@@ -570,7 +569,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_message(channel_id, message_id)
             .await
@@ -582,7 +581,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .send_message(channel_id, files, &data)
             .await
@@ -593,7 +592,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .crosspost_message(channel_id.expect_channel(), message_id)
             .await
@@ -645,7 +644,7 @@ pub trait DiscordProvider: 'static + Clone {
         is_burst: Option<bool>,
         after: Option<serenity::all::UserId>,
         limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<Vec<serenity::all::User>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         let mut params= vec![];
 
         let after = after.map(|x| x.to_string());
@@ -710,7 +709,7 @@ pub trait DiscordProvider: 'static + Clone {
         message_id: serenity::all::MessageId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_message(channel_id, message_id, &data, files)
             .await
@@ -759,7 +758,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_original_interaction_response(
         &self,
         interaction_token: &str,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_original_interaction_response(interaction_token)
             .await
@@ -772,7 +771,7 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_token: &str,
         map: impl serde::Serialize,
         new_files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_original_interaction_response(interaction_token, &map, new_files)
             .await
@@ -793,7 +792,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
         message_id: serenity::all::MessageId,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_followup_message(interaction_token, message_id)
             .await
@@ -805,7 +804,7 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_token: &str,
         response: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_followup_message(interaction_token, &response, files)
             .await
@@ -818,7 +817,7 @@ pub trait DiscordProvider: 'static + Clone {
         message_id: serenity::all::MessageId,
         map: impl serde::Serialize,
         new_files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_followup_message(interaction_token, message_id, &map, new_files)
             .await
@@ -842,7 +841,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Webhook, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_webhook(channel_id.expect_channel(), &map, audit_log_reason)
             .await
@@ -852,7 +851,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_channel_webhooks(
         &self,
         channel_id: serenity::all::GenericChannelId,
-    ) -> Result<Vec<serenity::all::Webhook>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_channel_webhooks(channel_id.expect_channel())
             .await
@@ -861,7 +860,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_guild_webhooks(
         &self,
-    ) -> Result<Vec<serenity::all::Webhook>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_webhooks(self.guild_id())
             .await
@@ -871,7 +870,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_webhook(
         &self,
         webhook_id: serenity::all::WebhookId,
-    ) -> Result<serenity::all::Webhook, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_webhook(webhook_id)
             .await
@@ -885,7 +884,7 @@ pub trait DiscordProvider: 'static + Clone {
         webhook_id: serenity::all::WebhookId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
-    ) -> Result<serenity::all::Webhook, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .edit_webhook(webhook_id, &map, audit_log_reason)
             .await
@@ -912,7 +911,7 @@ pub trait DiscordProvider: 'static + Clone {
         thread_id: Option<serenity::all::ThreadId>,
         map: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serde_json::Value, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
         .execute_webhook(webhook_id, thread_id, token, true, files, &map)
         .await
@@ -923,7 +922,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     // Uncategorized (for now)
 
-    async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error> {
+    async fn get_guild_commands(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_commands(self.guild_id())
             .await
@@ -933,7 +932,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_guild_command(
         &self,
         command_id: serenity::all::CommandId,
-    ) -> Result<serenity::all::Command, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_guild_command(self.guild_id(), command_id)
             .await
@@ -943,7 +942,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn create_guild_command(
         &self,
         map: impl serde::Serialize,
-    ) -> Result<serenity::all::Command, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_guild_command(self.guild_id(), &map)
             .await
@@ -953,7 +952,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn create_guild_commands(
         &self,
         map: impl serde::Serialize,
-    ) -> Result<Vec<serenity::all::Command>, crate::Error> {
+    ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .create_guild_commands(self.guild_id(), &map)
             .await

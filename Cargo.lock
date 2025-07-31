@@ -3881,7 +3881,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.12.4"
-source = "git+https://github.com/Anti-Raid/serenity?branch=next#890b25259b028bce929ad9d0009dc89c0dbc8553"
+source = "git+https://github.com/Anti-Raid/serenity?branch=next#27f14ac8cdd3c0a033961664cdee40d8852b7a0b"
 dependencies = [
  "aformat",
  "arrayvec",

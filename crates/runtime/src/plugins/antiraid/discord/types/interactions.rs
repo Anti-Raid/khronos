@@ -1,3 +1,5 @@
+use crate::plugins::antiraid::discord::types::MessageFlags;
+
 use super::allowed_mentions::CreateAllowedMentions;
 use super::attachment::CreateMessageAttachment;
 use super::embed::CreateEmbed;
