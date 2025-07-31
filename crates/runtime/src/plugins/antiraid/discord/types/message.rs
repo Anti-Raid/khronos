@@ -7,13 +7,59 @@ use super::poll::CreatePoll;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 use super::serenity_component::Component as SerenityComponent;
-use bitflags::bitflags;
 
-bitflags! {
+/// The macro forwards the generation to the `bitflags::bitflags!` macro and implements the default
+/// (de)serialization for Discord's bitmask values.
+///
+/// The flags are created with `T::from_bits_truncate` for the deserialized integer value.
+///
+/// Use the `bitflags::bitflags! macro directly if a different serde implementation is required.
+#[macro_export]
+macro_rules! internal_bitflags {
+    (
+        $(#[$outer:meta])*
+        $vis:vis struct $BitFlags:ident: $T:ty {
+            $(
+                $(#[$inner:ident $($args:tt)*])*
+                const $Flag:ident = $value:expr;
+            )*
+        }
+    ) => {
+        $(#[$outer])*
+        #[repr(Rust, packed)]
+        $vis struct $BitFlags($T);
+
+        bitflags::bitflags! {
+            impl $BitFlags: $T {
+                $(
+                    $(#[$inner $($args)*])*
+                    const $Flag = $value;
+                )*
+            }
+        }
+
+        internal_bitflags!(__impl_serde $BitFlags: $T);
+    };
+    (__impl_serde $BitFlags:ident: $T:tt) => {
+        impl<'de> serde::de::Deserialize<'de> for $BitFlags {
+            fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+                Ok(Self::from_bits_truncate(<$T>::deserialize(deserializer)?))
+            }
+        }
+
+        impl serde::ser::Serialize for $BitFlags {
+            fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+                self.bits().serialize(serializer)
+            }
+        }
+    };
+}
+
+internal_bitflags! {
     /// Describes extra features of the message.
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#message-object-message-flags).
-    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq)]
     pub struct MessageFlags: u64 {
         /// This message has been published to subscribed channels (via Channel Following).
         const CROSSPOSTED = 1 << 0;
