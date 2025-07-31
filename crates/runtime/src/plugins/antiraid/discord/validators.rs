@@ -383,6 +383,91 @@ pub fn validate_message_edit(message: &super::types::EditMessage) -> Result<(), 
     Ok(())
 }
 
+/// Validates webhook execute
+pub fn validate_webhook_execute(message: &super::types::ExecuteWebhook) -> Result<(), crate::Error> {
+    pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
+    pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
+    pub const MAX_WEBHOOK_USERNAME_LIMIT: usize = 80; 
+
+    let has_content = message.content.is_some();
+    let has_embed = if let Some(embeds) = message.embeds.as_ref() {
+        !embeds.is_empty()
+    } else {
+        false
+    };
+    let has_attachments = message.attachments.is_some()
+        && !message
+            .attachments
+            .as_ref()
+            .unwrap()
+            .new_and_existing_attachments
+            .is_empty();
+    let has_components =
+        message.components.is_some() && !message.components.as_ref().unwrap().is_empty();
+    let has_poll = message.poll.is_some();
+
+    if !has_content
+        && !has_embed
+        && !has_attachments
+        && !has_poll
+        && !has_components
+    {
+        return Err("No content/embeds/attachments/poll/components set".into());
+    }
+
+    if let Some(content) = message.content.as_ref() {
+        if content.is_empty() {
+            return Err("Message content cannot be empty".into());
+        }
+
+        //validate_string(content)?;
+
+        if content.len() > MESSAGE_CONTENT_LIMIT {
+            return Err(
+                format!("Message content is too long, limit is {MESSAGE_CONTENT_LIMIT}",).into(),
+            );
+        }
+    }
+
+    // Validate all embeds
+    let mut total_embed_chars = 0;
+
+    if let Some(embeds) = message.embeds.as_ref() {
+        for embed in embeds.iter() {
+            total_embed_chars += validate_embed(embed)?;
+
+            if total_embed_chars > MAX_EMBED_CHARACTERS_LIMIT {
+                return Err(format!(
+                    "Total embed characters is too long, limit is {MAX_EMBED_CHARACTERS_LIMIT}",
+                )
+                .into());
+            }
+        }
+    }
+
+    // Validate components
+    if let Some(components) = message.components.as_ref() {
+        validate_components(components)?
+    }
+
+    // Validate username
+    if let Some(username) = message.username.as_ref() {
+        if username.is_empty() {
+            return Err("Webhook username cannot be empty".into());
+        }
+
+        //validate_string(username)?;
+
+        if username.len() > MAX_WEBHOOK_USERNAME_LIMIT {
+            return Err(
+                format!("Webhook username is too long, limit is {MAX_WEBHOOK_USERNAME_LIMIT}",).into(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_option(
     option: &super::types::CreateCommandOption,
     kind: serenity::all::CommandType,

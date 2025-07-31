@@ -4,7 +4,8 @@ use std::cmp::Ordering;
 use super::types::{
     CreateAutoModRule, CreateChannel, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditMessage, EditAutoModRule, EditChannel,
-    EditGuild, EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType
+    EditGuild, EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType, CreateWebhook,
+    ModifyWebhook, ExecuteWebhook
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -427,4 +428,35 @@ pub struct AntiraidFusedMemberSingle {
 pub struct AntiraidFusedMember {
     pub guild: serenity::all::PartialGuild,
     pub members: Vec<AntiraidFusedMemberSingle>,
+}
+
+// Webhooks
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CreateWebhookOptions {
+    pub channel_id: serenity::all::GenericChannelId,
+    pub reason: String,
+    pub data: CreateWebhook,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct EditWebhookOptions {
+    pub webhook_id: serenity::all::WebhookId,
+    pub reason: String,
+    pub data: ModifyWebhook,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct DeleteWebhookOptions {
+    pub webhook_id: serenity::all::WebhookId,
+    pub reason: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ExecuteWebhookOptions {
+    pub webhook_id: serenity::all::WebhookId,
+    pub webhook_token: String,
+    pub thread_id: Option<serenity::all::ThreadId>,
+    pub reason: String,
+    pub data: ExecuteWebhook,
 }

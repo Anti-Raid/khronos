@@ -2713,6 +2713,275 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             Ok(Lazy::new(resp))
         });
+
+        // Webhooks
+        methods.add_scheduler_async_method("create_webhook", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::CreateWebhookOptions>(data)?;
+            
+            this.check_action(&lua, "create_webhook".to_string())
+                .map_err(LuaError::external)?;
+            
+            this.check_reason(&data.reason)?;
+
+            if let Some(ref avatar) = data.data.avatar {
+                let format = get_format_from_image_data(avatar)
+                .map_err(LuaError::external)?;
+
+                if format != "png" && format != "jpeg" && format != "gif" {
+                    return Err(LuaError::external(
+                        "Icon must be a PNG, JPEG, or GIF format",
+                    ));
+                }
+            }
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(
+                bot_user.id,   
+                data.channel_id,
+                serenity::all::Permissions::MANAGE_WEBHOOKS,
+            )
+            .await
+            .map_err(LuaError::external)?;
+            
+            let webhook = this.discord_provider
+                .create_webhook(
+                    data.channel_id,
+                    data.data,
+                    Some(data.reason.as_str())
+                )
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(webhook))
+        });
+
+        methods.add_scheduler_async_method("get_channel_webhooks", async move |lua, this, channel_id: String| {
+            let channel_id = channel_id.parse::<serenity::all::GenericChannelId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing webhook id: {e}")))?;
+
+            this.check_action(&lua, "get_channel_webhooks".to_string())
+                .map_err(LuaError::external)?;
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_channel_permissions(
+                bot_user.id,   
+                channel_id,
+                serenity::all::Permissions::MANAGE_WEBHOOKS,
+            )
+            .await
+            .map_err(LuaError::external)?;
+
+            let webhooks = this.discord_provider
+                .get_channel_webhooks(channel_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(webhooks))
+        });
+
+        methods.add_scheduler_async_method("get_guild_webhooks", async move |lua, this, _: ()| {
+            this.check_action(&lua, "get_guild_webhooks".to_string())
+                .map_err(LuaError::external)?;
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_permissions(
+                bot_user.id,   
+                serenity::all::Permissions::MANAGE_WEBHOOKS,
+            )
+            .await
+            .map_err(LuaError::external)?;
+
+            let webhooks = this.discord_provider
+                .get_guild_webhooks()
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(webhooks))
+        });
+
+        methods.add_scheduler_async_method("get_webhook", async move |lua, this, webhook_id: String| {
+            let webhook_id = webhook_id.parse::<serenity::all::WebhookId>()
+                .map_err(|e| LuaError::external(format!("Error while parsing webhook id: {e}")))?;
+
+            this.check_action(&lua, "get_webhook".to_string())
+                .map_err(LuaError::external)?;
+
+            let webhook = this.discord_provider
+                .get_webhook(webhook_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let Some(guild_id) = webhook.guild_id else {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
+            };
+
+            if guild_id != this.discord_provider.guild_id() {
+                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            }
+
+            Ok(Lazy::new(webhook))
+        });
+
+        methods.add_scheduler_async_method("modify_webhook", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::EditWebhookOptions>(data)?;
+            
+            this.check_action(&lua, "modify_webhook".to_string())
+                .map_err(LuaError::external)?;
+            
+            this.check_reason(&data.reason)?;
+
+            if let Some(ref avatar) = data.data.avatar.as_inner_ref() {
+                let format = get_format_from_image_data(avatar)
+                .map_err(LuaError::external)?;
+
+                if format != "png" && format != "jpeg" && format != "gif" {
+                    return Err(LuaError::external(
+                        "Icon must be a PNG, JPEG, or GIF format",
+                    ));
+                }
+            }
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            if let Some(channel_id) = data.data.channel_id {
+                this.check_channel_permissions(
+                    bot_user.id,   
+                    channel_id.widen(),
+                    serenity::all::Permissions::empty(),
+                )
+                .await
+                .map_err(LuaError::external)?;
+            }
+
+            this.check_permissions(
+                bot_user.id,   
+                serenity::all::Permissions::MANAGE_WEBHOOKS,
+            )
+            .await
+            .map_err(LuaError::external)?;
+
+            let webhook = this.discord_provider
+                .get_webhook(data.webhook_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let Some(guild_id) = webhook.guild_id else {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
+            };
+
+            if guild_id != this.discord_provider.guild_id() {
+                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            }
+            
+            let webhook = this.discord_provider
+                .modify_webhook(
+                    data.webhook_id,
+                    data.data,
+                    Some(data.reason.as_str())
+                )
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(webhook))
+        });
+
+        // Modify webhook with token is intentionally not supported due to security concerns
+
+        methods.add_scheduler_async_method("delete_webhook", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::DeleteWebhookOptions>(data)?;
+            
+            this.check_action(&lua, "delete_webhook".to_string())
+                .map_err(LuaError::external)?;
+            
+            this.check_reason(&data.reason)?;
+
+            let Some(bot_user) = this.context.current_user() else {
+                return Err(LuaError::runtime("Internal error: Current user not found"));
+            };
+
+            this.check_permissions(
+                bot_user.id,   
+                serenity::all::Permissions::MANAGE_WEBHOOKS,
+            )
+            .await
+            .map_err(LuaError::external)?;
+
+
+            let webhook = this.discord_provider
+                .get_webhook(data.webhook_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let Some(guild_id) = webhook.guild_id else {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
+            };
+
+            if guild_id != this.discord_provider.guild_id() {
+                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            }
+            
+            this.discord_provider
+                .delete_webhook(
+                    data.webhook_id,
+                    Some(data.reason.as_str())
+                )
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(())
+        });
+
+        // Delete webhook with token is intentionally not supported due to security concerns
+
+        methods.add_scheduler_async_method("execute_webhook", async move |lua, this, data: LuaValue| {
+            let data = lua.from_value::<structs::ExecuteWebhookOptions>(data)?;
+
+            validators::validate_webhook_execute(&data.data)
+                .map_err(|x| LuaError::external(x.to_string()))?;
+
+            this.check_action(&lua, "execute_webhook".to_string())
+                .map_err(LuaError::external)?;
+
+            // Ensure webhook exists on the same server as the guild we're in
+            let webhook = this.discord_provider
+                .get_webhook(data.webhook_id)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let Some(guild_id) = webhook.guild_id else {
+                return Err(LuaError::runtime("Webhook does not belong to a guild"));
+            };
+
+            if guild_id != this.discord_provider.guild_id() {
+                return Err(LuaError::runtime("Webhook does not belong to the current guild"));
+            }
+
+            let files = if let Some(ref attachments) = data.data.attachments {
+                attachments.take_files().map_err(|e| LuaError::external(e.to_string()))?
+            } else {
+                Vec::new()
+            };
+
+            let msg = this.discord_provider
+                .execute_webhook(data.webhook_id, &data.webhook_token, data.thread_id, &data.data, files)
+                .await
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            Ok(Lazy::new(msg))
+        });
+
+        // Get/Edit/Delete webhook message is intentionally not supported due to lack of use cases and security concerns
     }
 
     #[cfg(feature = "repl")]

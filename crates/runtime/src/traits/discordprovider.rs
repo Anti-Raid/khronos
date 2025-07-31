@@ -836,6 +836,95 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to delete interaction followup: {e}").into())
     }
 
+    // Webhooks
+    async fn create_webhook(
+        &self,
+        channel_id: serenity::all::GenericChannelId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::Webhook, crate::Error> {
+        self.serenity_http()
+            .create_webhook(channel_id.expect_channel(), &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to create webhook: {e}").into())
+    }
+
+    async fn get_channel_webhooks(
+        &self,
+        channel_id: serenity::all::GenericChannelId,
+    ) -> Result<Vec<serenity::all::Webhook>, crate::Error> {
+        self.serenity_http()
+            .get_channel_webhooks(channel_id.expect_channel())
+            .await
+            .map_err(|e| format!("Failed to get channel webhooks: {e}").into())
+    }
+
+    async fn get_guild_webhooks(
+        &self,
+    ) -> Result<Vec<serenity::all::Webhook>, crate::Error> {
+        self.serenity_http()
+            .get_guild_webhooks(self.guild_id())
+            .await
+            .map_err(|e| format!("Failed to get guild webhooks: {e}").into())
+    }
+
+    async fn get_webhook(
+        &self,
+        webhook_id: serenity::all::WebhookId,
+    ) -> Result<serenity::all::Webhook, crate::Error> {
+        self.serenity_http()
+            .get_webhook(webhook_id)
+            .await
+            .map_err(|e| format!("Failed to get webhook: {e}").into())
+    }
+
+    // Get Webhook with token is intentionally not supported for security reasons
+
+    async fn modify_webhook(
+        &self,
+        webhook_id: serenity::all::WebhookId,
+        map: impl serde::Serialize,
+        audit_log_reason: Option<&str>,
+    ) -> Result<serenity::all::Webhook, crate::Error> {
+        self.serenity_http()
+            .edit_webhook(webhook_id, &map, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to modify webhook: {e}").into())
+    }
+
+    async fn delete_webhook(
+        &self,
+        webhook_id: serenity::all::WebhookId,
+        audit_log_reason: Option<&str>,
+    ) -> Result<(), crate::Error> {
+        self.serenity_http()
+            .delete_webhook(webhook_id, audit_log_reason)
+            .await
+            .map_err(|e| format!("Failed to delete webhook: {e}").into())
+    }
+
+    // Delete webhook with token is intentionally not supported for security reasons
+
+    async fn execute_webhook(
+        &self,
+        webhook_id: serenity::all::WebhookId,
+        token: &str,
+        thread_id: Option<serenity::all::ThreadId>,
+        map: impl serde::Serialize,
+        files: Vec<serenity::all::CreateAttachment<'_>>,
+    ) -> Result<serenity::all::Message, crate::Error> {
+        let Some(msg) = self.serenity_http()
+        .execute_webhook(webhook_id, thread_id, token, true, files, &map)
+        .await
+        .map_err(|e| format!("Failed to execute webhook: {e}"))? else {
+            return Err("Webhook execution returned no message".into());
+        };
+
+        Ok(msg)
+    }
+
+    // Get/Edit/Delete webhook message is intentionally not supported due to lack of use cases and security concerns
+
     // Uncategorized (for now)
 
     async fn get_guild_commands(&self) -> Result<Vec<serenity::all::Command>, crate::Error> {
