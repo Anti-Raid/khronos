@@ -559,7 +559,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         target: Option<serenity::all::MessagePagination>,
         limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<Vec<serenity::all::Message>, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .get_messages(channel_id, target, limit)
             .await
@@ -570,7 +570,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
-    ) -> Result<serenity::all::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .get_message(channel_id, message_id)
             .await
@@ -582,7 +582,7 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: serenity::all::GenericChannelId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serenity::model::channel::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .send_message(channel_id, files, &data)
             .await
@@ -593,7 +593,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         channel_id: serenity::all::GenericChannelId,
         message_id: serenity::all::MessageId,
-    ) -> Result<serenity::all::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .crosspost_message(channel_id.expect_channel(), message_id)
             .await
@@ -710,7 +710,7 @@ pub trait DiscordProvider: 'static + Clone {
         message_id: serenity::all::MessageId,
         files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
-    ) -> Result<serenity::model::channel::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .edit_message(channel_id, message_id, &data, files)
             .await
@@ -759,7 +759,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_original_interaction_response(
         &self,
         interaction_token: &str,
-    ) -> Result<serenity::model::channel::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .get_original_interaction_response(interaction_token)
             .await
@@ -772,7 +772,7 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_token: &str,
         map: impl serde::Serialize,
         new_files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serenity::model::channel::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .edit_original_interaction_response(interaction_token, &map, new_files)
             .await
@@ -793,7 +793,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
         message_id: serenity::all::MessageId,
-    ) -> Result<serenity::all::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .get_followup_message(interaction_token, message_id)
             .await
@@ -805,7 +805,7 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_token: &str,
         response: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serenity::all::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .create_followup_message(interaction_token, &response, files)
             .await
@@ -818,7 +818,7 @@ pub trait DiscordProvider: 'static + Clone {
         message_id: serenity::all::MessageId,
         map: impl serde::Serialize,
         new_files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serenity::all::Message, crate::Error> {
+    ) -> Result<serde_json::Value, crate::Error> {
         self.serenity_http()
             .edit_followup_message(interaction_token, message_id, &map, new_files)
             .await
@@ -912,15 +912,11 @@ pub trait DiscordProvider: 'static + Clone {
         thread_id: Option<serenity::all::ThreadId>,
         map: impl serde::Serialize,
         files: Vec<serenity::all::CreateAttachment<'_>>,
-    ) -> Result<serenity::all::Message, crate::Error> {
-        let Some(msg) = self.serenity_http()
+    ) -> Result<serde_json::Value, crate::Error> {
+        self.serenity_http()
         .execute_webhook(webhook_id, thread_id, token, true, files, &map)
         .await
-        .map_err(|e| format!("Failed to execute webhook: {e}"))? else {
-            return Err("Webhook execution returned no message".into());
-        };
-
-        Ok(msg)
+        .map_err(|e| format!("Failed to execute webhook: {e}").into())
     }
 
     // Get/Edit/Delete webhook message is intentionally not supported due to lack of use cases and security concerns
