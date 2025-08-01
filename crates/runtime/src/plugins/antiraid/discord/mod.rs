@@ -98,7 +98,7 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
 
         if let Some(bulk_op) = &self.bulk_op {
             if let Some(ref b_action) = bulk_op.action {
-                if b_action != &action {
+                if b_action != &action && action != "antiraid_bulk_op_wait" {
                     return Err(LuaError::runtime(format!(
                         "Bulk operation action mismatch: expected `{}`, got `{}`",
                         b_action, action
