@@ -97,28 +97,30 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
         }
 
         if let Some(bulk_op) = &self.bulk_op {
-            if let Some(ref b_action) = bulk_op.action {
-                if b_action != &action && action != "antiraid_bulk_op_wait" {
+            if action != "antiraid_bulk_op_wait" {
+                if let Some(ref b_action) = bulk_op.action {
+                    if b_action != &action {
+                        return Err(LuaError::runtime(format!(
+                            "Bulk operation action mismatch: expected `{}`, got `{}`",
+                            b_action, action
+                        )));
+                    }
+                }
+
+                // Check expiry
+                if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
+                    return Err(LuaError::runtime("Bulk operation maximum wait period has passed"));
+                }
+
+                if *bulk_op.op_performed.try_borrow().map_err(LuaError::external)? >= bulk_op.max_ops {
                     return Err(LuaError::runtime(format!(
-                        "Bulk operation action mismatch: expected `{}`, got `{}`",
-                        b_action, action
+                        "Bulk operation limit reached: {action}. A call to `antiraid_bulk_op_wait` is required before performing more operations",
                     )));
                 }
-            }
 
-            // Check expiry
-            if *bulk_op.last_waited.try_borrow().map_err(LuaError::runtime)? + DEFAULT_BULK_OP_MAX_WAIT < std::time::Instant::now() {
-                return Err(LuaError::runtime("Bulk operation maximum wait period has passed"));
+                *bulk_op.op_performed.try_borrow_mut().map_err(LuaError::external)? += 1; // Increment the op performed counter
+                return Ok(()); // No GCRA/attempt_action check needed
             }
-
-            if *bulk_op.op_performed.try_borrow().map_err(LuaError::external)? >= bulk_op.max_ops {
-                return Err(LuaError::runtime(format!(
-                    "Bulk operation limit reached: {action}. A call to `antiraid_bulk_op_wait` is required before performing more operations",
-                )));
-            }
-
-            *bulk_op.op_performed.try_borrow_mut().map_err(LuaError::external)? += 1; // Increment the op performed counter
-            return Ok(()); // No GCRA/attempt_action check needed
         }
 
         self.discord_provider
