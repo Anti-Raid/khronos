@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use serenity::all::*;
 use std::collections::HashMap;
 use super::serenity_component::Component as SerenityComponent;
+use super::serenity_component::ActionRow as SerenityActionRow;
+
 
 /// [Discord docs](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object).
 #[derive(Clone, Debug)]
@@ -252,7 +254,7 @@ pub struct AutocompleteChoice {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[must_use]
 pub struct CreateModal {
-    components: Vec<ActionRow>,
+    components: Vec<SerenityActionRow>,
     custom_id: String,
     title: String,
 }

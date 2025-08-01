@@ -22,7 +22,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// Returns the audit logs for the guild.
     async fn get_audit_logs(
         &self,
-        action_type: Option<serenity::all::audit_log::Action>,
+        action_type: Option<u16>,
         user_id: Option<serenity::model::prelude::UserId>,
         before: Option<serenity::model::prelude::AuditLogEntryId>,
         limit: Option<serenity::nonmax::NonMaxU8>,

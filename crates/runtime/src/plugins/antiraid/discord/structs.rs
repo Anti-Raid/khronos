@@ -10,21 +10,10 @@ use super::types::{
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLogOptions {
-    pub action_type: Option<serenity::all::audit_log::Action>,
+    pub action_type: Option<u16>,
     pub user_id: Option<serenity::all::UserId>,
     pub before: Option<serenity::all::AuditLogEntryId>,
     pub limit: Option<serenity::nonmax::NonMaxU8>,
-}
-
-impl Default for GetAuditLogOptions {
-    fn default() -> Self {
-        Self {
-            action_type: Some(serenity::all::audit_log::Action::GuildUpdate),
-            user_id: Some(serenity::all::UserId::default()),
-            before: Some(serenity::all::AuditLogEntryId::default()),
-            limit: Some(serenity::nonmax::NonMaxU8::default()),
-        }
-    }
 }
 
 // Channel

@@ -12,7 +12,6 @@ use cli::{Cli, CliAuxOpts, CliEntrypointAction};
 use std::env::var;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs;
 
@@ -502,7 +501,7 @@ impl CliArgs {
                 http: self
                     .bot_token
                     .as_ref()
-                    .map(|token| Arc::new(serenity::all::Http::new(serenity::all::Token::from_str(token).expect("Failed to parse bot token")))),
+                    .map(|token| Arc::new(serenity::all::Http::new(serenity::all::SecretString::new(token.clone().into())))),
                 cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
                 file_storage_backend: match self.file_storage_backend {

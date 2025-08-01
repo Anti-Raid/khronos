@@ -1495,7 +1495,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             if let Some(communication_disabled_until) = *data.data.communication_disabled_until {
                 if let Some(crdu) = communication_disabled_until {
-                    if *crdu > (chrono::Utc::now() + chrono::Duration::days(28) + chrono::Duration::seconds(10)) {
+                    if crdu > (chrono::Utc::now() + chrono::Duration::days(28) + chrono::Duration::seconds(10)) {
                         return Err(LuaError::external("Communication disabled until must be less than 28 days in the future"));
                     }    
                 }

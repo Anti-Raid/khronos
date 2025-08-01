@@ -1,4 +1,4 @@
-use crate::core::typesext::MultiOption;
+use crate::{core::typesext::MultiOption, internal_enum_number};
 use nonmax::NonMaxU16;
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
@@ -215,4 +215,17 @@ pub struct CreateInvite {
 #[must_use]
 pub struct FollowAnnouncementChannelData {
     pub webhook_channel_id: GenericChannelId,
+}
+
+internal_enum_number! {
+    /// Type of target for a voice channel invite.
+    ///
+    /// [Discord docs](https://discord.com/developers/docs/resources/invite#invite-object-invite-target-types).
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    #[non_exhaustive]
+    pub enum InviteTargetType {
+        Stream = 1,
+        EmbeddedApplication = 2,
+        _ => Unknown(u8),
+    }
 }

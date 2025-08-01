@@ -1,4 +1,5 @@
-use crate::core::typesext::MultiOption;
+use crate::{core::typesext::MultiOption, internal_bitflags};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serenity::all::*;
 
@@ -62,7 +63,7 @@ pub struct EditMember {
     pub channel_id: MultiOption<ChannelId>,
 
     #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
-    pub communication_disabled_until: MultiOption<Timestamp>,
+    pub communication_disabled_until: MultiOption<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<GuildMemberFlags>,
 }
@@ -86,4 +87,25 @@ pub struct EditRole {
     pub unicode_emoji: MultiOption<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mentionable: Option<bool>,
+}
+
+internal_bitflags! {
+    /// Describes a system channel flags.
+    ///
+    /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-system-channel-flags).
+    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq)]
+    pub struct SystemChannelFlags: u64 {
+        /// Suppress member join notifications.
+        const SUPPRESS_JOIN_NOTIFICATIONS = 1 << 0;
+        /// Suppress server boost notifications.
+        const SUPPRESS_PREMIUM_SUBSCRIPTIONS = 1 << 1;
+        /// Suppress server setup tips.
+        const SUPPRESS_GUILD_REMINDER_NOTIFICATIONS = 1 << 2;
+        /// Hide member join sticker reply buttons.
+        const SUPPRESS_JOIN_NOTIFICATION_REPLIES = 1 << 3;
+        /// Suppress role subscription purchase and renewal notifications.
+        const SUPPRESS_ROLE_SUBSCRIPTION_PURCHASE_NOTIFICATIONS = 1 << 4;
+        /// Hide role subscription sticker reply buttons.
+        const SUPPRESS_ROLE_SUBSCRIPTION_PURCHASE_NOTIFICATION_REPLIES = 1 << 5;
+    }
 }
