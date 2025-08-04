@@ -3,7 +3,6 @@ mod cli_extensions;
 mod constants;
 mod experiments;
 mod filestorage;
-mod presets;
 mod provider;
 mod repl_completer;
 
@@ -116,22 +115,7 @@ struct CliArgs {
     #[clap(long, default_value = "wait-after-execution")]
     repl_wait_mode: ReplTaskWaitMode,
 
-    /// What preset to use for creating the event
-    #[clap(long)]
-    preset: Option<String>,
-
-    /// The input data to use for creating the event
-    /// using a preset
-    ///
-    /// Must be JSON encoded
-    ///
-    /// Environment variable: `PRESET_INPUT`
-    #[clap(long)]
-    preset_input: Option<String>,
-
     /// The raw event data to use for creating the event
-    ///
-    /// Overrides `preset`/`preset_input` if set
     ///
     /// Environment variable: `RAW_EVENT_DATA`
     #[clap(long)]
@@ -318,14 +302,6 @@ impl CliArgs {
                 .expect("Failed to parse repl wait mode");
         }
 
-        if let Ok(preset) = src.var("PRESET") {
-            self.preset = Some(preset);
-        }
-
-        if let Ok(preset_input) = src.var("PRESET_INPUT") {
-            self.preset_input = Some(preset_input);
-        }
-
         if let Ok(raw_event_data) = src.var("RAW_EVENT_DATA") {
             self.raw_event_data = Some(raw_event_data);
         }
@@ -489,8 +465,6 @@ impl CliArgs {
                 },
                 verbose: self.verbose,
                 aux_opts: aux_opts.clone(),
-                preset: self.preset,
-                preset_input: self.preset_input,
                 raw_event_data: self.raw_event_data,
                 context_data: self.context_data,
                 guild_id: self.guild_id,

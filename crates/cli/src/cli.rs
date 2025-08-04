@@ -1,10 +1,7 @@
 use crate::experiments::load_experiments;
 use crate::filestorage::FileStorageProvider;
-use crate::presets::impls::CreateEventFromPresetType;
-use crate::presets::types::AntiraidEventPresetType;
 use crate::provider;
 use crate::repl_completer;
-use antiraid_types::ar_event::AntiraidEvent;
 use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::primitives::event::Event;
 use khronos_runtime::rt::mlua::prelude::*;
@@ -18,7 +15,6 @@ use rustyline::Editor;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs;
 
@@ -108,15 +104,6 @@ pub struct Cli {
     /// The auxiliary options for the CLI
     pub aux_opts: CliAuxOpts,
 
-    /// What preset to use for creating the event
-    pub preset: Option<String>,
-
-    /// The input data to use for creating the event
-    /// using a preset
-    ///
-    /// Must be JSON encoded
-    pub preset_input: Option<String>,
-
     /// The raw event data to use for creating the event
     ///
     /// Overrides `preset`/`preset_input` if set
@@ -173,37 +160,21 @@ pub struct Cli {
     pub pool: Option<sqlx::PgPool>,
 }
 
+#[derive(serde::Deserialize, Debug)]
+struct EventArgs {
+    name: String,
+    data: serde_json::Value,
+}
+
 impl Cli {
-    fn parse_event_args(&self) -> AntiraidEvent {
+    fn parse_event_args(&self) -> EventArgs {
         if let Some(ref raw_event_data) = self.raw_event_data {
             serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
-        } else if let Some(ref preset) = self.preset {
-            let preset =
-                AntiraidEventPresetType::from_str(preset).expect("Failed to parse preset type");
-
-            let input = if let Some(input) = &self.preset_input {
-                let input: serde_json::Value =
-                    serde_json::from_str(input).expect("Failed to parse preset input data");
-                input
-            } else {
-                serde_json::Value::Null
-            };
-
-            preset
-                .to_event(input)
-                .expect("Failed to create event from preset")
         } else {
-            let input = if let Some(input) = &self.preset_input {
-                let input: serde_json::Value =
-                    serde_json::from_str(input).expect("Failed to parse preset input data");
-                input
-            } else {
-                serde_json::Value::Null
-            };
-
-            AntiraidEventPresetType::OnStartup
-                .to_event(input)
-                .expect("Failed to create event from preset")
+            EventArgs {
+                name: "NoEvent".to_string(),
+                data: serde_json::json!({}),
+            }
         }
     }
 
@@ -227,8 +198,8 @@ impl Cli {
 
         let create_event = CreateEvent::new(
             "AntiRaid".to_string(),
-            event.to_string(),
-            event.to_value().expect("Failed to convert event to value"),
+            event.name.to_string(),
+            event.data,
         );
 
         Event::from_create_event_with_runtime(&self.setup_data.main_isolate.inner(), create_event)

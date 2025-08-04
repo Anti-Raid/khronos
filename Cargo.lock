@@ -197,18 +197,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "antiraid-types"
-version = "0.1.0"
-source = "git+https://github.com/Anti-Raid/antiraid-types#c54e46a075eee6846b432c3fd799b2bc1639f3c8"
-dependencies = [
- "indexmap",
- "serde",
- "serde_json",
- "serenity",
- "strum",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2174,7 +2162,6 @@ dependencies = [
 name = "khronos_cli"
 version = "1.0.0"
 dependencies = [
- "antiraid-types",
  "chrono",
  "clap",
  "data-encoding",
