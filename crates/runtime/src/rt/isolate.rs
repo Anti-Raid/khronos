@@ -315,7 +315,7 @@ impl KhronosIsolate {
     }
 
     // Internal method to actually spawn the script
-    async fn spawn_script(
+    pub async fn spawn_script(
         &self,
         cache_key: &str,
         name: &str,
