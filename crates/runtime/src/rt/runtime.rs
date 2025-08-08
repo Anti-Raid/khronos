@@ -109,19 +109,19 @@ impl KhronosRuntime {
 
         lua.set_compiler(compiler.clone());
 
-        let scheduler = TaskManager::new(&lua, ReturnTracker::new());
-
-        scheduler.attach()?;
+        let scheduler = TaskManager::new(&lua, ReturnTracker::new())
+        .await
+        .map_err(|e| {
+            LuaError::external(format!(
+                "Failed to create task manager: {e:?}"
+            ))
+        })?;
 
         if !opts.disable_task_lib {
             lua.globals()
                 .set("task", mlua_scheduler::userdata::task_lib(&lua)?)?;
         }
 
-        scheduler
-            .run_in_task()
-            .await
-            .map_err(|e| LuaError::RuntimeError(format!("Failed to start scheduler: {e}")))?;
         log::debug!("Khronos runtime created successfully");
 
         let broken = Rc::new(Cell::new(false));
