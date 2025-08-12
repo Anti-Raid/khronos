@@ -38,7 +38,8 @@ impl LuaUserData for TimeDelta {
             LuaMetaMethod::Add,
             |_, this, other: LuaUserDataRef<TimeDelta>| {
                 Ok(TimeDelta {
-                    timedelta: this.timedelta + other.timedelta,
+                    timedelta: this.timedelta.checked_add(&other.timedelta)
+                        .ok_or(mluau::Error::RuntimeError("Overflow in TimeDelta addition".to_string()))?,
                 })
             },
         );
@@ -47,7 +48,8 @@ impl LuaUserData for TimeDelta {
             LuaMetaMethod::Sub,
             |_, this, other: LuaUserDataRef<TimeDelta>| {
                 Ok(TimeDelta {
-                    timedelta: this.timedelta - other.timedelta,
+                    timedelta: this.timedelta.checked_sub(&other.timedelta)
+                        .ok_or(mluau::Error::RuntimeError("Overflow in TimeDelta subtraction".to_string()))?,
                 })
             },
         );
@@ -145,7 +147,8 @@ where
             LuaMetaMethod::Add,
             |_, this, td: LuaUserDataRef<TimeDelta>| {
                 Ok(DateTime {
-                    dt: this.dt.clone() + td.timedelta,
+                    dt: this.dt.clone().checked_add_signed(td.timedelta)
+                        .ok_or(mluau::Error::RuntimeError("Overflow in DateTime addition".to_string()))?,
                 })
             },
         );
@@ -154,7 +157,8 @@ where
             LuaMetaMethod::Sub,
             |_, this, td: LuaUserDataRef<TimeDelta>| {
                 Ok(DateTime {
-                    dt: this.dt.clone() - td.timedelta,
+                    dt: this.dt.clone().checked_sub_signed(td.timedelta)
+                        .ok_or(mluau::Error::RuntimeError("Overflow in DateTime subtraction".to_string()))?,
                 })
             },
         );
