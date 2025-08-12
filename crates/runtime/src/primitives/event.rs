@@ -2,9 +2,9 @@ use mluau::prelude::*;
 use crate::rt::KhronosRuntime;
 use crate::utils::khronos_value::KhronosValue;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 enum InnerEventData {
     /// The inner data of the object
     Json(serde_json::Value),
@@ -21,6 +21,24 @@ impl<'de> Deserialize<'de> for InnerEventData {
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         Ok(Self::Json(value))
+    }
+}
+
+// Workaround for RawValue
+impl Serialize for InnerEventData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            InnerEventData::Json(value) => value.serialize(serializer),
+            InnerEventData::Khronos(khronos_value) => khronos_value.serialize(serializer),
+            InnerEventData::RawValue(raw_value) => {
+                let value: serde_json::Value = serde_json::from_str(raw_value.get())
+                    .map_err(serde::ser::Error::custom)?;
+                value.serialize(serializer)
+            },
+        }
     }
 }
 
