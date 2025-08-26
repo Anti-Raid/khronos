@@ -8,7 +8,6 @@ use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
-use khronos_runtime::rt::KhronosRuntimeInterruptData;
 use khronos_runtime::rt::RuntimeCreateOpts;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
@@ -244,10 +243,9 @@ impl Cli {
         let runtime = KhronosRuntime::new(
             RuntimeCreateOpts {
                 disable_task_lib: aux_opts.disable_task_lib,
+                time_limit: Some(std::time::Duration::from_secs(5)),
+                give_time: std::time::Duration::from_millis(500),
             },
-            Some(|_a: &Lua, _b: &KhronosRuntimeInterruptData| {
-                Ok(LuaVmState::Continue) // TODO: Maybe add time limits here?
-            }),
             None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn() -> ())>,
         )
         .await

@@ -208,6 +208,10 @@ impl KhronosIsolate {
         &self,
         context: K,
     ) -> Result<CreatedKhronosContext, LuaError> {
+        // Ensure create_thread wont error
+        self.inner
+            .update_last_execution_time(std::time::Instant::now());
+
         let Some(ref lua) = *self.inner.lua.borrow_mut() else {
             return Err(LuaError::RuntimeError(
                 "Lua instance is no longer valid".to_string(),
@@ -243,6 +247,10 @@ impl KhronosIsolate {
         context: CreatedKhronosContext,
         event: Event,
     ) -> Result<SpawnResult, LuaError> {
+        // Ensure create_thread wont error
+        self.inner
+            .update_last_execution_time(std::time::Instant::now());
+
         let args = {
             let Some(ref lua) = *self.inner.lua.borrow_mut() else {
                 return Err(LuaError::RuntimeError(
@@ -287,6 +295,10 @@ impl KhronosIsolate {
         context: CreatedKhronosContext,
         event: Event,
     ) -> Result<SpawnResult, LuaError> {
+        // Ensure create_thread wont error
+        self.inner
+            .update_last_execution_time(std::time::Instant::now());
+
         let args = {
             let Some(ref lua) = *self.inner.lua.borrow_mut() else {
                 return Err(LuaError::RuntimeError(
@@ -322,6 +334,10 @@ impl KhronosIsolate {
         code: &str,
         args: LuaMultiValue,
     ) -> LuaResult<SpawnResult> {
+        // Ensure create_thread wont error
+        self.inner
+            .update_last_execution_time(std::time::Instant::now());
+
         let thread = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError(

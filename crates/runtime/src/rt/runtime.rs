@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
+use mlua_scheduler::taskmgr::Hooks;
 use mlua_scheduler::{ReturnTracker, TaskManager};
 use mluau::prelude::*;
 
@@ -30,12 +31,36 @@ pub type OnBrokenFunc = Box<dyn Fn()>;
 #[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize, Default)]
 pub struct RuntimeCreateOpts {
     pub disable_task_lib: bool,
+    pub time_limit: Option<std::time::Duration>,
+    pub give_time: std::time::Duration,
+    //pub time_slice: Option<std::time::Duration>,
 }
 
-/// A struct representing the options for creating a Khronos runtime
-pub struct KhronosRuntimeInterruptData {
-    /// When the runtime last executed a script
-    pub last_execution_time: Option<Instant>,
+
+pub struct SchedulerHook {
+    execution_stop_time: Rc<Cell<Option<std::time::Instant>>>,
+    give_time: std::time::Duration,
+}
+
+impl Hooks for SchedulerHook {
+    fn on_resume(&self, _thread: &mluau::Thread) {
+        match self.execution_stop_time.get() {
+            Some(curr_stop) => {
+                // We need to give the thread some time to run
+
+                // If current stopping time is less than now + give_time, meaning
+                // the thread wouldn't be able to run for at least give_time,
+                // extend the time a bit
+                if curr_stop < Instant::now() + self.give_time {
+                    // Extend the time a bit
+                    self.execution_stop_time.set(Some(Instant::now() + self.give_time));
+                }
+            }
+            None => {
+                self.execution_stop_time.set(None);
+            }
+        }
+    }
 }
 
 /// A struct representing the inner VMs and structures used by Khronos.
@@ -72,6 +97,19 @@ pub struct KhronosRuntime {
     /// The last time the VM executed a script
     last_execution_time: Rc<Cell<Option<Instant>>>,
 
+    /// The time limit for execution
+    time_limit: Rc<Cell<Option<std::time::Duration>>>,
+
+    /// The time the execution should stop at
+    /// 
+    /// Automatically calculated (usually) from time_limit and last_execution_time
+    /// 
+    /// Scheduler resumes may extend this time
+    execution_stop_time: Rc<Cell<Option<Instant>>>,
+
+    /// The time to allow a thread to run for before temporarily yielding it
+    //time_slice: Rc<Cell<Option<std::time::Duration>>>,
+
     /// The shared store table for the runtime
     store_table: LuaTable,
 
@@ -84,12 +122,10 @@ impl KhronosRuntime {
     ///
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub async fn new<
-        OnInterruptFunc: Fn(&Lua, &KhronosRuntimeInterruptData) -> LuaResult<LuaVmState> + 'static,
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn() + 'static,
     >(
         opts: RuntimeCreateOpts,
-        on_interrupt: Option<OnInterruptFunc>,
         on_thread_event_callback: Option<(
             ThreadCreationCallbackFunc,
             ThreadDestructionCallbackFunc,
@@ -109,7 +145,15 @@ impl KhronosRuntime {
 
         lua.set_compiler(compiler.clone());
 
-        let scheduler = TaskManager::new(&lua, ReturnTracker::new())
+        let time_limit = Rc::new(Cell::new(opts.time_limit));
+        let execution_stop_time = match opts.time_limit {
+            Some(limit) => Rc::new(Cell::new(Some(Instant::now() + limit))),
+            None => Rc::new(Cell::new(None)),
+        };
+        let scheduler = TaskManager::new(&lua, ReturnTracker::new(), Rc::new(SchedulerHook {
+            execution_stop_time: execution_stop_time.clone(),
+            give_time: opts.give_time
+        }))
         .await
         .map_err(|e| {
             LuaError::external(format!(
@@ -126,35 +170,28 @@ impl KhronosRuntime {
 
         let broken = Rc::new(Cell::new(false));
         let broken_ref = broken.clone();
-        let last_execution_time = Rc::new(Cell::new(None));
-        let last_execution_time_ref = last_execution_time.clone();
+        let last_execution_time: Rc<Cell<Option<Instant>>> = Rc::new(Cell::new(None));
+        //let time_slice = Rc::new(Cell::new(opts.time_slice));
 
-        if let Some(on_interrupt) = on_interrupt {
-            lua.set_interrupt(move |lua| {
-                // If the runtime is broken, yield the lua vm immediately
-                let broken = broken_ref.get();
-                if broken {
-                    return Ok(LuaVmState::Yield);
+        let execution_stop_time_ref = execution_stop_time.clone();
+        //let time_slice_ref = time_slice.clone();
+        lua.set_interrupt(move |_lua| {
+            // If the runtime is broken, yield the lua vm immediately
+            let broken = broken_ref.get();
+            if broken {
+                return Ok(LuaVmState::Yield);
+            }
+            
+            if let Some(limit) = execution_stop_time_ref.get() {
+                if Instant::now() > limit {
+                    return Err(LuaError::RuntimeError(
+                        "Script execution time limit exceeded".to_string(),
+                    ));
                 }
+            }
 
-                on_interrupt(
-                    lua,
-                    &KhronosRuntimeInterruptData {
-                        last_execution_time: last_execution_time_ref.get(),
-                    },
-                )
-            });
-        } else {
-            lua.set_interrupt(move |_lua| {
-                // If the runtime is broken, yield the lua vm immediately
-                let broken = broken_ref.get();
-                if broken {
-                    return Ok(LuaVmState::Yield);
-                }
-
-                Ok(LuaVmState::Continue)
-            });
-        }
+            Ok(LuaVmState::Continue)
+        });
 
         disable_harmful(&lua)?;
 
@@ -275,6 +312,9 @@ impl KhronosRuntime {
             current_threads,
             on_broken: Rc::new(RefCell::new(None)),
             last_execution_time,
+            time_limit,
+            execution_stop_time,
+            //time_slice,
             opts,
         })
     }
@@ -323,7 +363,25 @@ impl KhronosRuntime {
     pub fn update_last_execution_time(&self, time: Instant) {
         log::debug!("Updating last execution time");
         self.last_execution_time.set(Some(time));
+
+        // Update the execution stop time as well
+        self.execution_stop_time.set(self.time_limit.get().map(|limit| time + limit));
     }
+
+    /// Returns the time limit for execution
+    pub fn time_limit(&self) -> Option<std::time::Duration> {
+        self.time_limit.get()
+    }
+
+    /// Sets the time limit for execution
+    pub fn set_time_limit(&self, limit: Option<std::time::Duration>) {
+        self.time_limit.set(limit);
+    }
+
+    /// Returns the time slice for execution
+    //pub fn time_slice(&self) -> Option<std::time::Duration> {
+    //    self.time_slice.get()
+    //}
 
     /// Returns whether the runtime is broken or not
     pub fn is_broken(&self) -> bool {

@@ -8,7 +8,7 @@ pub mod runtime;
 
 pub use isolate::{CreatedKhronosContext, KhronosIsolate};
 pub use manager::{IsolateData, KhronosRuntimeManager};
-pub use runtime::{KhronosRuntime, KhronosRuntimeInterruptData, RuntimeCreateOpts};
+pub use runtime::{KhronosRuntime, RuntimeCreateOpts};
 
 // Re-export for convenience
 pub use mluau;
