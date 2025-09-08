@@ -12,7 +12,7 @@ use crate::traits::discordprovider::DiscordProvider;
 use crate::utils::{serenity_backports, serenity_utils};
 use crate::{primitives::lazy::Lazy, TemplateContext};
 use mluau::prelude::*;
-use serenity::all::{Mentionable, ParseIdError};
+use serenity::all::{Mentionable, ParseIdError, UserId};
 use structs::{
     CreateAutoModerationRuleOptions, DeleteAutoModerationRuleOptions, EditAutoModerationRuleOptions,
 };
@@ -329,6 +329,48 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
             }
         }
     }
+
+    pub async fn get_fused_member(&self, user_ids: Vec<UserId>) -> LuaResult<structs::AntiraidFusedMember> {
+        // Fetch the partial guild *once*
+        let partial_guild_json = self.discord_provider
+            .get_guild()
+            .await
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        let partial_guild: serenity::all::PartialGuild = serde_json::from_value(partial_guild_json)
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        let mut member_and_resolved_perms = Vec::with_capacity(user_ids.len());
+
+        for id in user_ids {
+            let member_json = self.discord_provider
+            .get_guild_member(id)
+            .await
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+            if member_json.is_null() {
+                return Err(LuaError::runtime(format!(
+                    "User not found in guild: {}",
+                    id.mention()
+                )));
+            }
+
+            let member: serenity::all::Member = serde_json::from_value(member_json)
+                .map_err(|e| LuaError::external(e.to_string()))?;
+
+            let resolved_perms = serenity_backports::member_permissions(&partial_guild, &member);
+
+            member_and_resolved_perms.push(structs::AntiraidFusedMemberSingle {
+                member,
+                resolved_perms,
+            });
+        }
+        
+        Ok(structs::AntiraidFusedMember {
+            guild: partial_guild,
+            members: member_and_resolved_perms,
+        })
+    }
 }
 
 impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
@@ -507,47 +549,8 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 user_ids.push(user_id);
             }
 
-            // Fetch the partial guild *once*
-            let partial_guild_json = this.discord_provider
-                .get_guild()
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            let partial_guild: serenity::all::PartialGuild = serde_json::from_value(partial_guild_json)
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            let mut member_and_resolved_perms = Vec::with_capacity(user_ids.len());
-
-            for id in user_ids {
-                let member_json = this.discord_provider
-                .get_guild_member(id)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-                if member_json.is_null() {
-                    return Err(LuaError::runtime(format!(
-                        "User not found in guild: {}",
-                        id.mention()
-                    )));
-                }
-
-                let member: serenity::all::Member = serde_json::from_value(member_json)
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                let resolved_perms = serenity_backports::member_permissions(&partial_guild, &member);
-
-                member_and_resolved_perms.push(structs::AntiraidFusedMemberSingle {
-                    member,
-                    resolved_perms,
-                });
-            }
-            
-            Ok(Lazy::new(
-                structs::AntiraidFusedMember {
-                    guild: partial_guild,
-                    members: member_and_resolved_perms,
-                }
-            ))
+            this.get_fused_member(user_ids).await
+            .map(Lazy::new)
         });
 
         // Audit Log
