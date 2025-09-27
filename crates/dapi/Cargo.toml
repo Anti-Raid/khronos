@@ -1,0 +1,21 @@
+[package]
+name = "dapi"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+reqwest = { version = "0.12" }
+percent-encoding = { version = "2" }
+extract_map = { version = "0.3", features = ["serde"] }
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+bitflags = { version = "2", features = ["serde"] }
+small-fixed-array = "0.4"
+
+[dependencies.serenity]
+git = "https://github.com/Anti-Raid/serenity"
+branch = "next"
+features = ["model", "http", "cache", "rustls_backend", "unstable"]

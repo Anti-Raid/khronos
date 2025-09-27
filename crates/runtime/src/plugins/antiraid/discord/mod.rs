@@ -474,6 +474,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             Ok(this.check_reason(&reason))
         });
 
+        // now in dapi
         methods.add_scheduler_async_method(
             "antiraid_check_permissions",
             async move |lua, this, data: LuaValue| {
@@ -491,6 +492,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             },
         );
 
+        // now in dapi
         methods.add_scheduler_async_method(
             "antiraid_check_permissions_and_hierarchy",
             async move |lua, this, data: LuaValue| {
@@ -515,6 +517,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             },
         );
 
+        // now in dapi
         methods.add_scheduler_async_method("antiraid_check_channel_permissions", async move |
             lua, 
             this,
@@ -535,6 +538,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             ))
         });
 
+        // now in dapi
         methods.add_scheduler_async_method("antiraid_get_fused_member", async move |
             _lua, 
             this,
@@ -556,6 +560,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Audit Log
 
         // Should be documented
+        // Implemented in dapi
         methods.add_scheduler_async_method("get_audit_logs", async move |lua, this, data: LuaValue| {
             let data = lua.from_value::<structs::GetAuditLogOptions>(data)?;
 
