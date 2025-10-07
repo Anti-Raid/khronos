@@ -1,4 +1,3 @@
-use khronos_runtime::traits::context::CompatibilityFlags;
 use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
@@ -49,7 +48,6 @@ pub(crate) fn default_script_data(allowed_caps: Vec<String>) -> ScriptData {
         error_channel: None,
         lang: "luau".to_string(),
         allowed_caps,
-        compatibility_flags: CompatibilityFlags::empty(),
         created_by: None,
         created_at: None,
         updated_by: None,

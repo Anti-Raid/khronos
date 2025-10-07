@@ -8,9 +8,12 @@ use super::{
 use bitflags::bitflags;
 
 bitflags! {
-    /// The compatibility flags for the script context.
+    /// The tflags (template compatibility flags) to be passed to.
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
-    pub struct CompatibilityFlags: u8 {}
+    pub struct TFlags: u8 {
+        const MOVE_EVENT_TO_CONTEXT = 1 << 0; // Move the event object to the script context (instead of as a sep arg)
+        const READONLY_GLOBALS = 1 << 1; // Make the global object readonly (cannot add new globals) and enable safeenv
+    }
 }
 
 /// Extra data about the script context
@@ -34,8 +37,6 @@ pub struct ScriptData {
     pub lang: String,
     /// The allowed capabilities the template has access to
     pub allowed_caps: Vec<String>,
-    /// The compatibility flags for the script context
-    pub compatibility_flags: CompatibilityFlags,
     /// The user who created the template
     pub created_by: Option<serenity::all::UserId>,
     /// The time the template was created
@@ -101,11 +102,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     ///
     /// Note: TemplateContext will auto-cache Limitations and use it.
     fn limitations(&self) -> Limitations;
-
-    /// Returns the compatibility flags for the current context
-    fn compatibility_flags(&self) -> CompatibilityFlags {
-        self.data().compatibility_flags
-    }
 
     /// Returns the guild ID of the current context, if any
     fn guild_id(&self) -> Option<serenity::all::GuildId> {

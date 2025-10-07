@@ -2,13 +2,14 @@ use crate::experiments::load_experiments;
 use crate::filestorage::FileStorageProvider;
 use crate::provider;
 use crate::repl_completer;
+use khronos_runtime::TemplateContext;
 use khronos_runtime::primitives::event::CreateEvent;
-use khronos_runtime::primitives::event::Event;
+use khronos_runtime::rt::isolate::CodeSource;
 use khronos_runtime::rt::mlua::prelude::*;
-use khronos_runtime::rt::CreatedKhronosContext;
 use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
+use khronos_runtime::traits::context::TFlags;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
@@ -147,7 +148,7 @@ pub struct Cli {
     pub http: Option<Arc<serenity::all::Http>>,
 
     /// The cached khronos runtime arguments
-    pub cached_context: Option<CreatedKhronosContext>,
+    pub cached_context: Option<TemplateContext<provider::CliKhronosContext>>,
 
     /// Setup data
     pub setup_data: LuaSetupResult,
@@ -191,8 +192,14 @@ impl Cli {
         }
     }
 
-    /// Create an event from the parsed event args
-    fn create_event(&self) -> Event {
+    pub async fn spawn_script(
+        &mut self,
+        cache_key: &str,
+        name: &str,
+        code: &str,
+    ) -> LuaResult<LuaMultiValue> {
+        let context = self.create_khronos_context();
+
         let event = self.parse_event_args();
 
         let create_event = CreateEvent::new(
@@ -201,33 +208,12 @@ impl Cli {
             event.data,
         );
 
-        Event::from_create_event_with_runtime(&self.setup_data.main_isolate.inner(), create_event)
-        .expect("Failed to create event from CreateEvent")
-    }
-
-    pub async fn spawn_script(
-        &mut self,
-        cache_key: &str,
-        name: &str,
-        code: &str,
-    ) -> LuaResult<LuaMultiValue> {
-        let context = match &self.cached_context {
-            Some(context) => context.clone(),
-            None => {
-                let context = self.create_khronos_context();
-
-                let ctx = self.setup_data.main_isolate.create_context(context)?;
-
-                self.cached_context = Some(ctx.clone());
-
-                ctx
-            }
-        };
+        let ctx = self.setup_data.main_isolate.create_context(context, create_event)?;
 
         let result = self
             .setup_data
             .main_isolate
-            .spawn_known_script(cache_key, name, code, context, self.create_event())
+            .spawn_asset(cache_key, CodeSource::Code((name, code)), ctx)
             .await?;
 
         Ok(result.into_multi_value())
@@ -314,7 +300,12 @@ impl Cli {
         let file_asset_manager =
             khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
 
-        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager, aux_opts.safeenv)
+        let mut tflags = TFlags::empty();
+        if aux_opts.safeenv {
+            tflags |= TFlags::READONLY_GLOBALS;
+        }
+
+        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager, tflags)
             .expect("Failed to create main isolate");
 
         if !aux_opts.use_custom_print {

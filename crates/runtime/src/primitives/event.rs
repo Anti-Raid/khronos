@@ -1,6 +1,5 @@
 use mluau::prelude::*;
 use crate::rt::KhronosRuntime;
-use crate::utils::khronos_value::KhronosValue;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use serde::{Serialize, Deserialize};
 
@@ -8,8 +7,6 @@ use serde::{Serialize, Deserialize};
 enum InnerEventData {
     /// The inner data of the object
     Json(serde_json::Value),
-    /// The inner data of the object, as a KhronosValue
-    Khronos(KhronosValue),
     RawValue(Box<serde_json::value::RawValue>),
 }
 
@@ -32,7 +29,6 @@ impl Serialize for InnerEventData {
     {
         match self {
             InnerEventData::Json(value) => value.serialize(serializer),
-            InnerEventData::Khronos(khronos_value) => khronos_value.serialize(serializer),
             InnerEventData::RawValue(raw_value) => {
                 let value: serde_json::Value = serde_json::from_str(raw_value.get())
                     .map_err(serde::ser::Error::custom)?;
@@ -79,19 +75,6 @@ impl CreateEvent {
             data: InnerEventData::RawValue(data),
         }
     }
-
-    /// Create a new Event given a KhronosValue
-    pub fn new_khronos(
-        base_name: String,
-        name: String,
-        data: KhronosValue,
-    ) -> Self {
-        Self {
-            base_name,
-            name,
-            data: InnerEventData::Khronos(data),
-        }
-    }
 }
 
 impl CreateEvent {
@@ -109,7 +92,7 @@ impl CreateEvent {
 /// An `Event` is an object that can be passed to provide data to a Lua script.
 #[derive(Clone)]
 pub struct Event {
-    tab: LuaTable,
+    pub(crate) tab: LuaTable,
 }
 
 impl Event {
@@ -128,9 +111,6 @@ impl Event {
                     let value: serde_json::Value = serde_json::from_str(raw_value.get())
                         .map_err(|e| LuaError::external(e))?;
                     lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
-                },
-                InnerEventData::Khronos(khronos_value) => {
-                    khronos_value.into_lua_from_ref(lua, 0)?
                 },
             },
         )?;
