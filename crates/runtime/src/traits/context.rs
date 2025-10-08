@@ -1,10 +1,11 @@
 use crate::to_struct;
 
 use super::{
-    datastoreprovider::DataStoreProvider, discordprovider::DiscordProvider,
+    datastoreprovider::DataStoreProvider,
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
     kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
 };
+use dapi::controller::DiscordProvider;
 use bitflags::bitflags;
 
 bitflags! {
@@ -13,6 +14,14 @@ bitflags! {
     pub struct TFlags: u8 {
         const MOVE_EVENT_TO_CONTEXT = 1 << 0; // Move the event object to the script context (instead of as a sep arg)
         const READONLY_GLOBALS = 1 << 1; // Make the global object readonly (cannot add new globals) and enable safeenv
+        const EXPERIMENTAL_LUAUFUSION_SUPPORT = 1 << 2; // Enable LuauFusion support (proxy bridge to Javascript (and potentially other language))
+    }
+}
+
+impl TFlags {
+    /// Returns true if the flag is experimental
+    pub fn is_experimental(&self) -> bool {
+        self.contains(TFlags::EXPERIMENTAL_LUAUFUSION_SUPPORT)
     }
 }
 
@@ -120,9 +129,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns the templates name
     fn template_name(&self) -> String;
-
-    /// Returns the current Discord user, if any
-    fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
     /// Returns a key-value provider
     fn kv_provider(&self) -> Option<Self::KVProvider>;

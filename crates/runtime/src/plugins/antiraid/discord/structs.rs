@@ -1,20 +1,12 @@
 use crate::core::typesext::MultiOption;
 use std::cmp::Ordering;
 
-use super::types::{
+use dapi::types::{
     CreateAutoModRule, CreateChannel, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditMessage, EditAutoModRule, EditChannel,
-    EditGuild, EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType, CreateWebhook,
+    CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditMessage, EditAutoModRule,
+    EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType, CreateWebhook,
     ModifyWebhook, ExecuteWebhook
 };
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct GetAuditLogOptions {
-    pub action_type: Option<u16>,
-    pub user_id: Option<serenity::all::UserId>,
-    pub before: Option<serenity::all::AuditLogEntryId>,
-    pub limit: Option<serenity::nonmax::NonMaxU8>,
-}
 
 // Channel
 
@@ -22,13 +14,6 @@ pub struct GetAuditLogOptions {
 pub struct CreateChannelOptions {
     pub reason: String,
     pub data: CreateChannel,
-}
-
-#[derive(serde::Serialize, Default, serde::Deserialize)]
-pub struct EditChannelOptions {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub reason: String,
-    pub data: EditChannel,
 }
 
 #[derive(serde::Serialize, Default, serde::Deserialize)]
@@ -237,12 +222,6 @@ pub struct FollowAnnouncementChannel {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct ModifyGuildOptions {
-    pub data: EditGuild,
-    pub reason: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
 pub struct AddGuildMemberRoleOptions {
     pub user_id: serenity::all::UserId,
     pub role_id: serenity::all::RoleId,
@@ -301,41 +280,6 @@ pub struct ModifyGuildMemberOptions {
     pub user_id: serenity::all::UserId,
     pub reason: String,
     pub data: EditMember,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AntiRaidCheckPermissionsOptions {
-    pub user_id: serenity::all::UserId,
-    pub needed_permissions: serenity::all::Permissions,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AntiRaidCheckPermissionsAndHierarchyOptions {
-    pub user_id: serenity::all::UserId,
-    pub target_id: serenity::all::UserId,
-    pub needed_permissions: serenity::all::Permissions,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AntiRaidCheckPermissionsResponse {
-    pub partial_guild: serenity::all::PartialGuild,
-    pub member: serenity::all::Member,
-    pub permissions: serenity::all::Permissions,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AntiRaidCheckChannelPermissionsOptions {
-    pub user_id: serenity::all::UserId,
-    pub channel_id: serenity::all::GenericChannelId,
-    pub needed_permissions: serenity::all::Permissions,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AntiRaidCheckChannelPermissionsResponse {
-    pub partial_guild: serenity::all::PartialGuild,
-    pub channel: serenity::all::GuildChannel,
-    pub member: serenity::all::Member,
-    pub permissions: serenity::all::Permissions,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

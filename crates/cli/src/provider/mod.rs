@@ -13,7 +13,7 @@ use crate::filestorage::FileStorageProvider;
 use khronos_runtime::traits::context::KhronosContext;
 use khronos_runtime::traits::context::ScriptData;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
-use khronos_runtime::traits::discordprovider::DiscordProvider;
+use dapi::controller::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 
@@ -81,10 +81,6 @@ impl KhronosContext for CliKhronosContext {
 
     fn template_name(&self) -> String {
         self.template_name.clone()
-    }
-
-    fn current_user(&self) -> Option<serenity::all::CurrentUser> {
-        None // CLI mode does not have a current user yet
     }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {
@@ -564,6 +560,10 @@ pub struct CliDiscordProvider {
 impl DiscordProvider for CliDiscordProvider {
     fn attempt_action(&self, _bucket: &str) -> serenity::Result<(), khronos_runtime::Error> {
         Ok(())
+    }
+
+    fn current_user(&self) -> Option<serenity::all::CurrentUser> {
+        None
     }
 
     async fn get_guild(

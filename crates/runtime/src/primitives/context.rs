@@ -2,6 +2,7 @@ use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::primitives::event::CreateEvent;
 use crate::traits::context::{KhronosContext, Limitations, TFlags};
 use crate::utils::khronos_value::KhronosValue;
+use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -106,7 +107,11 @@ impl<T: KhronosContext> TemplateContext<T> {
             return Ok(v.clone());
         }
 
-        let v = lua.to_value_with(&self.context.current_user(), LUA_SERIALIZE_OPTIONS)?;
+        let Some(dp) = self.context.discord_provider() else {
+            return Err(LuaError::external("Current user not found"));
+        };
+
+        let v = lua.to_value_with(&dp.current_user(), LUA_SERIALIZE_OPTIONS)?;
 
         *cached_data = Some(v.clone());
 

@@ -1,4 +1,4 @@
-use crate::{context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLogOptions {
@@ -8,23 +8,32 @@ pub struct GetAuditLogOptions {
     pub limit: Option<serenity::nonmax::NonMaxU8>,
 }
 
-pub async fn get_audit_logs<T: DiscordProvider>(this: &DiscordContext<T>, data: GetAuditLogOptions) -> Result<serde_json::Value, crate::Error> {
-    let Some(bot_user) = this.controller().current_user() else {
-        return Err("Internal error: Current user not found".into());
-    };
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetAuditLog {
+    pub data: GetAuditLogOptions
+}
 
-    this.check_permissions(bot_user.id, serenity::all::Permissions::VIEW_AUDIT_LOG)
-        .await?;
+impl ApiReq for GetAuditLog {
+    type Resp = serde_json::Value;
 
-    let logs = this
-        .controller()
-        .get_audit_logs(
-            data.action_type,
-            data.user_id,
-            data.before,
-            data.limit,
-        )
-        .await?;
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+        let Some(bot_user) = this.controller().current_user() else {
+            return Err("Internal error: Current user not found".into());
+        };
 
-    Ok(logs)
+        this.check_permissions(bot_user.id, serenity::all::Permissions::VIEW_AUDIT_LOG)
+            .await?;
+
+        let logs = this
+            .controller()
+            .get_audit_logs(
+                self.data.action_type,
+                self.data.user_id,
+                self.data.before,
+                self.data.limit,
+            )
+            .await?;
+
+        Ok(logs)
+    }
 }

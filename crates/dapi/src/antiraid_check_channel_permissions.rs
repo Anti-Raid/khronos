@@ -1,4 +1,4 @@
-use crate::{context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckChannelPermissionsOptions {
@@ -15,15 +15,24 @@ pub struct AntiRaidCheckChannelPermissionsResponse {
     pub permissions: serenity::all::Permissions,
 }
 
-pub async fn antiraid_check_permissions<T: DiscordProvider>(this: &DiscordContext<T>, data: AntiRaidCheckChannelPermissionsOptions) -> Result<AntiRaidCheckChannelPermissionsResponse, crate::Error> {
-    let (partial_guild, member, channel, permissions) = this.check_channel_permissions(data.user_id, data.channel_id, data.needed_permissions)
-        .await?;
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckChannelPermissions {
+    pub data: AntiRaidCheckChannelPermissionsOptions
+}
 
-    Ok(AntiRaidCheckChannelPermissionsResponse {
+impl ApiReq for AntiRaidCheckChannelPermissions {
+    type Resp = AntiRaidCheckChannelPermissionsResponse;
+
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+        let (partial_guild, member, channel, permissions) = this.check_channel_permissions(self.data.user_id, self.data.channel_id, self.data.needed_permissions)
+            .await?;
+
+        Ok(AntiRaidCheckChannelPermissionsResponse {
             partial_guild,
             member,
             channel,
             permissions,
-        }
-    )
+        })
+
+    }
 }

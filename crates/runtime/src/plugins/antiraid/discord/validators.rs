@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use rustrict::{Censor, Type};
 
 use crate::utils::ensure_safe;
-use super::types::serenity_component::{ComponentType, Component, ActionRowComponent};
+use dapi::types::{CreateEmbed, CreateMessage, EditMessage, ExecuteWebhook, CreateCommandOption, CreateCommand, serenity_component::{ComponentType, Component, ActionRowComponent}};
 
 /// Checks if a string isn't offensive
 pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
@@ -137,7 +137,7 @@ pub fn validate_components(rows: &[Component]) -> Result<(), crate::Error> {
 /// Validates an embed, returning total number of characters used
 ///
 /// NOTE: This function does not check for offensive words (as embeds are currently deemed safe)
-pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate::Error> {
+pub fn validate_embed(embed: &CreateEmbed) -> Result<usize, crate::Error> {
     const EMBED_TITLE_LIMIT: usize = 256;
     const EMBED_DESCRIPTION_LIMIT: usize = 4096;
     const EMBED_FOOTER_TEXT_LIMIT: usize = 2048;
@@ -252,7 +252,7 @@ pub fn validate_embed(embed: &super::types::CreateEmbed) -> Result<usize, crate:
 }
 
 /// Validates all messages
-pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), crate::Error> {
+pub fn validate_message(message: &CreateMessage) -> Result<(), crate::Error> {
     pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
     pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
 
@@ -317,7 +317,7 @@ pub fn validate_message(message: &super::types::CreateMessage) -> Result<(), cra
 }
 
 /// Validates all messages
-pub fn validate_message_edit(message: &super::types::EditMessage) -> Result<(), crate::Error> {
+pub fn validate_message_edit(message: &EditMessage) -> Result<(), crate::Error> {
     pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
     pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
 
@@ -384,7 +384,7 @@ pub fn validate_message_edit(message: &super::types::EditMessage) -> Result<(), 
 }
 
 /// Validates webhook execute
-pub fn validate_webhook_execute(message: &super::types::ExecuteWebhook) -> Result<(), crate::Error> {
+pub fn validate_webhook_execute(message: &ExecuteWebhook) -> Result<(), crate::Error> {
     pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
     pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
     pub const MAX_WEBHOOK_USERNAME_LIMIT: usize = 80; 
@@ -469,7 +469,7 @@ pub fn validate_webhook_execute(message: &super::types::ExecuteWebhook) -> Resul
 }
 
 fn validate_option(
-    option: &super::types::CreateCommandOption,
+    option: &CreateCommandOption,
     kind: serenity::all::CommandType,
     depth: u8,
 ) -> Result<(), crate::Error> {
@@ -522,7 +522,7 @@ fn validate_option(
     Ok(())
 }
 
-pub fn validate_command(command: &super::types::CreateCommand) -> Result<(), crate::Error> {
+pub fn validate_command(command: &CreateCommand) -> Result<(), crate::Error> {
     let kind = command
         .kind
         .unwrap_or(serenity::all::CommandType::ChatInput);

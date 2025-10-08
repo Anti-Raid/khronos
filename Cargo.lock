@@ -2205,6 +2205,7 @@ version = "1.0.0"
 dependencies = [
  "chrono",
  "clap",
+ "dapi",
  "data-encoding",
  "dirs",
  "dotenvy 0.15.7 (git+https://github.com/allan2/dotenvy)",
@@ -2245,6 +2246,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "chrono_lc",
+ "dapi",
  "digest",
  "extract_map",
  "futures-core",

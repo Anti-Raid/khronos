@@ -28,6 +28,9 @@ bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
 
+# dapi
+dapi = { path = "../dapi" }
+
 # httpclient
 hickory-resolver = { version = "0.25", features = ["tokio"] }
 pin-project-lite = "0.2"
@@ -92,3 +95,4 @@ features = ["v4", "fast-rng", "serde"]
 [features]
 default = []
 repl = []
+luaufusion = []

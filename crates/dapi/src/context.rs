@@ -19,27 +19,40 @@ pub struct AntiraidFusedMember {
 
 
 /// A context for Discord operations, tied to a specific guild and HTTP client.
+#[derive(Clone)]
 pub struct DiscordContext<T: DiscordProvider> {
-    guild_id: serenity::all::GuildId,
-    http: serenity::http::Http,
     discord_provider: T,
 }
 
 impl<T: DiscordProvider> DiscordContext<T> {
-    pub fn new(guild_id: serenity::all::GuildId, http: serenity::http::Http, discord_provider: T) -> Self {
-        Self { guild_id, http, discord_provider }
+    pub fn new(discord_provider: T) -> Self {
+        Self { discord_provider }
     }
 
     pub fn guild_id(&self) -> serenity::all::GuildId {
-        self.guild_id
+        self.discord_provider.guild_id()
     }
 
-    pub fn http(&self) -> &serenity::http::Http {
-        &self.http
+    pub fn check_reason(&self, reason: &str) -> Result<(), crate::Error> {
+        if reason.len() > 512 {
+            return Err("Reason is too long".into());
+        } else if reason.is_empty() {
+            return Err("Reason is empty".into());
+        }
+
+        Ok(())
     }
 
     pub fn controller(&self) -> &T {
         &self.discord_provider
+    }
+
+    pub fn serenity_http(&self) -> &serenity::http::Http {
+        self.discord_provider.serenity_http()
+    }
+
+    pub fn current_user(&self) -> Option<serenity::all::CurrentUser> {
+        self.discord_provider.current_user()
     }
 
     pub async fn check_permissions(

@@ -1,4 +1,4 @@
-use crate::controller::DiscordProvider;
+use crate::{ApiReq, controller::DiscordProvider};
 
 use super::context::DiscordContext;
 
@@ -22,30 +22,50 @@ pub struct AntiRaidCheckPermissionsResponse {
     pub permissions: serenity::all::Permissions,
 }
 
-pub async fn antiraid_check_permissions<T: DiscordProvider>(this: &DiscordContext<T>, data: AntiRaidCheckPermissionsOptions) -> Result<AntiRaidCheckPermissionsResponse, crate::Error> {
-    let (partial_guild, member, permissions) = this
-        .check_permissions(data.user_id, data.needed_permissions)
-        .await?;
-
-    Ok(AntiRaidCheckPermissionsResponse {
-        partial_guild,
-        member,
-        permissions,
-    })
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckPermissions {
+    pub data: AntiRaidCheckPermissionsOptions
 }
 
-pub async fn check_permissions_and_hierarchy<T: DiscordProvider>(this: &DiscordContext<T>, data: AntiRaidCheckPermissionsAndHierarchyOptions) -> Result<AntiRaidCheckPermissionsResponse, crate::Error> {
-    let (partial_guild, member, permissions) = this
+impl ApiReq for AntiRaidCheckPermissions {
+    type Resp = AntiRaidCheckPermissionsResponse;
+
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+        let (partial_guild, member, permissions) = this
+        .check_permissions(self.data.user_id, self.data.needed_permissions)
+        .await?;
+
+        Ok(AntiRaidCheckPermissionsResponse {
+            partial_guild,
+            member,
+            permissions,
+        })
+
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct AntiRaidCheckPermissionsAndHierarchy {
+    pub data: AntiRaidCheckPermissionsAndHierarchyOptions
+}
+
+impl ApiReq for AntiRaidCheckPermissionsAndHierarchy {
+    type Resp = AntiRaidCheckPermissionsResponse;
+
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+        let (partial_guild, member, permissions) = this
         .check_permissions_and_hierarchy(
-            data.user_id,
-            data.target_id,
-            data.needed_permissions,
+            self.data.user_id,
+            self.data.target_id,
+            self.data.needed_permissions,
         )
         .await?;
 
-    Ok(AntiRaidCheckPermissionsResponse {
-        partial_guild,
-        member,
-        permissions,
-    })
+        Ok(AntiRaidCheckPermissionsResponse {
+            partial_guild,
+            member,
+            permissions,
+        })
+
+    }
 }
