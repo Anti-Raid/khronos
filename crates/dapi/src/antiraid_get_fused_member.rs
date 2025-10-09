@@ -21,4 +21,8 @@ impl ApiReq for AntiRaidGetFusedMember {
 
         Ok(fused_member)
     }
+
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::AntiRaidGetFusedMember(self)
+    }
 }

@@ -40,7 +40,10 @@ impl ApiReq for AntiRaidCheckPermissions {
             member,
             permissions,
         })
+    }
 
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::AntiRaidCheckPermissions(self)
     }
 }
 
@@ -66,6 +69,9 @@ impl ApiReq for AntiRaidCheckPermissionsAndHierarchy {
             member,
             permissions,
         })
+    }
 
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::AntiRaidCheckPermissionsAndHierarchy(self)
     }
 }

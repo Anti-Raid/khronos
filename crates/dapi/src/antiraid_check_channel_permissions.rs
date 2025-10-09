@@ -33,6 +33,9 @@ impl ApiReq for AntiRaidCheckChannelPermissions {
             channel,
             permissions,
         })
+    }
 
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::AntiRaidCheckChannelPermissions(self)
     }
 }

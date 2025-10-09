@@ -36,4 +36,8 @@ impl ApiReq for GetAuditLog {
 
         Ok(logs)
     }
+
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::GetAuditLog(self)
+    }
 }

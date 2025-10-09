@@ -19,6 +19,33 @@ bitflags! {
 }
 
 impl TFlags {
+    /// Given a list of strings, returns the corresponding TFlags
+    pub fn from_strs(flags: &[String], allow_restricted: bool) -> Result<Self, crate::Error> {
+        let mut tflags = TFlags::empty();
+        for flag in flags {
+            let f = Self::from_name(flag.as_str())
+                .ok_or_else(|| format!("Unknown tflag: {flag}"))?;
+            tflags |= f;
+        }
+
+        tflags.is_valid()?;
+
+        if !allow_restricted && tflags.is_experimental() {
+            return Err("At least one of the specified tflags is experimental and as such cannot be used in this context".into());
+        }
+
+        Ok(tflags)
+    }
+
+    /// Returns true if the specific tflag combination is valid
+    pub fn is_valid(&self) -> Result<(), crate::Error> {
+        if !self.contains(TFlags::MOVE_EVENT_TO_CONTEXT) && self.contains(Self::EXPERIMENTAL_LUAUFUSION_SUPPORT) {
+            return Err("The EXPERIMENTAL_LUAUFUSION_SUPPORT tflag requires MOVE_EVENT_TO_CONTEXT to be set as well".into());
+        }
+
+        Ok(())
+    }
+
     /// Returns true if the flag is experimental
     pub fn is_experimental(&self) -> bool {
         self.contains(TFlags::EXPERIMENTAL_LUAUFUSION_SUPPORT)

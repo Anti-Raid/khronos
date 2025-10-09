@@ -8,6 +8,7 @@ pub mod antiraid_check_channel_permissions;
 pub mod antiraid_get_fused_member;
 pub mod types;
 pub mod api;
+pub mod apilist;
 pub mod multioption;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>; // This is constant and should be copy pasted
@@ -17,6 +18,9 @@ pub trait ApiReq {
     type Resp: 'static + Send;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, Error>;
+
+    // Convert req to ApiList
+    fn to_apilist(self) -> apilist::API;
 }
 
 #[inline(always)]

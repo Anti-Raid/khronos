@@ -11,8 +11,8 @@ use dapi::antiraid_check_channel_permissions::{AntiRaidCheckChannelPermissions, 
 use dapi::antiraid_check_permissions::{AntiRaidCheckPermissions, AntiRaidCheckPermissionsAndHierarchy, AntiRaidCheckPermissionsAndHierarchyOptions, AntiRaidCheckPermissionsOptions};
 use dapi::antiraid_get_fused_member::AntiRaidGetFusedMember;
 use dapi::api::auditlogs::{GetAuditLog, GetAuditLogOptions};
-use dapi::api::channels::EditChannel;
-use dapi::api::guilds::ModifyGuild;
+use dapi::api::channels::edit_channel::EditChannel;
+use dapi::api::guilds::modify_guild::ModifyGuild;
 use dapi::context::DiscordContext;
 use dapi::controller::DiscordProvider;
 use crate::utils::{serenity_backports, serenity_utils};
