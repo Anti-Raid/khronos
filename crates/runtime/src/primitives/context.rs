@@ -1,5 +1,5 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
-use crate::primitives::event::CreateEvent;
+use crate::primitives::event::ContextEvent;
 use crate::traits::context::{KhronosContext, Limitations, TFlags};
 use crate::utils::khronos_value::KhronosValue;
 use dapi::controller::DiscordProvider;
@@ -28,13 +28,7 @@ pub struct TemplateContext<T: KhronosContext> {
     /// Store table
     store_table: LuaTable,
 
-    /// Event data
-    /// 
-    /// Reading it with `ctx.event` etc. will consume it
-    event: Rc<RefCell<Option<CreateEvent>>>,
-
-    /// Event lua value
-    cached_event_value: Rc<RefCell<Option<LuaValue>>>,
+    pub event: ContextEvent,
 
     /// Cached plugin data
     pub(crate) cached_plugin_data: Rc<RefCell<HashMap<String, LuaValue>>>,
@@ -54,7 +48,7 @@ impl<T: KhronosContext> std::fmt::Debug for TemplateContext<T> {
 }
 
 impl<T: KhronosContext> TemplateContext<T> {
-    pub(crate) fn new(lua: &Lua, context: T, event: CreateEvent, tflags: TFlags) -> LuaResult<Self> {
+    pub(crate) fn new(lua: &Lua, context: T, event: ContextEvent, tflags: TFlags) -> LuaResult<Self> {
         let store = lua
             .app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>()
             .ok_or(mluau::Error::RuntimeError(
@@ -68,14 +62,9 @@ impl<T: KhronosContext> TemplateContext<T> {
             cached_data: Rc::default(),
             current_discord_user: Rc::default(),
             cached_plugin_data: Rc::default(),
-            event: Rc::new(RefCell::new(Some(event))),
-            cached_event_value: Rc::default(),
+            event,
             tflags
         })
-    }
-
-    pub(crate) fn take_event(&self) -> Option<CreateEvent> {
-        self.event.borrow_mut().take()
     }
 
     fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
@@ -217,33 +206,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _, _: ()| Ok("TemplateContext"));
 
         methods.add_method("event", |lua, this, _: ()| {
-            // Check for cached event value
-            let mut cached_event_value = this
-                .cached_event_value
-                .try_borrow_mut()
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            if let Some(v) = cached_event_value.as_ref() {
-                return Ok(v.clone());
-            }
-
-            let event = this
-                .take_event()
-                .ok_or(LuaError::RuntimeError(
-                    "Event has already been taken from context".to_string(),
-                ))?;
-
-            let v = lua.to_value_with(&event, LUA_SERIALIZE_OPTIONS)?;
-            match v {
-                LuaValue::Table(ref t) => {
-                    t.set_readonly(true);
-                }
-                _ => {}
-            };
-
-            *cached_event_value = Some(v.clone());
-
-            Ok(v)
+            this.event.take_event_value(&lua)
         }); 
 
         methods.add_method("has_cap", |_, this, cap: String| {
@@ -273,7 +236,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
                 current_discord_user: this.current_discord_user.clone(),
                 cached_plugin_data: this.cached_plugin_data.clone(),
                 event: this.event.clone(),
-                cached_event_value: this.cached_event_value.clone(),
                 tflags: this.tflags,
             };
 

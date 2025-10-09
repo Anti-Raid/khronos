@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::primitives::event::{CreateEvent, Event};
+use crate::primitives::event::ContextEvent;
 use crate::require::{AssetRequirer, FilesystemWrapper};
 use crate::traits::context::{KhronosContext as KhronosContextTrait, TFlags};
 use crate::utils::khronos_value::KhronosValue;
@@ -207,7 +207,7 @@ impl KhronosIsolate {
     pub fn create_context<K: KhronosContextTrait>(
         &self,
         context: K,
-        event: CreateEvent,
+        event: ContextEvent,
     ) -> Result<TemplateContext<K>, LuaError> {
         // Ensure create_thread wont error
         self.inner
@@ -263,11 +263,7 @@ impl KhronosIsolate {
                 mw.push_front(context);
                 Ok(mw)
             } else {
-                let event = context.take_event().ok_or(LuaError::RuntimeError(
-                    "Event has already been taken from context".to_string(),
-                ))?;
-
-                let event = match Event::from_create_event(lua, event) {
+                let event = match context.event.take_event_value(lua) {
                     Ok(e) => e,
                     Err(e) => {
                         // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -298,7 +294,7 @@ impl KhronosIsolate {
                 };
                 
 
-                (event.tab, context).into_lua_multi(lua)
+                (event, context).into_lua_multi(lua)
             };
 
             match args_res {

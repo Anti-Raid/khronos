@@ -208,7 +208,7 @@ impl Cli {
             event.data,
         );
 
-        let ctx = self.setup_data.main_isolate.create_context(context, create_event)?;
+        let ctx = self.setup_data.main_isolate.create_context(context, create_event.into_context())?;
 
         let result = self
             .setup_data

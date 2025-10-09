@@ -1,5 +1,6 @@
+use std::{cell::RefCell, rc::Rc};
+
 use mluau::prelude::*;
-use crate::rt::KhronosRuntime;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 use serde::{Serialize, Deserialize};
 
@@ -75,6 +76,27 @@ impl CreateEvent {
             data: InnerEventData::RawValue(data),
         }
     }
+
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let tab = lua.create_table()?;
+        tab.set("base_name", self.base_name)?;
+        tab.set("name", self.name)?;
+        tab.set(
+            "data",
+            match self.data {
+                InnerEventData::Json(value) => {
+                    lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
+                },
+                InnerEventData::RawValue(raw_value) => {
+                    let value: serde_json::Value = serde_json::from_str(raw_value.get())
+                        .map_err(|e| LuaError::external(e))?;
+                    lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
+                },
+            },
+        )?;
+        tab.set_readonly(true);
+        Ok(LuaValue::Table(tab))
+    }
 }
 
 impl CreateEvent {
@@ -87,50 +109,58 @@ impl CreateEvent {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn into_context(self) -> ContextEvent {
+        ContextEvent::new(self)
+    }
 }
 
-/// An `Event` is an object that can be passed to provide data to a Lua script.
+/// A reference to an event's data
 #[derive(Clone)]
-pub struct Event {
-    pub(crate) tab: LuaTable,
+pub struct ContextEvent {
+    pub(crate) event: Rc<RefCell<Option<CreateEvent>>>,
+    pub(crate) cached_event_value: Rc<RefCell<Option<LuaValue>>>,
 }
 
-impl Event {
-    /// Converts the `CreateEvent` into an `Event`
-    pub fn from_create_event(lua: &mluau::Lua, ce: CreateEvent) -> Result<Event, mluau::Error> {
-        let tab = lua.create_table()?;
-        tab.set("base_name", ce.base_name.clone())?;
-        tab.set("name", ce.name.clone())?;
-        tab.set(
-            "data",
-            match &ce.data {
-                InnerEventData::Json(ref value) => {
-                    lua.to_value_with(value, LUA_SERIALIZE_OPTIONS)?
-                },
-                InnerEventData::RawValue(raw_value) => {
-                    let value: serde_json::Value = serde_json::from_str(raw_value.get())
-                        .map_err(|e| LuaError::external(e))?;
-                    lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
-                },
-            },
-        )?;
-        tab.set_readonly(true);
-        Ok(Event { tab })
+impl ContextEvent {
+    pub fn new(event: CreateEvent) -> Self {
+        Self {
+            event: Rc::new(RefCell::new(Some(event))),
+            cached_event_value: Rc::default(),
+        }
     }
 
-    pub fn from_create_event_with_runtime(
-        runtime: &KhronosRuntime,
-        ce: CreateEvent
-    ) -> Result<Event, mluau::Error> {
-        let Some(ref lua) = *runtime.lua() else {
-            return Err(LuaError::external("Runtime Lua instance not available"));
+    /// Consumes the event into a LuaValue if not already consumed, otherwise returns the cached value
+    pub fn take_event_value(&self, lua: &Lua) -> LuaResult<LuaValue> {
+        // Check for cached event value
+        let mut cached_event_value = self
+            .cached_event_value
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+
+        if let Some(v) = cached_event_value.as_ref() {
+            return Ok(v.clone());
+        }
+
+        let event = self
+            .event
+            .try_borrow_mut()
+            .map_err(|e| LuaError::external(e.to_string()))?
+            .take()
+            .ok_or(LuaError::RuntimeError(
+                "Event has already been taken from context".to_string(),
+            ))?;
+
+        let v = event.into_lua(lua)?;
+        match v {
+            LuaValue::Table(ref t) => {
+                t.set_readonly(true);
+            }
+            _ => {}
         };
-        Event::from_create_event(lua, ce)
-    }
-}
 
-impl IntoLua for Event {
-    fn into_lua(self, _lua: &Lua) -> LuaResult<LuaValue> {
-        Ok(LuaValue::Table(self.tab)) 
+        *cached_event_value = Some(v.clone());
+
+        Ok(v)
     }
 }
