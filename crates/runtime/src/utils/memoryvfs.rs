@@ -1,10 +1,10 @@
 use crate::require::FilesystemWrapper;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use vfs::FileSystem;
 
 /// Creates a virtual filesystem from a map of paths to content.
 pub fn create_vfs_from_map(
-    tree: std::collections::HashMap<String, String>,
+    tree: &HashMap<String, String>,
 ) -> Result<FilesystemWrapper, crate::Error> {
     let fs = FilesystemWrapper::new(vfs::MemoryFS::new());
     let mut created = HashSet::new();

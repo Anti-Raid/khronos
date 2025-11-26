@@ -90,7 +90,7 @@ fn test_basic_nested_require() {
     let lua = mluau::Lua::new();
 
     let c = AssetRequirer::new(
-        crate::utils::memoryvfs::create_vfs_from_map(tree).expect("Failed to make vfs"),
+        crate::utils::memoryvfs::create_vfs_from_map(&tree).expect("Failed to make vfs"),
         "test".to_string(),
         lua.globals(),
     );
