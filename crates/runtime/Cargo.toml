@@ -23,7 +23,7 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
     "serialize",
 ] }
 captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
-vfs = { git = "https://github.com/Anti-Raid/rust-vfs" }
+mluau-require = { git = "https://github.com/mluau/mluau-require" }
 bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"

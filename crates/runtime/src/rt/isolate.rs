@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::primitives::event::ContextEvent;
-use crate::require::{AssetRequirer, FilesystemWrapper};
+use mluau_require::{AssetRequirer, FilesystemWrapper};
 use crate::traits::context::{KhronosContext as KhronosContextTrait, TFlags};
 use crate::utils::khronos_value::KhronosValue;
 use crate::utils::prelude::setup_prelude;

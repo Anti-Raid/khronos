@@ -3,6 +3,8 @@ use crate::filestorage::FileStorageProvider;
 use crate::provider;
 use crate::repl_completer;
 use khronos_runtime::TemplateContext;
+use khronos_runtime::mluau_require::FilesystemWrapper;
+use khronos_runtime::mluau_require::vfs::PhysicalFS;
 use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::rt::isolate::CodeSource;
 use khronos_runtime::rt::mlua::prelude::*;
@@ -298,7 +300,7 @@ impl Cli {
         println!("Current dir: {current_dir:?}");
 
         let file_asset_manager =
-            khronos_runtime::require::FilesystemWrapper::new(vfs::PhysicalFS::new(current_dir));
+            FilesystemWrapper::new(PhysicalFS::new(current_dir));
 
         let mut tflags = TFlags::empty();
         if aux_opts.safeenv {
