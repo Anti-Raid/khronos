@@ -2,12 +2,10 @@ use mluau::prelude::*;
 use std::cell::Cell;
 use std::rc::Rc;
 
-use crate::traits::context::TFlags;
-
 /// Creates a proxy global table that forwards reads to the global table if the key is in the global table
 ///
 /// The resulting proxied global table includes
-pub fn proxy_global(lua: &Lua, tflags: TFlags) -> LuaResult<LuaTable> {
+pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
     // Setup the global table using a metatable
     //
     // SAFETY: This works because the global table will not change in the VM
@@ -99,9 +97,10 @@ pub fn proxy_global(lua: &Lua, tflags: TFlags) -> LuaResult<LuaTable> {
     global_mt.set("__metatable", false)?;
 
     global_tab.set_metatable(Some(global_mt))?;
-    if tflags.contains(TFlags::READONLY_GLOBALS) {
+    
+    /*if tflags.contains(TFlags::READONLY_GLOBALS) {
         global_tab.set_safeenv(true);
-    }
+    }*/
 
     Ok(global_tab)
 }

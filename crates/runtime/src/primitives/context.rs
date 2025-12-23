@@ -1,6 +1,6 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::primitives::event::ContextEvent;
-use crate::traits::context::{KhronosContext, Limitations, TFlags};
+use crate::traits::context::{ExtContextData, KhronosContext, KhronosValueWith, Limitations, TFlags};
 use crate::utils::khronos_value::KhronosValue;
 use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
@@ -19,8 +19,13 @@ pub struct TemplateContext<T: KhronosContext> {
     /// For subcontexts (created with `ctx:withlimits`), this will be a subset of the outer limitations.
     pub limitations: Rc<Limitations>,
 
-    /// The cached serialized value of the data
-    cached_data: Rc<RefCell<Option<LuaValue>>>,
+    /// The current ext data of the context
+    pub ext_data: Rc<ExtContextData>,
+
+    /// Returns if this is the root context or not
+    /// 
+    /// Will be used to block tflag changes in subcontexts
+    pub is_root_context: bool,
 
     /// The cached serialized value of the current user
     current_discord_user: Rc<RefCell<Option<LuaValue>>>,
@@ -32,23 +37,18 @@ pub struct TemplateContext<T: KhronosContext> {
 
     /// Cached plugin data
     pub(crate) cached_plugin_data: Rc<RefCell<HashMap<String, LuaValue>>>,
-
-    /// TFlags
-    tflags: TFlags,
 }
 
 impl<T: KhronosContext> std::fmt::Debug for TemplateContext<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TemplateContext")
-            .field("template_name", &self.context.template_name())
             .field("store_table", &self.store_table)
-            .field("tflags", &self.tflags)
             .finish()
     }
 }
 
 impl<T: KhronosContext> TemplateContext<T> {
-    pub(crate) fn new(lua: &Lua, context: T, event: ContextEvent, tflags: TFlags) -> LuaResult<Self> {
+    pub(crate) fn new(lua: &Lua, context: T, event: ContextEvent) -> LuaResult<Self> {
         let store = lua
             .app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>()
             .ok_or(mluau::Error::RuntimeError(
@@ -57,32 +57,14 @@ impl<T: KhronosContext> TemplateContext<T> {
 
         Ok(Self {
             limitations: Rc::new(context.limitations()),
+            ext_data: Rc::new(context.ext_data()),
+            is_root_context: true,
             context,
             store_table: store.0.clone(),
-            cached_data: Rc::default(),
             current_discord_user: Rc::default(),
             cached_plugin_data: Rc::default(),
             event,
-            tflags
         })
-    }
-
-    fn get_cached_data(&self, lua: &Lua) -> LuaResult<LuaValue> {
-        // Check for cached serialized data
-        let mut cached_data = self
-            .cached_data
-            .try_borrow_mut()
-            .map_err(|e| LuaError::external(e.to_string()))?;
-
-        if let Some(v) = cached_data.as_ref() {
-            return Ok(v.clone());
-        }
-
-        let v = lua.to_value_with(&self.context.data(), LUA_SERIALIZE_OPTIONS)?;
-
-        *cached_data = Some(v.clone());
-
-        Ok(v)
     }
 
     fn get_cached_current_user(&self, lua: &Lua) -> LuaResult<LuaValue> {
@@ -164,19 +146,8 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         // Fields
         fields.add_field_method_get("store", |_, this| Ok(this.store_table.clone()));
 
-        fields.add_field_method_get("data", |lua, this| {
-            let data = this.get_cached_data(lua)?;
-            Ok(data)
-        });
-
         fields.add_field_method_get("guild_id", |lua, this| {
             let v = lua.to_value_with(&this.context.guild_id(), LUA_SERIALIZE_OPTIONS)?;
-
-            Ok(v)
-        });
-
-        fields.add_field_method_get("owner_guild_id", |lua, this| {
-            let v = lua.to_value_with(&this.context.owner_guild_id(), LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
         });
@@ -187,8 +158,14 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(v)
         });
 
+        fields.add_field_method_get("events", |lua, this| {
+            let v = lua.to_value_with(&this.ext_data.events, LUA_SERIALIZE_OPTIONS)?;
+
+            Ok(v)
+        });
+
         fields.add_field_method_get("template_name", |_lua, this| {
-            Ok(this.context.template_name())
+            Ok(this.ext_data.template_name.clone())
         });
 
         fields.add_field_method_get("current_user", |lua, this| {
@@ -206,7 +183,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _, _: ()| Ok("TemplateContext"));
 
         methods.add_method("event", |lua, this, _: ()| {
-            this.event.take_event_value(&lua)
+            this.event.to_event_value(&lua)
         }); 
 
         methods.add_method("has_cap", |_, this, cap: String| {
@@ -217,10 +194,18 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(this.limitations.has_any_cap(&caps))
         });
 
-        methods.add_method("withlimits", |_lua, this, limits: KhronosValue| {
-            let limits: Limitations = limits.try_into().map_err(|e| {
+        methods.add_method("with", |_lua, this, with: KhronosValue| {
+            let with: KhronosValueWith = with.try_into().map_err(|e| {
                 mluau::Error::external(format!("Failed to convert LuaValue to Limitations: {e}"))
             })?;
+
+            let tflags = match with.tflags {
+                Some(tflags) => TFlags::from_strs(&tflags, this.is_root_context)
+                    .map_err(|x| mluau::Error::external(x.to_string()))?,
+                None => this.limitations.tflags.clone(),
+            };
+
+            let limits = Limitations::new(with.capabilities, tflags);
 
             // Ensure that the new limitations are a subset of the current limitations
             limits
@@ -230,13 +215,16 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             // Create a new context with the given limitations
             let new_context = TemplateContext {
                 limitations: Rc::new(limits),
+                is_root_context: false,
                 context: this.context.clone(),
                 store_table: this.store_table.clone(),
-                cached_data: this.cached_data.clone(),
+                ext_data: match with.ext_data {
+                    Some(d) => Rc::new(d),
+                    None => this.ext_data.clone(),
+                },
                 current_discord_user: this.current_discord_user.clone(),
                 cached_plugin_data: this.cached_plugin_data.clone(),
                 event: this.event.clone(),
-                tflags: this.tflags,
             };
 
             Ok(new_context)

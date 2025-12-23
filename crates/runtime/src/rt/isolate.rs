@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::primitives::event::ContextEvent;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
-use crate::traits::context::{KhronosContext as KhronosContextTrait, TFlags};
+use crate::traits::context::{KhronosContext as KhronosContextTrait};
 use crate::utils::khronos_value::KhronosValue;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
@@ -76,16 +76,12 @@ pub struct KhronosIsolate {
 
     /// A handle to this runtime's global table
     global_table: LuaTable,
-
-    /// TFlags
-    tflags: TFlags,
 }
 
 impl KhronosIsolate {
     pub fn new_isolate(
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
-        tflags: TFlags,
     ) -> Result<Self, LuaError> {
         if inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -93,7 +89,7 @@ impl KhronosIsolate {
             ));
         }
 
-        let mut isolate = Self::new(inner, asset_manager, false, tflags)?;
+        let mut isolate = Self::new(inner, asset_manager, false)?;
 
         isolate.inner_mut().sandbox()?; // Sandbox the runtime
 
@@ -103,7 +99,6 @@ impl KhronosIsolate {
     pub fn new_subisolate(
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
-        tflags: TFlags,
     ) -> Result<Self, LuaError> {
         if !inner.is_sandboxed() {
             return Err(LuaError::RuntimeError(
@@ -111,7 +106,7 @@ impl KhronosIsolate {
             ));
         }
 
-        Self::new(inner, asset_manager, true, tflags)
+        Self::new(inner, asset_manager, true)
     }
 
     /// Helper method to make the core isolate
@@ -119,7 +114,6 @@ impl KhronosIsolate {
         inner: KhronosRuntime,
         asset_manager: FilesystemWrapper,
         is_subisolate: bool,
-        tflags: TFlags,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new isolate");
         let id = Alphanumeric.sample_string(&mut rand::rng(), 16);
@@ -131,7 +125,7 @@ impl KhronosIsolate {
                 ));
             };
 
-            let global_table = proxy_global(lua, tflags)?;
+            let global_table = proxy_global(lua)?;
 
             global_table.set("__kanalytics_memusageafterisolateproxy", lua.used_memory())?;
 
@@ -163,7 +157,6 @@ impl KhronosIsolate {
             inner,
             global_table,
             function_cache: Rc::new(FunctionCache::new()),
-            tflags,
         })
     }
 
@@ -219,7 +212,7 @@ impl KhronosIsolate {
             ));
         };
 
-        let context = TemplateContext::new(lua, context, event, self.tflags)?;
+        let context = TemplateContext::new(lua, context, event)?;
 
         Ok(context)
         // Lua should be dropped here
@@ -244,61 +237,8 @@ impl KhronosIsolate {
             };
 
             // Get the args, either using the new context only arg or the (event, context) pair
-            let args_res = if self.tflags.contains(TFlags::MOVE_EVENT_TO_CONTEXT) {
-                let context = match context.into_lua(lua) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                        if let LuaError::MemoryError(_) = e {
-                            // Mark VM as broken
-                            self.inner
-                                .mark_broken(true)
-                                .map_err(|e| LuaError::external(e.to_string()))?;
-                        }
-
-                        return Err(e);
-                    }
-                };
-                let mut mw = LuaMultiValue::with_capacity(1);
-                mw.push_front(context);
-                Ok(mw)
-            } else {
-                let event = match context.event.take_event_value(lua) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                        if let LuaError::MemoryError(_) = e {
-                            // Mark VM as broken
-                            self.inner
-                                .mark_broken(true)
-                                .map_err(|e| LuaError::external(e.to_string()))?;
-                        }
-
-                        return Err(e);
-                    }
-                };
-
-                let context = match context.into_lua(lua) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                        if let LuaError::MemoryError(_) = e {
-                            // Mark VM as broken
-                            self.inner
-                                .mark_broken(true)
-                                .map_err(|e| LuaError::external(e.to_string()))?;
-                        }
-
-                        return Err(e);
-                    }
-                };
-                
-
-                (event, context).into_lua_multi(lua)
-            };
-
-            match args_res {
-                Ok(f) => f,
+            let context = match context.into_lua(lua) {
+                Ok(c) => c,
                 Err(e) => {
                     // Mark memory error'd VMs as broken automatically to avoid user grief/pain
                     if let LuaError::MemoryError(_) = e {
@@ -310,11 +250,14 @@ impl KhronosIsolate {
 
                     return Err(e);
                 }
-            }
+            };
+            let mut mw = LuaMultiValue::with_capacity(1);
+            mw.push_front(context);
+            mw
             // Lua should be dropped here
         };
 
-         match code_src {
+        match code_src {
             CodeSource::AssetPath(path) => {
                 let code = self
                     .asset_manager

@@ -1,4 +1,5 @@
 use khronos_runtime::traits::context::Limitations;
+use khronos_runtime::traits::context::TFlags;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
 use moka::future::Cache;
@@ -11,7 +12,6 @@ use std::sync::LazyLock;
 use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
 use khronos_runtime::traits::context::KhronosContext;
-use khronos_runtime::traits::context::ScriptData;
 use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use dapi::controller::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
@@ -30,29 +30,9 @@ pub struct CliKhronosContext {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
-    pub owner_guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
     pub template_name: String,
-    pub script_data: ScriptData,
     pub pool: Option<sqlx::PgPool>,
-}
-
-pub(crate) fn default_script_data(allowed_caps: Vec<String>) -> ScriptData {
-    ScriptData {
-        guild_id: None,
-        name: "cli".to_string(),
-        description: None,
-        shop_name: None,
-        shop_owner: None,
-        events: vec![],
-        error_channel: None,
-        lang: "luau".to_string(),
-        allowed_caps,
-        created_by: None,
-        created_at: None,
-        updated_by: None,
-        updated_at: None,
-    }
 }
 
 impl KhronosContext for CliKhronosContext {
@@ -63,24 +43,19 @@ impl KhronosContext for CliKhronosContext {
     type HTTPClientProvider = CliHttpClientProvider;
     type HTTPServerProvider = CliHttpServerProvider;
 
-    fn data(&self) -> &ScriptData {
-        &self.script_data
-    }
-
     fn limitations(&self) -> Limitations {
-        Limitations::new(self.allowed_caps.clone())
+        Limitations::new(self.allowed_caps.clone(), TFlags::all())
     }
 
     fn guild_id(&self) -> Option<serenity::all::GuildId> {
         self.guild_id
     }
 
-    fn owner_guild_id(&self) -> Option<serenity::all::GuildId> {
-        self.owner_guild_id
-    }
-
-    fn template_name(&self) -> String {
-        self.template_name.clone()
+    fn ext_data(&self) -> khronos_runtime::traits::context::ExtContextData {
+        khronos_runtime::traits::context::ExtContextData {
+            template_name: self.template_name.clone(),
+            events: vec![],
+        }
     }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {

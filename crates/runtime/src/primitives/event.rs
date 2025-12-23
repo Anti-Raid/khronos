@@ -77,17 +77,17 @@ impl CreateEvent {
         }
     }
 
-    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+    fn into_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
         let tab = lua.create_table()?;
-        tab.set("base_name", self.base_name)?;
-        tab.set("name", self.name)?;
+        tab.set("base_name", self.base_name.as_str())?;
+        tab.set("name", self.name.as_str())?;
         tab.set(
             "data",
             match self.data {
-                InnerEventData::Json(value) => {
-                    lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
+                InnerEventData::Json(ref value) => {
+                    lua.to_value_with(value, LUA_SERIALIZE_OPTIONS)?
                 },
-                InnerEventData::RawValue(raw_value) => {
+                InnerEventData::RawValue(ref raw_value) => {
                     let value: serde_json::Value = serde_json::from_str(raw_value.get())
                         .map_err(|e| LuaError::external(e))?;
                     lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
@@ -118,20 +118,20 @@ impl CreateEvent {
 /// A reference to an event's data
 #[derive(Clone)]
 pub struct ContextEvent {
-    pub(crate) event: Rc<RefCell<Option<CreateEvent>>>,
+    pub(crate) event: Rc<RefCell<CreateEvent>>,
     pub(crate) cached_event_value: Rc<RefCell<Option<LuaValue>>>,
 }
 
 impl ContextEvent {
     pub fn new(event: CreateEvent) -> Self {
         Self {
-            event: Rc::new(RefCell::new(Some(event))),
+            event: Rc::new(RefCell::new(event)),
             cached_event_value: Rc::default(),
         }
     }
 
-    /// Consumes the event into a LuaValue if not already consumed, otherwise returns the cached value
-    pub fn take_event_value(&self, lua: &Lua) -> LuaResult<LuaValue> {
+    /// Turns the event into a LuaValue if not already converted, otherwise returns the cached value
+    pub fn to_event_value(&self, lua: &Lua) -> LuaResult<LuaValue> {
         // Check for cached event value
         let mut cached_event_value = self
             .cached_event_value
@@ -144,13 +144,9 @@ impl ContextEvent {
 
         let event = self
             .event
-            .try_borrow_mut()
-            .map_err(|e| LuaError::external(e.to_string()))?
-            .take()
-            .ok_or(LuaError::RuntimeError(
-                "Event has already been taken from context".to_string(),
-            ))?;
-
+            .try_borrow()
+            .map_err(|e| LuaError::external(e.to_string()))?;
+        
         let v = event.into_lua(lua)?;
         match v {
             LuaValue::Table(ref t) => {

@@ -12,9 +12,13 @@ bitflags! {
     /// The tflags (template compatibility flags) to be passed to.
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
     pub struct TFlags: u8 {
-        const MOVE_EVENT_TO_CONTEXT = 1 << 0; // Move the event object to the script context (instead of as a sep arg)
-        const READONLY_GLOBALS = 1 << 1; // Make the global object readonly (cannot add new globals) and enable safeenv
         const EXPERIMENTAL_LUAUFUSION_SUPPORT = 1 << 2; // Enable LuauFusion support (proxy bridge to Javascript (and potentially other language))
+
+        // Privileged flags (require elevated permissions to use)
+        const DAPI_DESTRUCTIVE_CHANNEL_OPERATIONS = 1 << 3; // Allow destructive channel operations via dapi 
+        const DAPI_DESTRUCTIVE_ROLE_OPERATIONS = 1 << 4; // Allow destructive role operations via dapi
+        const DAPI_DESTRUCTIVE_WEBHOOK_OPERATIONS = 1 << 5; // Allow destructive webhook operations via dapi
+        const DAPI_DESTRUCTIVE_GLOBAL = 1 << 6; // Allow all destructive operations via dapi
     }
 }
 
@@ -30,8 +34,8 @@ impl TFlags {
 
         tflags.is_valid()?;
 
-        if !allow_restricted && tflags.is_experimental() {
-            return Err("At least one of the specified tflags is experimental and as such cannot be used in this context".into());
+        if !allow_restricted && (tflags.is_experimental() || tflags.is_privileged()) {
+            return Err("At least one of the specified tflags is experimental or privileged and as such cannot be used in this context".into());
         }
 
         Ok(tflags)
@@ -39,10 +43,6 @@ impl TFlags {
 
     /// Returns true if the specific tflag combination is valid
     pub fn is_valid(&self) -> Result<(), crate::Error> {
-        if !self.contains(TFlags::MOVE_EVENT_TO_CONTEXT) && self.contains(Self::EXPERIMENTAL_LUAUFUSION_SUPPORT) {
-            return Err("The EXPERIMENTAL_LUAUFUSION_SUPPORT tflag requires MOVE_EVENT_TO_CONTEXT to be set as well".into());
-        }
-
         Ok(())
     }
 
@@ -50,50 +50,37 @@ impl TFlags {
     pub fn is_experimental(&self) -> bool {
         self.contains(TFlags::EXPERIMENTAL_LUAUFUSION_SUPPORT)
     }
-}
 
-/// Extra data about the script context
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ScriptData {
-    /// The guild ID the script is running in, if any
-    pub guild_id: Option<serenity::all::GuildId>,
-    /// The name of the template
-    pub name: String,
-    /// The description of the template
-    pub description: Option<String>,
-    /// The name of the template as it appears on the template shop listing
-    pub shop_name: Option<String>,
-    /// The owner of the template on the template shop
-    pub shop_owner: Option<serenity::all::GuildId>,
-    /// The events that this template listens to
-    pub events: Vec<String>,
-    /// The channel to send errors to
-    pub error_channel: Option<serenity::all::GenericChannelId>,
-    /// The language of the template
-    pub lang: String,
-    /// The allowed capabilities the template has access to
-    pub allowed_caps: Vec<String>,
-    /// The user who created the template
-    pub created_by: Option<serenity::all::UserId>,
-    /// The time the template was created
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    /// The user who last updated the template
-    pub updated_by: Option<serenity::all::UserId>,
-    /// The time the template was last updated
-    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Returns true if the flag is privileged
+    pub fn is_privileged(&self) -> bool {
+        self.intersects(
+            TFlags::DAPI_DESTRUCTIVE_CHANNEL_OPERATIONS
+                | TFlags::DAPI_DESTRUCTIVE_ROLE_OPERATIONS
+                | TFlags::DAPI_DESTRUCTIVE_WEBHOOK_OPERATIONS
+                | TFlags::DAPI_DESTRUCTIVE_GLOBAL,
+        )
+    }
 }
 
 to_struct!(
-    /// Represents a result of a set operation in the key-value store
-    pub struct Limitations {
+    /// Represents the data to be passed into ctx:with()
+    pub struct KhronosValueWith {
+        pub ext_data: Option<ExtContextData>,
         pub capabilities: Vec<String>,
+        pub tflags: Option<Vec<String>>,
     }
 );
 
+/// Represents a result of a set operation in the key-value store
+pub struct Limitations {
+    pub capabilities: Vec<String>,
+    pub tflags: TFlags,
+}
+
 impl Limitations {
     /// Returns a new limitations instance with the given capabilities
-    pub fn new(capabilities: Vec<String>) -> Self {
-        Self { capabilities }
+    pub fn new(capabilities: Vec<String>, tflags: TFlags) -> Self {
+        Self { capabilities, tflags }
     }
 
     /// Returns Ok(()) if `other` is a subset of `self`, otherwise returns an error
@@ -119,6 +106,13 @@ impl Limitations {
     }
 }
 
+to_struct! {
+    pub struct ExtContextData {
+        pub template_name: String,
+        pub events: Vec<String>,
+    }
+}
+
 pub trait KhronosContext: 'static + Clone + Sized {
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
@@ -127,35 +121,20 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type HTTPClientProvider: HTTPClientProvider;
     type HTTPServerProvider: HTTPServerProvider;
 
-    /// Returns context-specific data that will be exposed in context.data
-    fn data(&self) -> &ScriptData;
-
     /// Returns the (outer) limitations for the context
     ///
-    /// Note that subcontexts may have subsets of these limitations (e.g. with ctx:withlimits)
+    /// Note that subcontexts may have subsets of these limitations (e.g. with ctx:with)
     /// to further limit the capabilities available within sections of a script/shared core
     /// between scripts
     ///
     /// Note: TemplateContext will auto-cache Limitations and use it.
     fn limitations(&self) -> Limitations;
 
+    /// Returns the initial extended context data    
+    fn ext_data(&self) -> ExtContextData;
+
     /// Returns the guild ID of the current context, if any
-    fn guild_id(&self) -> Option<serenity::all::GuildId> {
-        self.data().guild_id
-    }
-
-    /// Returns the owner guild ID of the current context, if any
-    ///
-    /// In a shop template, this would be the guild ID that owns the template on the shop,
-    /// and in a normal guild template, this would be the guild ID that owns the template on the guild.
-    ///
-    /// In local development, both owner_guild_id and guild_id will be the same, unless configured otherwise.
-    fn owner_guild_id(&self) -> Option<serenity::all::GuildId> {
-        self.data().shop_owner
-    }
-
-    /// Returns the templates name
-    fn template_name(&self) -> String;
+    fn guild_id(&self) -> Option<serenity::all::GuildId>;
 
     /// Returns a key-value provider
     fn kv_provider(&self) -> Option<Self::KVProvider>;

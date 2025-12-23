@@ -11,7 +11,6 @@ use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
-use khronos_runtime::traits::context::TFlags;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
@@ -184,9 +183,7 @@ impl Cli {
     fn create_khronos_context(&self) -> provider::CliKhronosContext {
         provider::CliKhronosContext {
             allowed_caps: self.allowed_caps.clone(),
-            script_data: provider::default_script_data(self.allowed_caps.clone()),
             guild_id: self.guild_id,
-            owner_guild_id: self.owner_guild_id,
             http: self.http.clone(),
             file_storage_provider: self.file_storage_provider.clone(),
             template_name: self.template_name.clone(),
@@ -302,12 +299,7 @@ impl Cli {
         let file_asset_manager =
             FilesystemWrapper::new(PhysicalFS::new(current_dir));
 
-        let mut tflags = TFlags::empty();
-        if aux_opts.safeenv {
-            tflags |= TFlags::READONLY_GLOBALS;
-        }
-
-        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager, tflags)
+        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
             .expect("Failed to create main isolate");
 
         if !aux_opts.use_custom_print {
