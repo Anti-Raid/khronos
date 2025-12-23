@@ -204,6 +204,7 @@ impl Cli {
         let create_event = CreateEvent::new(
             "AntiRaid".to_string(),
             event.name.to_string(),
+            vec![],
             event.data,
         );
 

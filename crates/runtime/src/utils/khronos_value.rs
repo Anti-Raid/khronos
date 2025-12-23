@@ -1,10 +1,10 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::primitives::{blob::Blob, lazy::{self, Lazy}};
+use crate::primitives::{blob::Blob, lazy::Lazy};
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 

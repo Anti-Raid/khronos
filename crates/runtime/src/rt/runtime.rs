@@ -272,6 +272,10 @@ impl KhronosRuntime {
 
         // Load core modules
         lua.register_module(
+            "@antiraid/channel",
+            crate::core::channel::init_plugin(&lua)?,
+        )?;
+        lua.register_module(
             "@antiraid/datetime",
             crate::core::datetime::init_plugin(&lua)?,
         )?;

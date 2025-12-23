@@ -4,7 +4,7 @@ use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 use rand::distr::{Alphanumeric, SampleString};
 
-use crate::primitives::lazy::Lazy;
+use crate::{primitives::lazy::Lazy, utils::proxyglobal::proxy_global};
 
 /// Syntactically:
 ///
@@ -826,6 +826,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         })?,
     )?;
 
+    // VFS/require related logic
     module.set("newlazystringmap", lua.create_function(|lua, val: LuaValue| {
         let lazy_value: HashMap<String, String> = lua.from_value(val)
             .map_err(|e| LuaError::external(format!("Failed to convert LuaValue to serde_json::Value: {}", e)))?;
@@ -834,6 +835,11 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     })?)?;
 
     module.set("Vfs", lua.create_proxy::<Vfs>()?)?;
+
+    //
+    module.set("createglobalproxy", lua.create_function(|lua, _: ()| {
+        proxy_global(lua)
+    })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
 
