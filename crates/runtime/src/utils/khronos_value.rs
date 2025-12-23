@@ -1,8 +1,10 @@
+use std::{collections::HashMap, rc::Rc};
+
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::primitives::{blob::Blob, lazy::Lazy};
+use crate::primitives::{blob::Blob, lazy::{self, Lazy}};
 
 const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
 
@@ -22,6 +24,11 @@ pub struct KhronosLazyValue {
 }
 
 #[derive(Debug, Clone)]
+pub struct KhronosLazyStringMap {
+    pub data: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone)]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
@@ -32,6 +39,7 @@ pub enum KhronosValue {
     Vector((f32, f32, f32)), // Luau vector
     Map(indexmap::IndexMap<String, KhronosValue>),
     LazyValue(KhronosLazyValue),
+    LazyStringMap(KhronosLazyStringMap),
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
@@ -507,6 +515,7 @@ where
     }
 }
 
+// LazyValue
 impl TryFrom<Lazy<serde_json::Value>> for KhronosValue {
     type Error = crate::Error;
     fn try_from(value: Lazy<serde_json::Value>) -> Result<Self, Self::Error> {
@@ -557,6 +566,49 @@ impl TryFrom<KhronosValue> for serde_json::Value {
     type Error = crate::Error;
     fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
         value.into_serde_json_value(0, false)
+    }
+}
+
+// LazyMap
+impl TryFrom<Lazy<HashMap<String, String>>> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: Lazy<HashMap<String, String>>) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::LazyStringMap(KhronosLazyStringMap {
+            data: value.data,
+        }))
+    }
+}
+
+impl TryFrom<KhronosValue> for Lazy<HashMap<String, String>> {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::LazyStringMap(lazy) => Ok(Lazy::new(lazy.data)),
+            _ => {
+                let serde_json_value = value.into_serde_json_value(0, false)?;
+                let v: HashMap<String, String> =
+                    serde_json::from_value(serde_json_value)
+                        .map_err(|e| format!("Failed to convert KhronosValue to HashMap<String, String>: {}", e))?;
+                Ok(Lazy::new(v))
+            }
+        }
+    }
+}
+
+impl TryFrom<KhronosLazyStringMap> for KhronosValue {
+    type Error = crate::Error;
+    fn try_from(value: KhronosLazyStringMap) -> Result<Self, Self::Error> {
+        Ok(KhronosValue::LazyStringMap(value))
+    }
+}
+
+impl TryFrom<KhronosValue> for KhronosLazyStringMap {
+    type Error = crate::Error;
+    fn try_from(value: KhronosValue) -> Result<Self, Self::Error> {
+        match value {
+            KhronosValue::LazyStringMap(lazy) => Ok(lazy),
+            _ => Err("KhronosValue is not a LazyStringMap".into()),
+        }
     }
 }
 
@@ -731,6 +783,7 @@ impl KhronosValue {
             KhronosValue::Vector(_) => "vector",
             KhronosValue::Map(_) => "map",
             KhronosValue::LazyValue(_) => "lazy_value",
+            KhronosValue::LazyStringMap(_) => "lazy_string_map",
             KhronosValue::List(_) => "list",
             KhronosValue::Timestamptz(_) => "timestamptz",
             KhronosValue::Interval(_) => "interval",
@@ -959,6 +1012,9 @@ impl KhronosValue {
                 Ok(LuaValue::Table(table))
             }
             KhronosValue::LazyValue(lazy) => Lazy::new(lazy.data).into_lua(lua),
+            KhronosValue::LazyStringMap(lazy) => {
+                Lazy::new(lazy.data).into_lua(lua)
+            }
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.into_iter() {
@@ -1018,6 +1074,9 @@ impl KhronosValue {
                 Ok(LuaValue::Table(table))
             }
             KhronosValue::LazyValue(lazy) => Lazy::new(lazy.data.clone()).into_lua(lua),
+            KhronosValue::LazyStringMap(lazy) => {
+                Lazy::new(lazy.data.clone()).into_lua(lua)
+            }
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.iter() {
@@ -1092,9 +1151,23 @@ impl KhronosValue {
                 serde_json::Value::Object(map)
             }
             KhronosValue::LazyValue(lazy) => {
-                // There is no point in preserving types for LazyValue,
+                // We never preserve types for LazyValue, as it is already serialized
                 serde_json::to_value(lazy.data)
                     .map_err(|e| format!("Failed to serialize LazyValue: {e}"))?
+
+            }
+            KhronosValue::LazyStringMap(lazy) => {
+                if !preserve_types {
+                    serde_json::to_value(lazy.data)
+                    .map_err(|e| format!("Failed to serialize LazyStringMap: {e}"))?
+                } else {
+                    serde_json::json!({
+                        KHRONOS_VALUE_TYPE_KEY: "lazy_string_map",
+                        "value": serde_json::to_value(lazy.data)
+                        .map_err(|e| format!("Failed to serialize LazyStringMap: {e}"))?
+                    
+                    })
+                }
             }
             KhronosValue::List(l) => {
                 let mut list = Vec::with_capacity(l.len());
@@ -1196,6 +1269,14 @@ impl KhronosValue {
                                         })?,
                                     ));
                                 }
+                                "lazy_string_map" => {
+                                    let value = m.remove("value").ok_or("Missing value field")?;
+                                    return Ok(KhronosValue::LazyStringMap(KhronosLazyStringMap {
+                                        data: serde_json::from_value(value).map_err(|e| {
+                                            format!("Failed to deserialize LazyStringMap: {e}")
+                                        })?,
+                                    }));
+                                }
                                 "interval" => {
                                     let value = m.remove("value").ok_or("Missing value field")?;
                                     return Ok(KhronosValue::Interval(
@@ -1282,9 +1363,16 @@ impl Serialize for KhronosValue {
                 map.serialize_entry("value", buf)?;
                 map.end()
             }
-            KhronosValue::LazyValue(lazy) => {
-                // Serialize the LazyValue's data directly
+            KhronosValue::LazyValue(lazy) => {                
                 lazy.data.serialize(serializer)
+            }
+            KhronosValue::LazyStringMap(lazy) => {
+                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "lazy_string_map")?;
+                map.serialize_entry("value", &lazy.data)?;
+                map.end()
             }
             KhronosValue::Vector(v) => {
                 // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
@@ -1503,7 +1591,7 @@ mod test_to_struct {
     use crate::utils::khronos_value::KhronosValue;
 
     to_struct!(
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct MyData {
             pub name: String,

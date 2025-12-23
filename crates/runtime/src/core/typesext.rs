@@ -1,5 +1,10 @@
+use std::{collections::HashMap, sync::Arc};
+
 use mluau::prelude::*;
+use mluau_require::{AssetRequirer, FilesystemWrapper};
 use rand::distr::{Alphanumeric, SampleString};
+
+use crate::primitives::lazy::Lazy;
 
 /// Syntactically:
 ///
@@ -741,6 +746,42 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
     Ok(submodule)
 }
 
+pub struct Vfs {
+    vfs: Arc<dyn mluau_require::vfs::FileSystem>
+}
+
+impl LuaUserData for Vfs {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_function("newoverlay", |_lua, vfs_list: Vec<LuaAnyUserData>| {
+            let mut vfs_refs = Vec::with_capacity(vfs_list.len());
+            for vfs in vfs_list {
+                if vfs.is::<Lazy<HashMap<String, String>>>() {
+                    let vfs = vfs
+                    .borrow::<Lazy<HashMap<String, String>>>()
+                    .map_err(|_| LuaError::external("Failed to borrow Lazy<serde_json::Value>"))?;
+
+                    vfs_refs.push(mluau_require::vfs::VfsPath::new(
+                        mluau_require::create_memory_vfs_from_map(&vfs.data)
+                        .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
+                    ));
+                    continue;
+                }
+
+                let vfs = vfs.borrow::<Vfs>()?;
+
+                vfs_refs.push(mluau_require::vfs::VfsPath::new(vfs.vfs.clone()));
+            }
+
+            Ok(Vfs { vfs: Arc::new(mluau_require::vfs::OverlayFS::new(&vfs_refs)) })
+        });
+
+        methods.add_method("createrequirefunction", |lua, this, (id, global_table): (String, LuaTable)| {
+            let controller = AssetRequirer::new(FilesystemWrapper::new(this.vfs.clone()), id, global_table);
+            lua.create_require_function(controller)
+        });
+    }
+}
+
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
@@ -784,6 +825,15 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             Ok(Alphanumeric.sample_string(&mut rand::rng(), length))
         })?,
     )?;
+
+    module.set("newlazystringmap", lua.create_function(|lua, val: LuaValue| {
+        let lazy_value: HashMap<String, String> = lua.from_value(val)
+            .map_err(|e| LuaError::external(format!("Failed to convert LuaValue to serde_json::Value: {}", e)))?;
+
+        Ok(Lazy::new(lazy_value))
+    })?)?;
+
+    module.set("Vfs", lua.create_proxy::<Vfs>()?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
 
