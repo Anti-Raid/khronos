@@ -1,12 +1,12 @@
-use crate::to_struct;
+use crate::{TemplateContext, to_struct};
 
 use super::{
-    datastoreprovider::DataStoreProvider,
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
     kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
 };
 use dapi::controller::DiscordProvider;
 use bitflags::bitflags;
+use mluau::prelude::*;
 
 bitflags! {
     /// The tflags (template compatibility flags) to be passed to.
@@ -116,7 +116,6 @@ to_struct! {
 pub trait KhronosContext: 'static + Clone + Sized {
     type KVProvider: KVProvider;
     type DiscordProvider: DiscordProvider;
-    type DataStoreProvider: DataStoreProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
     type HTTPServerProvider: HTTPServerProvider;
@@ -144,9 +143,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// This is used to interact with Discord API
     fn discord_provider(&self) -> Option<Self::DiscordProvider>;
 
-    /// Returns a DataStore provider
-    fn datastore_provider(&self) -> Option<Self::DataStoreProvider>;
-
     /// Returns a ObjectStorage provider
     fn objectstorage_provider(&self) -> Option<Self::ObjectStorageProvider>;
 
@@ -159,5 +155,10 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// Returns the contexts memory limit, if any
     fn memory_limit(&self) -> Option<usize> {
         None
+    }
+
+    /// Returns any additional plugins to bind to the context
+    fn extra_plugins() -> indexmap::IndexMap<String, Box<dyn Fn(&Lua, &TemplateContext<Self>) -> LuaResult<LuaValue>>> {
+        indexmap::IndexMap::new()
     }
 }

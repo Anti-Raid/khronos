@@ -1,4 +1,3 @@
-pub mod datastores;
 pub mod discord;
 pub mod httpclient;
 pub mod httpserver;

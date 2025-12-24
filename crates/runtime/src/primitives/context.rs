@@ -62,7 +62,7 @@ impl<T: KhronosContext> TemplateContext<T> {
             context,
             store_table: store.0.clone(),
             current_discord_user: Rc::default(),
-            cached_plugin_data: Rc::default(),
+            cached_plugin_data: Rc::default(), // Safety note: the cached plugin data must be reset for subcontexts to avoid privilege escalation across subcontexts
             event,
         })
     }
@@ -115,10 +115,6 @@ impl<T: KhronosContext> TemplateContext<T> {
 impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         // Plugins
-        fields.add_field_method_get("DataStores", |lua, this| {
-            this.get_plugin(lua, "DataStores", antiraid::datastores::init_plugin)
-        });
-
         fields.add_field_method_get("Discord", |lua, this| {
             this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
         });
@@ -141,6 +137,19 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         fields.add_field_method_get("HTTPServer", |lua, this| {
             this.get_plugin(lua, "HTTPServer", antiraid::httpserver::init_plugin)
+        });
+
+        let mut available_extra_plugins = Vec::new();
+        for (plugin_name, plugin_init) in T::extra_plugins() {
+            available_extra_plugins.push(plugin_name.clone());
+            fields.add_field_method_get(plugin_name.clone(), move |lua, this| {
+                let plugin_func = |lua: &Lua, this: &Self| plugin_init(lua, this);
+                this.get_plugin(lua, &plugin_name, plugin_func)
+            });
+        }
+
+        fields.add_field_method_get("available_extra_plugins", move |_lua, _this| {
+            Ok(available_extra_plugins.clone())
         });
 
         // Fields

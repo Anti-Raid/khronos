@@ -12,7 +12,6 @@ use std::sync::LazyLock;
 use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
 use khronos_runtime::traits::context::KhronosContext;
-use khronos_runtime::traits::datastoreprovider::{DataStoreImpl, DataStoreProvider};
 use dapi::controller::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
@@ -38,7 +37,6 @@ pub struct CliKhronosContext {
 impl KhronosContext for CliKhronosContext {
     type KVProvider = CliKVProvider;
     type DiscordProvider = CliDiscordProvider;
-    type DataStoreProvider = CliDataStoreProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
     type HTTPServerProvider = CliHttpServerProvider;
@@ -74,16 +72,6 @@ impl KhronosContext for CliKhronosContext {
             guild_id,
             pool: pool.clone(),
         })
-    }
-
-    fn datastore_provider(&self) -> Option<Self::DataStoreProvider> {
-        let guild_id = if let Some(guild_id) = self.guild_id {
-            guild_id
-        } else {
-            default_global_guild_id()
-        };
-
-        Some(CliDataStoreProvider { guild_id })
     }
 
     fn discord_provider(&self) -> Option<Self::DiscordProvider> {
@@ -497,32 +485,6 @@ ORDER BY scope;
             .collect::<Vec<_>>();
 
         Ok(keys)
-    }
-}
-
-#[derive(Clone)]
-#[allow(dead_code)]
-pub struct CliDataStoreProvider {
-    pub guild_id: serenity::all::GuildId,
-}
-
-impl DataStoreProvider for CliDataStoreProvider {
-    fn attempt_action(&self, _method: &str, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    /// Returns a builtin data store given its name
-    fn get_builtin_data_store(&self, name: &str) -> Option<Rc<dyn DataStoreImpl>> {
-        if name == "CopyDataStore" {
-            return Some(Rc::new(khronos_runtime::traits::ir::CopyDataStore {}));
-        }
-
-        None
-    }
-
-    /// Returns all public builtin data stores
-    fn public_builtin_data_stores(&self) -> Vec<String> {
-        vec!["CopyDataStore".to_string()] // TODO
     }
 }
 
