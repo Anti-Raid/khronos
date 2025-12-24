@@ -1,0 +1,31 @@
+use serenity::all::Permissions;
+use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetGuildWebhooks;
+
+impl ApiReq for GetGuildWebhooks {
+    type Resp = serde_json::Value;
+
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+        let Some(bot_user) = this.current_user() else {
+            return Err("Internal error: Current user not found".into());
+        };
+
+        this.check_permissions(
+            bot_user.id,   
+            Permissions::MANAGE_WEBHOOKS,
+        )
+        .await?;
+
+        let webhooks = this.controller()
+            .get_guild_webhooks()
+            .await?;
+
+        Ok(webhooks)
+    }
+
+    fn to_apilist(self) -> crate::apilist::API {
+        crate::apilist::API::GetGuildWebhooks(self)
+    }
+}
