@@ -11,6 +11,27 @@ pub struct EditMessageRequest {
 impl ApiReq for EditMessageRequest {
     type Resp = serde_json::Value;
 
+    /// Edits a message in the specified channel using the provided edit data and returns the edited message.
+    ///
+    /// The request data is validated before performing the edit. The operation requires the bot to have
+    /// the `MANAGE_MESSAGES` permission in the target channel; otherwise an error is returned. If the
+    /// edit includes attachments, they are sent with the edit. On success, the edited message is
+    /// returned as JSON.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use serde_json::Value;
+    /// # async fn example<T: crate::DiscordProvider>(ctx: &crate::DiscordContext<T>) -> Result<(), crate::Error> {
+    /// let req = crate::api::messages::edit_message::EditMessageRequest {
+    ///     channel_id: /* GenericChannelId */ 0.into(),
+    ///     message_id: /* MessageId */ 0.into(),
+    ///     data: /* EditMessage */ Default::default(),
+    /// };
+    /// let edited: Value = req.execute(ctx).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         self.data.validate()?;
 
@@ -34,6 +55,15 @@ impl ApiReq for EditMessageRequest {
         Ok(msg)
     }
 
+    /// Convert this request into the corresponding API enum variant for dispatch.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Build an `EditMessageRequest` and convert it into the API enum:
+    /// // let req = EditMessageRequest { channel_id, message_id, data };
+    /// // let api = req.to_apilist();
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::EditMessage(self)
     }

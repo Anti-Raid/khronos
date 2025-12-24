@@ -11,6 +11,28 @@ pub struct AddGuildMemberRole {
 impl ApiReq for AddGuildMemberRole {
     type Resp = ();
 
+    /// Adds a role to a guild member after validating permissions and role hierarchy.
+    ///
+    /// Validates the provided reason, ensures the bot is present in the guild, verifies the bot has
+    /// the `MANAGE_ROLES` permission and a highest role above the target role, and confirms the target
+    /// role exists in the guild before requesting the controller to add the role to the specified user.
+    /// Returns `Ok(())` on success or an error describing the failure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use serenity::all::{RoleId, UserId};
+    /// # use crate::api::guilds::AddGuildMemberRole;
+    /// # async fn example(ctx: &crate::DiscordContext<impl crate::DiscordProvider>) -> Result<(), crate::Error> {
+    /// let req = AddGuildMemberRole {
+    ///     user_id: UserId(42),
+    ///     role_id: RoleId(123),
+    ///     reason: "Grant access".to_string(),
+    /// };
+    /// req.execute(ctx).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -54,6 +76,23 @@ impl ApiReq for AddGuildMemberRole {
         Ok(())
     }
 
+    /// Convert this request into the global API enum wrapper.
+    ///
+    /// This wraps the `AddGuildMemberRole` request in the `crate::apilist::API` enum so
+    /// it can be dispatched through the centralized API path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use serenity::all::{UserId, RoleId};
+    /// let req = crate::api::guilds::add_guild_member_role::AddGuildMemberRole {
+    ///     user_id: UserId(1),
+    ///     role_id: RoleId(2),
+    ///     reason: String::from("assign role"),
+    /// };
+    /// let api = req.to_apilist();
+    /// assert!(matches!(api, crate::apilist::API::AddGuildMemberRole(_)));
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::AddGuildMemberRole(self)
     }

@@ -11,6 +11,29 @@ pub struct GetGuildBans {
 impl ApiReq for GetGuildBans {
     type Resp = serde_json::Value;
 
+    /// Fetches guild bans as JSON, applying optional pagination and an optional item limit after ensuring the bot has ban permissions.
+    ///
+    /// The request will be paginated using `before` or `after` if provided (`before` takes precedence). If `limit` is provided it must be less than or equal to 1000.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - the current bot user is not available,
+    /// - the bot lacks the `BAN_MEMBERS` permission,
+    /// - `limit` is greater than 1000,
+    /// - or the underlying controller call fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use serenity::all::UserId;
+    /// # use serenity::nonmax::NonMaxU16;
+    /// # use crates::dapi::api::guilds::GetGuildBans;
+    /// // Construct a request for the first 100 bans
+    /// let req = GetGuildBans { limit: Some(NonMaxU16::new(100).unwrap()), before: None, after: None };
+    /// // `ctx` would be a `&DiscordContext<_>` available in the real runtime
+    /// // let bans = req.execute(&ctx).await.unwrap();
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         let Some(bot_user) = this.current_user() else {
             return Err("Internal error: Current user not found".into());
@@ -39,6 +62,22 @@ impl ApiReq for GetGuildBans {
         Ok(bans)
     }
 
+    /// Convert this request into the corresponding `crate::apilist::API` enum variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let req = crate::api::guilds::get_guild_bans::GetGuildBans {
+    ///     limit: None,
+    ///     before: None,
+    ///     after: None,
+    /// };
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::GetGuildBans(_) => {}
+    ///     _ => panic!("expected GetGuildBans variant"),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::GetGuildBans(self)
     }

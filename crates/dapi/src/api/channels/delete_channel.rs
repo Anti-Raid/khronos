@@ -10,6 +10,27 @@ pub struct DeleteChannel {
 impl ApiReq for DeleteChannel {
     type Resp = serde_json::Value;
 
+    /// Deletes the specified channel after validating the provided reason and the bot's permissions.
+    ///
+    /// The function validates `reason`, ensures the current bot user is available, checks that the bot
+    /// has `manage_threads` for thread channels or `manage_channels` for other channel types, and then
+    /// calls the controller to delete the channel. Returns the deleted channel's JSON representation.
+    ///
+    /// # Returns
+    ///
+    /// The deleted channel payload as a `serde_json::Value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::api::channels::DeleteChannel;
+    /// # use serenity::all::GenericChannelId;
+    /// # async fn example<T: crate::DiscordProvider>(ctx: &crate::DiscordContext<T>) -> Result<(), crate::Error> {
+    /// let req = DeleteChannel { channel_id: GenericChannelId(123), reason: "cleanup".into() };
+    /// let resp = req.execute(ctx).await?;
+    /// println!("{}", resp);
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -47,6 +68,14 @@ impl ApiReq for DeleteChannel {
         Ok(channel)
     }
 
+    /// Convert this request into the corresponding `apilist::API` variant for dispatch.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let api = crate::api::channels::delete_channel::DeleteChannel::default().to_apilist();
+    /// assert!(matches!(api, crate::apilist::API::DeleteChannel(_)));
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteChannel(self)
     }

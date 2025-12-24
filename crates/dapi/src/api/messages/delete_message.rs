@@ -11,6 +11,27 @@ pub struct DeleteMessage {
 impl ApiReq for DeleteMessage {
     type Resp = ();
 
+    /// Deletes a message in the specified channel using the bot account.
+    ///
+    /// Performs a permission check for `MANAGE_MESSAGES` for the bot user before calling the controller
+    /// to delete the message. Returns `Err` if the current user is not available, the permission check
+    /// fails, or the controller fails to delete the message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use serenity::all::{GenericChannelId, MessageId};
+    /// # use crate::api::messages::delete_message::DeleteMessage;
+    /// # async fn example(ctx: &crate::DiscordContext<impl crate::DiscordProvider>) -> Result<(), crate::Error> {
+    /// let req = DeleteMessage {
+    ///     channel_id: GenericChannelId(123),
+    ///     message_id: MessageId(456),
+    ///     reason: "cleanup".into(),
+    /// };
+    /// req.execute(ctx).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         let Some(bot_user) = this.current_user() else {
             return Err("Internal error: Current user not found".into());
@@ -26,6 +47,22 @@ impl ApiReq for DeleteMessage {
         Ok(())
     }
 
+    /// Converts this `DeleteMessage` request into the crate's `apilist::API::DeleteMessage` variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let req = DeleteMessage {
+    ///     channel_id: (1u64).into(),
+    ///     message_id: (2u64).into(),
+    ///     reason: "cleanup".into(),
+    /// };
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::DeleteMessage(_) => {}
+    ///     _ => panic!("expected DeleteMessage variant"),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteMessage(self)
     }

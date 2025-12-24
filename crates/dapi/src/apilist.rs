@@ -119,6 +119,19 @@ macro_rules! op {
 impl ApiReq for API {
     type Resp = serde_json::Value;
 
+    /// Execute the API variant using the provided DiscordContext.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Given an `api` value of type `API` and a `ctx: DiscordContext<_>`:
+    /// let resp = futures::executor::block_on(async { api.execute(&ctx).await.unwrap() });
+    /// println!("{}", resp);
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// `serde_json::Value` containing the API response on success.
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         match self {
             API::AntiRaidCheckChannelPermissions(req) => op!(this, req),

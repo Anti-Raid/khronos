@@ -10,6 +10,31 @@ pub struct CreateGuildRole {
 impl ApiReq for CreateGuildRole {
     type Resp = serde_json::Value;
 
+    /// Create a new guild role after validating the request data, the bot's permissions, and an optional role icon.
+    ///
+    /// This performs the following checks before creating the role:
+    /// - Validates the provided reason.
+    /// - If a role name is provided, ensures its length is between 1 and 100 characters.
+    /// - Ensures the current bot user is available.
+    /// - Verifies the bot has MANAGE_ROLES and, if specific permissions are requested for the new role, that the bot possesses those permissions.
+    /// - If an icon is provided, ensures the guild supports role icons and that the image format is PNG, JPEG, or GIF.
+    ///
+    /// # Returns
+    ///
+    /// The created role as a JSON value.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use crate::{CreateGuildRole, EditRole, DiscordContext, DiscordProvider};
+    /// # async fn example<T: DiscordProvider>(ctx: &DiscordContext<T>) -> Result<(), crate::Error> {
+    /// let req = CreateGuildRole {
+    ///     reason: "initial setup".into(),
+    ///     data: EditRole::default(), // fill fields as needed
+    /// };
+    /// let role_json = req.execute(ctx).await?;
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -61,6 +86,17 @@ impl ApiReq for CreateGuildRole {
         Ok(role)
     }
 
+    /// Wraps this `CreateGuildRole` request in the API enum for dispatch.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let req = CreateGuildRole { reason: String::from("reason"), data: EditRole::default() };
+    /// let api = req.to_apilist();
+    /// if let crate::apilist::API::CreateGuildRole(_) = api {
+    ///     // dispatched as CreateGuildRole
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateGuildRole(self)
     }

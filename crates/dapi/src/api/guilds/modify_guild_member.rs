@@ -11,6 +11,22 @@ pub struct ModifyGuildMember {
 impl ApiReq for ModifyGuildMember {
     type Resp = serde_json::Value;
 
+    /// Modify a guild member according to the provided `EditMember` payload.
+    ///
+    /// Returns the updated guild member as a `serde_json::Value`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(ctx: &DiscordContext<_>) -> Result<(), crate::Error> {
+    /// let req = ModifyGuildMember {
+    ///     user_id,
+    ///     reason: "update nick".into(),
+    ///     data: edit_member,
+    /// };
+    /// let updated_member = req.execute(ctx).await?;
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -116,6 +132,18 @@ impl ApiReq for ModifyGuildMember {
         Ok(member)
     }
 
+    /// Convert this request into the `crate::apilist::API::ModifyGuildMember` enum variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::apilist::API;
+    /// # use crate::api::guilds::modify_guild_member::ModifyGuildMember;
+    /// # use crate::models::EditMember;
+    /// let req = ModifyGuildMember { user_id: Default::default(), reason: String::new(), data: EditMember::default() };
+    /// let api = req.to_apilist();
+    /// matches!(api, API::ModifyGuildMember(_));
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::ModifyGuildMember(self)
     }

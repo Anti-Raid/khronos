@@ -11,6 +11,26 @@ pub struct ModifyWebhook {
 impl ApiReq for ModifyWebhook {
     type Resp = serde_json::Value;
 
+    /// Modifies the specified webhook after validating the reason, avatar format, ownership, and required permissions.
+    ///
+    /// Performs these checks in order: validates `reason`; if an avatar is provided, ensures its format is PNG, JPEG, or GIF; verifies the current bot user exists; if `channel_id` is present, checks channel-specific permissions; checks the `MANAGE_WEBHOOKS` permission; verifies the webhook belongs to the current guild; then applies the modification and returns the updated webhook payload.
+    ///
+    /// # Returns
+    ///
+    /// The modified webhook payload as JSON (`serde_json::Value`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn run_example() -> Result<(), crate::Error> {
+    /// let modify = ModifyWebhook {
+    ///     webhook_id: /* ... */,
+    ///     data: /* EditWebhook payload ... */,
+    ///     reason: "Updating webhook".into(),
+    /// };
+    /// let updated: serde_json::Value = modify.execute(&context).await?;
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -64,6 +84,23 @@ impl ApiReq for ModifyWebhook {
         Ok(webhook)
     }
 
+    /// Convert this `ModifyWebhook` request into its corresponding `API` enum variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::apilist::API;
+    /// use std::mem::MaybeUninit;
+    ///
+    /// // Construct a `ModifyWebhook` without initializing its fields purely for example purposes.
+    /// // This pattern is only used here to avoid depending on concrete field constructors.
+    /// let req: crate::api::webhooks::modify_webhook::ModifyWebhook = unsafe {
+    ///     MaybeUninit::zeroed().assume_init()
+    /// };
+    ///
+    /// let api = req.to_apilist();
+    /// assert!(matches!(api, API::ModifyWebhook(_)));
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::ModifyWebhook(self)
     }

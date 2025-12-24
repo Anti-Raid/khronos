@@ -11,6 +11,28 @@ pub struct ModifyGuildRole {
 impl ApiReq for ModifyGuildRole {
     type Resp = serde_json::Value;
 
+    /// Executes the ModifyGuildRole request: validates inputs, checks permissions and role hierarchy, and updates the guild role.
+    ///
+    /// Performs validation of the provided reason and role name length, ensures the bot exists and has MANAGE_ROLES permission, verifies the bot's highest role is above the target role, checks guild feature support for role icons and icon format when provided, validates requested permissions against the bot's permissions, and then calls the controller to apply the role modifications.
+    ///
+    /// # Returns
+    ///
+    /// The updated role as a `serde_json::Value`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Context and request construction are environment-specific and omitted here.
+    /// // This example demonstrates the intended use pattern.
+    /// # async fn example_usage() -> Result<(), Box<dyn std::error::Error>> {
+    /// use crate::api::guilds::ModifyGuildRole;
+    ///
+    /// // let context: DiscordContext<_> = /* ... */;
+    /// // let req = ModifyGuildRole { role_id, reason: "rename".into(), data: edit_role };
+    /// // let updated = req.execute(&context).await?;
+    ///
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -72,6 +94,18 @@ impl ApiReq for ModifyGuildRole {
         Ok(role)
     }
 
+    /// Convert this request into the central `API` enum used by the dispatcher.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given a `ModifyGuildRole` request `req`, convert it into `API` for the dispatcher.
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::ModifyGuildRole(_) => (),
+    ///     _ => unreachable!(),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::ModifyGuildRole(self)
     }

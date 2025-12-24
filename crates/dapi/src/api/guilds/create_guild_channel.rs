@@ -10,6 +10,39 @@ pub struct CreateGuildChannel {
 impl ApiReq for CreateGuildChannel {
     type Resp = serde_json::Value;
 
+    /// Validates input and creates a guild channel using the provided data and reason.
+    ///
+    /// Performs the following validations and checks before creating the channel:
+    /// - Validates the provided `reason`.
+    /// - Ensures a current bot user is available.
+    /// - Verifies the bot has `MANAGE_CHANNELS` and, when needed, `MANAGE_ROLES`.
+    /// - Validates `topic` length (<= 1024), `rate_limit_per_user` and `default_thread_rate_limit_per_user` (<= 21600),
+    ///   and each available tag name length (<= 20).
+    /// - Ensures any permission overwrites only allow/deny permissions the bot possesses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any validation or permission check fails, or if the underlying controller call fails.
+    ///
+    /// # Returns
+    ///
+    /// The created channel as `serde_json::Value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::api::guilds::create_guild_channel::CreateGuildChannel;
+    /// # use crate::DiscordContext;
+    /// # async fn example<T: crate::DiscordProvider>(ctx: &DiscordContext<T>) -> Result<(), crate::Error> {
+    /// let req = CreateGuildChannel {
+    ///     reason: "Organizing channels".into(),
+    ///     data: Default::default(),
+    /// };
+    /// let created = req.execute(ctx).await?;
+    /// println!("{}", created);
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -75,6 +108,18 @@ impl ApiReq for CreateGuildChannel {
         Ok(channel)
     }
 
+    /// Converts this `CreateGuildChannel` request into the `API::CreateGuildChannel` enum variant used by the API router.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let req = CreateGuildChannel { reason: String::new(), data: CreateChannel::default() };
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::CreateGuildChannel(_) => {},
+    ///     _ => panic!("expected CreateGuildChannel variant"),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateGuildChannel(self)
     }

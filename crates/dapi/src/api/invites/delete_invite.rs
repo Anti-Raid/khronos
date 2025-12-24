@@ -10,6 +10,19 @@ pub struct DeleteInvite {
 impl ApiReq for DeleteInvite {
     type Resp = serde_json::Value;
 
+    /// Deletes the invite identified by `self.code` after validating inputs and permissions.
+    ///
+    /// Validates the provided reason, ensures the invite belongs to the current guild, verifies the bot has either the Manage Server (Manage Guild) permission or Manage Channels permission for the invite's channel, deletes the invite using the controller, and returns the deleted invite as JSON.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use dapi::api::invites::delete_invite::DeleteInvite;
+    /// # use dapi::DiscordContext;
+    /// let req = DeleteInvite { code: "abc".into(), reason: "cleanup".into() };
+    /// // `ctx` must be a valid `DiscordContext` implementation
+    /// let deleted = futures::executor::block_on(async { req.execute(&ctx).await }).unwrap();
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
@@ -46,6 +59,20 @@ impl ApiReq for DeleteInvite {
         Ok(invite)
     }
 
+    /// Wraps this request value in the crate's API enum as the `API::DeleteInvite` variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::api::invites::delete_invite::DeleteInvite;
+    ///
+    /// let req = DeleteInvite { code: "abc123".into(), reason: "cleanup".into() };
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::DeleteInvite(_) => {},
+    ///     _ => panic!("expected API::DeleteInvite variant"),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteInvite(self)
     }

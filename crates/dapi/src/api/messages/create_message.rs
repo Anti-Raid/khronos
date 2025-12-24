@@ -10,6 +10,26 @@ pub struct CreateMessageRequest {
 impl ApiReq for CreateMessageRequest {
     type Resp = serde_json::Value;
 
+    /// Creates a message in the specified channel after validating input, checking permissions, and handling attachments.
+    ///
+    /// Validates `data`, ensures the current bot user is available, verifies the bot has `SEND_MESSAGES` permission in the target channel, extracts any attachment files, and delegates message creation to the controller.
+    ///
+    /// # Returns
+    /// `serde_json::Value` representing the created message.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use serenity::all::GenericChannelId;
+    /// # use dapi::api::messages::CreateMessageRequest;
+    /// # use dapi::CreateMessage;
+    /// # async fn example(ctx: &dapi::DiscordContext<impl dapi::DiscordProvider>) -> Result<(), Box<dyn std::error::Error>> {
+    /// let data = CreateMessage { /* fields */ };
+    /// let req = CreateMessageRequest { channel_id: GenericChannelId(123), data };
+    /// let created = req.execute(ctx).await?;
+    /// println!("{}", created);
+    /// # Ok(()) }
+    /// ```
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         self.data.validate()?;
 
@@ -33,6 +53,18 @@ impl ApiReq for CreateMessageRequest {
         Ok(msg)
     }
 
+    /// Convert this request into the `API::CreateMessage` enum variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // assuming `req` is a `CreateMessageRequest`
+    /// let api = req.to_apilist();
+    /// match api {
+    ///     crate::apilist::API::CreateMessage(_) => (),
+    ///     _ => panic!("expected CreateMessage variant"),
+    /// }
+    /// ```
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateMessage(self)
     }
