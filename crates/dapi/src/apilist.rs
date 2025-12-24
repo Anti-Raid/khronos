@@ -1,4 +1,4 @@
-use crate::{ApiReq, antiraid_check_channel_permissions::AntiRaidCheckChannelPermissions, antiraid_check_permissions::{AntiRaidCheckPermissions, AntiRaidCheckPermissionsAndHierarchy}, antiraid_get_fused_member::AntiRaidGetFusedMember, api::{auditlogs::GetAuditLog, channels::edit_channel::EditChannel, guilds::modify_guild::ModifyGuild}, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, antiraid_check_channel_permissions::AntiRaidCheckChannelPermissions, antiraid_check_permissions::{AntiRaidCheckPermissions, AntiRaidCheckPermissionsAndHierarchy}, antiraid_get_fused_member::AntiRaidGetFusedMember, api::{auditlogs::GetAuditLog, automoderation::{get_auto_moderation_rule::GetAutoModerationRule, list_auto_moderation_rules::ListAutoModerationRules}, channels::edit_channel::EditChannel, guilds::modify_guild::ModifyGuild}, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum API {
@@ -10,6 +10,10 @@ pub enum API {
 
     // Audit logs
     GetAuditLog(GetAuditLog),
+
+    // Auto Moderation
+    GetAutoModerationRule(GetAutoModerationRule),
+    ListAutoModerationRules(ListAutoModerationRules),
 
     // Channels
     EditChannel(EditChannel),
@@ -43,6 +47,8 @@ impl ApiReq for API {
             API::AntiRaidCheckPermissionsAndHierarchy(req) => op!(this, req),
             API::AntiRaidGetFusedMember(req) => op!(this, req),
             API::GetAuditLog(req) => op!(this, req),
+            API::GetAutoModerationRule(req) => op!(this, req),
+            API::ListAutoModerationRules(req) => op!(this, req),
             API::EditChannel(req) => op!(this, req),
             API::ModifyGuild(req) => op!(this, req),
         }

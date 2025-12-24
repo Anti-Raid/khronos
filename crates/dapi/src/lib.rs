@@ -15,7 +15,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>; // This is constant a
 
 #[allow(async_fn_in_trait)]
 pub trait ApiReq {
-    type Resp: 'static + Send;
+    type Resp: 'static + serde::Serialize + for<'de> serde::Deserialize<'de> + Send;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, Error>;
 
@@ -30,6 +30,8 @@ pub async fn exec_api<A: ApiReq, T: DiscordProvider>(
 ) -> Result<A::Resp, crate::Error> {
     req.execute(this).await
 }
+
+
 
 /// Helper function to extract image format from a data URL
 pub fn get_format_from_image_data<'a>(data: &'a str) -> Result<&'a str, crate::Error> {

@@ -11,6 +11,8 @@ use dapi::antiraid_check_channel_permissions::{AntiRaidCheckChannelPermissions, 
 use dapi::antiraid_check_permissions::{AntiRaidCheckPermissions, AntiRaidCheckPermissionsAndHierarchy, AntiRaidCheckPermissionsAndHierarchyOptions, AntiRaidCheckPermissionsOptions};
 use dapi::antiraid_get_fused_member::AntiRaidGetFusedMember;
 use dapi::api::auditlogs::{GetAuditLog, GetAuditLogOptions};
+use dapi::api::automoderation::get_auto_moderation_rule::{GetAutoModerationRule, GetAutoModerationRuleOptions};
+use dapi::api::automoderation::list_auto_moderation_rules::ListAutoModerationRules;
 use dapi::api::channels::edit_channel::EditChannel;
 use dapi::api::guilds::modify_guild::ModifyGuild;
 use dapi::context::DiscordContext;
@@ -431,47 +433,38 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
         // Auto Moderation
 
         // Should be documented.
+        // Implemented in dapi
         methods.add_scheduler_async_method("list_auto_moderation_rules", async move |lua, this, _: ()| {
             this.check_action(&lua, "list_auto_moderation_rules".to_string())
             .map_err(LuaError::external)?;
 
-            let Some(bot_user) = this.discord_controller.current_user() else {
-                return Err(LuaError::runtime("Internal error: Current user not found"));
-            };
-
-            this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
-                .await
-                .map_err(LuaError::external)?;
-
-            let rules = this
-                .discord_provider
-                .list_auto_moderation_rules()
-                .await
-                .map_err(|x| LuaError::external(x.to_string()))?;
+            let rules = dapi::exec_api(
+                &this.discord_controller, 
+                ListAutoModerationRules {
+                }, 
+            )
+            .await
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(Lazy::new(rules))
         });
 
         // Should be documented.
+        // Implemented in dapi
         methods.add_scheduler_async_method("get_auto_moderation_rule", async move |lua, this, data: LuaValue| {
-            let data = lua.from_value::<structs::GetAutoModerationRuleOptions>(data)?;
+            let data = lua.from_value::<GetAutoModerationRuleOptions>(data)?;
 
             this.check_action(&lua, "get_auto_moderation_rule".to_string())
                 .map_err(LuaError::external)?;
 
-            let Some(bot_user) = this.discord_controller.current_user() else {
-                return Err(LuaError::runtime("Internal error: Current user not found"));
-            };
-
-            this.check_permissions(bot_user.id, serenity::all::Permissions::MANAGE_GUILD)
-                .await
-                .map_err(LuaError::external)?;
-
-            let rule = this
-                .discord_provider
-                .get_auto_moderation_rule(data.rule_id)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
+            let rule = dapi::exec_api(
+                &this.discord_controller, 
+                GetAutoModerationRule {
+                    data,
+                }, 
+            )
+            .await
+            .map_err(|e| LuaError::external(e.to_string()))?;
 
             Ok(Lazy::new(rule))
         });
