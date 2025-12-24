@@ -1,7 +1,5 @@
 use crate::{
-    to_struct,
     traits::context::KhronosContext,
-    utils::khronos_value::{KhronosBuffer, KhronosValue},
     TemplateContext,
 };
 use captcha::filters::Filter;
@@ -13,13 +11,6 @@ pub const MAX_CHAR_COUNT: u8 = 10;
 pub const MAX_FILTERS: usize = 12;
 pub const MAX_VIEWBOX_X: u32 = 512;
 pub const MAX_VIEWBOX_Y: u32 = 512;
-
-to_struct! {
-    pub struct Captcha {
-        pub text: String,
-        pub image: KhronosBuffer,
-    }
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CaptchaConfig {
@@ -169,14 +160,11 @@ pub async fn new(lua: &Lua, config: CaptchaConfig) -> LuaResult<LuaValue> {
         .await
         .map_err(|e| LuaError::runtime(e.to_string()))?;
 
-    let kv: KhronosValue = Captcha {
-        text,
-        image: KhronosBuffer::new(image),
-    }
-    .try_into()
-    .map_err(|e| LuaError::runtime(format!("Failed to convert captcha: {e}")))?;
-
-    kv.into_lua(lua)
+    let tab = lua.create_table()?;
+    tab.set("text", text.as_str())?;
+    tab.set("image", lua.create_buffer(image)?)?;
+    tab.set_readonly(true);
+    Ok(LuaValue::Table(tab))
 }
 
 pub fn init_plugin<T: KhronosContext>(lua: &Lua, _: &TemplateContext<T>) -> LuaResult<LuaTable> {

@@ -6,7 +6,6 @@ use std::rc::Rc;
 use crate::primitives::event::ContextEvent;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 use crate::traits::context::{KhronosContext as KhronosContextTrait};
-use crate::utils::khronos_value::KhronosValue;
 use crate::utils::prelude::setup_prelude;
 use crate::utils::proxyglobal::proxy_global;
 use crate::TemplateContext;
@@ -347,17 +346,15 @@ impl KhronosIsolate {
             .spawn_thread_and_wait(thread, args)
             .await?;
 
-        // Do a GC
-        {
+        let weak_lua = {
             let Some(ref lua) = *self.inner.lua.borrow() else {
                 return Err(LuaError::RuntimeError(
                     "Lua instance is no longer valid".to_string(),
                 ));
             };
 
-            lua.gc_collect()?;
-            lua.gc_collect()?; // Twice to ensure we get all the garbage
-        }
+            lua.weak()
+        };
 
         // Now unwrap it
         let res = match res {
@@ -376,7 +373,7 @@ impl KhronosIsolate {
             None => None,
         };
 
-        Ok(SpawnResult::new(res))
+        Ok(SpawnResult::new(weak_lua, res))
     }
 
     pub fn is_closed(&self) -> bool {
@@ -391,12 +388,13 @@ impl KhronosIsolate {
 /// convenient conversion to serde_json::Value and LuaMultiValue without dealing with
 /// scheduler implementation details
 pub struct SpawnResult {
+    weak_lua: WeakLua,
     result: Option<LuaMultiValue>,
 }
 
 impl SpawnResult {
-    pub(crate) fn new(result: Option<LuaMultiValue>) -> Self {
-        Self { result }
+    pub(crate) fn new(weak_lua: WeakLua, result: Option<LuaMultiValue>) -> Self {
+        Self { weak_lua, result }
     }
 
     pub fn into_multi_value(self) -> LuaMultiValue {
@@ -407,27 +405,32 @@ impl SpawnResult {
     }
 
     /// Converts the result into a KhronosValue
-    pub fn into_khronos_value(self, isolate: &KhronosIsolate) -> LuaResult<KhronosValue> {
-        let Some(values) = self.result else {
-            return Ok(KhronosValue::Null);
+    pub fn into_value<T: for<'de> serde::Deserialize<'de>>(&self, isolate: &KhronosIsolate, idx: usize) -> LuaResult<T> {
+        let Some(ref values) = self.result else {
+            return Err(LuaError::external("No return value from script"))
         };
 
         match values.len() {
-            0 => Ok(KhronosValue::Null),
-            1 => {
-                let value = values.into_iter().next().unwrap();
+            0 => Err(LuaError::external("No return value from script")),
+            _ => {
+                let value = values.iter().nth(idx).ok_or_else(|| {
+                    LuaError::external(format!(
+                        "Return value at index {} does not exist (only {} values returned)",
+                        idx,
+                        values.len()
+                    ))
+                })?;
 
-                let result_value = {
-                    let Some(ref lua) = *isolate.inner().lua.borrow() else {
-                        return Err(LuaError::RuntimeError(
+                let lua = match self.weak_lua.try_upgrade() {
+                    Some(lua) => lua,
+                    None => {
+                        return Err(LuaError::external(
                             "Lua instance is no longer valid".to_string(),
-                        ));
-                    };
+                        ))
+                    }
+                };
 
-                    KhronosValue::from_lua(value, lua)
-                }; // Lua should be dropped here
-
-                match result_value {
+                match lua.from_value(value.clone()) {
                     Ok(v) => Ok(v),
                     Err(e) => {
                         // Mark memory error'd VMs as broken automatically to avoid user grief/pain
@@ -442,39 +445,6 @@ impl SpawnResult {
                         Err(e)
                     }
                 }
-            }
-            _ => {
-                let mut arr = Vec::with_capacity(values.len());
-
-                for v in values {
-                    let result_value = {
-                        let Some(ref lua) = *isolate.inner().lua.borrow() else {
-                            return Err(LuaError::RuntimeError(
-                                "Lua instance is no longer valid".to_string(),
-                            ));
-                        };
-
-                        KhronosValue::from_lua(v, lua)
-                    }; // Lua should be dropped here
-
-                    match result_value {
-                        Ok(v) => arr.push(v),
-                        Err(e) => {
-                            // Mark memory error'd VMs as broken automatically to avoid user grief/pain
-                            if let LuaError::MemoryError(_) = e {
-                                // Mark VM as broken
-                                isolate
-                                    .inner()
-                                    .mark_broken(true)
-                                    .map_err(|e| LuaError::external(e.to_string()))?;
-                            }
-
-                            return Err(e);
-                        }
-                    }
-                }
-
-                Ok(KhronosValue::List(arr))
             }
         }
     }

@@ -1,23 +1,32 @@
 use std::rc::Rc;
 
+use crate::core::datetime::DateTime;
 use crate::core::datetime::TimeDelta;
 use crate::primitives::blob::Blob;
 use crate::primitives::blob::BlobTaker;
-use crate::to_struct;
 use crate::traits::context::KhronosContext;
 use crate::traits::context::Limitations;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
-use crate::utils::khronos_value::KhronosValue;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
 
-to_struct! {
-    pub struct ObjectMetadata {
-        pub key: String,
-        pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
-        pub size: i64,
-        pub etag: Option<String>,
+pub struct ObjectMetadata {
+    pub key: String,
+    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub size: i64,
+    pub etag: Option<String>,
+}
+
+impl IntoLua for ObjectMetadata {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("key", self.key)?;
+        table.set("last_modified", self.last_modified.map(|dt| DateTime::from_utc(dt)))?;
+        table.set("size", self.size)?;
+        table.set("etag", self.etag)?;
+        table.set_readonly(true);
+        Ok(LuaValue::Table(table))
     }
 }
 
@@ -83,7 +92,7 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
-                let kv: KhronosValue = result
+                let files = result
                     .into_iter()
                     .map(|r| ObjectMetadata {
                         key: r.key,
@@ -91,11 +100,9 @@ impl<T: KhronosContext> LuaUserData for Bucket<T> {
                         size: r.size,
                         etag: r.etag,
                     })
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
+                    .collect::<Vec<_>>();
 
-                Ok(kv)
+                Ok(files)
             },
         );
 

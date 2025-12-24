@@ -1,4 +1,4 @@
-use crate::{TemplateContext, to_struct};
+use crate::TemplateContext;
 
 use super::{
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
@@ -62,14 +62,13 @@ impl TFlags {
     }
 }
 
-to_struct!(
-    /// Represents the data to be passed into ctx:with()
-    pub struct KhronosValueWith {
-        pub ext_data: Option<ExtContextData>,
-        pub capabilities: Vec<String>,
-        pub tflags: Option<Vec<String>>,
-    }
-);
+/// Represents the data to be passed into ctx:with()
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct KhronosValueWith {
+    pub ext_data: Option<ExtContextData>,
+    pub capabilities: Vec<String>,
+    pub tflags: Option<Vec<String>>,
+}
 
 /// Represents a result of a set operation in the key-value store
 pub struct Limitations {
@@ -106,11 +105,10 @@ impl Limitations {
     }
 }
 
-to_struct! {
-    pub struct ExtContextData {
-        pub template_name: String,
-        pub events: Vec<String>,
-    }
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct ExtContextData {
+    pub template_name: String,
+    pub events: Vec<String>,
 }
 
 pub trait KhronosContext: 'static + Clone + Sized {

@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use crate::core::datetime::DateTimeRef;
-use crate::to_struct;
+use crate::core::datetime::{DateTime, DateTimeRef};
 use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::kvprovider::KVProvider;
 use crate::utils::khronos_value::KhronosValue;
@@ -17,28 +16,60 @@ pub struct KvExecutor<T: KhronosContext> {
     kv_provider: T::KVProvider,
 }
 
-to_struct!(
-    /// Represents a result of a set operation in the key-value store
-    pub struct SetResult {
-        pub exists: bool, // If true, the key already existed
-        pub id: String,   // The ID of the record
-    }
-);
+/// Represents a result of a set operation in the key-value store
+pub struct SetResult {
+    pub exists: bool, // If true, the key already existed
+    pub id: String,   // The ID of the record
+}
 
-to_struct!(
-    /// Represents a full record complete with metadata
-    pub struct KvRecord {
-        pub id: String,
-        pub key: String,
-        pub value: KhronosValue,
-        pub scopes: Vec<String>,
-        pub exists: bool,
-        pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-        pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
-        pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-        pub resume: bool,
+impl IntoLua for SetResult {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("exists", self.exists)?;
+        table.set("id", self.id)?;
+        table.set_readonly(true); // We want SetResults to be immutable
+        Ok(LuaValue::Table(table))
     }
-);
+}
+
+/// Represents a full record complete with metadata
+pub struct KvRecord {
+    pub id: String,
+    pub key: String,
+    pub value: KhronosValue,
+    pub scopes: Vec<String>,
+    pub exists: bool,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub resume: bool,
+}
+
+impl IntoLua for KvRecord {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("id", self.id)?;
+        table.set("key", self.key)?;
+        table.set("value", self.value)?;
+        table.set("scopes", self.scopes)?;
+        table.set("exists", self.exists)?;
+        table.set("created_at", match self.created_at {
+            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
+            None => LuaValue::Nil,
+        })?;
+        table.set("last_updated_at", match self.last_updated_at {
+            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
+            None => LuaValue::Nil,
+        })?;
+        table.set("expires_at", match self.expires_at {
+            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
+            None => LuaValue::Nil,
+        })?;
+        table.set("resume", self.resume)?;
+        table.set_readonly(true); // We want KvRecords to be immutable
+        Ok(LuaValue::Table(table))
+    }
+}
 
 impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
     fn from(record: crate::traits::ir::kv::KvRecord) -> Self {
@@ -250,11 +281,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     })
                     .collect::<Vec<KvRecord>>();
 
-                let v: KhronosValue = records
-                    .try_into()
-                    .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
-
-                Ok(v)
+                Ok(records)
             },
         );
 
@@ -339,11 +366,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     None => KvRecord::default(),
                 };
 
-                let v: KhronosValue = record
-                    .try_into()
-                    .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
-
-                Ok(v)
+                Ok(record)
             },
         );
 
@@ -372,11 +395,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 None => KvRecord::default(),
             };
 
-            let v: KhronosValue = record
-                .try_into()
-                .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
-
-            Ok(v)
+            Ok(record)
         });
 
         methods.add_scheduler_async_method("keys", async move |_, this, scopes: Vec<String>| {
@@ -421,11 +440,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let rec = SetResult { exists, id };
-
-                let rec: KhronosValue = rec
-                    .try_into()
-                    .map_err(|x: crate::Error| LuaError::external(x.to_string()))?;
-
                 Ok(rec)
             },
         );

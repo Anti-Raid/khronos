@@ -1,7 +1,6 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::primitives::event::ContextEvent;
 use crate::traits::context::{ExtContextData, KhronosContext, KhronosValueWith, Limitations, TFlags};
-use crate::utils::khronos_value::KhronosValue;
 use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 use std::cell::RefCell;
@@ -203,10 +202,8 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(this.limitations.has_any_cap(&caps))
         });
 
-        methods.add_method("with", |_lua, this, with: KhronosValue| {
-            let with: KhronosValueWith = with.try_into().map_err(|e| {
-                mluau::Error::external(format!("Failed to convert LuaValue to Limitations: {e}"))
-            })?;
+        methods.add_method("with", |lua, this, with: LuaValue| {
+            let with: KhronosValueWith = lua.from_value(with)?;
 
             let tflags = match with.tflags {
                 Some(tflags) => TFlags::from_strs(&tflags, this.is_root_context)

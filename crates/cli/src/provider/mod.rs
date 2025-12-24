@@ -2,6 +2,7 @@ use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::context::TFlags;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
+use khronos_runtime::utils::khronos_value::KhronosValue;
 use moka::future::Cache;
 use serde_json::Value;
 use sqlx::Row;
@@ -152,7 +153,7 @@ ORDER BY scope;
 
         let value = data.get::<serde_json::Value, _>("value");
 
-        let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
+        let record = KhronosValue::from_serde_json_value(value, 0, true)?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
             id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
@@ -191,7 +192,7 @@ ORDER BY scope;
 
         let value = data.get::<serde_json::Value, _>("value");
 
-        let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
+        let record = KhronosValue::from_serde_json_value(value, 0, true)?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
             id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
@@ -420,7 +421,7 @@ ORDER BY scope;
         for data in entries {
             let value = data.get::<serde_json::Value, _>("value");
 
-            let record: khronos_runtime::utils::khronos_value::KhronosValue = value.try_into()?;
+            let record = KhronosValue::from_serde_json_value(value, 0, true)?;
 
             let file_contents = khronos_runtime::traits::ir::KvRecord {
                 id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
