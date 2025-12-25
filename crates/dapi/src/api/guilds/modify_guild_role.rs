@@ -1,5 +1,5 @@
 use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data, serenity_backports::{member_permissions, highest_role}};
+use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data, serenity_backports::highest_role};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildRole {
@@ -36,7 +36,7 @@ impl ApiReq for ModifyGuildRole {
         let mod_role = guild.roles.get(&self.role_id)
             .ok_or_else(|| "The role being modified could not be found on the server")?;
 
-        if bot_highest_role <= mod_role {
+        if bot_highest_role <= *mod_role {
             return Err("The bot must have a role that is higher than the role it is trying to modify".into());
         }
 

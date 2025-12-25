@@ -30,7 +30,7 @@ impl ApiReq for ModifyGuildRolePositions {
             };
 
             // Check current
-            if role >= bot_highest_role || modify_role_position >= bot_highest_role {
+            if *role >= bot_highest_role || *modify_role_position >= bot_highest_role {
                 return Err(format!("Bot does not have permission to modify the requested role ({}, ``{}``)", role.id, role.name.replace("`", "\\`")).into());
             }
         }

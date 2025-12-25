@@ -1,4 +1,4 @@
-use serenity::all::Permissions;
+// use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::{member_permissions, highest_role}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -43,7 +43,7 @@ impl ApiReq for AddGuildMemberRole {
             return Err("Role to add to member not found in guild".into());
         };
 
-        if role_to_add >= bot_highest_role {
+        if *role_to_add >= bot_highest_role {
             return Err(format!("Bot does not have permission to add the requested role ({}, ``{}``) to the member", role_to_add.id, role_to_add.name.replace("`", "\\`")).into());
         }
 

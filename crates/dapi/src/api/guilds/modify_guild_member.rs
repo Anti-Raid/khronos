@@ -99,7 +99,7 @@ impl ApiReq for ModifyGuildMember {
                     return Err("Role not found in guild".into());
                 };
 
-                if role >= bot_highest_role {
+                if *role >= bot_highest_role {
                     return Err(format!("Bot does not have permission to add the requested role to the member specified ({}, ``{}``)", role.id, role.name.replace("`", "\\`")).into());
                 }
             }

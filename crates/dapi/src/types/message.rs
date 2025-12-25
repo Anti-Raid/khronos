@@ -142,6 +142,12 @@ pub struct CreateMessage {
     pub attachments: Option<CreateMessageAttachment>,
 }
 
+impl CreateMessage {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
+}
+
 /// [Discord docs](https://discord.com/developers/docs/resources/channel#edit-message)
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[must_use]
@@ -158,6 +164,12 @@ pub struct EditMessage {
     pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<CreateMessageAttachment>,
+}
+
+impl EditMessage {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
 }
 
 internal_enum_number! {
@@ -191,4 +203,22 @@ pub struct MessageReference {
     /// When sending, whether to error if the referenced message doesn't exist instead of sending
     /// as a normal (non-reply) message, default true.
     pub fail_if_not_exists: Option<bool>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MessagePagination {
+    Before(MessageId),
+    After(MessageId),
+    Around(MessageId),
+}
+
+impl From<MessagePagination> for serenity::all::MessagePagination {
+    fn from(p: MessagePagination) -> Self {
+        match p {
+            MessagePagination::Before(id) => serenity::all::MessagePagination::Before(id),
+            MessagePagination::After(id) => serenity::all::MessagePagination::After(id),
+            MessagePagination::Around(id) => serenity::all::MessagePagination::Around(id),
+        }
+    }
 }

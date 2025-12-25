@@ -33,7 +33,7 @@ impl ApiReq for DeleteGuildRole {
         let mod_role = guild.roles.get(&self.role_id)
             .ok_or_else(|| "The role being modified could not be found on the server")?;
 
-        if bot_highest_role <= mod_role {
+        if bot_highest_role <= *mod_role {
             return Err("The bot must have a role that is higher than the role it is trying to modify".into());
         }
 

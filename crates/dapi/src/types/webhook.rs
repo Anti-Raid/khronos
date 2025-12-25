@@ -54,3 +54,15 @@ pub struct ExecuteWebhook {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
 }
+
+impl ExecuteWebhook {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
+}
+
+impl EditWebhook {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
+}

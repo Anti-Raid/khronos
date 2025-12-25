@@ -120,14 +120,14 @@ pub struct ModifyRolePosition {
 
 impl PartialEq<Role> for ModifyRolePosition {
     fn eq(&self, other: &Role) -> bool {
-        self.id == other.id && self.position == Some(other.position)
+        self.id == other.id && self.position == Some(other.position as u16)
     }
 }
 
 impl PartialOrd<Role> for ModifyRolePosition {
     fn partial_cmp(&self, other: &Role) -> Option<std::cmp::Ordering> {
-        let self_pos = self.position.unwrap_or(other.position);
-        match self_pos.partial_cmp(&other.position) {
+        let self_pos = self.position.unwrap_or(other.position as u16);
+        match self_pos.partial_cmp(&(other.position as u16)) {
             Some(std::cmp::Ordering::Equal) => other.id.partial_cmp(&self.id),
             res => res,
         }

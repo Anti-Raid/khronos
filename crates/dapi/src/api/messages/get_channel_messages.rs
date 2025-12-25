@@ -4,7 +4,7 @@ use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetChannelMessages {
     pub channel_id: serenity::all::GenericChannelId,
-    pub target: Option<serenity::all::MessagePagination>,
+    pub target: Option<crate::types::MessagePagination>,
     pub limit: Option<serenity::nonmax::NonMaxU8>,
 }
 
@@ -25,7 +25,7 @@ impl ApiReq for GetChannelMessages {
         }
 
         let msg = this.controller()
-            .get_channel_messages(self.channel_id, self.target, self.limit)
+            .get_channel_messages(self.channel_id, self.target.map(|t| t.into()), self.limit)
             .await?;
 
         Ok(msg)

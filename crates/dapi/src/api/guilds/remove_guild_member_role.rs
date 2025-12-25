@@ -1,4 +1,4 @@
-use serenity::all::Permissions;
+// use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::{member_permissions, highest_role}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -43,7 +43,7 @@ impl ApiReq for RemoveGuildMemberRole {
             return Err("Role to remove from member not found in guild".into());
         };
 
-        if role_to_remove >= bot_highest_role {
+        if *role_to_remove >= bot_highest_role {
             return Err(format!("Bot does not have permission to remove the requested role ({}, ``{}``) from the member", role_to_remove.id, role_to_remove.name.replace("`", "\\`")).into());
         }
 

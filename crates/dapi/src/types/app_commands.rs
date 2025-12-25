@@ -23,6 +23,12 @@ pub struct CreateCommand {
     pub fields: EditCommand,
 }
 
+impl CreateCommand {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
+}
+
 impl Default for CreateCommand {
     fn default() -> Self {
         Self {
