@@ -133,7 +133,7 @@ ORDER BY scope;
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
             FROM kv_v2
             WHERE 
             guild_id = $1 AND
@@ -163,7 +163,6 @@ ORDER BY scope;
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
             scopes: data.get::<Vec<String>, _>("scopes"),
             expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
-            resume: data.get::<bool, _>("resume"),
         };
 
         Ok(Some(file_contents))
@@ -174,7 +173,7 @@ ORDER BY scope;
         id: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+            "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
             FROM kv_v2
             WHERE 
             guild_id = $1 AND
@@ -202,7 +201,6 @@ ORDER BY scope;
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
             scopes: data.get::<Vec<String>, _>("scopes"),
             expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
-            resume: data.get::<bool, _>("resume"),
         };
 
         Ok(Some(file_contents))
@@ -214,7 +212,6 @@ ORDER BY scope;
         key: String,
         value: khronos_runtime::utils::khronos_value::KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
-        resume: bool,
     ) -> Result<(bool, String), khronos_runtime::Error> {
         if let Some(existing) = sqlx::query(
             "SELECT id
@@ -233,10 +230,9 @@ ORDER BY scope;
         .map_err(|e| format!("Failed to get existing keys: {e}"))?
         {
             let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
-            sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2, resume = $3 WHERE id = $4")
+            sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2 WHERE id = $3")
                 .bind(value.into_serde_json_value(1, true)?)
                 .bind(expires_at)
-                .bind(resume)
                 .bind(key)
                 .execute(&self.pool)
                 .await
@@ -245,13 +241,12 @@ ORDER BY scope;
             return Ok((true, key.to_string()));
         }
 
-        let id = sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes, expires_at, resume) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id")
+        let id = sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING id")
             .bind(self.guild_id.to_string())
             .bind(&key)
             .bind(value.into_serde_json_value(1, true)?)
             .bind(scopes)
             .bind(expires_at)
-            .bind(resume)
             .fetch_one(&self.pool)
             .await
             .map_err(|e| format!("Failed to set key: {e}"))?
@@ -266,15 +261,13 @@ ORDER BY scope;
         id: String,
         value: khronos_runtime::utils::khronos_value::KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
-        resume: bool,
     ) -> Result<(), khronos_runtime::Error> {
         let key = sqlx::types::uuid::Uuid::parse_str(&id)
             .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
-        sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2, resume = $3 WHERE id = $4")
+        sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2 WHERE id = $3")
             .bind(value.into_serde_json_value(1, true)?)
             .bind(expires_at)
-            .bind(resume)
             .bind(key)
             .execute(&self.pool)
             .await
@@ -401,7 +394,7 @@ ORDER BY scope;
             .map_err(|e| format!("Failed to get key: {e}"))?
         } else {
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at, resume
+                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
@@ -433,7 +426,6 @@ ORDER BY scope;
                 ),
                 scopes: data.get::<Vec<String>, _>("scopes"),
                 expires_at: data.get::<Option<chrono::DateTime<chrono::Utc>>, _>("expires_at"),
-                resume: data.get::<bool, _>("resume"),
             };
 
             records.push(file_contents);
