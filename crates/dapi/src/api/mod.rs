@@ -3,3 +3,7 @@ pub mod automoderation;
 pub mod channels;
 pub mod guilds;
 pub mod webhooks;
+pub mod invites;
+pub mod messages;
+pub mod interactions;
+pub mod commands;

@@ -16,7 +16,7 @@ pub struct CreateWebhook {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ModifyWebhook {
+pub struct EditWebhook {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]
@@ -53,4 +53,16 @@ pub struct ExecuteWebhook {
     pub applied_tags: Option<Vec<GenericId>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
+}
+
+impl ExecuteWebhook {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
+}
+
+impl EditWebhook {
+    pub fn validate(&self) -> Result<(), crate::Error> {
+        Ok(())
+    }
 }
