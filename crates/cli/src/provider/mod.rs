@@ -1,5 +1,4 @@
 use khronos_runtime::traits::context::Limitations;
-use khronos_runtime::traits::context::TFlags;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
 use khronos_runtime::utils::khronos_value::KhronosValue;
@@ -31,7 +30,6 @@ pub struct CliKhronosContext {
     pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
-    pub template_name: String,
     pub pool: Option<sqlx::PgPool>,
 }
 
@@ -43,18 +41,11 @@ impl KhronosContext for CliKhronosContext {
     type HTTPServerProvider = CliHttpServerProvider;
 
     fn limitations(&self) -> Limitations {
-        Limitations::new(self.allowed_caps.clone(), TFlags::all())
+        Limitations::new(self.allowed_caps.clone())
     }
 
     fn guild_id(&self) -> Option<serenity::all::GuildId> {
         self.guild_id
-    }
-
-    fn ext_data(&self) -> khronos_runtime::traits::context::ExtContextData {
-        khronos_runtime::traits::context::ExtContextData {
-            template_name: self.template_name.clone(),
-            events: vec![],
-        }
     }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {

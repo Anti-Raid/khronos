@@ -186,7 +186,6 @@ impl Cli {
             guild_id: self.guild_id,
             http: self.http.clone(),
             file_storage_provider: self.file_storage_provider.clone(),
-            template_name: self.template_name.clone(),
             pool: self.pool.clone(),
         }
     }
