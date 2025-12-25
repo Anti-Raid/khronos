@@ -1,4 +1,4 @@
-use crate::TemplateContext;
+use crate::{TemplateContext, primitives::event::CreateEvent};
 
 use super::{
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
@@ -63,11 +63,12 @@ impl TFlags {
 }
 
 /// Represents the data to be passed into ctx:with()
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct KhronosValueWith {
     pub ext_data: Option<ExtContextData>,
     pub capabilities: Vec<String>,
     pub tflags: Option<Vec<String>>,
+    pub event: Option<CreateEvent>,
 }
 
 /// Represents a result of a set operation in the key-value store

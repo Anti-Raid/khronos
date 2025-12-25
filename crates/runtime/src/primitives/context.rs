@@ -230,7 +230,10 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
                 },
                 current_discord_user: this.current_discord_user.clone(),
                 cached_plugin_data: this.cached_plugin_data.clone(),
-                event: this.event.clone(),
+                event: match with.event {
+                    Some(e) => e.into_context(),
+                    None => this.event.clone(),
+                },
             };
 
             Ok(new_context)
