@@ -229,3 +229,15 @@ internal_enum_number! {
         _ => Unknown(u8),
     }
 }
+
+/// [Discord docs](https://discord.com/developers/docs/resources/guild#modify-guild-channel-positions)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModifyChannelPosition {
+    pub id: GenericChannelId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock_permissions: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<GenericChannelId>,
+}

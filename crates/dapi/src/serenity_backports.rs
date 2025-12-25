@@ -74,3 +74,26 @@ fn calculate_permissions(data: CalculatePermissions) -> Permissions {
 
     permissions
 }
+
+pub fn highest_role(guild: &PartialGuild, member: &Member) -> Option<Role> {
+    let mut highest: Option<&Role> = None;
+
+    for role_id in &member.roles {
+        if let Some(role) = guild.roles.get(role_id) {
+            if let Some(highest_role) = highest {
+                if role.position > highest_role.position || (role.position == highest_role.position && role.id < highest_role.id) {
+                    highest = Some(role);
+                }
+            } else {
+                highest = Some(role);
+            }
+        }
+    }
+
+    // Default to @everyone if no other roles match and it exists
+    if highest.is_none() {
+        highest = guild.roles.get(&RoleId::new(guild.id.get()));
+    }
+
+    highest.cloned()
+}

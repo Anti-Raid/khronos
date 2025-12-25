@@ -109,3 +109,27 @@ internal_bitflags! {
         const SUPPRESS_ROLE_SUBSCRIPTION_PURCHASE_NOTIFICATION_REPLIES = 1 << 5;
     }
 }
+
+/// [Discord docs](https://discord.com/developers/docs/resources/guild#modify-guild-role-positions)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ModifyRolePosition {
+    pub id: RoleId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<u16>,
+}
+
+impl PartialEq<Role> for ModifyRolePosition {
+    fn eq(&self, other: &Role) -> bool {
+        self.id == other.id && self.position == Some(other.position)
+    }
+}
+
+impl PartialOrd<Role> for ModifyRolePosition {
+    fn partial_cmp(&self, other: &Role) -> Option<std::cmp::Ordering> {
+        let self_pos = self.position.unwrap_or(other.position);
+        match self_pos.partial_cmp(&other.position) {
+            Some(std::cmp::Ordering::Equal) => other.id.partial_cmp(&self.id),
+            res => res,
+        }
+    }
+}

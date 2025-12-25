@@ -23,10 +23,10 @@ pub enum API {
     GetChannel(crate::api::channels::get_channel::GetChannel),
     DeleteChannel(crate::api::channels::delete_channel::DeleteChannel),
     EditChannelPermissions(crate::api::channels::edit_channel_permissions::EditChannelPermissions),
-    GetChannelInvites(crate::api::channels::get_channel_invites::GetChannelInvites),
+    // GetChannelInvites(crate::api::channels::get_channel_invites::GetChannelInvites),
     CreateChannelInvite(crate::api::channels::create_channel_invite::CreateChannelInvite),
     DeleteChannelPermission(crate::api::channels::delete_channel_permission::DeleteChannelPermission),
-    FollowAnnouncementChannel(crate::api::channels::follow_announcement_channel::FollowAnnouncementChannel),
+    // FollowAnnouncementChannel(crate::api::channels::follow_announcement_channel::FollowAnnouncementChannel),
 
     // Guilds
     ModifyGuild(ModifyGuild),
@@ -92,7 +92,7 @@ pub enum API {
     CreateGuildCommands(crate::api::commands::create_guild_commands::CreateGuildCommands),
 
     // Webhooks
-    CreateWebhook(crate::api::webhooks::create_webhook::CreateWebhook),
+    CreateWebhook(crate::api::webhooks::create_webhook::CreateWebhookRequest),
     GetChannelWebhooks(crate::api::webhooks::get_channel_webhooks::GetChannelWebhooks),
     GetGuildWebhooks(crate::api::webhooks::get_guild_webhooks::GetGuildWebhooks),
     GetWebhook(crate::api::webhooks::get_webhook::GetWebhook),
@@ -135,10 +135,10 @@ impl ApiReq for API {
             API::GetChannel(req) => op!(this, req),
             API::DeleteChannel(req) => op!(this, req),
             API::EditChannelPermissions(req) => op!(this, req),
-            API::GetChannelInvites(req) => op!(this, req),
+            // API::GetChannelInvites(req) => op!(this, req),
             API::CreateChannelInvite(req) => op!(this, req),
             API::DeleteChannelPermission(req) => op!(this, req),
-            API::FollowAnnouncementChannel(req) => op!(this, req),
+            // API::FollowAnnouncementChannel(req) => op!(this, req),
             API::ModifyGuild(req) => op!(this, req),
             API::GetGuild(req) => op!(this, req),
             API::GetGuildPreview(req) => op!(this, req),

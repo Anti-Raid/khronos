@@ -16,7 +16,7 @@ pub struct CreateWebhook {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ModifyWebhook {
+pub struct EditWebhook {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "MultiOption::should_not_serialize")]

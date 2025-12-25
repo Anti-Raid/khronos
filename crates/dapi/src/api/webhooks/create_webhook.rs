@@ -2,13 +2,13 @@ use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::CreateWebhook};
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct CreateWebhook {
+pub struct CreateWebhookRequest {
     pub channel_id: serenity::all::GenericChannelId,
     pub reason: String,
     pub data: CreateWebhook,
 }
 
-impl ApiReq for CreateWebhook {
+impl ApiReq for CreateWebhookRequest {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {

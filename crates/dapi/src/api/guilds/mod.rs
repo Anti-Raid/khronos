@@ -20,3 +20,5 @@ pub mod get_guild_roles;
 pub mod get_guild_role;
 pub mod create_guild_role;
 pub mod modify_guild_role_positions;
+pub mod modify_guild_role;
+pub mod delete_guild_role;
