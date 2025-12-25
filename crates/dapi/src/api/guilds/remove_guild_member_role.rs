@@ -29,6 +29,11 @@ impl ApiReq for RemoveGuildMemberRole {
         let guild_json = this.controller().get_guild().await?;
         let guild = serde_json::from_value::<serenity::all::PartialGuild>(guild_json)?;
 
+        let target_member_json = this.controller().get_guild_member(self.user_id).await?;
+        if target_member_json.is_null() {
+            return Err("Target user not found in guild".into());
+        }
+
         let resolved = member_permissions(&guild, &bot_member);
 
         if !resolved.manage_roles() {

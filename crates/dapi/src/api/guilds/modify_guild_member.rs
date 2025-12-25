@@ -76,6 +76,11 @@ impl ApiReq for ModifyGuildMember {
         )
         .await?;
 
+        let target_member_json = this.controller().get_guild_member(self.user_id).await?;
+        if target_member_json.is_null() {
+            return Err("Target user not found in guild".into());
+        }
+
         if let Some(ref mut flags) = self.data.flags {
             if !(perms.contains(Permissions::MANAGE_GUILD) || perms.contains(Permissions::MANAGE_ROLES) || perms.contains(Permissions::MODERATE_MEMBERS | Permissions::KICK_MEMBERS | Permissions::BAN_MEMBERS)) {
                 return Err("Modifying member flags requires either MANAGE_GUILD, MANAGE_ROLES, or (MODERATE_MEMBERS and KICK_MEMBERS and BAN_MEMBERS)".into());
