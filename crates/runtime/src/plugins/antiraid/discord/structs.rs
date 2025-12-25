@@ -5,7 +5,7 @@ use dapi::types::{
     CreateAutoModRule, CreateChannel, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseFollowup, CreateInvite, CreateMessage, EditMessage, EditAutoModRule,
     EditMember, EditRole, EditWebhookMessage, FollowAnnouncementChannelData, ReactionType, CreateWebhook,
-    ModifyWebhook, ExecuteWebhook
+    EditWebhook, ExecuteWebhook
 };
 
 // Channel
@@ -371,7 +371,7 @@ pub struct CreateWebhookOptions {
 pub struct EditWebhookOptions {
     pub webhook_id: serenity::all::WebhookId,
     pub reason: String,
-    pub data: ModifyWebhook,
+    pub data: EditWebhook,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
