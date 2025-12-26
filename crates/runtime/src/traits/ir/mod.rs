@@ -6,6 +6,8 @@
 pub mod kv;
 /// Object Storage IR
 pub mod objectstorage;
+/// Runtime IR
+pub mod runtime;
 
 pub use kv::*;
 pub use objectstorage::*;
