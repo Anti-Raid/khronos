@@ -42,12 +42,8 @@ impl Serialize for InnerEventData {
 /// An `CreateEvent` is a/an thread-safe object that can be used to create a Event
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateEvent {
-    /// The name of the base event
-    base_name: String,
     /// The name of the event
     name: String,
-    /// The scopes of the event
-    scopes: Vec<String>,
     /// The inner data of the object
     data: InnerEventData,
 }
@@ -55,48 +51,29 @@ pub struct CreateEvent {
 impl CreateEvent {
     /// Create a new Event
     pub fn new(
-        base_name: String,
         name: String,
-        scopes: Vec<String>,
         data: serde_json::Value,
     ) -> Self {
         Self {
-            base_name,
             name,
-            scopes,
             data: InnerEventData::Json(data),
         }
     }
 
     /// Create a new Event given a raw value
     pub fn new_raw_value(
-        base_name: String,
         name: String,
-        scopes: Vec<String>,
         data: Box<serde_json::value::RawValue>,
     ) -> Self {
         Self {
-            base_name,
             name,
-            scopes,
             data: InnerEventData::RawValue(data),
         }
     }
 
     fn into_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
         let tab = lua.create_table()?;
-        tab.set("base_name", self.base_name.as_str())?;
         tab.set("name", self.name.as_str())?;
-        
-        if self.scopes.len() > 0 {
-            let scopes_tab = lua.create_table()?;
-            for scope in self.scopes.iter() {
-                scopes_tab.raw_push(scope.as_str())?;
-            }
-            scopes_tab.set_readonly(true);
-            tab.set("scopes", scopes_tab)?;
-        }
-
         tab.set(
             "data",
             match self.data {
@@ -116,19 +93,9 @@ impl CreateEvent {
 }
 
 impl CreateEvent {
-    /// Returns the base name of the event
-    pub fn base_name(&self) -> &str {
-        &self.base_name
-    }
-
-    /// Returns the name (NOT the base name) of the event
+    /// Returns the event name
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    /// Returns the scopes of the event
-    pub fn scopes(&self) -> &[String] {
-        &self.scopes
     }
 
     pub fn into_context(self) -> ContextEvent {
