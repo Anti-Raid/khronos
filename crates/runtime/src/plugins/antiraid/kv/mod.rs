@@ -42,7 +42,6 @@ pub struct KvRecord {
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub resume: bool,
 }
 
 impl IntoLua for KvRecord {
@@ -65,7 +64,6 @@ impl IntoLua for KvRecord {
             Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
             None => LuaValue::Nil,
         })?;
-        table.set("resume", self.resume)?;
         table.set_readonly(true); // We want KvRecords to be immutable
         Ok(LuaValue::Table(table))
     }
@@ -82,7 +80,6 @@ impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
             expires_at: record.expires_at,
-            resume: record.resume,
         }
     }
 }
@@ -97,7 +94,6 @@ impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
             expires_at: record.expires_at,
-            resume: record.resume,
         }
     }
 }
@@ -113,7 +109,6 @@ impl KvRecord {
             created_at: None,
             last_updated_at: None,
             expires_at: None,
-            resume: false,
         }
     }
 }
@@ -277,7 +272,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         created_at: k.created_at,
                         last_updated_at: k.last_updated_at,
                         expires_at: k.expires_at,
-                        resume: k.resume,
                     })
                     .collect::<Vec<KvRecord>>();
 
@@ -361,7 +355,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         created_at: rec.created_at,
                         last_updated_at: rec.last_updated_at,
                         expires_at: rec.expires_at,
-                        resume: rec.resume,
                     },
                     None => KvRecord::default(),
                 };
@@ -390,7 +383,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     created_at: rec.created_at,
                     last_updated_at: rec.last_updated_at,
                     expires_at: rec.expires_at,
-                    resume: rec.resume,
                 },
                 None => KvRecord::default(),
             };
@@ -415,12 +407,11 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             "set",
             async move |lua,
                         this,
-                        (key, value, scopes, expires_at, resume): (
+                        (key, value, scopes, expires_at): (
                 String,
                 LuaValue,
                 Vec<String>,
                 Option<DateTimeRef>,
-                Option<bool>,
             )| {
                 if scopes.is_empty() {
                     return Err(LuaError::external(
@@ -435,7 +426,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 let (exists, id) = this
                     .kv_provider
-                    .set(&scopes, key, value, expires_at, resume.unwrap_or(false))
+                    .set(&scopes, key, value, expires_at)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -448,11 +439,10 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             "setbyid",
             async move |lua,
                         this,
-                        (id, value, expires_at, resume): (
+                        (id, value, expires_at): (
                 String,
                 LuaValue,
                 Option<DateTimeRef>,
-                Option<bool>,
             )| {
                 this.id_check("setbyid")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
@@ -462,7 +452,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 this
                     .kv_provider
-                    .set_by_id(id, value, expires_at, resume.unwrap_or(false))
+                    .set_by_id(id, value, expires_at)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 

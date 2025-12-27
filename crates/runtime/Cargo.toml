@@ -13,10 +13,8 @@ indexmap = { version = "2", features = ["serde"] }
 tokio = { version = "1" }
 arrayvec = "0.7"
 small-fixed-array = "0.4"
-rustrict = "0.7"
 reqwest = { version = "0.12" }
 percent-encoding = { version = "2" }
-linkify = { git = "https://github.com/robinst/linkify" }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
 mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
@@ -58,7 +56,7 @@ chrono_lc = "0.1"
 thiserror = "1.0"
 self_cell = "1"
 
-# @lune/regex and discord
+# @lune/regex
 regex = "1"
 
 # @lune/serde

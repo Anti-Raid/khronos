@@ -1,6 +1,6 @@
 use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::primitives::event::ContextEvent;
-use crate::traits::context::{ExtContextData, KhronosContext, KhronosValueWith, Limitations, TFlags};
+use crate::traits::context::{KhronosContext, KhronosValueWith, Limitations};
 use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 use std::cell::RefCell;
@@ -17,14 +17,6 @@ pub struct TemplateContext<T: KhronosContext> {
     ///
     /// For subcontexts (created with `ctx:withlimits`), this will be a subset of the outer limitations.
     pub limitations: Rc<Limitations>,
-
-    /// The current ext data of the context
-    pub ext_data: Rc<ExtContextData>,
-
-    /// Returns if this is the root context or not
-    /// 
-    /// Will be used to block tflag changes in subcontexts
-    pub is_root_context: bool,
 
     /// The cached serialized value of the current user
     current_discord_user: Rc<RefCell<Option<LuaValue>>>,
@@ -56,8 +48,6 @@ impl<T: KhronosContext> TemplateContext<T> {
 
         Ok(Self {
             limitations: Rc::new(context.limitations()),
-            ext_data: Rc::new(context.ext_data()),
-            is_root_context: true,
             context,
             store_table: store.0.clone(),
             current_discord_user: Rc::default(),
@@ -138,6 +128,10 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "HTTPServer", antiraid::httpserver::init_plugin)
         });
 
+        fields.add_field_method_get("Runtime", |lua, this| {
+            this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
+        });
+
         let mut available_extra_plugins = Vec::new();
         for (plugin_name, plugin_init) in T::extra_plugins() {
             available_extra_plugins.push(plugin_name.clone());
@@ -164,16 +158,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             let v = lua.to_value_with(&this.limitations.capabilities, LUA_SERIALIZE_OPTIONS)?;
 
             Ok(v)
-        });
-
-        fields.add_field_method_get("events", |lua, this| {
-            let v = lua.to_value_with(&this.ext_data.events, LUA_SERIALIZE_OPTIONS)?;
-
-            Ok(v)
-        });
-
-        fields.add_field_method_get("template_name", |_lua, this| {
-            Ok(this.ext_data.template_name.clone())
         });
 
         fields.add_field_method_get("current_user", |lua, this| {
@@ -205,13 +189,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         methods.add_method("with", |lua, this, with: LuaValue| {
             let with: KhronosValueWith = lua.from_value(with)?;
 
-            let tflags = match with.tflags {
-                Some(tflags) => TFlags::from_strs(&tflags, this.is_root_context)
-                    .map_err(|x| mluau::Error::external(x.to_string()))?,
-                None => this.limitations.tflags.clone(),
-            };
-
-            let limits = Limitations::new(with.capabilities, tflags);
+            let limits = Limitations::new(with.capabilities);
 
             // Ensure that the new limitations are a subset of the current limitations
             limits
@@ -221,16 +199,14 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             // Create a new context with the given limitations
             let new_context = TemplateContext {
                 limitations: Rc::new(limits),
-                is_root_context: false,
                 context: this.context.clone(),
                 store_table: this.store_table.clone(),
-                ext_data: match with.ext_data {
-                    Some(d) => Rc::new(d),
-                    None => this.ext_data.clone(),
-                },
                 current_discord_user: this.current_discord_user.clone(),
                 cached_plugin_data: this.cached_plugin_data.clone(),
-                event: this.event.clone(),
+                event: match with.event {
+                    Some(e) => e.into_context(),
+                    None => this.event.clone(),
+                },
             };
 
             Ok(new_context)

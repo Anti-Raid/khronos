@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 
 /// Create a trie with safe word list.
 fn make_safe_words_trie() -> &'static Trie {
-    let words = include_str!("../../../../data/clean_words_alpha.txt");
+    let words = include_str!("../../../data/clean_words_alpha.txt");
 
     let mut trie = Trie::new();
 

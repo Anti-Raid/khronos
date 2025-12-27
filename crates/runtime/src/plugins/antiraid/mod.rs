@@ -4,6 +4,7 @@ pub mod httpserver;
 pub mod img_captcha;
 pub mod kv;
 pub mod objectstorage;
+pub mod runtime;
 
 use mluau::prelude::*;
 

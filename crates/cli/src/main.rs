@@ -530,8 +530,7 @@ impl CliArgs {
                                 scopes TEXT[] NOT NULL,
                                 guild_id TEXT NOT NULL,
                                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                resume BOOLEAN NOT NULL DEFAULT FALSE,
+                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                             )
                         ",
                         )

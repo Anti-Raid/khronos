@@ -57,12 +57,13 @@ pub struct ExecuteWebhook {
 
 impl ExecuteWebhook {
     pub fn validate(&self) -> Result<(), crate::Error> {
-        Ok(())
+        crate::validator::validate_webhook_execute(self)
     }
 }
 
 impl EditWebhook {
     pub fn validate(&self) -> Result<(), crate::Error> {
-        Ok(())
+        // TODO: implement validation
+        return Err("Not yet implemented".into());
     }
 }
