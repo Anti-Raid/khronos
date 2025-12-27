@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
+use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 //use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::{KhronosContext, Limitations};
-use dapi::context::DiscordContext;
+use dapi::{apilist::MapResponseMetadata, context::DiscordContext};
 use dapi::controller::DiscordProvider;
 use crate::{primitives::lazy::Lazy, TemplateContext};
 use mluau::prelude::*;
@@ -135,7 +136,12 @@ impl<T: KhronosContext> dapi::apilist::APIUserData for DiscordActionExecutor<T> 
         &self.discord_controller
     }
 
-    fn map_response<TT: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, resp: TT) -> mluau::Result<mluau::Value> {
+    fn map_response<TT: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, mrm: MapResponseMetadata, resp: TT) -> mluau::Result<mluau::Value> {
+        if mrm.is_primitive_response {
+            let v = lua.to_value_with(&resp, LUA_SERIALIZE_OPTIONS)?;
+            return Ok(v);
+        }
+        
         let ud = lua.create_userdata(Lazy::new(resp))?;
         Ok(mluau::Value::UserData(ud))
     }

@@ -2,12 +2,16 @@ use crate::{ApiReq, antiraid_check_channel_permissions::AntiRaidCheckChannelPerm
 
 // ($name:ident { $($variant:ident($ty:ty) = $api_name:literal),* $(,)? }) => {
 
+pub struct MapResponseMetadata {
+    pub is_primitive_response: bool,
+}
+
 #[cfg(feature = "luau")]
 pub trait APIUserData: mluau::UserData + 'static {
     type DiscordProvider: DiscordProvider;
     fn check_action(&self, lua: &mluau::Lua, action: &str) -> mluau::Result<()>;
     fn controller(&self) -> &DiscordContext<Self::DiscordProvider>;
-    fn map_response<T: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, resp: T) -> mluau::Result<mluau::Value> {
+    fn map_response<T: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, _mrm: MapResponseMetadata, resp: T) -> mluau::Result<mluau::Value> {
         use mluau::LuaSerdeExt;
         let value = lua.to_value(&resp)?;
         Ok(value)
@@ -75,7 +79,11 @@ macro_rules! api_list_enum {
                         .await
                         .map_err(|e| mluau::Error::external(e.to_string()))?;
                         
-                        this.map_response(&lua, $api_name, resp)
+                        let mrm = MapResponseMetadata {
+                            is_primitive_response: <$ty as crate::ApiReq>::is_primitive_response(),
+                        };
+
+                        this.map_response(&lua, $api_name, mrm, resp)
                     });
                 )*
             }
