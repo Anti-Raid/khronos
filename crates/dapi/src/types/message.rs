@@ -144,7 +144,8 @@ pub struct CreateMessage {
 
 impl CreateMessage {
     pub fn validate(&self) -> Result<(), crate::Error> {
-        Ok(())
+        crate::validator::validate_message(self)
+
     }
 }
 
@@ -168,7 +169,7 @@ pub struct EditMessage {
 
 impl EditMessage {
     pub fn validate(&self) -> Result<(), crate::Error> {
-        Ok(())
+        crate::validator::validate_message_edit(self)
     }
 }
 

@@ -3,8 +3,8 @@ use std::sync::LazyLock;
 
 use rustrict::{Censor, Type};
 
-use crate::utils::ensure_safe;
-use dapi::types::{CreateEmbed, CreateMessage, EditMessage, ExecuteWebhook, CreateCommandOption, CreateCommand, serenity_component::{ComponentType, Component, ActionRowComponent}};
+use crate::ensure_safe;
+use crate::types::{CreateEmbed, CreateMessage, EditMessage, ExecuteWebhook, CreateCommandOption, CreateCommand, serenity_component::{ComponentType, Component, ActionRowComponent}};
 
 /// Checks if a string isn't offensive
 pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {

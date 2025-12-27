@@ -25,7 +25,7 @@ pub struct CreateCommand {
 
 impl CreateCommand {
     pub fn validate(&self) -> Result<(), crate::Error> {
-        Ok(())
+        crate::validator::validate_command(self)
     }
 }
 
