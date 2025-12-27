@@ -4,6 +4,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Once;
 use std::time::Instant;
 
 use crate::utils::prelude::disable_harmful;
@@ -62,6 +63,8 @@ impl Hooks for SchedulerHook {
         }
     }
 }
+
+static FFLAG_SET_GLOBAL: Once = Once::new();
 
 /// A struct representing the inner VMs and structures used by Khronos.
 #[derive(Clone)]
@@ -132,6 +135,15 @@ impl KhronosRuntime {
         )>,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new Khronos runtime");
+        
+        // Allow <<>> syntax
+        FFLAG_SET_GLOBAL.call_once(|| {
+            // Allow <<>> syntax
+            if let Err(e) = Lua::set_fflag("LuauExplicitTypeExpressionInstantiation", true) {
+                log::warn!("Failed to enable LuauExplicitTypeExpressionInstantiation fflag: {:?}", e);
+            }
+        });
+
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
             LuaOptions::new()

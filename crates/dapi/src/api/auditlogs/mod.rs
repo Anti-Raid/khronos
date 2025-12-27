@@ -10,6 +10,7 @@ pub struct GetAuditLogOptions {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLog {
+    #[serde(flatten)]
     pub data: GetAuditLogOptions
 }
 
