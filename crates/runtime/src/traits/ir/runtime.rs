@@ -233,7 +233,7 @@ impl IntoLua for TenantState {
         table.set("flags", self.flags)?;
         table.set("startup_events", self.startup_events)?;
 
-        table.set_readonly(true);
+        // Note that we do not set tenant state to readonly as we may want to mutate it
 
         Ok(LuaValue::Table(table))
     }
