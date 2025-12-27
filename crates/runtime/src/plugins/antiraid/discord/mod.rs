@@ -135,7 +135,7 @@ impl<T: KhronosContext> dapi::apilist::APIUserData for DiscordActionExecutor<T> 
         &self.discord_controller
     }
 
-    fn map_response<TT: serde::Serialize + 'static>(&self, lua: &mluau::Lua, resp: TT) -> mluau::Result<mluau::Value> {
+    fn map_response<TT: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, resp: TT) -> mluau::Result<mluau::Value> {
         let ud = lua.create_userdata(Lazy::new(resp))?;
         Ok(mluau::Value::UserData(ud))
     }

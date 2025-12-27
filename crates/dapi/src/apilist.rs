@@ -7,7 +7,7 @@ pub trait APIUserData: mluau::UserData + 'static {
     type DiscordProvider: DiscordProvider;
     fn check_action(&self, lua: &mluau::Lua, action: &str) -> mluau::Result<()>;
     fn controller(&self) -> &DiscordContext<Self::DiscordProvider>;
-    fn map_response<T: serde::Serialize + 'static>(&self, lua: &mluau::Lua, resp: T) -> mluau::Result<mluau::Value> {
+    fn map_response<T: serde::Serialize + 'static>(&self, lua: &mluau::Lua, _action: &str, resp: T) -> mluau::Result<mluau::Value> {
         use mluau::LuaSerdeExt;
         let value = lua.to_value(&resp)?;
         Ok(value)
@@ -75,7 +75,7 @@ macro_rules! api_list_enum {
                         .await
                         .map_err(|e| mluau::Error::external(e.to_string()))?;
                         
-                        this.map_response(&lua, resp)
+                        this.map_response(&lua, $api_name, resp)
                     });
                 )*
             }
