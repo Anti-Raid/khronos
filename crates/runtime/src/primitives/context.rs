@@ -128,6 +128,10 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "HTTPServer", antiraid::httpserver::init_plugin)
         });
 
+        fields.add_field_method_get("Runtime", |lua, this| {
+            this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
+        });
+
         let mut available_extra_plugins = Vec::new();
         for (plugin_name, plugin_init) in T::extra_plugins() {
             available_extra_plugins.push(plugin_name.clone());

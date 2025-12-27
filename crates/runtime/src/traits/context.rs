@@ -1,4 +1,4 @@
-use crate::{TemplateContext, primitives::event::CreateEvent};
+use crate::{TemplateContext, primitives::event::CreateEvent, traits::runtimeprovider::RuntimeProvider};
 
 use super::{
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
@@ -54,6 +54,7 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
     type HTTPServerProvider: HTTPServerProvider;
+    type RuntimeProvider: RuntimeProvider;
 
     /// Returns the (outer) limitations for the context
     ///
@@ -83,6 +84,9 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a HTTP server provider
     fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider>;
+
+    /// Returns a runtime provider
+    fn runtime_provider(&self) -> Option<Self::RuntimeProvider>;
 
     /// Returns the contexts memory limit, if any
     fn memory_limit(&self) -> Option<usize> {

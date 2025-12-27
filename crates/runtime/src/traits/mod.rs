@@ -4,3 +4,4 @@ pub mod httpserverprovider;
 pub mod ir;
 pub mod kvprovider;
 pub mod objectstorageprovider;
+pub mod runtimeprovider;

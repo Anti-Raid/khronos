@@ -5,71 +5,6 @@ use serenity::all::{GuildId, UserId};
 
 use crate::{core::{datetime::DateTime, typesext::Vfs}, primitives::lazy::Lazy};
 
-/**
- * TODO:
---- Runtime plugin provides basic hooks into the AntiRaid template-worker runtime
-export type Plugin = {
-    --- @yields
-    ---
-    --- Lists all templates
-    listtemplates: (self: Plugin) -> { Template },
-
-    --- @yields
-    ---
-    --- Gets a template by name
-    gettemplate: (self: Plugin, id: string) -> Template?,
-
-    --- @yields
-    ---
-    --- Creates an existing template
-    createtemplate: (self: Plugin, template: CreateTemplate) -> nil,
-
-    --- @yields
-    ---
-    --- Creates an existing template
-    updatetemplate: (self: Plugin, id: string, template: CreateTemplate) -> nil,
-
-    --- @yields
-    ---
-    --- Deletes a template by name
-    deletetemplate: (self: Plugin, id: string) -> nil,
-
-    --- @yields
-    ---
-    --- Fetches the TenantState or returns a suitable default
-    gettenantstate: (self: Plugin) -> TenantState,
-
-    --- @yields
-    ---
-    --- Sets the TenantState
-    settenantstate: (self: Plugin, state: TenantState) -> (),
-
-    --- @yields
-    ---
-    --- Returns the statistics of the bot.
-    stats: (self: Plugin) -> {
-        total_cached_guilds: number,
-        total_guilds: number,
-        total_users: number,
-        last_started_at: datetime.DateTime,
-    },
-
-    --- Returns various important links
-    --- of the bot
-    links: (self: Plugin) -> {
-        support_server: string,
-        api_url: string,
-        frontend_url: string,
-        docs_url: string,
-    },
-
-    --- Returns the list of events the bot can dispatch
-    event_list: (self: Plugin) -> {string},
-}
-
-return {}
- */
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateOwner {
     User { id: UserId },
@@ -171,7 +106,6 @@ impl IntoLua for Template {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CreateTemplateSource {
-    Builtins,
     Shop { shop_listing: String },
     Custom {
         name: String,
@@ -181,7 +115,7 @@ pub enum CreateTemplateSource {
 }
 
 impl FromLua for CreateTemplateSource {
-    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
         let table = match value {
             LuaValue::Table(t) => t,
             _ => {
@@ -196,7 +130,6 @@ impl FromLua for CreateTemplateSource {
         let source_type: String = table.get("type")?;
 
         match source_type.as_str() {
-            "builtins" => Ok(CreateTemplateSource::Builtins),
             "shop" => {
                 let shop_listing: String = table.get("shop_listing")?;
                 Ok(CreateTemplateSource::Shop { shop_listing })
@@ -204,8 +137,8 @@ impl FromLua for CreateTemplateSource {
             "custom" => {
                 let name: String = table.get("name")?;
                 let language: String = table.get("language")?;
-                let content: LuaValue = table.get("content")?;
-                let content: HashMap<String, String> = lua.from_value(content)?;
+                let content: LuaAnyUserData = table.get("content")?;
+                let content: HashMap<String, String> = content.take::<Lazy<HashMap<String, String>>>()?.data;
                 Ok(CreateTemplateSource::Custom {
                     name,
                     language,
@@ -299,6 +232,50 @@ impl IntoLua for TenantState {
         table.set("banned", self.banned)?;
         table.set("flags", self.flags)?;
         table.set("startup_events", self.startup_events)?;
+
+        table.set_readonly(true);
+
+        Ok(LuaValue::Table(table))
+    }
+}
+
+pub struct RuntimeStats {
+    pub total_cached_guilds: u64,
+    pub total_guilds: u64,
+    pub total_users: u64,
+    pub last_started_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl IntoLua for RuntimeStats {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+
+        table.set("total_cached_guilds", self.total_cached_guilds)?;
+        table.set("total_guilds", self.total_guilds)?;
+        table.set("total_users", self.total_users)?;
+        table.set("last_started_at", DateTime::from_utc(self.last_started_at))?;
+
+        table.set_readonly(true);
+
+        Ok(LuaValue::Table(table))
+    }
+}
+
+pub struct RuntimeLinks {
+    pub support_server: String,
+    pub api_url: String,
+    pub frontend_url: String,
+    pub docs_url: String,
+}
+
+impl IntoLua for RuntimeLinks {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+
+        table.set("support_server", self.support_server)?;
+        table.set("api_url", self.api_url)?;
+        table.set("frontend_url", self.frontend_url)?;
+        table.set("docs_url", self.docs_url)?;
 
         table.set_readonly(true);
 

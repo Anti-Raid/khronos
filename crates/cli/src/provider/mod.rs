@@ -1,6 +1,8 @@
+use dapi::EVENT_LIST;
 use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
+use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
 use khronos_runtime::utils::khronos_value::KhronosValue;
 use moka::future::Cache;
 use serde_json::Value;
@@ -15,6 +17,7 @@ use khronos_runtime::traits::context::KhronosContext;
 use dapi::controller::DiscordProvider;
 use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
+use khronos_runtime::traits::ir::runtime as runtime_ir;
 
 /// Internal short-lived channel cache
 pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, Value>> =
@@ -39,6 +42,7 @@ impl KhronosContext for CliKhronosContext {
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
     type HTTPServerProvider = CliHttpServerProvider;
+    type RuntimeProvider = CliRuntimeProvider;
 
     fn limitations(&self) -> Limitations {
         Limitations::new(self.allowed_caps.clone())
@@ -91,6 +95,12 @@ impl KhronosContext for CliKhronosContext {
 
     fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider> {
         Some(CliHttpServerProvider)
+    }
+
+    fn runtime_provider(&self) -> Option<Self::RuntimeProvider> {
+        Some(CliRuntimeProvider {
+            file_storage_provider: self.file_storage_provider.clone(),
+        })
     }
 }
 
@@ -763,5 +773,105 @@ pub struct CliHttpServerProvider;
 impl HTTPServerProvider for CliHttpServerProvider {
     fn attempt_action(&self, _bucket: &str, _path: String) -> Result<(), khronos_runtime::Error> {
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct CliRuntimeProvider {
+    pub file_storage_provider: Rc<dyn FileStorageProvider>,
+}
+
+mod _runtimeprovider {
+    #[derive(serde::Serialize, serde::Deserialize)]
+    pub struct TenantState {
+        pub events: Vec<String>,
+        pub banned: bool,
+        pub flags: u32,
+        pub startup_events: bool,
+    }
+}
+
+// TODO: Actually implement this correctly, for now everything is a stub
+impl RuntimeProvider for CliRuntimeProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+
+    async fn list_templates(&self) -> Result<Vec<runtime_ir::Template>, khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn get_template(&self, _id: &str) -> Result<Option<runtime_ir::Template>, khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn create_template(&self, _template: runtime_ir::CreateTemplate) -> Result<(), khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn update_template(&self, _id: &str, _template: runtime_ir::CreateTemplate) -> Result<(), khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn delete_template(&self, _id: &str) -> Result<(), khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn get_tenant_state(&self) -> Result<runtime_ir::TenantState, khronos_runtime::Error> {
+        let file = self.file_storage_provider.get_file(&["tenantstate".to_string()], "0").await?;
+        if let Some(file) = file {
+            let v: _runtimeprovider::TenantState = serde_json::from_slice(&file.contents)?;
+            return Ok(runtime_ir::TenantState {
+                events: v.events,
+                banned: v.banned,
+                flags: v.flags,
+                startup_events: v.startup_events,   
+            });
+        }
+        return Ok(runtime_ir::TenantState {
+            events: vec!["INTERACTION_CREATE".to_string()],
+            banned: false,
+            flags: 0,
+            startup_events: false,   
+        });
+    }
+
+    async fn set_tenant_state(&self, state: runtime_ir::TenantState) -> Result<(), khronos_runtime::Error> {
+        let v = serde_json::to_vec(&_runtimeprovider::TenantState {
+            events: state.events,
+            banned: state.banned,
+            flags: state.flags,
+            startup_events: state.startup_events,
+        })?;
+        self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;
+        Ok(())
+    }
+
+    async fn stats(&self) -> Result<runtime_ir::RuntimeStats, khronos_runtime::Error> {
+        // TODO: Support customizing this to smth sensible
+        Ok(runtime_ir::RuntimeStats {
+            total_cached_guilds: 0,
+            total_guilds: 1,
+            total_users: 1,
+            last_started_at: chrono::Utc::now(),
+        })
+    }
+
+    fn links(&self) -> Result<runtime_ir::RuntimeLinks, khronos_runtime::Error> {
+        // TODO: Support customizing this to smth sensible
+        Ok(runtime_ir::RuntimeLinks {
+            support_server: "cli".to_string(),
+            api_url: "cli".to_string(),
+            frontend_url: "cli".to_string(),
+            docs_url: "cli".to_string()
+        })
+    }
+
+    fn event_list(&self) -> Result<Vec<String>, khronos_runtime::Error> {
+        Ok(EVENT_LIST
+            .iter()
+            .copied()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>())
     }
 }

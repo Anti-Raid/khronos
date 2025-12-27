@@ -844,6 +844,13 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         })?,
     )?;
 
+    module.set("newlazystringmap", lua.create_function(|lua, val: LuaValue| {
+        let lazy_value: HashMap<String, String> = lua.from_value(val)
+            .map_err(|e| LuaError::external(format!("Failed to convert LuaValue to serde_json::Value: {}", e)))?;
+
+        Ok(Lazy::new(lazy_value))
+    })?)?;
+
     module.set("Vfs", lua.create_proxy::<Vfs>()?)?;
 
     //
