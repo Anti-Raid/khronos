@@ -29,4 +29,8 @@ impl ApiReq for CreateReaction {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateReaction(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

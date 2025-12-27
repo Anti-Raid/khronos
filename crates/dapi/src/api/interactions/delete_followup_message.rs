@@ -20,4 +20,8 @@ impl ApiReq for DeleteFollowupMessage {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteFollowupMessage(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

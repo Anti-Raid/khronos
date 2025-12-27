@@ -36,4 +36,8 @@ impl ApiReq for RemoveGuildBan {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::RemoveGuildBan(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

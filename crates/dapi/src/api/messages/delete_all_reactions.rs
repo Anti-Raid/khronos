@@ -28,4 +28,8 @@ impl ApiReq for DeleteAllReactions {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteAllReactions(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

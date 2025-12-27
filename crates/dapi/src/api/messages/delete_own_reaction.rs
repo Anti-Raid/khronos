@@ -29,4 +29,8 @@ impl ApiReq for DeleteOwnReaction {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteOwnReaction(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

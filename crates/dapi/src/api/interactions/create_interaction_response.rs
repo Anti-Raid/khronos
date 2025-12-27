@@ -23,4 +23,8 @@ impl ApiReq for CreateInteractionResponseRequest {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateInteractionResponse(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

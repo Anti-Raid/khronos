@@ -29,4 +29,8 @@ impl ApiReq for DeleteAllReactionsForEmoji {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteAllReactionsForEmoji(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

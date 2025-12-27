@@ -29,4 +29,8 @@ impl ApiReq for BulkDeleteMessages {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::BulkDeleteMessages(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

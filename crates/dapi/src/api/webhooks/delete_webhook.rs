@@ -49,4 +49,8 @@ impl ApiReq for DeleteWebhook {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteWebhook(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }
