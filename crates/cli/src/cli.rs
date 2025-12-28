@@ -3,11 +3,14 @@ use crate::filestorage::FileStorageProvider;
 use crate::provider;
 use crate::repl_completer;
 use khronos_runtime::TemplateContext;
+use khronos_runtime::mluau_require::AssetRequirer;
+use khronos_runtime::mluau_require::FilesystemWrapper;
 use khronos_runtime::mluau_require::vfs::PhysicalFS;
 use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
+use khronos_runtime::utils::proxyglobal::proxy_global;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
 use std::cell::RefCell;
@@ -228,7 +231,7 @@ impl Cli {
                 give_time: std::time::Duration::from_millis(500),
             },
             None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn(LuaLightUserData) -> ())>,
-            PhysicalFS::new(current_dir)
+            PhysicalFS::new(current_dir.clone())
         )
         .await
         .expect("Failed to create runtime");
@@ -243,7 +246,9 @@ impl Cli {
         let ext_state_ref = ext_state.clone();
         let global_table = runtime
             .with_lua(move |lua| {
-                let tab = lua.create_table()?;
+                let tab = proxy_global(lua)?;
+                // Expose require function that uses our custom global table as its environment
+                tab.set("require", lua.create_require_function(AssetRequirer::new(FilesystemWrapper::new(PhysicalFS::new(current_dir)), "tgt".to_string(), tab.clone()))?)?;
                 tab.set("cli", Self::setup_cli_specific_table(ext_state_ref, lua, &aux_opts))?;
                 tab.set("print", lua.create_function(|_lua, values: LuaMultiValue| {
                         if !values.is_empty() {
