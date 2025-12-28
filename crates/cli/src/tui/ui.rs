@@ -1,6 +1,6 @@
 use crate::tui::{
     app::App,
-    widgets::{Dashboard, OutputPanel, ReplInput, StatusBar, ThemeSwitcher},
+    widgets::{AboutModal, Dashboard, HelpModal, OutputPanel, QuitModal, ReplInput, StatusBar, ThemeSwitcher},
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -61,6 +61,24 @@ pub fn render(frame: &mut Frame, app: &App) {
     if app.show_help {
         let help_area = centered_rect(80, 80, frame.area());
         frame.render_widget(Dashboard::new(theme.clone()), help_area);
+    }
+
+    // Render Theme Switcher modal on top of everything
+    // Modals (Render order determines Z-index)
+    
+    // Help Modal
+    if app.show_help_modal {
+        frame.render_widget(HelpModal::new(app), frame.area());
+    }
+
+    // About Modal
+    if app.show_about_modal {
+        frame.render_widget(AboutModal::new(app), frame.area());
+    }
+
+    // Quit Modal
+    if app.show_quit_modal {
+        frame.render_widget(QuitModal::new(app), frame.area());
     }
 
     // Render Theme Switcher modal on top of everything

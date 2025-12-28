@@ -42,12 +42,8 @@ pub async fn run_tui(cli: &mut Cli) -> io::Result<()> {
                 // If theme switcher is open, it captures most input
                 if app.show_theme_switcher {
                     match key.code {
-                        KeyCode::Esc => {
-                            app.show_theme_switcher = false;
-                        }
-                        KeyCode::Enter => {
-                            app.apply_selected_theme();
-                        }
+                        KeyCode::Esc => app.show_theme_switcher = false,
+                        KeyCode::Enter => app.apply_selected_theme(),
                         KeyCode::Up => {
                             let filtered_count = app.filtered_themes().len();
                             if filtered_count > 0 {
@@ -62,7 +58,7 @@ pub async fn run_tui(cli: &mut Cli) -> io::Result<()> {
                         }
                         KeyCode::Char(c) => {
                             app.theme_filter.push(c);
-                            app.selected_theme_index = 0; // Reset selection on filter change
+                            app.selected_theme_index = 0;
                         }
                         KeyCode::Backspace => {
                             app.theme_filter.pop();
@@ -70,16 +66,39 @@ pub async fn run_tui(cli: &mut Cli) -> io::Result<()> {
                         }
                         _ => {}
                     }
-                    continue; // Skip other handlers when switcher is open
+                    continue;
                 }
 
-                // Check for quit
-                if crate::tui::events::is_quit(&key) {
-                    app.quit();
+                // Quit Modal Handling
+                if app.show_quit_modal {
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Char('n') => app.show_quit_modal = false,
+                        KeyCode::Enter | KeyCode::Char('y') => app.quit(),
+                        _ => {}
+                    }
+                    continue;
                 }
-                // Check for help
+
+                // Help/About Modal Handling (Esc to close)
+                if app.show_help_modal || app.show_about_modal {
+                    if matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char(' ')) {
+                        app.show_help_modal = false;
+                        app.show_about_modal = false;
+                    }
+                    continue;
+                }
+
+                 // Check for quit (Ctrl+C / Ctrl+Q) -> Toggles Quit Modal now instead of immediate quit
+                 if crate::tui::events::is_quit(&key) {
+                    app.toggle_quit_modal();
+                }
+                // Check for help (F1)
                 else if crate::tui::events::is_help(&key) {
-                    app.toggle_help();
+                    app.toggle_help_modal();
+                }
+                // Check for About (F2)
+                else if key.code == KeyCode::F(2) {
+                    app.toggle_about_modal();
                 }
                 // Check for theme switcher
                 else if crate::tui::events::is_theme_switch(&key) {
@@ -112,9 +131,10 @@ pub async fn run_tui(cli: &mut Cli) -> io::Result<()> {
                                     
                                     let cmd = input.trim().to_lowercase();
                                     match cmd.as_str() {
-                                        "/help" => app.toggle_help(),
+                                        "/help" => app.toggle_help_modal(),
                                         "/theme" => app.open_theme_switcher(),
-                                        "/quit" | "/exit" => app.quit(),
+                                        "/quit" | "/exit" => app.toggle_quit_modal(),
+                                        "/about" => app.toggle_about_modal(),
                                         "/clear" => app.clear_output(),
                                         "/repl" => app.is_interactive = true, // Force REPL mode
                                         "/script" => app.is_interactive = true, // Same for now
@@ -164,6 +184,16 @@ pub async fn run_tui(cli: &mut Cli) -> io::Result<()> {
                                     
                                     app.clear_input();
                                 }
+                            }
+                        }
+                        KeyCode::Tab => {
+                            // Autocomplete on Tab
+                            if let Some(_) = app.get_active_suggestion() {
+                                app.autocomplete();
+                            } else {
+                                // Default tab behavior (insert spaces) or maybe nothing?
+                                // Let's just insert 2 spaces for Lua indentation if not completing a command
+                                app.input.insert_str("  ");
                             }
                         }
                         KeyCode::Up if key.modifiers.contains(KeyModifiers::NONE) => {

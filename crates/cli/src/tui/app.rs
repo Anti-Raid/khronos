@@ -54,6 +54,15 @@ pub struct App<'a> {
 
     /// Whether the user has started interacting with the REPL
     pub is_interactive: bool,
+
+    /// Whether the help modal is visible
+    pub show_help_modal: bool,
+
+    /// Whether the quit confirmation modal is visible
+    pub show_quit_modal: bool,
+
+    /// Whether the about modal is visible
+    pub show_about_modal: bool,
 }
 
 /// Application mode
@@ -67,6 +76,10 @@ pub enum AppMode {
     /// Idle
     Idle,
 }
+
+pub const SLASH_COMMANDS: &[&str] = &[
+    "/help", "/theme", "/quit", "/exit", "/about", "/clear", "/repl", "/script"
+];
 
 impl<'a> App<'a> {
     /// Create a new app with the default theme
@@ -90,6 +103,9 @@ impl<'a> App<'a> {
             selected_theme_index: 0,
             theme_filter: String::new(),
             is_interactive: false,
+            show_help_modal: false,
+            show_quit_modal: false,
+            show_about_modal: false,
         };
 
         app.add_output("🚀 Khronos CLI Started. Type a command or press F1 for help.".to_string());
@@ -213,10 +229,10 @@ impl<'a> App<'a> {
         }
     }
 
-    /// Toggle help panel
-    pub fn toggle_help(&mut self) {
-        self.show_help = !self.show_help;
-    }
+    /// toggle help modal - removed in favor of toggle_help_modal
+    // pub fn toggle_help(&mut self) {
+    //    self.show_help = !self.show_help;
+    // }
 
     /// Scroll output up
     pub fn scroll_up(&mut self, amount: usize) {
@@ -251,6 +267,73 @@ impl<'a> App<'a> {
     /// Quit the application
     pub fn quit(&mut self) {
         self.should_quit = true;
+    }
+
+    /// Toggle help modal
+    pub fn toggle_help_modal(&mut self) {
+        self.show_help_modal = !self.show_help_modal;
+        // Close others
+        if self.show_help_modal {
+            self.show_quit_modal = false;
+            self.show_about_modal = false;
+            self.show_theme_switcher = false;
+        }
+    }
+
+    /// Toggle quit modal
+    pub fn toggle_quit_modal(&mut self) {
+        self.show_quit_modal = !self.show_quit_modal;
+        // Close others
+        if self.show_quit_modal {
+            self.show_help_modal = false;
+            self.show_about_modal = false;
+            self.show_theme_switcher = false;
+        }
+    }
+
+    /// Toggle about modal
+    pub fn toggle_about_modal(&mut self) {
+        self.show_about_modal = !self.show_about_modal;
+        // Close others
+        if self.show_about_modal {
+            self.show_help_modal = false;
+            self.show_quit_modal = false;
+            self.show_theme_switcher = false;
+        }
+    }
+
+    /// Get active auto-complete suggestion
+    pub fn get_active_suggestion(&self) -> Option<&'static str> {
+        let input = self.get_input();
+        let trimmed = input.trim();
+        
+        if !trimmed.starts_with('/') {
+            return None;
+        }
+
+        // Don't suggest if we already have a full valid command + space
+        // or if the input strictly matches a command (let them hit enter or space)
+        // Actually, if it strictly matches, we might want to suggest nothing or just let them be.
+        // If I type `/theme`, suggestion could be empty or `/theme`.
+        // Let's suggest only if it's a strict prefix and not equal.
+        
+        for &cmd in SLASH_COMMANDS {
+            if cmd.starts_with(trimmed) && cmd.len() > trimmed.len() {
+                return Some(cmd);
+            }
+        }
+        
+        None
+    }
+
+    /// Auto-complete the current input
+    pub fn autocomplete(&mut self) {
+        if let Some(suggestion) = self.get_active_suggestion() {
+            // Replace input with suggestion + space
+            self.clear_input();
+            self.input.insert_str(suggestion);
+            self.input.insert_char(' '); 
+        }
     }
 }
 

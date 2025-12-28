@@ -60,5 +60,47 @@ impl<'a> Widget for ReplInput<'a> {
         textarea.set_block(block);
 
         textarea.render(area, buf);
+
+        // Render suggestion overlay
+        if let Some(suggestion) = self.app.get_active_suggestion() {
+            let input = self.app.get_input();
+            let trimmed_input = input.trim();
+            
+            // Calculate where to draw the suggestion
+            // This is tricky with TUI-textarea but for single line we can estimate.
+            // We assume single line input for commands.
+            
+            let cursor_x = area.x + 1 + (trimmed_input.len() as u16); 
+            // Note: This simple calculation assumes no scrolling and simple layout.
+            // For a robust solution, we'd need to know the cursor position from textarea, 
+            // but tui-textarea encapsulates that.
+            // However, since we are auto-completing potentially empty prefixes (/help vs /h),
+            // we should render the *rest* of the command.
+            
+            let suggestion_text = &suggestion[trimmed_input.len()..];
+            
+            if !suggestion_text.is_empty() && cursor_x < area.x + area.width {
+                 let ghost_text = ratatui::text::Span::styled(
+                    suggestion_text, 
+                    Style::default().fg(theme.muted_foreground).add_modifier(ratatui::style::Modifier::ITALIC)
+                );
+                
+                // Render ghost text right after the input
+                buf.set_string(cursor_x, area.y + 1, ghost_text.content, ghost_text.style);
+
+                // Render "Tab to complete" hint on the right
+                let hint = "Tab to complete";
+                let hint_len = hint.len() as u16;
+                // Ensure we have space
+                if area.width > hint_len + 5 {
+                     let hint_x = area.x + area.width - hint_len - 1;
+                     let hint_span = ratatui::text::Span::styled(
+                        hint, 
+                        Style::default().fg(theme.primary).add_modifier(ratatui::style::Modifier::BOLD)
+                    );
+                    buf.set_string(hint_x, area.y + 1, hint_span.content, hint_span.style);
+                }
+            }
+        }
     }
 }
