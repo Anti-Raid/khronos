@@ -15,7 +15,7 @@ pub trait RuntimeProvider: 'static + Clone {
     async fn get_template(&self, id: &str) -> Result<Option<runtime_ir::Template>, crate::Error>;
 
     /// Creates a new template
-    async fn create_template(&self, template: runtime_ir::CreateTemplate) -> Result<(), crate::Error>;
+    async fn create_template(&self, template: runtime_ir::CreateTemplate) -> Result<String, crate::Error>;
 
     /// Updates an existing template by ID
     async fn update_template(&self, id: &str, template: runtime_ir::CreateTemplate) -> Result<(), crate::Error>;
