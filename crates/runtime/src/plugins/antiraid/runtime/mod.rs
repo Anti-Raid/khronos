@@ -56,8 +56,8 @@ impl<T: KhronosContext> LuaUserData for RuntimeExecutor<T> {
 
         methods.add_scheduler_async_method("createtemplate", async |_lua, this, template: runtime_ir::CreateTemplate| {
             this.check("createtemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            this.runtime_provider.create_template(template).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(())
+            let id = this.runtime_provider.create_template(template).await.map_err(|x| LuaError::external(x.to_string()))?;
+            Ok(id)
         });
 
         methods.add_scheduler_async_method("updatetemplate", async |_lua, this, (id, template): (String, runtime_ir::CreateTemplate)| {

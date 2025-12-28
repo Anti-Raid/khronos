@@ -805,7 +805,7 @@ impl RuntimeProvider for CliRuntimeProvider {
         todo!()
     }
 
-    async fn create_template(&self, _template: runtime_ir::CreateTemplate) -> Result<(), khronos_runtime::Error> {
+    async fn create_template(&self, _template: runtime_ir::CreateTemplate) -> Result<String, khronos_runtime::Error> {
         todo!()
     }
 
