@@ -32,4 +32,8 @@ impl ApiReq for DeleteChannelPermission {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteChannelPermission(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

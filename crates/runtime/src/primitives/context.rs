@@ -39,17 +39,11 @@ impl<T: KhronosContext> std::fmt::Debug for TemplateContext<T> {
 }
 
 impl<T: KhronosContext> TemplateContext<T> {
-    pub(crate) fn new(lua: &Lua, context: T, event: ContextEvent) -> LuaResult<Self> {
-        let store = lua
-            .app_data_ref::<crate::rt::runtime::RuntimeGlobalTable>()
-            .ok_or(mluau::Error::RuntimeError(
-                "No runtime global table found".to_string(),
-            ))?;
-
+    pub(crate) fn new(store_table: LuaTable, context: T, event: ContextEvent) -> LuaResult<Self> {
         Ok(Self {
             limitations: Rc::new(context.limitations()),
             context,
-            store_table: store.0.clone(),
+            store_table,
             current_discord_user: Rc::default(),
             cached_plugin_data: Rc::default(), // Safety note: the cached plugin data must be reset for subcontexts to avoid privilege escalation across subcontexts
             event,

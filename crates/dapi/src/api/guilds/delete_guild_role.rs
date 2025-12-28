@@ -47,4 +47,8 @@ impl ApiReq for DeleteGuildRole {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteGuildRole(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

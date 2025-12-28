@@ -51,4 +51,8 @@ impl ApiReq for CreateGuildBan {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::CreateGuildBan(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

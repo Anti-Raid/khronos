@@ -1,5 +1,14 @@
 --task.delay(60, function() print("HI") end)
-print("World")
-while true do 
-	task.wait(0.1)
+local a = 0
+function incra()
+	a = a + 1
 end
+
+function geta()
+	return a
+end
+
+return {
+	incra = incra,
+	geta = geta,
+}

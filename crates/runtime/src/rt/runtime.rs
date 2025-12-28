@@ -4,25 +4,17 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::Once;
 use std::time::Instant;
 
-use crate::utils::prelude::disable_harmful;
 use mlua_scheduler::taskmgr::Hooks;
 use mlua_scheduler::{ReturnTracker, TaskManager};
 use mluau::prelude::*;
+use mluau_require::{AssetRequirer, FilesystemWrapper};
 
-/// A wrapper around the Lua vm that cannot be cloned
-pub struct KhronosLuaRef<'a>(&'a Lua);
-
-impl std::ops::Deref for KhronosLuaRef<'_> {
-    type Target = Lua;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-pub struct RuntimeGlobalTable(pub LuaTable);
+use crate::TemplateContext;
+use crate::primitives::event::ContextEvent;
+use crate::traits::context::KhronosContext as KhronosContextTrait;
 
 /// A function to be called when the Khronos runtime is marked as broken
 pub type OnBrokenFunc = Box<dyn Fn()>;
@@ -63,6 +55,8 @@ impl Hooks for SchedulerHook {
     }
 }
 
+static FFLAG_SET_GLOBAL: Once = Once::new();
+
 /// A struct representing the inner VMs and structures used by Khronos.
 #[derive(Clone)]
 pub struct KhronosRuntime {
@@ -77,19 +71,8 @@ pub struct KhronosRuntime {
     /// The vm scheduler
     scheduler: TaskManager,
 
-    /// Has the runtime been sandboxed
-    sandboxed: bool,
-
     /// Is the runtime instance 'broken' or not
     broken: Rc<Cell<bool>>,
-
-    /// The maximum number of threads the runtime can spawn. This is internally verified using a thread callback
-    ///
-    /// If unset, this will be set to i64::MAX by default, meaning there is no limit on the number of threads that can be spawned
-    max_threads: Rc<Cell<i64>>,
-
-    /// Stores the current number of threads
-    current_threads: Rc<Cell<i64>>,
 
     /// A function to be called if the runtime is marked as broken
     on_broken: Rc<RefCell<Option<OnBrokenFunc>>>,
@@ -113,6 +96,9 @@ pub struct KhronosRuntime {
     /// The shared store table for the runtime
     store_table: LuaTable,
 
+    /// The require function
+    require: LuaFunction,
+
     /// runtime creation options
     opts: RuntimeCreateOpts,
 }
@@ -123,15 +109,26 @@ impl KhronosRuntime {
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
     pub async fn new<
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
-        ThreadDestructionCallbackFunc: Fn() + 'static,
+        ThreadDestructionCallbackFunc: Fn(LuaLightUserData) + 'static,
+        FS: mluau_require::vfs::FileSystem + 'static,
     >(
         opts: RuntimeCreateOpts,
         on_thread_event_callback: Option<(
             ThreadCreationCallbackFunc,
             ThreadDestructionCallbackFunc,
         )>,
+        vfs: FS,
     ) -> Result<Self, LuaError> {
         log::debug!("Creating new Khronos runtime");
+        
+        // Allow <<>> syntax
+        FFLAG_SET_GLOBAL.call_once(|| {
+            // Allow <<>> syntax
+            if let Err(e) = Lua::set_fflag("LuauExplicitTypeExpressionInstantiation", true) {
+                log::warn!("Failed to enable LuauExplicitTypeExpressionInstantiation fflag: {:?}", e);
+            }
+        });
+
         let lua = Lua::new_with(
             LuaStdLib::ALL_SAFE,
             LuaOptions::new()
@@ -193,82 +190,32 @@ impl KhronosRuntime {
             Ok(LuaVmState::Continue)
         });
 
-        disable_harmful(&lua)?;
+        // Ensure _G.print and _G.eprint are nil
+        lua.globals().set("print", lua.create_function(|_lua, _: ()| {
+            Err::<(), LuaError>(LuaError::external("print() is disabled in this environment"))
+        })?)?;
+        lua.globals().set("eprint", lua.create_function(|_lua, _: ()| {
+            Err::<(), LuaError>(LuaError::external("eprint() is disabled in this environment"))
+        })?)?;
 
-        let current_threads = Rc::new(Cell::new(0));
-        let max_threads = Rc::new(Cell::new(i64::MAX)); // Default to i64::MAX if not set
-
-        let current_threads_ref = current_threads.clone();
-        let max_threads_ref = max_threads.clone();
+        // Setup require function
+        let controller = AssetRequirer::new(FilesystemWrapper::new(vfs), "main".to_string(), lua.globals());
+        let require = lua.create_require_function(controller)?;
+        lua.globals()
+            .set("require", require.clone())?;
 
         if let Some(on_thread_event_callback) = on_thread_event_callback {
-            lua.set_thread_creation_callback(move |lua, thread| {
-                let new = current_threads_ref.get() + 1;
-                current_threads_ref.set(new);
-
-                log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
-                if new > max_threads_ref.get() {
-                    // Prevent runaway threads
-                    return Err(mluau::Error::RuntimeError(format!(
-                        "Maximum number of threads exceeded: {} (current: {}, max: {})",
-                        new,
-                        current_threads_ref.get(),
-                        max_threads_ref.get()
-                    )));
-                }
-
-                // Call the user provided callback
-                on_thread_event_callback.0(lua, thread)?;
-
-                Ok(())
-            });
-
-            let current_threads_ref = current_threads.clone();
-
-            lua.set_thread_collection_callback(move |_| {
-                let mut new = current_threads_ref.get() - 1;
-                // Ensure we don't go negative
-                if new < 0 {
-                    new = 0;
-                }
-                current_threads_ref.set(new);
-
-                // Call the user provided callback
-                on_thread_event_callback.1();
-            });
-        } else {
-            lua.set_thread_creation_callback(move |_lua, _thread| {
-                let new = current_threads_ref.get() + 1;
-                current_threads_ref.set(new);
-
-                log::debug!("Thread count now: {}, max: {}", new, max_threads_ref.get());
-                if new > max_threads_ref.get() {
-                    // Prevent runaway threads
-                    return Err(mluau::Error::RuntimeError(format!(
-                        "Maximum number of threads exceeded: {} (current: {}, max: {})",
-                        new,
-                        current_threads_ref.get(),
-                        max_threads_ref.get()
-                    )));
-                }
-
-                Ok(())
-            });
-
-            let current_threads_ref = current_threads.clone();
-
-            lua.set_thread_collection_callback(move |_| {
-                let mut new = current_threads_ref.get() - 1;
-                // Ensure we don't go negative
-                if new < 0 {
-                    new = 0;
-                }
-                current_threads_ref.set(new);
-            });
+            lua.set_thread_creation_callback(on_thread_event_callback.0);
+            lua.set_thread_collection_callback(on_thread_event_callback.1);
         }
 
+        // Now, sandbox the lua vm
+        lua.sandbox(true)?;
+        lua.globals().set_readonly(true);
+        lua.globals().set_safeenv(true);
+
+        // Create a store table
         let store_table = lua.create_table()?;
-        lua.set_app_data::<RuntimeGlobalTable>(RuntimeGlobalTable(store_table.clone()));
 
         // Load core modules
         lua.register_module(
@@ -310,43 +257,15 @@ impl KhronosRuntime {
             lua: Rc::new(RefCell::new(Some(lua))),
             compiler,
             scheduler,
-            sandboxed: false,
             broken,
-            max_threads,
-            current_threads,
             on_broken: Rc::new(RefCell::new(None)),
             last_execution_time,
             time_limit,
             execution_stop_time,
             //time_slice,
             opts,
+            require,
         })
-    }
-
-    /// Returns the lua vm
-    ///
-    /// The use of this function is discouraged where possible. Do *not* hold the returned value across await points
-    /// as it is internally a RefCell. Do not clone the Lua VM as it may impact closing the runtime and lead to memory
-    /// leaks
-    pub fn lua(&'_ self) -> std::cell::Ref<'_, Option<Lua>> {
-        log::debug!("Getting lua vm");
-        self.lua.borrow()
-    }
-
-    /// Returns the lua compiler being used
-    pub fn compiler(&self) -> &mluau::Compiler {
-        log::debug!("Getting lua compiler");
-        &self.compiler
-    }
-
-    /// Sets the lua compiler being used on both the lua vm and the runtime
-    pub fn set_compiler(&mut self, compiler: mluau::Compiler) {
-        log::debug!("Setting lua compiler");
-        let Some(ref lua) = *self.lua.borrow() else {
-            return;
-        };
-        lua.set_compiler(compiler.clone());
-        self.compiler = compiler;
     }
 
     /// Returns the scheduler
@@ -382,21 +301,10 @@ impl KhronosRuntime {
         self.time_limit.set(limit);
     }
 
-    /// Returns the time slice for execution
-    //pub fn time_slice(&self) -> Option<std::time::Duration> {
-    //    self.time_slice.get()
-    //}
-
     /// Returns whether the runtime is broken or not
     pub fn is_broken(&self) -> bool {
         log::debug!("Getting if runtime is broken");
         self.broken.get()
-    }
-
-    /// Returns if the runtime is sandboxed or not
-    pub fn is_sandboxed(&self) -> bool {
-        log::debug!("Getting if runtime is sandboxed");
-        self.sandboxed
     }
 
     /// Returns the runtime creation options
@@ -445,67 +353,6 @@ impl KhronosRuntime {
         self.on_broken.borrow_mut().replace(callback);
     }
 
-    /// Sandboxes the VM after all extra needed setup has been performed.
-    ///
-    /// Note that Isolates cannot be created if the runtime is sandboxed
-    /// and that Subisolates cannot be created if the runtime is not sandboxed
-    pub fn sandbox(&mut self) -> Result<(), LuaError> {
-        log::debug!("Sandboxing runtime");
-        if self.sandboxed {
-            return Ok(());
-        }
-
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-
-        lua.sandbox(true)?;
-        lua.globals().set_readonly(true);
-        self.sandboxed = true;
-        Ok(())
-    }
-
-    /// Un-sandboxes the VM
-    ///
-    /// DANGER: This should not be run after isolates have been created
-    pub fn unsandbox(&mut self) -> Result<(), LuaError> {
-        log::debug!("Unsandboxing runtime");
-        if !self.sandboxed {
-            return Ok(());
-        }
-
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-
-        lua.sandbox(false)?;
-        lua.globals().set_readonly(false);
-        self.sandboxed = false;
-        Ok(())
-    }
-
-    /// Returns the maximum number of threads allowed in the runtime
-    pub fn max_threads(&self) -> i64 {
-        self.max_threads.get()
-    }
-
-    /// Sets the maximum number of threads allowed in the runtime
-    pub fn set_max_threads(&self, max_threads: i64) {
-        // Ensure we don't set a negative value
-        if max_threads < 0 {
-            self.max_threads.set(0);
-        } else {
-            self.max_threads.set(max_threads);
-        }
-    }
-
-    /// Returns the current number of threads in the runtime
-    ///
-    /// The current number of threads is immutable and cannot be directly modified by the user.
-    pub fn current_threads(&self) -> i64 {
-        self.current_threads.get()
-    }
-
     /// Returns the current memory usage of the runtime
     ///
     /// Returns `0` if the lua vm is not valid
@@ -529,95 +376,138 @@ impl KhronosRuntime {
 
     /// Returns the store table for the runtime
     pub fn store_table(&self) -> &LuaTable {
-        log::debug!("Getting store table");
         &self.store_table
     }
 
-    /// Sets the print function to use stdout
-    pub fn use_stdout_print(&self) -> LuaResult<()> {
-        // Ensure print is global as everything basically relies on print
+    /// Execute a closure with the lua vm if it is valid
+    pub fn with_lua<F, R>(&self, func: F) -> LuaResult<R>
+    where
+        F: FnOnce(&Lua) -> LuaResult<R>,
+    {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
+        self.handle_error(func(lua))
+    }
 
-        log::debug!("Setting print global");
-        lua.globals().set(
-            "print",
-            lua.create_function(|_lua, values: LuaMultiValue| {
-                if !values.is_empty() {
-                    println!(
-                        "{}",
-                        values
-                            .iter()
-                            .map(|value| {
-                                match value {
-                                    LuaValue::String(s) => format!("{}", s.display()),
-                                    _ => format!("{value:#?}"),
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\t")
-                    );
-                } else {
-                    println!("nil");
+    /// Creates a new TemplateContext with the given KhronosContext
+    pub fn create_context<K: KhronosContextTrait>(
+        &self,
+        context: K,
+        event: ContextEvent,
+    ) -> Result<TemplateContext<K>, LuaError> {
+        // Ensure create_thread wont error
+        self.update_last_execution_time(std::time::Instant::now());
+        let context = TemplateContext::new(self.store_table.clone(), context, event)?;
+        Ok(context)
+    }
+
+    /// Helper methods to handle errors correctly, dispatching mark_broken calls if theres
+    /// a memory error etc.
+    pub fn handle_error<T>(&self, resp: LuaResult<T>) -> LuaResult<T> {
+        match resp {
+            Ok(f) => Ok(f),
+            Err(e) => {
+                // Mark memory error'd VMs as broken automatically to avoid user grief/pain
+                if let LuaError::MemoryError(_) = e {
+                    // Mark VM as broken
+                    self.mark_broken(true)
+                    .map_err(|e| LuaError::external(e.to_string()))?;
                 }
 
-                Ok(())
-            })?,
-        )?;
-        Ok(())
+                return Err(e);
+            }
+        }
     }
 
-    /// Executes a function in the lua vm.
-    ///
-    /// The given lua vm is wrapped in a KhronosLuaRef to try and block cloning
-    pub fn exec_lua<F: FnOnce(KhronosLuaRef) -> LuaResult<()> + mluau::MaybeSend + 'static>(
+    /// Loads/evaluates a script
+    pub fn eval_script<R>(
         &self,
-        func: F,
-    ) -> LuaResult<()> {
+        path: &str,
+    ) -> LuaResult<R> 
+    where
+        R: FromLuaMulti,
+    {
+        // Ensure create_thread wont error
+        self.update_last_execution_time(std::time::Instant::now());
+        self.handle_error(self.require.call(path))
+    }
+
+    /// Loads/evaluates a chunk of code into a function
+    pub fn eval_chunk(
+        &self,
+        code: &str,
+        name: Option<&str>,
+        env: Option<LuaTable>,
+    ) -> LuaResult<LuaFunction> {
+        // Ensure create_thread wont error
+        self.update_last_execution_time(std::time::Instant::now());
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
 
-        (func)(KhronosLuaRef(lua))
+        let chunk = match name {
+            Some(n) => lua.load(code).set_name(n),
+            None => lua.load(code),
+        };
+        let chunk = match env {
+            Some(e) => chunk.set_environment(e),
+            None => chunk,
+        };
+        let chunk = chunk
+            .set_compiler(self.compiler.clone())
+            .set_mode(mluau::ChunkMode::Text)
+            .try_cache();
+
+        self.handle_error(chunk.into_function())
     }
 
-    /// Sets a custom global
-    pub fn set_custom_global<
-        A: IntoLua + mluau::MaybeSend + 'static,
-        V: IntoLua + mluau::MaybeSend + 'static,
-    >(
+    /// Helper method to call a function inside of the scheduler as a thread
+    pub async fn call_in_scheduler<A, R>(
         &self,
-        name: A,
-        value: V,
-    ) -> LuaResult<()> {
+        func: LuaFunction,
+        args: A,
+    ) -> LuaResult<R>
+    where
+        A: IntoLuaMulti,
+        R: FromLuaMulti,
+    {
+        // Ensure create_thread wont error
+        self.update_last_execution_time(std::time::Instant::now());
+        let (th, args) = {
+            let Some(ref lua) = *self.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+            };
+            (self.handle_error(lua.create_thread(func))?, self.handle_error(args.into_lua_multi(lua))?)
+        };
+
+        // Update last_execution_time
+        self.update_last_execution_time(std::time::Instant::now());
+
+        let res = self.handle_error(self
+            .scheduler
+            .spawn_thread_and_wait(th, args)
+            .await)?;
+
+        {
+            let Some(ref lua) = *self.lua.borrow() else {
+                return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
+            };
+
+            let Some(res) = res else {
+                return Ok(R::from_lua_multi(LuaMultiValue::with_capacity(0), lua)?)
+            };
+
+            let res = self.handle_error(res)?;
+            self.handle_error(R::from_lua_multi(res, lua))
+        }
+    }
+
+    pub fn from_value<T: for<'de> serde::Deserialize<'de>>(&self, value: LuaValue) -> LuaResult<T> {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
-
-        lua.globals().set(name, value)?;
-        Ok(())
-    }
-
-    /// Sets a custom global function
-    pub fn set_custom_global_function<
-        F: Fn(KhronosLuaRef, A) -> LuaResult<R> + mluau::MaybeSend + 'static,
-        A: FromLuaMulti,
-        R: IntoLuaMulti,
-    >(
-        &self,
-        name: &str,
-        func: F,
-    ) -> LuaResult<()> {
-        let Some(ref lua) = *self.lua.borrow() else {
-            return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
-        };
-
-        lua.globals().set(
-            name,
-            lua.create_function(move |lua, args: A| (func)(KhronosLuaRef(lua), args))?,
-        )?;
-        Ok(())
+        self.handle_error(lua.from_value(value))
     }
 
     /// Closes the lua vm and marks the runtime as broken

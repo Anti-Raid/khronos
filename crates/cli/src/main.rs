@@ -621,8 +621,7 @@ fn main() {
 
         println!("Closing Lua state");
         cli.setup_data
-            .main_isolate
-            .inner()
+            .rt
             .close()
             .expect("Failed to close Lua state");
     });

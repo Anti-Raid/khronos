@@ -30,4 +30,8 @@ impl ApiReq for DeleteUserReaction {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteUserReaction(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

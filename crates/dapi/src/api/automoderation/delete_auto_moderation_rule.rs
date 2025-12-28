@@ -31,4 +31,8 @@ impl ApiReq for DeleteAutoModerationRule {
     fn to_apilist(self) -> crate::apilist::API {
         crate::apilist::API::DeleteAutoModerationRule(self)
     }
+
+    fn is_primitive_response() -> bool {
+        true
+    }
 }

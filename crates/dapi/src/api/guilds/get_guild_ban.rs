@@ -2,6 +2,7 @@ use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct GetGuildBan {
     pub user_id: serenity::all::UserId,
 }

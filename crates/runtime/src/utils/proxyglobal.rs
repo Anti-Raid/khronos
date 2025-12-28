@@ -16,23 +16,15 @@ pub fn proxy_global(lua: &Lua) -> LuaResult<LuaTable> {
     global_mt.set("__index", lua.globals())?;
     global_tab.set("_G", global_tab.clone())?;
 
-    // Provies writes
-    // Forward to _G if key is in globals, otherwise to the table
-    let globals_ref = lua.globals();
-    global_mt.set(
+    // Forward writes to the table itself
+    /*global_mt.set(
         "__newindex",
         lua.create_function(
             move |_lua, (tab, key, value): (LuaTable, LuaValue, LuaValue)| {
-                let v = globals_ref.get::<LuaValue>(key.clone())?;
-
-                if !v.is_nil() {
-                    globals_ref.set(key, value)
-                } else {
-                    tab.raw_set(key, value)
-                }
+                tab.raw_set(key, value)
             },
         )?,
-    )?;
+    )?;*/
 
     lua.gc_collect()?;
 

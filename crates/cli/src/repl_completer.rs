@@ -206,7 +206,7 @@ impl LuaStatementCompleter {
             let to_add_vec = std::rc::Rc::new(std::cell::RefCell::new(vec![]));
 
             let to_add_vec_ref = to_add_vec.clone();
-            let _ = self.runtime.exec_lua(move |lua| {
+            let _ = self.runtime.with_lua(move |lua| {
                 let mut to_add = to_add_vec_ref.borrow_mut();
                 // Add the real global table to the list of tables to search
                 to_add.push(LuaValue::Table(lua.globals()));

@@ -23,6 +23,11 @@ pub trait ApiReq {
 
     // Convert req to ApiList
     fn to_apilist(self) -> apilist::API;
+
+    // Is the response from this request a primitive type (nil or a boolean etc.)
+    fn is_primitive_response() -> bool {
+        false
+    }
 }
 
 #[inline(always)]
