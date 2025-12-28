@@ -748,7 +748,7 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
 
 #[derive(Debug, Clone)]
 pub struct Vfs {
-    vfs: Arc<dyn mluau_require::vfs::FileSystem>
+    pub vfs: Arc<dyn mluau_require::vfs::FileSystem>
 }
 
 impl LuaUserData for Vfs {
