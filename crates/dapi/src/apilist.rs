@@ -49,18 +49,6 @@ macro_rules! api_list_enum {
         }
 
         impl $name {
-            pub fn from_name_and_data(name: &str, data: serde_json::Value) -> Result<Self, crate::Error> {
-                match name {
-                    $(
-                        $api_name => {
-                            let req: $ty = serde_json::from_value(data)?;
-                            Ok($name::$variant(req))
-                        }
-                    )*
-                    _ => Err(format!("internal error: unknown API name: {}", name).into()),
-                }
-            }
-
             #[cfg(feature = "luau")]
             pub fn add_luau_methods<T: APIUserData, M: mluau::UserDataMethods<T>>(methods: &mut M) {
                 use mlua_scheduler::LuaSchedulerAsyncUserData;

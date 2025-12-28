@@ -1,11 +1,9 @@
 //! Single threaded khronos runtime struct/runner
 
-pub mod isolate;
 pub mod runtime;
 
 // Re-exports
 
-pub use isolate::KhronosIsolate;
 pub use runtime::{KhronosRuntime, RuntimeCreateOpts};
 
 // Re-export for convenience

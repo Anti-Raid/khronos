@@ -3,12 +3,9 @@ use crate::filestorage::FileStorageProvider;
 use crate::provider;
 use crate::repl_completer;
 use khronos_runtime::TemplateContext;
-use khronos_runtime::mluau_require::FilesystemWrapper;
 use khronos_runtime::mluau_require::vfs::PhysicalFS;
 use khronos_runtime::primitives::event::CreateEvent;
-use khronos_runtime::rt::isolate::CodeSource;
 use khronos_runtime::rt::mlua::prelude::*;
-use khronos_runtime::rt::KhronosIsolate;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
 use rustyline::history::DefaultHistory;
@@ -52,7 +49,8 @@ pub enum FileStorageBackend {
 }
 
 pub struct LuaSetupResult {
-    pub main_isolate: KhronosIsolate,
+    pub rt: KhronosRuntime,
+    pub global_table: LuaTable,
     pub benckark_instant: std::time::Instant,
 }
 
@@ -192,7 +190,6 @@ impl Cli {
 
     pub async fn spawn_script(
         &mut self,
-        cache_key: &str,
         name: &str,
         code: &str,
     ) -> LuaResult<LuaMultiValue> {
@@ -205,22 +202,23 @@ impl Cli {
             event.data,
         );
 
-        let ctx = self.setup_data.main_isolate.create_context(context, create_event.into_context())?;
+        let ctx = self.setup_data.rt.create_context(context, create_event.into_context())?;
 
-        let result = self
+        let chunk_fn = self
             .setup_data
-            .main_isolate
-            .spawn_asset(cache_key, CodeSource::Code((name, code)), ctx)
-            .await?;
+            .rt
+            .eval_chunk(code, Some(name), Some(self.setup_data.global_table.clone()))?;
 
-        Ok(result.into_multi_value())
+        self.setup_data.rt.handle_error(chunk_fn.call(ctx))
     }
 
     pub async fn setup_lua_vm(
         aux_opts: CliAuxOpts,
         ext_state: Rc<RefCell<CliExtensionState>>,
     ) -> LuaSetupResult {
-        log::debug!("UseCustomPrint: {}", aux_opts.use_custom_print);
+        let current_dir = std::env::current_dir().expect("Failed to get current dir");
+
+        log::trace!("Current dir: {current_dir:?}");
 
         let time_now = std::time::Instant::now();
         let runtime = KhronosRuntime::new(
@@ -229,15 +227,12 @@ impl Cli {
                 time_limit: Some(std::time::Duration::from_secs(5)),
                 give_time: std::time::Duration::from_millis(500),
             },
-            None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn() -> ())>,
+            None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn(LuaLightUserData) -> ())>,
+            PhysicalFS::new(current_dir)
         )
         .await
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());
-
-        if let Some(max_threads) = aux_opts.max_threads {
-            runtime.set_max_threads(max_threads)
-        }
 
         if let Some(memory_limit) = aux_opts.memory_limit {
             runtime
@@ -245,82 +240,41 @@ impl Cli {
                 .expect("Failed to set memory limit");
         }
 
-        // Test related functions, not available outside of script runner
-        /*if !aux_opts.disable_test_funcs {
-            runtime
-                .lua()
-                .globals()
-                .set("_OS", OS.to_lowercase())
-                .expect("Failed to set _OS global");
+        let ext_state_ref = ext_state.clone();
+        let global_table = runtime
+            .with_lua(move |lua| {
+                let tab = lua.create_table()?;
+                tab.set("cli", Self::setup_cli_specific_table(ext_state_ref, lua, &aux_opts))?;
+                tab.set("print", lua.create_function(|_lua, values: LuaMultiValue| {
+                        if !values.is_empty() {
+                            println!(
+                                "{}",
+                                values
+                                    .iter()
+                                    .map(|value| {
+                                        match value {
+                                            LuaValue::String(s) => format!("{}", s.display()),
+                                            _ => format!("{value:#?}"),
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\t")
+                            );
+                        } else {
+                            println!("nil");
+                        }
 
-            runtime
-                .lua()
-                .globals()
-                .set(
-                    "_TEST_ASYNC_WORK",
-                    runtime
-                        .lua()
-                        .create_scheduler_async_function(|lua, n: u64| async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(n)).await;
-                            lua.create_table()
-                        })
-                        .expect("Failed to create async function"),
-                )
-                .expect("Failed to set _OS global");
-        }*/
+                        Ok(())
+                    })?,
+                )?;
 
-        if !aux_opts.use_custom_print {
-            // Ensure print is global as everything basically relies on print
-            log::debug!("Setting print global");
-            runtime
-                .use_stdout_print()
-                .expect("Failed to set custom print");
-        }
-
-        {
-            let Some(ref lua) = *runtime.lua() else {
-                panic!("Lua is not available");
-            };
-
-            lua.globals()
-                .set(
-                    "cli",
-                    Self::setup_cli_specific_table(ext_state.clone(), lua, &aux_opts),
-                )
-                .expect("Failed to set cli global");
-        }
-
-        let current_dir = std::env::current_dir().expect("Failed to get current dir");
-
-        println!("Current dir: {current_dir:?}");
-
-        let file_asset_manager =
-            FilesystemWrapper::new(PhysicalFS::new(current_dir));
-
-        let main_isolate = KhronosIsolate::new_isolate(runtime, file_asset_manager)
-            .expect("Failed to create main isolate");
-
-        if !aux_opts.use_custom_print {
-            // Disable print in the main isolate so it points to the global one
-            log::debug!("Disabling print in main isolate");
-            main_isolate
-                .global_table()
-                .expect("Failed to get global table")
-                .raw_set("print", LuaValue::Nil)
-                .expect("Failed to set print global");
-
-            assert_eq!(
-                main_isolate
-                    .global_table()
-                    .expect("Failed to get global table")
-                    .raw_get::<LuaValue>("print")
-                    .expect("Failed to set print global to null"),
-                LuaValue::Nil
-            );
-        }
+                Ok(tab)
+            })
+            .expect("Failed to get global table");
 
         LuaSetupResult {
-            main_isolate,
+            rt: runtime,
+            global_table,
             benckark_instant: time_now,
         }
     }
@@ -376,10 +330,6 @@ impl Cli {
 
                     let path = &path;
 
-                    let name = match fs::canonicalize(path).await {
-                        Ok(p) => p.to_string_lossy().to_string(),
-                        Err(_) => path.to_string_lossy().to_string(),
-                    };
                     let contents = match fs::read_to_string(&path).await {
                         Ok(c) => c,
                         Err(e) => {
@@ -389,7 +339,7 @@ impl Cli {
                     };
 
                     let values = match self
-                        .spawn_script(&name, &format!("{}", path.display()), &contents)
+                        .spawn_script(&format!("{}", path.display()), &contents)
                         .await
                     {
                         Ok(values) => values,
@@ -416,8 +366,7 @@ impl Cli {
                     }
 
                     self.setup_data
-                        .main_isolate
-                        .inner()
+                        .rt
                         .scheduler()
                         .wait_till_done()
                         .await
@@ -434,13 +383,12 @@ impl Cli {
                     Editor::new().expect("Failed to create editor");
 
                 editor.set_helper(Some(repl_completer::LuaStatementCompleter {
-                    runtime: self.setup_data.main_isolate.inner().clone(),
+                    runtime: self.setup_data.rt.clone(),
                     global_tab: self
                         .setup_data
-                        .main_isolate
-                        .global_table()
-                        .expect("Failed to get global table")
-                        .clone(),
+                        .rt
+                        .with_lua(|lua| Ok(lua.globals()))
+                        .expect("Failed to get global table"),
                 }));
 
                 loop {
@@ -487,8 +435,7 @@ impl Cli {
                                     | ReplTaskWaitMode::YieldBeforePrompt => {}
                                     ReplTaskWaitMode::WaitAfterExecution => {
                                         self.setup_data
-                                            .main_isolate
-                                            .inner()
+                                            .rt
                                             .scheduler()
                                             .wait_till_done()
                                             .await
@@ -540,8 +487,7 @@ impl Cli {
                         ReplTaskWaitMode::None | ReplTaskWaitMode::YieldBeforePrompt => {}
                         ReplTaskWaitMode::WaitAfterExecution => {
                             self.setup_data
-                                .main_isolate
-                                .inner()
+                                .rt
                                 .scheduler()
                                 .wait_till_done()
                                 .await
@@ -562,11 +508,11 @@ impl Cli {
     /// Used internally for the REPL
     async fn try_spawn_as(&mut self, name: &str, code: &str) -> LuaResult<LuaMultiValue> {
         let ret_code = format!("return {code}");
-        match self.spawn_script(&ret_code, name, &ret_code).await {
+        match self.spawn_script(name, &ret_code).await {
             Ok(result) => return Ok(result),
             Err(LuaError::SyntaxError { .. }) => {}
             Err(e) => return Err(e),
         }
-        self.spawn_script(code, name, code).await
+        self.spawn_script(name, code).await
     }
 }
