@@ -410,11 +410,13 @@ impl LuaUserData for BindAddr {
 
         fields.add_field_method_get("addr", |_lua, this| match this {
             BindAddr::Tcp { addr, .. } => Ok(addr.to_string()),
+            #[cfg(unix)]
             _ => Err(LuaError::external("Not a TCP socket")),
         });
 
         fields.add_field_method_get("port", |_lua, this| match this {
             BindAddr::Tcp { addr, .. } => Ok(addr.port()),
+            #[cfg(unix)]
             _ => Err(LuaError::external("Not a TCP socket")),
         });
     }

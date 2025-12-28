@@ -18,6 +18,7 @@ use tokio::fs;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum CliEntrypointAction {
+    Tui,
     Repl {
         task_wait_mode: ReplTaskWaitMode,
     },
@@ -306,6 +307,16 @@ impl Cli {
             self.setup_data.benckark_instant.elapsed()
         );
         match action {
+            CliEntrypointAction::Tui => {
+                if self.verbose {
+                    println!("Starting TUI mode");
+                }
+                
+                // Run the TUI
+                if let Err(e) = crate::tui_entrypoint::run_tui(self).await {
+                    eprintln!("TUI error: {}", e);
+                }
+            }
             CliEntrypointAction::RunScripts { scripts } => {
                 if self.verbose {
                     println!("Running script: {scripts:?}");
