@@ -194,7 +194,6 @@ pub struct TenantState {
     pub events: Vec<String>,
     pub banned: bool,
     pub flags: u32,
-    pub startup_events: bool,
 }
 
 impl FromLua for TenantState {
@@ -213,13 +212,11 @@ impl FromLua for TenantState {
         let events: Vec<String> = table.get("events")?;
         let banned: bool = table.get("banned")?;
         let flags: u32 = table.get("flags")?;
-        let startup_events: bool = table.get("startup_events")?;
 
         Ok(TenantState {
             events,
             banned,
             flags,
-            startup_events,
         })
     }
 }
@@ -231,7 +228,6 @@ impl IntoLua for TenantState {
         table.set("events", self.events)?;
         table.set("banned", self.banned)?;
         table.set("flags", self.flags)?;
-        table.set("startup_events", self.startup_events)?;
 
         // Note that we do not set tenant state to readonly as we may want to mutate it
 
