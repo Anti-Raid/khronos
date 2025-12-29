@@ -9,5 +9,7 @@ pub use primitives::context::TemplateContext;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>; // This is constant and should be copy pasted
 
-// Re-export mluau_require for convenience
+// Re-export mluau_require, chrono and chrono_tz for convenience
 pub use mluau_require;
+pub use chrono;
+pub use chrono_tz;

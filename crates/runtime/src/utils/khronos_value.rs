@@ -4,106 +4,21 @@ use serde::{Deserialize, Serialize};
 use crate::primitives::blob::Blob;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct KhronosBuffer(pub Vec<u8>);
-
-impl KhronosBuffer {
-    pub fn new(data: Vec<u8>) -> Self {
-        KhronosBuffer(data)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(from = "KhronosProxy", into = "KhronosProxy")]
+#[serde(tag = "type", content = "value")]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
     Boolean(bool),
-    Buffer(KhronosBuffer),   // Binary data
+    Buffer(Vec<u8>),   // Binary data
     Vector((f32, f32, f32)), // Luau vector
-    Map(indexmap::IndexMap<String, KhronosValue>),
+    Map(Vec<(KhronosValue, KhronosValue)>),
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
     Null,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "___khronosValType___", content = "value")]
-#[serde(rename_all = "lowercase")] 
-enum KhronosSpecial {
-    Buffer(KhronosBuffer),
-    Vector((f32, f32, f32)),
-    Timestamptz(chrono::DateTime<chrono::Utc>),
-    Interval(chrono::Duration),
-    TimeZone(chrono_tz::Tz),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-enum KhronosProxy {
-    // Note that order matters here as serde(untagged) will try each variant in order.
-
-    // First, check special types
-    Special(KhronosSpecial),
-
-    // Primitives
-    Boolean(bool),
-    Integer(i64),
-    UnsignedInteger(u64),
-    Float(f64),
-    Text(String),
-    List(Vec<KhronosValue>),
-    
-    // Map (as this can overlap with other types, it must be last)
-    Map(indexmap::IndexMap<String, KhronosValue>),
-    
-    Null,
-}
-
-impl From<KhronosProxy> for KhronosValue {
-    fn from(proxy: KhronosProxy) -> Self {
-        match proxy {
-            KhronosProxy::Special(s) => match s {
-                KhronosSpecial::Buffer(b) => KhronosValue::Buffer(b),
-                KhronosSpecial::Vector(v) => KhronosValue::Vector(v),
-                KhronosSpecial::Timestamptz(t) => KhronosValue::Timestamptz(t),
-                KhronosSpecial::Interval(i) => KhronosValue::Interval(i),
-                KhronosSpecial::TimeZone(t) => KhronosValue::TimeZone(t),
-            },
-            KhronosProxy::Boolean(b) => KhronosValue::Boolean(b),
-            KhronosProxy::Integer(i) => KhronosValue::Integer(i),
-            KhronosProxy::UnsignedInteger(u) => KhronosValue::UnsignedInteger(u),
-            KhronosProxy::Float(f) => KhronosValue::Float(f),
-            KhronosProxy::Text(t) => KhronosValue::Text(t),
-            KhronosProxy::List(l) => KhronosValue::List(l),
-            KhronosProxy::Map(m) => KhronosValue::Map(m),
-            KhronosProxy::Null => KhronosValue::Null,
-        }
-    }
-}
-
-impl From<KhronosValue> for KhronosProxy {
-    fn from(val: KhronosValue) -> Self {
-        match val {
-            KhronosValue::Buffer(b) => KhronosProxy::Special(KhronosSpecial::Buffer(b)),
-            KhronosValue::Vector(v) => KhronosProxy::Special(KhronosSpecial::Vector(v)),
-            KhronosValue::Timestamptz(t) => KhronosProxy::Special(KhronosSpecial::Timestamptz(t)),
-            KhronosValue::Interval(i) => KhronosProxy::Special(KhronosSpecial::Interval(i)),
-            KhronosValue::TimeZone(t) => KhronosProxy::Special(KhronosSpecial::TimeZone(t)),
-            KhronosValue::Boolean(b) => KhronosProxy::Boolean(b),
-            KhronosValue::Integer(i) => KhronosProxy::Integer(i),
-            KhronosValue::UnsignedInteger(u) => KhronosProxy::UnsignedInteger(u),
-            KhronosValue::Float(f) => KhronosProxy::Float(f),
-            KhronosValue::Text(t) => KhronosProxy::Text(t),
-            KhronosValue::List(l) => KhronosProxy::List(l),
-            KhronosValue::Map(m) => KhronosProxy::Map(m),
-            KhronosValue::Null => KhronosProxy::Null,
-        }
-    }
 }
 
 impl KhronosValue {
@@ -117,13 +32,13 @@ impl KhronosValue {
         }
 
         match value {
-            LuaValue::String(s) => Ok(KhronosValue::Text(s.to_string_lossy().to_string())),
+            LuaValue::String(s) => Ok(KhronosValue::Text(s.to_string_lossy())),
             LuaValue::Integer(i) => Ok(KhronosValue::Integer(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
             LuaValue::Boolean(b) => Ok(KhronosValue::Boolean(b)),
             LuaValue::Buffer(buf) => {
                 let data = buf.to_vec();
-                Ok(KhronosValue::Buffer(KhronosBuffer::new(data)))
+                Ok(KhronosValue::Buffer(data))
             }
             LuaValue::Vector(v) => Ok(KhronosValue::Vector((v.x(), v.y(), v.z()))),
             LuaValue::Nil => Ok(KhronosValue::Null),
@@ -138,11 +53,12 @@ impl KhronosValue {
                     }
 
                     // Map
-                    let mut map = indexmap::IndexMap::new();
-                    for pair in table.pairs::<String, LuaValue>() {
+                    let mut map = Vec::new();
+                    for pair in table.pairs::<LuaValue, LuaValue>() {
                         let (k, v) = pair?;
+                        let k = KhronosValue::from_lua_impl(k, lua, depth + 1)?;
                         let v = KhronosValue::from_lua_impl(v, lua, depth + 1)?;
-                        map.insert(k, v);
+                        map.push((k, v));
                     }
                     return Ok(KhronosValue::Map(map));
                 }
@@ -175,7 +91,7 @@ impl KhronosValue {
                 if let Ok(mut blob) = ud.borrow_mut::<Blob>() {
                     // Take out the contents of the blob 
                     let data = std::mem::take(&mut blob.data);
-                    return Ok(KhronosValue::Buffer(KhronosBuffer::new(data)));
+                    return Ok(KhronosValue::Buffer(data));
                 }
 
                 Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) })
@@ -213,7 +129,7 @@ impl KhronosValue {
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
             KhronosValue::Buffer(buf) => {
-                let data = buf.0;
+                let data = buf;
                 let lua_buf = lua.create_buffer(data)?;
                 Ok(LuaValue::Buffer(lua_buf))
             }
@@ -221,6 +137,7 @@ impl KhronosValue {
             KhronosValue::Map(j) => {
                 let table = lua.create_table()?;
                 for (k, v) in j.into_iter() {
+                    let k = k.into_lua_impl(lua, depth + 1)?;
                     let v = v.into_lua_impl(lua, depth + 1)?;
                     table.set(k, v)?;
                 }
