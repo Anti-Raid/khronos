@@ -11,6 +11,9 @@ pub trait RuntimeProvider: 'static + Clone {
     /// Returns a list of all templates
     async fn list_templates(&self) -> Result<Vec<runtime_ir::Template>, crate::Error>;
 
+    /// Returns the builtin template
+    fn builtin_template(&self) -> Result<runtime_ir::Template, crate::Error>;
+
     /// Gets a template by ID
     async fn get_template(&self, id: &str) -> Result<Option<runtime_ir::Template>, crate::Error>;
 
