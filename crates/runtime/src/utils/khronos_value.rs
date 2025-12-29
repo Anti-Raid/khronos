@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::primitives::blob::Blob;
 
-const KHRONOS_VALUE_TYPE_KEY: &str = "___khronosValType___";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct KhronosBuffer(pub Vec<u8>);
@@ -15,7 +13,8 @@ impl KhronosBuffer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "KhronosProxy", into = "KhronosProxy")]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
@@ -30,6 +29,81 @@ pub enum KhronosValue {
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
     Null,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "___khronosValType___", content = "value")]
+#[serde(rename_all = "lowercase")] 
+enum KhronosSpecial {
+    Buffer(KhronosBuffer),
+    Vector((f32, f32, f32)),
+    Timestamptz(chrono::DateTime<chrono::Utc>),
+    Interval(chrono::Duration),
+    TimeZone(chrono_tz::Tz),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum KhronosProxy {
+    // Note that order matters here as serde(untagged) will try each variant in order.
+
+    // First, check special types
+    Special(KhronosSpecial),
+
+    // Primitives
+    Boolean(bool),
+    Integer(i64),
+    UnsignedInteger(u64),
+    Float(f64),
+    Text(String),
+    List(Vec<KhronosValue>),
+    
+    // Map (as this can overlap with other types, it must be last)
+    Map(indexmap::IndexMap<String, KhronosValue>),
+    
+    Null,
+}
+
+impl From<KhronosProxy> for KhronosValue {
+    fn from(proxy: KhronosProxy) -> Self {
+        match proxy {
+            KhronosProxy::Special(s) => match s {
+                KhronosSpecial::Buffer(b) => KhronosValue::Buffer(b),
+                KhronosSpecial::Vector(v) => KhronosValue::Vector(v),
+                KhronosSpecial::Timestamptz(t) => KhronosValue::Timestamptz(t),
+                KhronosSpecial::Interval(i) => KhronosValue::Interval(i),
+                KhronosSpecial::TimeZone(t) => KhronosValue::TimeZone(t),
+            },
+            KhronosProxy::Boolean(b) => KhronosValue::Boolean(b),
+            KhronosProxy::Integer(i) => KhronosValue::Integer(i),
+            KhronosProxy::UnsignedInteger(u) => KhronosValue::UnsignedInteger(u),
+            KhronosProxy::Float(f) => KhronosValue::Float(f),
+            KhronosProxy::Text(t) => KhronosValue::Text(t),
+            KhronosProxy::List(l) => KhronosValue::List(l),
+            KhronosProxy::Map(m) => KhronosValue::Map(m),
+            KhronosProxy::Null => KhronosValue::Null,
+        }
+    }
+}
+
+impl From<KhronosValue> for KhronosProxy {
+    fn from(val: KhronosValue) -> Self {
+        match val {
+            KhronosValue::Buffer(b) => KhronosProxy::Special(KhronosSpecial::Buffer(b)),
+            KhronosValue::Vector(v) => KhronosProxy::Special(KhronosSpecial::Vector(v)),
+            KhronosValue::Timestamptz(t) => KhronosProxy::Special(KhronosSpecial::Timestamptz(t)),
+            KhronosValue::Interval(i) => KhronosProxy::Special(KhronosSpecial::Interval(i)),
+            KhronosValue::TimeZone(t) => KhronosProxy::Special(KhronosSpecial::TimeZone(t)),
+            KhronosValue::Boolean(b) => KhronosProxy::Boolean(b),
+            KhronosValue::Integer(i) => KhronosProxy::Integer(i),
+            KhronosValue::UnsignedInteger(u) => KhronosProxy::UnsignedInteger(u),
+            KhronosValue::Float(f) => KhronosProxy::Float(f),
+            KhronosValue::Text(t) => KhronosProxy::Text(t),
+            KhronosValue::List(l) => KhronosProxy::List(l),
+            KhronosValue::Map(m) => KhronosProxy::Map(m),
+            KhronosValue::Null => KhronosProxy::Null,
+        }
+    }
 }
 
 impl FromLua for Box<KhronosValue> {
@@ -199,218 +273,6 @@ impl KhronosValue {
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
-
-    pub fn into_serde_json_value(
-        self,
-        depth: usize,
-        preserve_types: bool,
-    ) -> Result<serde_json::Value, crate::Error> {
-        if depth > 10 {
-            return Err("Recursion limit exceeded".into());
-        }
-
-        Ok(match self {
-            KhronosValue::Text(s) => serde_json::Value::String(s),
-            KhronosValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(i)),
-            KhronosValue::UnsignedInteger(i) => {
-                serde_json::Value::Number(serde_json::Number::from(i))
-            }
-            KhronosValue::Float(f) => {
-                serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap())
-            }
-            KhronosValue::Boolean(b) => serde_json::Value::Bool(b),
-            KhronosValue::Buffer(buf) => {
-                if !preserve_types {
-                    serde_json::to_value(buf)
-                        .map_err(|e| format!("Failed to serialize Buffer: {e}"))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "buffer",
-                        "value": serde_json::to_value(buf)
-                        .map_err(|e| format!("Failed to serialize Buffer: {e}"))?
-                    })
-                }
-            }
-            KhronosValue::Vector(v) => {
-                if !preserve_types {
-                    serde_json::to_value(v)
-                        .map_err(|e| format!("Failed to serialize Vector: {e}"))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "vector",
-                        "value": serde_json::to_value(v)
-                        .map_err(|e| format!("Failed to serialize Vector: {e}"))?
-                    })
-                }
-            }
-            KhronosValue::Map(m) => {
-                let mut map = serde_json::Map::new();
-                for (k, v) in m.into_iter() {
-                    if k == KHRONOS_VALUE_TYPE_KEY {
-                        return Err(format!(
-                            "Cannot use reserved key `{KHRONOS_VALUE_TYPE_KEY}` in map",
-                        )
-                        .into());
-                    }
-                    map.insert(k, v.into_serde_json_value(depth + 1, preserve_types)?);
-                }
-                serde_json::Value::Object(map)
-            }
-            KhronosValue::List(l) => {
-                let mut list = Vec::with_capacity(l.len());
-                for v in l.into_iter() {
-                    list.push(v.into_serde_json_value(depth + 1, preserve_types)?);
-                }
-                serde_json::Value::Array(list)
-            }
-            // Special types have a __khronos_value_type field to identify them
-            KhronosValue::Timestamptz(dt) => {
-                if !preserve_types {
-                    serde_json::to_value(dt)
-                        .map_err(|e| format!("Failed to serialize DateTime: {e}"))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "timestamptz",
-                        "value": serde_json::to_value(dt)
-                        .map_err(|e| format!("Failed to serialize DateTime: {e}"))?
-                    })
-                }
-            }
-            KhronosValue::Interval(i) => {
-                if !preserve_types {
-                    serde_json::to_value(i)
-                        .map_err(|e| format!("Failed to serialize Interval: {e}"))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "interval",
-                        "value": serde_json::to_value(i)
-                        .map_err(|e| format!("Failed to serialize Interval: {e}"))?
-                    })
-                }
-            }
-            KhronosValue::TimeZone(tz) => {
-                if !preserve_types {
-                    serde_json::to_value(tz)
-                        .map_err(|e| format!("Failed to serialize TimeZone: {e}"))?
-                } else {
-                    serde_json::json!({
-                        KHRONOS_VALUE_TYPE_KEY: "timezone",
-                        "value": serde_json::to_value(tz)
-                        .map_err(|e| format!("Failed to serialize TimeZone: {e}"))?
-                    })
-                }
-            }
-            KhronosValue::Null => serde_json::Value::Null,
-        })
-    }
-
-    pub fn from_serde_json_value(
-        value: serde_json::Value,
-        depth: usize,
-        preserve_types: bool,
-    ) -> Result<Self, crate::Error> {
-        if depth > 10 {
-            return Err("Recursion limit exceeded".into());
-        }
-
-        Ok(match value {
-            serde_json::Value::String(s) => KhronosValue::Text(s),
-            serde_json::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    KhronosValue::Integer(i)
-                } else if let Some(u) = n.as_u64() {
-                    KhronosValue::UnsignedInteger(u)
-                } else if let Some(f) = n.as_f64() {
-                    KhronosValue::Float(f)
-                } else {
-                    return Err("Invalid number type".into());
-                }
-            }
-            serde_json::Value::Bool(b) => KhronosValue::Boolean(b),
-            serde_json::Value::Object(mut m) => {
-                if preserve_types {
-                    if let Some(khronos_value_type) = m.get(KHRONOS_VALUE_TYPE_KEY) {
-                        if let Some(khronos_value_type) = khronos_value_type.as_str() {
-                            match khronos_value_type {
-                                "buffer" => {
-                                    let value = m.remove("value").ok_or("Missing value field")?;
-                                    return Ok(KhronosValue::Buffer(
-                                        serde_json::from_value(value).map_err(|e| {
-                                            format!("Failed to deserialize Buffer: {e}")
-                                        })?,
-                                    ));
-                                }
-                                "vector" => {
-                                    let value = m.remove("value").ok_or("Missing value field")?;
-                                    return Ok(KhronosValue::Vector(
-                                        serde_json::from_value(value).map_err(|e| {
-                                            format!("Failed to deserialize Vector: {e}")
-                                        })?,
-                                    ));
-                                }
-                                "timestamptz" => {
-                                    let value = m.remove("value").ok_or("Missing value field")?;
-                                    return Ok(KhronosValue::Timestamptz(
-                                        serde_json::from_value(value).map_err(|e| {
-                                            format!("Failed to deserialize DateTime: {e}")
-                                        })?,
-                                    ));
-                                }
-                                "interval" => {
-                                    let value = m.remove("value").ok_or("Missing value field")?;
-                                    return Ok(KhronosValue::Interval(
-                                        serde_json::from_value(value).map_err(|e| {
-                                            format!("Failed to deserialize Interval: {e}")
-                                        })?,
-                                    ));
-                                }
-                                "timezone" => {
-                                    let value = m.remove("value").ok_or("Missing value field")?;
-                                    return Ok(KhronosValue::TimeZone(
-                                        serde_json::from_value(value).map_err(|e| {
-                                            format!("Failed to deserialize TimeZone: {e}")
-                                        })?,
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-
-                let mut map = indexmap::IndexMap::new();
-                for (k, v) in m.into_iter() {
-                    map.insert(
-                        k,
-                        Self::from_serde_json_value(v, depth + 1, preserve_types)?,
-                    );
-                }
-                KhronosValue::Map(map)
-            }
-            serde_json::Value::Array(l) => {
-                let mut list = Vec::with_capacity(l.len());
-                for v in l.into_iter() {
-                    list.push(Self::from_serde_json_value(v, depth + 1, preserve_types)?);
-                }
-                KhronosValue::List(list)
-            }
-            serde_json::Value::Null => KhronosValue::Null,
-        })
-    }
-
-    /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
-    pub fn into_value<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
-        let value = self.into_serde_json_value(0, true)?;
-        T::deserialize(&value)
-            .map_err(|e| crate::Error::from(format!("Failed to deserialize KhronosValue: {e}")))
-    }
-
-    /// Note: this is not the best performance-wise. In general, consider using `to_struct` to parse a KhronosValue to a struct etc.
-    pub fn into_value_untyped<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
-        let value = self.into_serde_json_value(0, false)?;
-        T::deserialize(&value)
-            .map_err(|e| crate::Error::from(format!("Failed to deserialize KhronosValue: {e}")))
-    }
 }
 
 impl FromLua for KhronosValue {
@@ -422,91 +284,5 @@ impl FromLua for KhronosValue {
 impl IntoLua for KhronosValue {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         KhronosValue::into_lua_impl(self, lua, 0)
-    }
-}
-
-impl Serialize for KhronosValue {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ::serde::Serializer,
-    {
-        match self {
-            KhronosValue::Null => serializer.serialize_unit(),
-            KhronosValue::Boolean(b) => serializer.serialize_bool(*b),
-            KhronosValue::Buffer(buf) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "buffer")?;
-                map.serialize_entry("value", buf)?;
-                map.end()
-            }
-            KhronosValue::Vector(v) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "vector")?;
-                map.serialize_entry("value", v)?;
-                map.end()
-            }
-            KhronosValue::Integer(i) => serializer.serialize_i64(*i),
-            KhronosValue::UnsignedInteger(i) => serializer.serialize_u64(*i),
-            KhronosValue::Float(f) => serializer.serialize_f64(*f),
-            KhronosValue::Text(s) => serializer.serialize_str(s),
-            KhronosValue::Timestamptz(dt) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "timestamptz")?;
-                map.serialize_entry("value", dt)?;
-                map.end()
-            }
-            KhronosValue::Interval(i) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "interval")?;
-                map.serialize_entry("value", i)?;
-                map.end()
-            }
-            KhronosValue::TimeZone(tz) => {
-                // We need to preserve the KHRONOS_VALUE_TYPE_KEY field for deserialization
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry(KHRONOS_VALUE_TYPE_KEY, "timezone")?;
-                map.serialize_entry("value", tz)?;
-                map.end()
-            }
-            KhronosValue::Map(m) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(m.len()))?;
-                for (k, v) in m {
-                    map.serialize_entry(k, v)?;
-                }
-                map.end()
-            }
-            KhronosValue::List(v) => {
-                use serde::ser::SerializeSeq;
-                let mut seq = serializer.serialize_seq(Some(v.len()))?;
-                for value in v {
-                    seq.serialize_element(value)?;
-                }
-                seq.end()
-            }
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for KhronosValue {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: ::serde::Deserializer<'de>,
-    {
-        // First deserialize to a serde_json::Value
-        let value = serde_json::Value::deserialize(deserializer)?;
-        // Then convert to KhronosValue
-        KhronosValue::from_serde_json_value(value, 0, true).map_err(serde::de::Error::custom)
     }
 }
