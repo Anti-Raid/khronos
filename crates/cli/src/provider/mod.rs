@@ -154,7 +154,7 @@ ORDER BY scope;
 
         let value = data.get::<serde_json::Value, _>("value");
 
-        let record = KhronosValue::from_serde_json_value(value, 0, true)?;
+        let record = serde_json::from_value(value)?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
             id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
@@ -192,7 +192,7 @@ ORDER BY scope;
 
         let value = data.get::<serde_json::Value, _>("value");
 
-        let record = KhronosValue::from_serde_json_value(value, 0, true)?;
+        let record = serde_json::from_value(value)?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
             id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
@@ -211,7 +211,7 @@ ORDER BY scope;
         &self,
         scopes: &[String],
         key: String,
-        value: khronos_runtime::utils::khronos_value::KhronosValue,
+        value: KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(bool, String), khronos_runtime::Error> {
         if let Some(existing) = sqlx::query(
@@ -232,7 +232,7 @@ ORDER BY scope;
         {
             let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
             sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2 WHERE id = $3")
-                .bind(value.into_serde_json_value(1, true)?)
+                .bind(serde_json::to_value(value)?)
                 .bind(expires_at)
                 .bind(key)
                 .execute(&self.pool)
@@ -245,7 +245,7 @@ ORDER BY scope;
         let id = sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING id")
             .bind(self.guild_id.to_string())
             .bind(&key)
-            .bind(value.into_serde_json_value(1, true)?)
+            .bind(serde_json::to_value(value)?)
             .bind(scopes)
             .bind(expires_at)
             .fetch_one(&self.pool)
@@ -260,14 +260,14 @@ ORDER BY scope;
     async fn set_by_id(
         &self,
         id: String,
-        value: khronos_runtime::utils::khronos_value::KhronosValue,
+        value: KhronosValue,
         expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), khronos_runtime::Error> {
         let key = sqlx::types::uuid::Uuid::parse_str(&id)
             .map_err(|e| format!("Failed to parse ID: {e}"))?;
 
         sqlx::query("UPDATE kv_v2 SET value = $1, expires_at = $2 WHERE id = $3")
-            .bind(value.into_serde_json_value(1, true)?)
+            .bind(serde_json::to_value(value)?)
             .bind(expires_at)
             .bind(key)
             .execute(&self.pool)
@@ -415,7 +415,7 @@ ORDER BY scope;
         for data in entries {
             let value = data.get::<serde_json::Value, _>("value");
 
-            let record = KhronosValue::from_serde_json_value(value, 0, true)?;
+            let record = serde_json::from_value(value)?;
 
             let file_contents = khronos_runtime::traits::ir::KvRecord {
                 id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
