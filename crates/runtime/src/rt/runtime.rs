@@ -15,6 +15,7 @@ use mluau_require::{AssetRequirer, FilesystemWrapper};
 use crate::TemplateContext;
 use crate::primitives::event::ContextEvent;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
+use crate::utils::proxyglobal::proxy_global;
 
 /// A function to be called when the Khronos runtime is marked as broken
 pub type OnBrokenFunc = Box<dyn Fn()>;
@@ -95,6 +96,9 @@ pub struct KhronosRuntime {
 
     /// The shared store table for the runtime
     store_table: LuaTable,
+
+    /// The base global table
+    global_table: LuaTable,
 
     /// The proxy require function
     proxy_require: LuaFunction,
@@ -191,21 +195,19 @@ impl KhronosRuntime {
         });
 
         // Ensure _G.print and _G.eprint are nil
-        lua.globals().set("print", lua.create_function(|_lua, _: ()| {
-            Err::<(), LuaError>(LuaError::external("print() is disabled in this environment"))
-        })?)?;
-        lua.globals().set("eprint", lua.create_function(|_lua, _: ()| {
-            Err::<(), LuaError>(LuaError::external("eprint() is disabled in this environment"))
-        })?)?;
+        lua.globals().set("print", LuaValue::Nil)?;
+        lua.globals().set("eprint", LuaValue::Nil)?;
+        lua.globals().set("require", LuaValue::Nil)?;
 
         // Setup require function
-        let controller = AssetRequirer::new(FilesystemWrapper::new(vfs), "main".to_string(), lua.globals());
+        let global_table = proxy_global(&lua)?;
+        let controller = AssetRequirer::new(FilesystemWrapper::new(vfs), "main".to_string(), global_table.clone());
         let require = lua.create_require_function(controller)?;
-        lua.globals()
+        global_table
             .set("require", require)?;
 
         let proxy_require = lua.load("return require(...)")
-            .set_environment(lua.globals())
+            .set_environment(global_table.clone())
             .set_name("/init.luau")
             .set_mode(mluau::ChunkMode::Text)
             .try_cache()
@@ -261,6 +263,7 @@ impl KhronosRuntime {
 
         Ok(Self {
             store_table,
+            global_table,
             lua: Rc::new(RefCell::new(Some(lua))),
             compiler,
             scheduler,
@@ -459,7 +462,7 @@ impl KhronosRuntime {
         };
         let chunk = match env {
             Some(e) => chunk.set_environment(e),
-            None => chunk,
+            None => chunk.set_environment(self.global_table.clone()),
         };
         let chunk = chunk
             .set_compiler(self.compiler.clone())
