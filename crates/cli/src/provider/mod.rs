@@ -787,7 +787,6 @@ mod _runtimeprovider {
         pub events: Vec<String>,
         pub banned: bool,
         pub flags: u32,
-        pub startup_events: bool,
     }
 }
 
@@ -825,14 +824,12 @@ impl RuntimeProvider for CliRuntimeProvider {
                 events: v.events,
                 banned: v.banned,
                 flags: v.flags,
-                startup_events: v.startup_events,   
             });
         }
         return Ok(runtime_ir::TenantState {
             events: vec!["INTERACTION_CREATE".to_string()],
             banned: false,
             flags: 0,
-            startup_events: false,   
         });
     }
 
@@ -841,7 +838,6 @@ impl RuntimeProvider for CliRuntimeProvider {
             events: state.events,
             banned: state.banned,
             flags: state.flags,
-            startup_events: state.startup_events,
         })?;
         self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;
         Ok(())
