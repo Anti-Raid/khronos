@@ -800,6 +800,10 @@ impl RuntimeProvider for CliRuntimeProvider {
         todo!()
     }
 
+    fn builtin_template(&self) -> Result<runtime_ir::Template, khronos_runtime::Error> {
+        todo!()
+    }
+
     async fn get_template(&self, _id: &str) -> Result<Option<runtime_ir::Template>, khronos_runtime::Error> {
         todo!()
     }

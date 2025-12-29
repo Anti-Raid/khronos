@@ -48,6 +48,12 @@ impl<T: KhronosContext> LuaUserData for RuntimeExecutor<T> {
             Ok(templates)
         });
 
+        methods.add_method("builtintemplate", |_lua, this, _: ()| {
+            this.check("builtintemplate").map_err(|x| LuaError::external(x.to_string()))?;
+            let templates = this.runtime_provider.builtin_template().map_err(|x| LuaError::external(x.to_string()))?;
+            Ok(templates)
+        });
+
         methods.add_scheduler_async_method("gettemplate", async |_lua, this, id: String| {
             this.check("gettemplate").map_err(|x| LuaError::external(x.to_string()))?;
             let template = this.runtime_provider.get_template(&id).await.map_err(|x| LuaError::external(x.to_string()))?;
