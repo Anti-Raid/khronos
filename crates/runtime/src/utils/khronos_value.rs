@@ -106,39 +106,8 @@ impl From<KhronosValue> for KhronosProxy {
     }
 }
 
-impl FromLua for Box<KhronosValue> {
-    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
-        let value = KhronosValue::from_lua_impl(value, lua, 0)?;
-        Ok(Box::new(value))
-    }
-}
-
-impl IntoLua for Box<KhronosValue> {
-    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        (*self).into_lua_impl(lua, 0)
-    }
-}
-
 impl KhronosValue {
-    pub fn kind(&self) -> &'static str {
-        match self {
-            KhronosValue::Text(_) => "text",
-            KhronosValue::Integer(_) => "integer",
-            KhronosValue::UnsignedInteger(_) => "unsigned_integer",
-            KhronosValue::Float(_) => "float",
-            KhronosValue::Boolean(_) => "boolean",
-            KhronosValue::Buffer(_) => "buffer",
-            KhronosValue::Vector(_) => "vector",
-            KhronosValue::Map(_) => "map",
-            KhronosValue::List(_) => "list",
-            KhronosValue::Timestamptz(_) => "timestamptz",
-            KhronosValue::Interval(_) => "interval",
-            KhronosValue::TimeZone(_) => "timezone",
-            KhronosValue::Null => "null",
-        }
-    }
-
-    pub fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
+    fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
         if depth > 10 {
             return Err(LuaError::FromLuaConversionError {
                 from: "any",
@@ -219,7 +188,7 @@ impl KhronosValue {
         }
     }
 
-    pub fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
+    fn into_lua_impl(self, lua: &Lua, depth: usize) -> LuaResult<LuaValue> {
         if depth > 10 {
             return Err(LuaError::FromLuaConversionError {
                 from: "any",
