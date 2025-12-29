@@ -96,8 +96,8 @@ pub struct KhronosRuntime {
     /// The shared store table for the runtime
     store_table: LuaTable,
 
-    /// The require function
-    require: LuaFunction,
+    /// The proxy require function
+    proxy_require: LuaFunction,
 
     /// runtime creation options
     opts: RuntimeCreateOpts,
@@ -202,7 +202,14 @@ impl KhronosRuntime {
         let controller = AssetRequirer::new(FilesystemWrapper::new(vfs), "main".to_string(), lua.globals());
         let require = lua.create_require_function(controller)?;
         lua.globals()
-            .set("require", require.clone())?;
+            .set("require", require)?;
+
+        let proxy_require = lua.load("return require(...)")
+            .set_environment(lua.globals())
+            .set_name("/init.luau")
+            .set_mode(mluau::ChunkMode::Text)
+            .try_cache()
+            .into_function()?;
 
         if let Some(on_thread_event_callback) = on_thread_event_callback {
             lua.set_thread_creation_callback(on_thread_event_callback.0);
@@ -264,7 +271,7 @@ impl KhronosRuntime {
             execution_stop_time,
             //time_slice,
             opts,
-            require,
+            proxy_require
         })
     }
 
@@ -430,7 +437,7 @@ impl KhronosRuntime {
     {
         // Ensure create_thread wont error
         self.update_last_execution_time(std::time::Instant::now());
-        self.handle_error(self.require.call(path))
+        self.handle_error(self.proxy_require.call(path))
     }
 
     /// Loads/evaluates a chunk of code into a function
