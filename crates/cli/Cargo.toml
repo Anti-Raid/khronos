@@ -21,6 +21,18 @@ dirs = "6"
 data-encoding = "2"
 reqwest = "0.12"
 termcolor = "1"
+
+# Ratatui TUI dependencies
+ratatui = "0.29"
+crossterm = "0.28"
+tui-textarea = "0.7"
+syntect = "5.2"
+indicatif = "0.17"
+comfy-table = "7"
+unicode-width = "0.2"
+ansi-to-tui = "7"
+unicode-segmentation = "1.12"
+textwrap = "0.16"
 sqlx = { version = "0.8", features = [
     "runtime-tokio-rustls",
     "chrono",
