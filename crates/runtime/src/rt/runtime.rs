@@ -13,7 +13,7 @@ use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 
 use crate::TemplateContext;
-use crate::primitives::event::ContextEvent;
+use crate::primitives::event::CreateEvent;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::proxyglobal::proxy_global;
 
@@ -404,7 +404,7 @@ impl KhronosRuntime {
     pub fn create_context<K: KhronosContextTrait>(
         &self,
         context: K,
-        event: ContextEvent,
+        event: CreateEvent,
     ) -> Result<TemplateContext<K>, LuaError> {
         // Ensure create_thread wont error
         self.update_last_execution_time(std::time::Instant::now());

@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use crate::primitives::{blob::Blob, lazy::Lazy};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),

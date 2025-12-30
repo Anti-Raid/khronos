@@ -205,7 +205,7 @@ impl Cli {
             event.data,
         );
 
-        let ctx = self.setup_data.rt.create_context(context, create_event.into_context())?;
+        let ctx = self.setup_data.rt.create_context(context, create_event)?;
 
         let chunk_fn = self
             .setup_data

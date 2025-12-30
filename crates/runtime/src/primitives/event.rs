@@ -1,42 +1,13 @@
-use std::{cell::RefCell, rc::Rc};
-
 use mluau::prelude::*;
-use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+use crate::{plugins::antiraid::LUA_SERIALIZE_OPTIONS, utils::khronos_value::KhronosValue};
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum InnerEventData {
     /// The inner data of the object
     Json(serde_json::Value),
     RawValue(Box<serde_json::value::RawValue>),
-}
-
-impl<'de> Deserialize<'de> for InnerEventData {
-    #[inline]
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: ::serde::Deserializer<'de>,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        Ok(Self::Json(value))
-    }
-}
-
-// Workaround for RawValue
-impl Serialize for InnerEventData {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            InnerEventData::Json(value) => value.serialize(serializer),
-            InnerEventData::RawValue(raw_value) => {
-                let value: serde_json::Value = serde_json::from_str(raw_value.get())
-                    .map_err(serde::ser::Error::custom)?;
-                value.serialize(serializer)
-            },
-        }
-    }
+    KhronosValue(KhronosValue)
 }
 
 /// An `CreateEvent` is a/an thread-safe object that can be used to create a Event
@@ -71,7 +42,20 @@ impl CreateEvent {
         }
     }
 
-    fn into_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
+    /// Create a new Event given a KhronosValue
+    pub fn new_khronos_value(
+        name: String,
+        data: KhronosValue,
+    ) -> Self {
+        Self {
+            name,
+            data: InnerEventData::KhronosValue(data),
+        }
+    }
+}
+
+impl IntoLua for CreateEvent {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tab = lua.create_table()?;
         tab.set("name", self.name.as_str())?;
         tab.set(
@@ -85,66 +69,12 @@ impl CreateEvent {
                         .map_err(|e| LuaError::external(e))?;
                     lua.to_value_with(&value, LUA_SERIALIZE_OPTIONS)?
                 },
+                InnerEventData::KhronosValue(kv) => {
+                    kv.into_lua(lua)?
+                }
             },
         )?;
         tab.set_readonly(true);
         Ok(LuaValue::Table(tab))
-    }
-}
-
-impl CreateEvent {
-    /// Returns the event name
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn into_context(self) -> ContextEvent {
-        ContextEvent::new(self)
-    }
-}
-
-/// A reference to an event's data
-#[derive(Clone)]
-pub struct ContextEvent {
-    pub(crate) event: Rc<RefCell<CreateEvent>>,
-    pub(crate) cached_event_value: Rc<RefCell<Option<LuaValue>>>,
-}
-
-impl ContextEvent {
-    pub fn new(event: CreateEvent) -> Self {
-        Self {
-            event: Rc::new(RefCell::new(event)),
-            cached_event_value: Rc::default(),
-        }
-    }
-
-    /// Turns the event into a LuaValue if not already converted, otherwise returns the cached value
-    pub fn to_event_value(&self, lua: &Lua) -> LuaResult<LuaValue> {
-        // Check for cached event value
-        let mut cached_event_value = self
-            .cached_event_value
-            .try_borrow_mut()
-            .map_err(|e| LuaError::external(e.to_string()))?;
-
-        if let Some(v) = cached_event_value.as_ref() {
-            return Ok(v.clone());
-        }
-
-        let event = self
-            .event
-            .try_borrow()
-            .map_err(|e| LuaError::external(e.to_string()))?;
-        
-        let v = event.into_lua(lua)?;
-        match v {
-            LuaValue::Table(ref t) => {
-                t.set_readonly(true);
-            }
-            _ => {}
-        };
-
-        *cached_event_value = Some(v.clone());
-
-        Ok(v)
     }
 }
