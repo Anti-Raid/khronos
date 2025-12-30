@@ -202,6 +202,7 @@ impl Cli {
 
         let create_event = CreateEvent::new(
             event.name.to_string(),
+            None,
             event.data,
         );
 
