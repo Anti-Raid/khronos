@@ -15,6 +15,8 @@ enum InnerEventData {
 pub struct CreateEvent {
     /// The name of the event
     name: String,
+    /// The authorized author of the event
+    author: Option<String>,
     /// The inner data of the object
     data: InnerEventData,
 }
@@ -23,10 +25,12 @@ impl CreateEvent {
     /// Create a new Event
     pub fn new(
         name: String,
+        author: Option<String>,
         data: serde_json::Value,
     ) -> Self {
         Self {
             name,
+            author,
             data: InnerEventData::Json(data),
         }
     }
@@ -34,10 +38,12 @@ impl CreateEvent {
     /// Create a new Event given a raw value
     pub fn new_raw_value(
         name: String,
+        author: Option<String>,
         data: Box<serde_json::value::RawValue>,
     ) -> Self {
         Self {
             name,
+            author,
             data: InnerEventData::RawValue(data),
         }
     }
@@ -45,10 +51,12 @@ impl CreateEvent {
     /// Create a new Event given a KhronosValue
     pub fn new_khronos_value(
         name: String,
+        author: Option<String>,
         data: KhronosValue,
     ) -> Self {
         Self {
             name,
+            author,
             data: InnerEventData::KhronosValue(data),
         }
     }
@@ -58,6 +66,10 @@ impl IntoLua for CreateEvent {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tab = lua.create_table()?;
         tab.set("name", self.name.as_str())?;
+        match self.author {
+            Some(author) => tab.set("author", author.as_str())?,
+            None => {},
+        }
         tab.set(
             "data",
             match self.data {
