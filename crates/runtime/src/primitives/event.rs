@@ -60,6 +60,14 @@ impl CreateEvent {
             data: InnerEventData::KhronosValue(data),
         }
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn author(&self) -> Option<&str> {
+        self.author.as_deref()
+    }
 }
 
 impl IntoLua for CreateEvent {
