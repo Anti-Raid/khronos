@@ -42,40 +42,10 @@ impl<T: KhronosContext> LuaUserData for RuntimeExecutor<T> {
         methods.add_meta_method(LuaMetaMethod::Type, |_, _this, _: ()| Ok("RuntimeExecutor"));
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("RuntimeExecutor"));
         
-        methods.add_scheduler_async_method("listtemplates", async |_lua, this, _: ()| {
-            this.check("listtemplates").map_err(|x| LuaError::external(x.to_string()))?;
-            let templates = this.runtime_provider.list_templates().await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(templates)
-        });
-
-        methods.add_method("builtintemplate", |_lua, this, _: ()| {
-            this.check("builtintemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            let templates = this.runtime_provider.builtin_template().map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(templates)
-        });
-
-        methods.add_scheduler_async_method("gettemplate", async |_lua, this, id: String| {
-            this.check("gettemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            let template = this.runtime_provider.get_template(&id).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(template)
-        });
-
-        methods.add_scheduler_async_method("createtemplate", async |_lua, this, template: runtime_ir::CreateTemplate| {
-            this.check("createtemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            let id = this.runtime_provider.create_template(template).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(id)
-        });
-
-        methods.add_scheduler_async_method("updatetemplate", async |_lua, this, (id, template): (String, runtime_ir::CreateTemplate)| {
-            this.check("updatetemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            this.runtime_provider.update_template(&id, template).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(())
-        });
-
-        methods.add_scheduler_async_method("deletetemplate", async |_lua, this, id: String| {
-            this.check("deletetemplate").map_err(|x| LuaError::external(x.to_string()))?;
-            this.runtime_provider.delete_template(&id).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(())
+        methods.add_method("getexposedvfs", |_lua, this, _: ()| {
+            this.check("getexposedvfs").map_err(|x| LuaError::external(x.to_string()))?;
+            let vfs_map = this.runtime_provider.get_exposed_vfs().map_err(|x| LuaError::external(x.to_string()))?;
+            Ok(vfs_map)
         });
 
         methods.add_scheduler_async_method("gettenantstate", async |_lua, this, _: ()| {
