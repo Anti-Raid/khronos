@@ -13,6 +13,9 @@ pub trait RuntimeProvider: 'static + Clone {
     fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
 
     /// Returns a set of VFS's exposed by the runtime
+    ///
+    /// The HashMap maps VFS identifiers (keys) to their corresponding Vfs instances (values).
+    /// These VFS instances can be used to create overlays or access runtime-provided virtual filesystems.
     fn get_exposed_vfs(&self) -> Result<HashMap<String, Vfs>, crate::Error>;
 
     /// Fetches the TenantState or returns a suitable default

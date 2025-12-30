@@ -798,6 +798,7 @@ impl RuntimeProvider for CliRuntimeProvider {
     }
 
     fn get_exposed_vfs(&self) -> Result<HashMap<String, khronos_runtime::core::typesext::Vfs>, khronos_runtime::Error> {
+        // CLI mode does not expose any VFS mappings
         Ok(std::collections::HashMap::new())
     }
 
