@@ -753,7 +753,7 @@ pub struct Vfs {
 
 impl LuaUserData for Vfs {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_function("newoverlay", |lua, vfs_list: Vec<LuaValue>| {
+        methods.add_function("newoverlay", |_lua, vfs_list: Vec<LuaValue>| {
             let mut vfs_refs = Vec::with_capacity(vfs_list.len());
             for vfs in vfs_list {
                 match vfs {
@@ -774,17 +774,9 @@ impl LuaUserData for Vfs {
 
                         vfs_refs.push(mluau_require::vfs::VfsPath::new(vfs.vfs.clone()));
                     }
-                    LuaValue::Table(tab) => {
-                        let map: HashMap<String, String> = lua.from_value(LuaValue::Table(tab))?;
-
-                        vfs_refs.push(mluau_require::vfs::VfsPath::new(
-                            mluau_require::create_memory_vfs_from_map(&map)
-                            .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
-                        ));
-                    }
                     _ => {
                         return Err(LuaError::external(
-                            "VFS list must contain only Vfs UserData or tables of string to string mappings",
+                            "VFS list must contain only Vfs UserData or lazy string maps",
                         ));
                     }
                 }

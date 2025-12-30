@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::primitives::blob::Blob;
+use crate::primitives::{blob::Blob, lazy::Lazy};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
@@ -18,6 +20,7 @@ pub enum KhronosValue {
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
+    LazyStringMap(HashMap<String, String>), // For lazy string maps
     Null,
 }
 
@@ -93,6 +96,11 @@ impl KhronosValue {
                     let data = std::mem::take(&mut blob.data);
                     return Ok(KhronosValue::Buffer(data));
                 }
+                if let Ok(mut s_map) = ud.borrow_mut::<Lazy<HashMap<String, String>>>() {
+                    // Take out the contents of the lazy string map 
+                    let data = std::mem::take(&mut s_map.data);
+                    return Ok(KhronosValue::LazyStringMap(data));
+                }
 
                 Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) })
             }
@@ -142,6 +150,10 @@ impl KhronosValue {
                     table.set(k, v)?;
                 }
                 Ok(LuaValue::Table(table))
+            }
+            KhronosValue::LazyStringMap(m) => {
+                let lazy = Lazy::new(m);
+                lazy.into_lua(lua)
             }
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;

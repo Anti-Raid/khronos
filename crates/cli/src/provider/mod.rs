@@ -7,6 +7,7 @@ use khronos_runtime::utils::khronos_value::KhronosValue;
 use moka::future::Cache;
 use serde_json::Value;
 use sqlx::Row;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -796,28 +797,8 @@ impl RuntimeProvider for CliRuntimeProvider {
         Ok(())
     }
 
-    async fn list_templates(&self) -> Result<Vec<runtime_ir::Template>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    fn builtin_template(&self) -> Result<runtime_ir::Template, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn get_template(&self, _id: &str) -> Result<Option<runtime_ir::Template>, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn create_template(&self, _template: runtime_ir::CreateTemplate) -> Result<String, khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn update_template(&self, _id: &str, _template: runtime_ir::CreateTemplate) -> Result<(), khronos_runtime::Error> {
-        todo!()
-    }
-
-    async fn delete_template(&self, _id: &str) -> Result<(), khronos_runtime::Error> {
-        todo!()
+    fn get_exposed_vfs(&self) -> Result<HashMap<String, khronos_runtime::core::typesext::Vfs>, khronos_runtime::Error> {
+        Ok(std::collections::HashMap::new())
     }
 
     async fn get_tenant_state(&self) -> Result<runtime_ir::TenantState, khronos_runtime::Error> {
