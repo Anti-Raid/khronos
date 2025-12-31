@@ -787,7 +787,7 @@ mod _runtimeprovider {
     pub struct TenantState {
         pub events: Vec<String>,
         pub banned: bool,
-        pub flags: u32,
+        pub data: serde_json::Value,
     }
 }
 
@@ -809,13 +809,13 @@ impl RuntimeProvider for CliRuntimeProvider {
             return Ok(runtime_ir::TenantState {
                 events: v.events,
                 banned: v.banned,
-                flags: v.flags,
+                data: v.data,
             });
         }
         return Ok(runtime_ir::TenantState {
             events: vec!["INTERACTION_CREATE".to_string()],
             banned: false,
-            flags: 0,
+            data: serde_json::Value::Null,
         });
     }
 
@@ -823,7 +823,7 @@ impl RuntimeProvider for CliRuntimeProvider {
         let v = serde_json::to_vec(&_runtimeprovider::TenantState {
             events: state.events,
             banned: state.banned,
-            flags: state.flags,
+            data: state.data,
         })?;
         self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;
         Ok(())

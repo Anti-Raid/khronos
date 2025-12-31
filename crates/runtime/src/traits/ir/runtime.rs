@@ -7,11 +7,11 @@ use crate::core::datetime::DateTime;
 pub struct TenantState {
     pub events: Vec<String>,
     pub banned: bool,
-    pub flags: u32,
+    pub data: serde_json::Value,
 }
 
 impl FromLua for TenantState {
-    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
         let table = match value {
             LuaValue::Table(t) => t,
             _ => {
@@ -25,12 +25,13 @@ impl FromLua for TenantState {
 
         let events: Vec<String> = table.get("events")?;
         let banned: bool = table.get("banned")?;
-        let flags: u32 = table.get("flags")?;
+        let data: LuaValue = table.get("data")?;
+        let data = lua.from_value(data)?;
 
         Ok(TenantState {
             events,
             banned,
-            flags,
+            data,
         })
     }
 }
@@ -41,7 +42,7 @@ impl IntoLua for TenantState {
 
         table.set("events", self.events)?;
         table.set("banned", self.banned)?;
-        table.set("flags", self.flags)?;
+        table.set("data", lua.to_value(&self.data)?)?;
 
         // Note that we do not set tenant state to readonly as we may want to mutate it
 
