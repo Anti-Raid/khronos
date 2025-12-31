@@ -2,11 +2,12 @@ use mlua_scheduler::{LuaSchedulerAsync, LuaSchedulerAsyncUserData};
 use mluau::prelude::*;
 use serenity::futures::{Stream, StreamExt};
 use serenity::futures::stream::FuturesUnordered;
+use tokio::sync::Notify;
 use tokio_util::time::DelayQueue;
 use std::task::{Context, Poll};
 use std::{cell::RefCell, pin::Pin};
 use std::time::Duration;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use crate::core::datetime::TimeDelta;
 
@@ -69,23 +70,29 @@ impl LuaUserData for OneshotChannel {
 }
 
 pub struct KeyHandle {
-    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+    queue: Weak<RefCell<DelayQueue<LuaValue>>>,
     key: tokio_util::time::delay_queue::Key,
 }
 
 impl LuaUserData for KeyHandle {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("cancel", |_, this, ()| {
-            match this.queue.try_borrow_mut()
+            let Some(queue) = this.queue.upgrade() else {
+                return Err(LuaError::external("Delay channel has been dropped"));
+            };
+
+            let val = match queue.try_borrow_mut()
             .map_err(LuaError::external)?
             .try_remove(&this.key) {
                 Some(val) => Ok((true, val.into_inner())),
                 None => Ok((false, LuaValue::Nil)),
-            }
+            };
+
+            val
         });
 
         methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaUserDataRef<KeyHandle>| {
-            Ok(this.key == other.key && Rc::ptr_eq(&this.queue, &other.queue))
+            Ok(this.key == other.key && Weak::ptr_eq(&this.queue, &other.queue))
         });
     }
 }
@@ -93,36 +100,47 @@ impl LuaUserData for KeyHandle {
 /// A delay channel that can be used to return a value after a delay/expiration
 pub struct DelayChannel {
     queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+    notify: Rc<Notify>,
 }
 
 impl DelayChannel {
     pub fn new() -> Self {
         Self {
             queue: Rc::new(RefCell::new(DelayQueue::new())),
+            notify: Rc::new(Notify::new()),
         }
     }
     
     /// Inserts a value into the delay channel with the given delay
     pub fn add(&self, value: LuaValue, delay: Duration) {
         self.queue.borrow_mut().insert(value, delay);
+        self.notify.notify_one();
     }
 
     /// Inserts a value into the delay channel with the given delay
     /// and returns a handle that can be used to cancel it
     pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> KeyHandle {
         let key = self.queue.borrow_mut().insert(value, delay);
-        KeyHandle { key, queue: self.queue.clone() }
+        self.notify.notify_one();
+        KeyHandle { key, queue: Rc::downgrade(&self.queue) }
     }
 
     pub async fn next(&self) -> LuaResult<LuaValue> {
-        let mut stream = QueueStream {
-            queue: self.queue.clone(),
-        };
-        
-        // Wait for next item to be ready
-        match stream.next().await {
-            Some(expired) => Ok(expired.into_inner()),
-            None => Err(LuaError::external("DelayChannel stream ended unexpectedly")),
+        loop {
+            // We recreate the stream wrapper in the loop (it's cheap)
+            let mut stream = QueueStream {
+                queue: self.queue.clone(),
+            };
+
+            // Attempt to get the next expired item
+            tokio::select! {
+                biased;
+                Some(expired) = stream.next() => return Ok(expired.into_inner()),
+                _ = self.notify.notified() => {
+                    // Notified, loop to recreate the stream and try again
+                },
+                
+            }
         }
     }
 }
