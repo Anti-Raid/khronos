@@ -26,6 +26,30 @@ impl FromLua for TenantState {
         let events: Vec<String> = table.get("events")?;
         let banned: bool = table.get("banned")?;
         let data: LuaValue = table.get("data")?;
+
+        // Ensure data is either a Object or Nil
+        match data {
+            LuaValue::Table(ref t) => {
+                if t.metatable().is_none() {
+                    // OK
+                } else {
+                    return Err(LuaError::FromLuaConversionError {
+                        from: "table with metatable",
+                        to: "TenantState".to_string(),
+                        message: Some("data field must be an object/map with no metatable or nil".to_string()),
+                    });
+                }
+            },
+            LuaValue::Nil => {}
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: data.type_name(),
+                    to: "TenantState".to_string(),
+                    message: Some("data field must be an object/map with no metatable or nil".to_string()),
+                });
+            }
+        }
+
         let data = lua.from_value(data)?;
 
         Ok(TenantState {
