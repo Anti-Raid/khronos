@@ -2,6 +2,8 @@ use mluau::prelude::*;
 
 use crate::core::datetime::DateTime;
 
+const MAX_EVENTS: usize = 100;
+
 // Tenant State
 #[derive(Debug, Clone)]
 pub struct TenantState {
@@ -24,6 +26,16 @@ impl FromLua for TenantState {
         };
 
         let events: Vec<String> = table.get("events")?;
+
+        // Ensure we dont have too many events set (which signifies a app logic error)
+        if events.len() > MAX_EVENTS {
+            return Err(LuaError::FromLuaConversionError {
+                from: "table",
+                to: "TenantState".to_string(),
+                message: Some(format!("too many events set in tenant state (max {} allowed)", MAX_EVENTS)),
+            });
+        }
+
         let banned: bool = table.get("banned")?;
         let data: LuaValue = table.get("data")?;
 
