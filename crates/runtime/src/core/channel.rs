@@ -1,13 +1,16 @@
 use mlua_scheduler::{LuaSchedulerAsync, LuaSchedulerAsyncUserData};
 use mluau::prelude::*;
-use serenity::futures::StreamExt;
+use serenity::futures::{Stream, StreamExt};
 use serenity::futures::stream::FuturesUnordered;
-use std::cell::RefCell;
+use tokio_util::time::DelayQueue;
+use std::task::{Context, Poll};
+use std::{cell::RefCell, pin::Pin};
+use std::time::Duration;
 use std::rc::Rc;
 
 use crate::core::datetime::TimeDelta;
 
-const MAX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(7);
+const MAX_TIMEOUT: Duration = Duration::from_secs(7);
 
 pub struct OneshotChannel {
     tx: Rc<RefCell<Option<tokio::sync::oneshot::Sender<LuaValue>>>>,
@@ -65,11 +68,108 @@ impl LuaUserData for OneshotChannel {
     }
 }
 
+pub struct KeyHandle {
+    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+    key: tokio_util::time::delay_queue::Key,
+}
+
+impl LuaUserData for KeyHandle {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("cancel", |_, this, ()| {
+            match this.queue.try_borrow_mut()
+            .map_err(LuaError::external)?
+            .try_remove(&this.key) {
+                Some(val) => Ok((true, val.into_inner())),
+                None => Ok((false, LuaValue::Nil)),
+            }
+        });
+
+        methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaUserDataRef<KeyHandle>| {
+            Ok(this.key == other.key && Rc::ptr_eq(&this.queue, &other.queue))
+        });
+    }
+}
+
+/// A delay channel that can be used to return a value after a delay/expiration
+pub struct DelayChannel {
+    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+}
+
+impl DelayChannel {
+    pub fn new() -> Self {
+        Self {
+            queue: Rc::new(RefCell::new(DelayQueue::new())),
+        }
+    }
+    
+    /// Inserts a value into the delay channel with the given delay
+    pub fn add(&self, value: LuaValue, delay: Duration) {
+        self.queue.borrow_mut().insert(value, delay);
+    }
+
+    /// Inserts a value into the delay channel with the given delay
+    /// and returns a handle that can be used to cancel it
+    pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> KeyHandle {
+        let key = self.queue.borrow_mut().insert(value, delay);
+        KeyHandle { key, queue: self.queue.clone() }
+    }
+
+    pub async fn next(&self) -> LuaResult<LuaValue> {
+        let mut stream = QueueStream {
+            queue: self.queue.clone(),
+        };
+        
+        // Wait for next item to be ready
+        match stream.next().await {
+            Some(expired) => Ok(expired.into_inner()),
+            None => Err(LuaError::external("DelayChannel stream ended unexpectedly")),
+        }
+    }
+}
+
+impl LuaUserData for DelayChannel {
+    fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("add", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
+            let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
+            Ok(this.add(value, delay))
+        });
+
+        methods.add_method("addwithhandle", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
+            let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
+            let handle = this.add_with_handle(value, delay);
+            Ok(handle)
+        });
+
+        methods.add_scheduler_async_method("next", async move |_, this, ()| {
+            this.next().await
+        });
+    }
+}
+
+struct QueueStream {
+    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+}
+
+impl Stream for QueueStream {
+    type Item = tokio_util::time::delay_queue::Expired<LuaValue>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // We only borrow MUTABLY right here, inside the poll.
+        // If the queue is not ready, DelayQueue registers the waker and returns Pending.
+        // The borrow is dropped immediately after this line.
+        self.queue.borrow_mut().poll_expired(cx)
+    }
+}
+
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
     module.set("OneshotChannel", lua.create_function(|_, ()| {
         Ok(OneshotChannel::new())
+    })?)?;
+
+    module.set("DelayChannel", lua.create_function(|_, ()| {
+        Ok(DelayChannel::new())
     })?)?;
 
     module.set("selectoneshots", lua.create_scheduler_async_function(async |_lua, (channels, timeout): (Vec<LuaUserDataRef<OneshotChannel>>, LuaUserDataRef<TimeDelta>)| {
