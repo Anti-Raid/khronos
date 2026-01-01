@@ -323,7 +323,7 @@ ORDER BY scope;
         let entries = if query == "%%" {
             // Fast path for querying all keys
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
+                "SELECT id, key, value, created_at, last_updated_at, scopes
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
@@ -337,7 +337,7 @@ ORDER BY scope;
             .map_err(|e| format!("Failed to get key: {e}"))?
         } else {
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes, expires_at
+                "SELECT id, key, value, created_at, last_updated_at, scopes
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
