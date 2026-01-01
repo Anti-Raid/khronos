@@ -214,7 +214,10 @@ impl Cli {
             .rt
             .eval_chunk(code, Some(name), Some(self.setup_data.global_table.clone()))?;
 
-        self.setup_data.rt.handle_error(chunk_fn.call(ctx))
+        self
+        .setup_data
+        .rt
+        .call_in_scheduler(chunk_fn, ctx).await
     }
 
     pub async fn setup_lua_vm(

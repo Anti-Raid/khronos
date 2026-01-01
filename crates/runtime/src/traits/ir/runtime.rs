@@ -2,16 +2,18 @@ use mluau::prelude::*;
 
 use crate::core::datetime::DateTime;
 
+const MAX_EVENTS: usize = 100;
+
 // Tenant State
 #[derive(Debug, Clone)]
 pub struct TenantState {
     pub events: Vec<String>,
     pub banned: bool,
-    pub flags: u32,
+    pub data: serde_json::Value,
 }
 
 impl FromLua for TenantState {
-    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
         let table = match value {
             LuaValue::Table(t) => t,
             _ => {
@@ -24,13 +26,48 @@ impl FromLua for TenantState {
         };
 
         let events: Vec<String> = table.get("events")?;
+
+        // Ensure we dont have too many events set (which signifies a app logic error)
+        if events.len() > MAX_EVENTS {
+            return Err(LuaError::FromLuaConversionError {
+                from: "table",
+                to: "TenantState".to_string(),
+                message: Some(format!("too many events set in tenant state (max {} allowed)", MAX_EVENTS)),
+            });
+        }
+
         let banned: bool = table.get("banned")?;
-        let flags: u32 = table.get("flags")?;
+        let data: LuaValue = table.get("data")?;
+
+        // Ensure data is either a Object or Nil
+        match data {
+            LuaValue::Table(ref t) => {
+                if t.metatable().is_none() {
+                    // OK
+                } else {
+                    return Err(LuaError::FromLuaConversionError {
+                        from: "table with metatable",
+                        to: "TenantState".to_string(),
+                        message: Some("data field must be an object/map with no metatable or nil".to_string()),
+                    });
+                }
+            },
+            LuaValue::Nil => {}
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: data.type_name(),
+                    to: "TenantState".to_string(),
+                    message: Some("data field must be an object/map with no metatable or nil".to_string()),
+                });
+            }
+        }
+
+        let data = lua.from_value(data)?;
 
         Ok(TenantState {
             events,
             banned,
-            flags,
+            data,
         })
     }
 }
@@ -41,7 +78,7 @@ impl IntoLua for TenantState {
 
         table.set("events", self.events)?;
         table.set("banned", self.banned)?;
-        table.set("flags", self.flags)?;
+        table.set("data", lua.to_value(&self.data)?)?;
 
         // Note that we do not set tenant state to readonly as we may want to mutate it
 

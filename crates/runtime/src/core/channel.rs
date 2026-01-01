@@ -1,13 +1,23 @@
 use mlua_scheduler::{LuaSchedulerAsync, LuaSchedulerAsyncUserData};
 use mluau::prelude::*;
-use serenity::futures::StreamExt;
+use serenity::futures::{Stream, StreamExt};
 use serenity::futures::stream::FuturesUnordered;
-use std::cell::RefCell;
-use std::rc::Rc;
+use tokio::sync::Notify;
+use tokio_util::time::DelayQueue;
+use std::task::{Context, Poll};
+use std::{cell::RefCell, pin::Pin};
+use std::time::Duration;
+use std::rc::{Rc, Weak};
 
 use crate::core::datetime::TimeDelta;
 
-const MAX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(7);
+const MAX_TIMEOUT: Duration = Duration::from_secs(7);
+
+const NUM_LEVELS: usize = 6;
+const MAX_DURATION: i64 = (1 << (6 * NUM_LEVELS)) - 1;
+const MAX_DURATION_UNSIGNED: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+const MAX_DURATION_OBJ: TimeDelta = TimeDelta::from_millis(MAX_DURATION-5000);
+const MAX_DURATION_OBJ_STD: Duration = Duration::from_millis(MAX_DURATION_UNSIGNED-5000);
 
 pub struct OneshotChannel {
     tx: Rc<RefCell<Option<tokio::sync::oneshot::Sender<LuaValue>>>>,
@@ -65,11 +75,142 @@ impl LuaUserData for OneshotChannel {
     }
 }
 
+pub struct KeyHandle {
+    queue: Weak<RefCell<DelayQueue<LuaValue>>>,
+    key: tokio_util::time::delay_queue::Key,
+}
+
+impl LuaUserData for KeyHandle {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("cancel", |_, this, ()| {
+            let Some(queue) = this.queue.upgrade() else {
+                return Err(LuaError::external("Delay channel has been dropped"));
+            };
+
+            let val = match queue.try_borrow_mut()
+            .map_err(LuaError::external)?
+            .try_remove(&this.key) {
+                Some(val) => Ok((true, val.into_inner())),
+                None => Ok((false, LuaValue::Nil)),
+            };
+
+            val
+        });
+
+        methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaUserDataRef<KeyHandle>| {
+            Ok(this.key == other.key && Weak::ptr_eq(&this.queue, &other.queue))
+        });
+    }
+}
+
+/// A delay channel that can be used to return a value after a delay/expiration
+pub struct DelayChannel {
+    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+    notify: Rc<Notify>,
+}
+
+impl DelayChannel {
+    pub fn new() -> Self {
+        Self {
+            queue: Rc::new(RefCell::new(DelayQueue::new())),
+            notify: Rc::new(Notify::new()),
+        }
+    }
+    
+    fn check_delay(delay: Duration) -> LuaResult<()> {
+        if delay > MAX_DURATION_OBJ_STD {
+            return Err(LuaError::external(format!("Duration is greater than max duration of {MAX_DURATION_OBJ_STD:?}")));
+        }
+        return Ok(())
+    }
+
+    /// Inserts a value into the delay channel with the given delay
+    pub fn add(&self, value: LuaValue, delay: Duration) -> LuaResult<()> {
+        Self::check_delay(delay)?;
+        self.queue.borrow_mut().insert(value, delay);
+        self.notify.notify_one();
+        Ok(())
+    }
+
+    /// Inserts a value into the delay channel with the given delay
+    /// and returns a handle that can be used to cancel it
+    pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> LuaResult<KeyHandle> {
+        Self::check_delay(delay)?;
+        let key = self.queue.borrow_mut().insert(value, delay);
+        self.notify.notify_one();
+        Ok(KeyHandle { key, queue: Rc::downgrade(&self.queue) })
+    }
+
+    pub async fn next(&self) -> LuaResult<LuaValue> {
+        loop {
+            // We recreate the stream wrapper in the loop (it's cheap)
+            let mut stream = QueueStream {
+                queue: self.queue.clone(),
+            };
+
+            // Attempt to get the next expired item
+            tokio::select! {
+                biased;
+                Some(expired) = stream.next() => return Ok(expired.into_inner()),
+                _ = self.notify.notified() => {
+                    // Notified, loop to recreate the stream and try again
+                },
+                
+            }
+        }
+    }
+}
+
+impl LuaUserData for DelayChannel {
+    fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("maxdelay", |_lua, _this, _: ()| {
+            Ok(MAX_DURATION_OBJ)
+        });
+
+        methods.add_method("add", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
+            let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
+            this.add(value, delay)
+        });
+
+        methods.add_method("addwithhandle", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
+            let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
+            this.add_with_handle(value, delay)
+        });
+
+        methods.add_scheduler_async_method("next", async move |_, this, ()| {
+            this.next().await
+        });
+
+        methods.add_meta_method(LuaMetaMethod::Len, |_, this, _: ()| {
+            Ok(this.queue.try_borrow().map_err(LuaError::external)?.len())
+        });
+    }
+}
+
+struct QueueStream {
+    queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+}
+
+impl Stream for QueueStream {
+    type Item = tokio_util::time::delay_queue::Expired<LuaValue>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // We only borrow MUTABLY right here, inside the poll.
+        // If the queue is not ready, DelayQueue registers the waker and returns Pending.
+        // The borrow is dropped immediately after this line.
+        self.queue.borrow_mut().poll_expired(cx)
+    }
+}
+
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
     module.set("OneshotChannel", lua.create_function(|_, ()| {
         Ok(OneshotChannel::new())
+    })?)?;
+
+    module.set("DelayChannel", lua.create_function(|_, ()| {
+        Ok(DelayChannel::new())
     })?)?;
 
     module.set("selectoneshots", lua.create_scheduler_async_function(async |_lua, (channels, timeout): (Vec<LuaUserDataRef<OneshotChannel>>, LuaUserDataRef<TimeDelta>)| {
