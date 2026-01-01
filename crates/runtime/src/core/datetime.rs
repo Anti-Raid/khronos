@@ -1,5 +1,5 @@
 use super::typesext::I64;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use chrono::{Datelike, TimeZone, Timelike};
 use chrono_tz::OffsetComponents;
@@ -19,6 +19,19 @@ impl TimeDelta {
     pub fn from_secs(td: i64) -> Self {
         TimeDelta {
             timedelta: chrono::Duration::seconds(td),
+        }
+    }
+
+    pub const fn from_millis(td: i64) -> Self {
+        TimeDelta {
+            timedelta: chrono::Duration::milliseconds(td),
+        }
+    }
+
+    pub const fn from_std(td: Duration) -> Result<TimeDelta, chrono::OutOfRangeError> {
+        match chrono::Duration::from_std(td) {
+            Ok(x) => Ok(TimeDelta { timedelta: x }),
+            Err(e) => Err(e)
         }
     }
 }

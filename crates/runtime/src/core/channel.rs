@@ -13,6 +13,12 @@ use crate::core::datetime::TimeDelta;
 
 const MAX_TIMEOUT: Duration = Duration::from_secs(7);
 
+const NUM_LEVELS: usize = 6;
+const MAX_DURATION: i64 = (1 << (6 * NUM_LEVELS)) - 1;
+const MAX_DURATION_UNSIGNED: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+const MAX_DURATION_OBJ: TimeDelta = TimeDelta::from_millis(MAX_DURATION-5000);
+const MAX_DURATION_OBJ_STD: Duration = Duration::from_millis(MAX_DURATION_UNSIGNED-5000);
+
 pub struct OneshotChannel {
     tx: Rc<RefCell<Option<tokio::sync::oneshot::Sender<LuaValue>>>>,
     rx: Rc<RefCell<Option<tokio::sync::oneshot::Receiver<LuaValue>>>>,
@@ -111,18 +117,28 @@ impl DelayChannel {
         }
     }
     
+    fn check_delay(delay: Duration) -> LuaResult<()> {
+        if delay > MAX_DURATION_OBJ_STD {
+            return Err(LuaError::external(format!("Duration is greater than max duration of {MAX_DURATION_OBJ_STD:?}")));
+        }
+        return Ok(())
+    }
+
     /// Inserts a value into the delay channel with the given delay
-    pub fn add(&self, value: LuaValue, delay: Duration) {
+    pub fn add(&self, value: LuaValue, delay: Duration) -> LuaResult<()> {
+        Self::check_delay(delay)?;
         self.queue.borrow_mut().insert(value, delay);
         self.notify.notify_one();
+        Ok(())
     }
 
     /// Inserts a value into the delay channel with the given delay
     /// and returns a handle that can be used to cancel it
-    pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> KeyHandle {
+    pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> LuaResult<KeyHandle> {
+        Self::check_delay(delay)?;
         let key = self.queue.borrow_mut().insert(value, delay);
         self.notify.notify_one();
-        KeyHandle { key, queue: Rc::downgrade(&self.queue) }
+        Ok(KeyHandle { key, queue: Rc::downgrade(&self.queue) })
     }
 
     pub async fn next(&self) -> LuaResult<LuaValue> {
@@ -147,15 +163,18 @@ impl DelayChannel {
 
 impl LuaUserData for DelayChannel {
     fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("maxdelay", |_lua, _this, _: ()| {
+            Ok(MAX_DURATION_OBJ)
+        });
+
         methods.add_method("add", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
             let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
-            Ok(this.add(value, delay))
+            this.add(value, delay)
         });
 
         methods.add_method("addwithhandle", |_, this, (value, delay): (LuaValue, LuaUserDataRef<TimeDelta>)| {
             let delay = delay.timedelta.to_std().map_err(LuaError::external)?;
-            let handle = this.add_with_handle(value, delay);
-            Ok(handle)
+            this.add_with_handle(value, delay)
         });
 
         methods.add_scheduler_async_method("next", async move |_, this, ()| {
