@@ -39,7 +39,6 @@ pub trait KVProvider: 'static + Clone {
         scopes: &[String],
         key: String,
         value: KhronosValue,
-        expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(bool, String), crate::Error>;
 
     /// Set a record in the key-value store by ID which already exists in the database
@@ -49,22 +48,6 @@ pub trait KVProvider: 'static + Clone {
         &self,
         id: String,
         value: KhronosValue,
-        expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Result<(), crate::Error>;
-
-    /// Sets the expiry of a key in the key-value store
-    async fn set_expiry(
-        &self,
-        scopes: &[String],
-        key: String,
-        expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Result<(), crate::Error>;
-
-    /// Sets the expiry of a key in the key-value store by ID
-    async fn set_expiry_by_id(
-        &self,
-        id: String,
-        expires_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), crate::Error>;
 
     /// Delete a record from the key-value store.
