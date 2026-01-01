@@ -161,6 +161,10 @@ impl LuaUserData for DelayChannel {
         methods.add_scheduler_async_method("next", async move |_, this, ()| {
             this.next().await
         });
+
+        methods.add_meta_method(LuaMetaMethod::Len, |_, this, _: ()| {
+            Ok(this.queue.try_borrow().map_err(LuaError::external)?.len())
+        });
     }
 }
 
