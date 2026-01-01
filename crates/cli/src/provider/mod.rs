@@ -755,7 +755,7 @@ impl RuntimeProvider for CliRuntimeProvider {
         return Ok(runtime_ir::TenantState {
             events: vec!["INTERACTION_CREATE".to_string()],
             banned: false,
-            data: serde_json::Value::Null,
+            data: serde_json::Value::Object(serde_json::Map::new()),
         });
     }
 
