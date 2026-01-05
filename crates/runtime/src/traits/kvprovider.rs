@@ -19,12 +19,6 @@ pub trait KVProvider: 'static + Clone {
     /// E.g. %abc% will match any occurrence of abc
     async fn find(&self, scopes: &[String], query: String) -> Result<Vec<KvRecord>, crate::Error>;
 
-    /// Returns if a specific key exists in the key-value store.
-    async fn exists(&self, scopes: &[String], key: String) -> Result<bool, crate::Error>;
-
-    /// Returns all keys in the key-value store.
-    async fn keys(&self, scopes: &[String]) -> Result<Vec<String>, crate::Error>;
-
     /// Get a record from the key-value store.
     async fn get(&self, scopes: &[String], key: String) -> Result<Option<KvRecord>, crate::Error>;
 

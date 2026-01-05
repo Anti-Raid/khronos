@@ -301,52 +301,6 @@ ORDER BY scope;
 
         Ok(records)
     }
-
-    async fn exists(&self, scopes: &[String], key: String) -> Result<bool, khronos_runtime::Error> {
-        let data = sqlx::query(
-            "SELECT COUNT(*)
-            FROM kv_v2
-            WHERE 
-            guild_id = $1 
-            AND key = $2
-            AND scopes @> $3
-            LIMIT 1
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(key)
-        .bind(scopes)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?;
-
-        let count = data.get::<i64, _>(0);
-
-        Ok(count > 0)
-    }
-
-    async fn keys(&self, scopes: &[String]) -> Result<Vec<String>, khronos_runtime::Error> {
-        let data = sqlx::query(
-            "SELECT key
-            FROM kv_v2
-            WHERE 
-            guild_id = $1 
-            AND scopes @> $2
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(scopes)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?;
-
-        let keys = data
-            .iter()
-            .map(|row| row.get::<String, _>("key"))
-            .collect::<Vec<_>>();
-
-        Ok(keys)
-    }
 }
 
 #[derive(Clone)]
