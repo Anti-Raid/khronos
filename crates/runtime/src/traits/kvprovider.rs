@@ -28,31 +28,14 @@ pub trait KVProvider: 'static + Clone {
     /// Get a record from the key-value store.
     async fn get(&self, scopes: &[String], key: String) -> Result<Option<KvRecord>, crate::Error>;
 
-    /// Get a record from the key-value store by ID.
-    async fn get_by_id(&self, id: String) -> Result<Option<KvRecord>, crate::Error>;
-
     /// Set a record in the key-value store.
-    ///
-    /// Returns a KvRecord with exists set to true if the key already exists, or false if it was created.
     async fn set(
         &self,
         scopes: &[String],
         key: String,
         value: KhronosValue,
-    ) -> Result<(bool, String), crate::Error>;
-
-    /// Set a record in the key-value store by ID which already exists in the database
-    ///
-    /// Returns a KvRecord. ``exists`` is guaranteed to be true
-    async fn set_by_id(
-        &self,
-        id: String,
-        value: KhronosValue,
     ) -> Result<(), crate::Error>;
 
     /// Delete a record from the key-value store.
     async fn delete(&self, scopes: &[String], key: String) -> Result<(), crate::Error>;
-
-    /// Delete a record from the key-value store by ID.
-    async fn delete_by_id(&self, id: String) -> Result<(), crate::Error>;
 }

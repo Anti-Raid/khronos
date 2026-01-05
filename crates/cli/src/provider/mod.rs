@@ -169,49 +169,12 @@ ORDER BY scope;
         Ok(Some(file_contents))
     }
 
-    async fn get_by_id(
-        &self,
-        id: String,
-    ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes
-            FROM kv_v2
-            WHERE 
-            guild_id = $1 AND
-            id = $2
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?
-        else {
-            return Ok(None);
-        };
-
-        let value = data.get::<serde_json::Value, _>("value");
-
-        let record = serde_json::from_value(value)?;
-
-        let file_contents = khronos_runtime::traits::ir::KvRecord {
-            id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
-            key: data.get::<String, _>("key"),
-            value: record,
-            created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
-            last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
-            scopes: data.get::<Vec<String>, _>("scopes"),
-        };
-
-        Ok(Some(file_contents))
-    }
-
     async fn set(
         &self,
         scopes: &[String],
         key: String,
         value: KhronosValue,
-    ) -> Result<(bool, String), khronos_runtime::Error> {
+    ) -> Result<(), khronos_runtime::Error> {
         if let Some(existing) = sqlx::query(
             "SELECT id
             FROM kv_v2
@@ -236,35 +199,15 @@ ORDER BY scope;
                 .await
                 .map_err(|e| format!("Failed to set key: {e}"))?;
 
-            return Ok((true, key.to_string()));
+            return Ok(());
         }
 
-        let id = sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes) VALUES ($1, $2, $3, $4) RETURNING id")
+        sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes) VALUES ($1, $2, $3, $4)")
             .bind(self.guild_id.to_string())
             .bind(&key)
             .bind(serde_json::to_value(value)?)
             .bind(scopes)
             .fetch_one(&self.pool)
-            .await
-            .map_err(|e| format!("Failed to set key: {e}"))?
-            .try_get::<sqlx::types::uuid::Uuid, _>("id")
-            .map_err(|e| format!("Failed to get ID: {e}"))?;
-
-        Ok((false, id.to_string()))
-    }
-
-    async fn set_by_id(
-        &self,
-        id: String,
-        value: KhronosValue,
-    ) -> Result<(), khronos_runtime::Error> {
-        let id = sqlx::types::uuid::Uuid::parse_str(&id)
-            .map_err(|e| format!("Failed to parse ID: {e}"))?;
-
-        sqlx::query("UPDATE kv_v2 SET value = $1 WHERE id = $2")
-            .bind(serde_json::to_value(value)?)
-            .bind(id)
-            .execute(&self.pool)
             .await
             .map_err(|e| format!("Failed to set key: {e}"))?;
 
@@ -283,23 +226,6 @@ ORDER BY scope;
         .bind(self.guild_id.to_string())
         .bind(key)
         .bind(scopes)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?;
-
-        Ok(())
-    }
-
-    async fn delete_by_id(&self, id: String) -> Result<(), khronos_runtime::Error> {
-        sqlx::query(
-            "DELETE FROM kv_v2
-            WHERE 
-            guild_id = $1 AND
-            id = $2
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Failed to get key: {e}"))?;
