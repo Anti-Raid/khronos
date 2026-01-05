@@ -224,21 +224,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         );
 
         methods.add_scheduler_async_method(
-            "exists",
-            async move |_, this, (key, scopes): (String, Vec<String>)| {
-                this.check(&scopes, "exists", &key)
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let exists = this
-                    .kv_provider
-                    .exists(&scopes, key)
-                    .await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-                Ok(exists)
-            },
-        );
-
-        methods.add_scheduler_async_method(
             "get",
             async move |_, this, (key, scopes): (String, Vec<String>)| {
                 this.check(&scopes, "get", &key)
@@ -287,19 +272,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 Ok(record)
             },
         );
-
-        methods.add_scheduler_async_method("keys", async move |_, this, scopes: Vec<String>| {
-            this.check_keys(&scopes)
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            let keys = this
-                .kv_provider
-                .keys(&scopes)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            Ok(keys)
-        });
 
         methods.add_scheduler_async_method(
             "set",
