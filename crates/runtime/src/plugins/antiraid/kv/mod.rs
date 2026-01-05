@@ -15,22 +15,6 @@ pub struct KvExecutor<T: KhronosContext> {
     kv_provider: T::KVProvider,
 }
 
-/// Represents a result of a set operation in the key-value store
-pub struct SetResult {
-    pub exists: bool, // If true, the key already existed
-    pub id: String,   // The ID of the record
-}
-
-impl IntoLua for SetResult {
-    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        let table = lua.create_table()?;
-        table.set("exists", self.exists)?;
-        table.set("id", self.id)?;
-        table.set_readonly(true); // We want SetResults to be immutable
-        Ok(LuaValue::Table(table))
-    }
-}
-
 /// Represents a full record complete with metadata
 pub struct KvRecord {
     pub id: String,
@@ -188,18 +172,6 @@ impl<T: KhronosContext> KvExecutor<T> {
         )
         .into())
     }
-
-    pub fn id_check(&self, action: &str) -> Result<(), crate::Error> {
-        if !self.limitations.has_cap("kv.meta:id_ops") {
-            return Err(
-                "The kv.meta:id_ops capability is required to use ID-taking methods".into(),
-            );
-        }
-
-        self.kv_provider.attempt_action(&[], action)?; // Check rate limits
-
-        Ok(())
-    }
 }
 
 impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
@@ -287,24 +259,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             },
         );
 
-        methods.add_scheduler_async_method("getbyid", async move |_, this, id: String| {
-            this.id_check("getbyid")
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            let record = this
-                .kv_provider
-                .get_by_id(id)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            match record {
-                // Return None and true if record was found but value is null
-                Some(rec) => Ok((Some(rec.value), true)),
-                // Return None and 0 if record was not found
-                None => Ok((None, false)),
-            }
-        });
-
         methods.add_scheduler_async_method(
             "getrecord",
             async move |_, this, (key, scopes): (String, Vec<String>)| {
@@ -333,32 +287,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 Ok(record)
             },
         );
-
-        methods.add_scheduler_async_method("getrecordbyid", async move |_, this, id: String| {
-            this.id_check("getbyid")
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            let record = this
-                .kv_provider
-                .get_by_id(id)
-                .await
-                .map_err(|e| LuaError::external(e.to_string()))?;
-
-            let record = match record {
-                Some(rec) => KvRecord {
-                    id: rec.id,
-                    key: rec.key,
-                    value: rec.value,
-                    scopes: rec.scopes,
-                    exists: true,
-                    created_at: rec.created_at,
-                    last_updated_at: rec.last_updated_at,
-                },
-                None => KvRecord::default(),
-            };
-
-            Ok(record)
-        });
 
         methods.add_scheduler_async_method("keys", async move |_, this, scopes: Vec<String>| {
             this.check_keys(&scopes)
@@ -392,33 +320,9 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 let value = KhronosValue::from_lua(value, &lua)?;
 
-                let (exists, id) = this
-                    .kv_provider
-                    .set(&scopes, key, value)
-                    .await
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let rec = SetResult { exists, id };
-                Ok(rec)
-            },
-        );
-
-        methods.add_scheduler_async_method(
-            "setbyid",
-            async move |lua,
-                        this,
-                        (id, value): (
-                String,
-                LuaValue,
-            )| {
-                this.id_check("setbyid")
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let value = KhronosValue::from_lua(value, &lua)?;
-
                 this
                     .kv_provider
-                    .set_by_id(id, value)
+                    .set(&scopes, key, value)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -440,18 +344,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                 Ok(())
             },
         );
-
-        methods.add_scheduler_async_method("deletebyid", async move |_, this, id: String| {
-            this.id_check("deletebyid")
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            this.kv_provider
-                .delete_by_id(id)
-                .await
-                .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-            Ok(())
-        });
     }
 
     #[cfg(feature = "repl")]
