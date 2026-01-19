@@ -626,18 +626,10 @@ impl Router {
     }
 
     fn parse_lua_thread_response(
-        output: LuaResult<Option<LuaResult<LuaMultiValue>>>,
+        output: LuaResult<LuaMultiValue>,
     ) -> LuaServerResponseParsed {
         match output {
-            Ok(Some(result)) => match result {
-                Ok(output) => Self::parse_mv_response(output),
-                Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-                    .into_response()
-                    .into(),
-            },
-            Ok(None) => (axum::http::StatusCode::NO_CONTENT, "")
-                .into_response()
-                .into(),
+            Ok(output) => Self::parse_mv_response(output),
             Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
                 .into_response()
                 .into(),

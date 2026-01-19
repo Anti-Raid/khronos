@@ -3,6 +3,7 @@ use crate::{TemplateContext, primitives::event::CreateEvent, traits::runtimeprov
 use super::{
     httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
     kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
+    globalkvprovider::GlobalKVProvider
 };
 use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
@@ -50,6 +51,7 @@ impl Limitations {
 
 pub trait KhronosContext: 'static + Clone + Sized {
     type KVProvider: KVProvider;
+    type GlobalKVProvider: GlobalKVProvider;
     type DiscordProvider: DiscordProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
@@ -70,6 +72,9 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a key-value provider
     fn kv_provider(&self) -> Option<Self::KVProvider>;
+
+    /// Returns a global key-value provider
+    fn global_kv_provider(&self) -> Option<Self::GlobalKVProvider>;
 
     /// Returns a Discord provider
     ///

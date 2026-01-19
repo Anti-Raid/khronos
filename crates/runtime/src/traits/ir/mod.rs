@@ -8,6 +8,8 @@ pub mod kv;
 pub mod objectstorage;
 /// Runtime IR
 pub mod runtime;
+/// Global KV IR
+pub mod globalkv;
 
 pub use kv::*;
 pub use objectstorage::*;

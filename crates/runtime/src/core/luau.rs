@@ -92,12 +92,7 @@ impl LuaUserData for Chunk {
                 let th = lua.create_thread(func)?;
 
                 let scheduler = mlua_scheduler::taskmgr::get(&lua);
-                let output = scheduler.spawn_thread_and_wait(th, args).await?;
-
-                match output {
-                    Some(result) => result,
-                    None => Ok(LuaMultiValue::new()),
-                }
+                scheduler.spawn_thread_and_wait(th, args).await
             },
         );
     }

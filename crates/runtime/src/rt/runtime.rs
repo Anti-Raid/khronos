@@ -8,7 +8,7 @@ use std::sync::Once;
 use std::time::Instant;
 
 use mlua_scheduler::taskmgr::Hooks;
-use mlua_scheduler::{ReturnTracker, TaskManager};
+use mlua_scheduler::TaskManager;
 use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 
@@ -111,7 +111,7 @@ impl KhronosRuntime {
     /// Creates a new Khronos runtime from scratch
     ///
     /// Note that the resulting lua vm is *not* sandboxed until KhronosRuntime::sandbox() is called
-    pub async fn new<
+    pub fn new<
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn(LuaLightUserData) + 'static,
         FS: mluau_require::vfs::FileSystem + 'static,
@@ -151,11 +151,10 @@ impl KhronosRuntime {
             Some(limit) => Rc::new(Cell::new(Some(Instant::now() + limit))),
             None => Rc::new(Cell::new(None)),
         };
-        let scheduler = TaskManager::new(&lua, ReturnTracker::new(), Rc::new(SchedulerHook {
+        let scheduler = TaskManager::new(&lua, Rc::new(SchedulerHook {
             execution_stop_time: execution_stop_time.clone(),
             give_time: opts.give_time
         }))
-        .await
         .map_err(|e| {
             LuaError::external(format!(
                 "Failed to create task manager: {e:?}"
@@ -504,11 +503,6 @@ impl KhronosRuntime {
                 return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
             };
 
-            let Some(res) = res else {
-                return Ok(R::from_lua_multi(LuaMultiValue::with_capacity(0), lua)?)
-            };
-
-            let res = self.handle_error(res)?;
             self.handle_error(R::from_lua_multi(res, lua))
         }
     }

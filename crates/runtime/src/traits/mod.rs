@@ -5,3 +5,4 @@ pub mod ir;
 pub mod kvprovider;
 pub mod objectstorageprovider;
 pub mod runtimeprovider;
+pub mod globalkvprovider;

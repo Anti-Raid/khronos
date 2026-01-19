@@ -238,7 +238,6 @@ impl Cli {
             None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn(LuaLightUserData) -> ())>,
             PhysicalFS::new(current_dir.clone())
         )
-        .await
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());
 
