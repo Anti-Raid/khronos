@@ -1,7 +1,9 @@
 use dapi::EVENT_LIST;
 use khronos_runtime::traits::context::Limitations;
+use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
+use khronos_runtime::traits::ir::globalkv::GlobalKv;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
 use khronos_runtime::utils::khronos_value::KhronosValue;
 use moka::future::Cache;
@@ -39,6 +41,7 @@ pub struct CliKhronosContext {
 
 impl KhronosContext for CliKhronosContext {
     type KVProvider = CliKVProvider;
+    type GlobalKVProvider = CliGlobalKVProvider;
     type DiscordProvider = CliDiscordProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
@@ -66,6 +69,24 @@ impl KhronosContext for CliKhronosContext {
         };
 
         Some(CliKVProvider {
+            guild_id,
+            pool: pool.clone(),
+        })
+    }
+
+    fn global_kv_provider(&self) -> Option<Self::GlobalKVProvider> {
+        let guild_id = if let Some(guild_id) = self.guild_id {
+            guild_id
+        } else {
+            default_global_guild_id()
+        };
+
+        let Some(pool) = &self.pool else {
+            eprintln!("WARNING: A postgres pool is required for GlobalKVProvider in CLI mode.");
+            return None;
+        };
+
+        Some(CliGlobalKVProvider {
             guild_id,
             pool: pool.clone(),
         })
@@ -300,6 +321,27 @@ ORDER BY scope;
         }
 
         Ok(records)
+    }
+}
+
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct CliGlobalKVProvider {
+    pub guild_id: serenity::all::GuildId,
+    pub pool: sqlx::PgPool,
+}
+
+impl GlobalKVProvider for CliGlobalKVProvider {
+    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
+        Ok(())
+    }
+
+    async fn list(&self) -> Result<Vec<GlobalKv>, khronos_runtime::Error> {
+        todo!()
+    }
+
+    async fn get(&self, _key: String, _version: i32) -> Result<Option<GlobalKv>, khronos_runtime::Error> {
+        todo!()
     }
 }
 

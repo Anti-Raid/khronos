@@ -1,5 +1,4 @@
 use mluau::prelude::*;
-
 use crate::core::datetime::DateTime;
 
 const MAX_EVENTS: usize = 100;

@@ -4,7 +4,7 @@ use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 use rand::distr::{Alphanumeric, SampleString};
 
-use crate::{primitives::lazy::Lazy, utils::proxyglobal::proxy_global};
+use crate::{primitives::{lazy::Lazy, opaque::Opaque}, utils::proxyglobal::proxy_global};
 
 /// Syntactically:
 ///
@@ -748,13 +748,28 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
 
 #[derive(Debug, Clone)]
 pub struct Vfs {
-    pub vfs: Arc<dyn mluau_require::vfs::FileSystem>
+    pub vfs: Arc<dyn mluau_require::vfs::FileSystem>,
+
+    #[allow(dead_code)]
+    /// Not used currently, but may be useful in the future
+    ///
+    /// Denotes whether this VFS was created from an Opaque type
+    /// 
+    /// Will in future block certain operations that would expose the underlying data
+    from_opaque: bool,
+}
+
+impl Vfs {
+    pub fn new(vfs: Arc<dyn mluau_require::vfs::FileSystem>, opaque: bool) -> Self {
+        Self { vfs, from_opaque: opaque }
+    }
 }
 
 impl LuaUserData for Vfs {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_function("newoverlay", |_lua, vfs_list: Vec<LuaValue>| {
             let mut vfs_refs = Vec::with_capacity(vfs_list.len());
+            let mut from_opaque = false;
             for vfs in vfs_list {
                 match vfs {
                     LuaValue::UserData(vfs) => {
@@ -767,6 +782,17 @@ impl LuaUserData for Vfs {
                                 mluau_require::create_memory_vfs_from_map(&vfs.data)
                                 .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
                             ));
+                            continue;
+                        } else if vfs.is::<Opaque<HashMap<String, String>>>() {
+                            let vfs = vfs
+                            .borrow::<Opaque<HashMap<String, String>>>()
+                            .map_err(|_| LuaError::external("Failed to borrow Opaque<serde_json::Value>"))?;
+
+                            vfs_refs.push(mluau_require::vfs::VfsPath::new(
+                                mluau_require::create_memory_vfs_from_map(&vfs.data)
+                                .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
+                            ));
+                            from_opaque = true;
                             continue;
                         }
 
@@ -782,7 +808,7 @@ impl LuaUserData for Vfs {
                 }
             }
 
-            Ok(Vfs { vfs: Arc::new(mluau_require::vfs::OverlayFS::new(&vfs_refs)) })
+            Ok(Vfs { vfs: Arc::new(mluau_require::vfs::OverlayFS::new(&vfs_refs)), from_opaque })
         });
 
         methods.add_method("createrequirefunction", |lua, this, (id, global_table): (String, LuaTable)| {
