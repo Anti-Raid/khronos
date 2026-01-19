@@ -67,9 +67,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     /// Note: TemplateContext will auto-cache Limitations and use it.
     fn limitations(&self) -> Limitations;
 
-    /// Returns the guild ID of the current context, if any
-    fn guild_id(&self) -> Option<serenity::all::GuildId>;
-
     /// Returns a key-value provider
     fn kv_provider(&self) -> Option<Self::KVProvider>;
 

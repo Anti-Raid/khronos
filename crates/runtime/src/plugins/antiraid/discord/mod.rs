@@ -244,9 +244,13 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
             },
         );
 
-        // Basic helper functions
         methods.add_method("antiraid_check_reason", |_, this, reason: String| {
             Ok(this.check_reason(&reason))
+        });
+
+        // Checks the guild_id of the discord executor
+        methods.add_method("guild_id", |_lua, this, _: ()| {
+            Ok(this.discord_provider.guild_id().to_string())
         });
 
         dapi::apilist::API::add_luau_methods::<DiscordActionExecutor<T>, _>(methods);
