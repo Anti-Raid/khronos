@@ -2,8 +2,10 @@ mod http_binder;
 
 use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
+use mlua_scheduler::taskmgr::SchedulerImpl;
 use crate::core::datetime::TimeDelta;
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
+use crate::rt::runtime::S;
 use crate::traits::context::KhronosContext;
 use crate::traits::httpserverprovider::HTTPServerProvider;
 use crate::TemplateContext;
@@ -973,7 +975,7 @@ impl LuaUserData for Router {
                 }
             };
 
-            let taskmgr = mlua_scheduler::taskmgr::get(&lua);
+            let taskmgr = S::get(&lua);
 
             while let Some(req) = rx.recv().await {
                 match req {
@@ -1027,7 +1029,7 @@ impl LuaUserData for Router {
 
                             let taskmgr = taskmgr.clone();
                             tokio::task::spawn_local(async move {
-                                let output = taskmgr.spawn_thread_and_wait(th, request).await;
+                                let output = taskmgr.run_in_scheduler(th, request).await;
 
                                 // Output must be a ServerResponse struct
                                 let parsed_output = Self::parse_lua_thread_response(output);

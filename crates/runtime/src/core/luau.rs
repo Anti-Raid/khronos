@@ -1,5 +1,7 @@
-use mlua_scheduler::LuaSchedulerAsyncUserData;
+use mlua_scheduler::{LuaSchedulerAsyncUserData, taskmgr::SchedulerImpl};
 use mluau::prelude::*;
+
+use crate::rt::runtime::S;
 
 #[derive(Clone)]
 /// An lockdown executor is used to manage AntiRaid lockdowns from Lua
@@ -91,8 +93,8 @@ impl LuaUserData for Chunk {
 
                 let th = lua.create_thread(func)?;
 
-                let scheduler = mlua_scheduler::taskmgr::get(&lua);
-                scheduler.spawn_thread_and_wait(th, args).await
+                let scheduler = S::get(&lua);
+                scheduler.run_in_scheduler(th, args).await
             },
         );
     }
