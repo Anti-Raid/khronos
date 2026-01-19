@@ -53,10 +53,6 @@ impl KhronosContext for CliKhronosContext {
         Limitations::new(self.allowed_caps.clone())
     }
 
-    fn guild_id(&self) -> Option<serenity::all::GuildId> {
-        self.guild_id
-    }
-
     fn kv_provider(&self) -> Option<Self::KVProvider> {
         let guild_id = if let Some(guild_id) = self.guild_id {
             guild_id

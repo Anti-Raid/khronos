@@ -163,12 +163,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
         // Fields
         fields.add_field_method_get("store", |_, this| Ok(this.store_table.clone()));
 
-        fields.add_field_method_get("guild_id", |lua, this| {
-            let v = lua.to_value_with(&this.context.guild_id(), LUA_SERIALIZE_OPTIONS)?;
-
-            Ok(v)
-        });
-
         fields.add_field_method_get("allowed_caps", |lua, this| {
             let v = lua.to_value_with(&this.limitations.capabilities, LUA_SERIALIZE_OPTIONS)?;
 
