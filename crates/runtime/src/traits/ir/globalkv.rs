@@ -29,17 +29,6 @@ pub struct GlobalKv {
     pub data: serde_json::Value, // the actual value of the key-value, may be private
 }
 
-impl GlobalKv {
-    pub fn extract_data<T: 'static>(&mut self, lua: &Lua) -> LuaResult<LuaValue> {
-        let data = std::mem::take(&mut self.data);
-        if self.price.is_some() || !self.public_data {
-            lua.create_userdata(Opaque::new(data)).map(LuaValue::UserData)
-        } else {
-            lua.create_userdata(Lazy::new(data)).map(LuaValue::UserData)
-        }
-    }
-}
-
 impl IntoLua for GlobalKv {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
@@ -62,13 +51,50 @@ impl IntoLua for GlobalKv {
         table.set("last_updated_at", DateTime::from_utc(self.last_updated_at))?;
         table.set("public_data", self.public_data)?;
         table.set("review_state", self.review_state)?;
-        let data = if self.price.is_some() || !self.public_data {
-            lua.create_userdata(Opaque::new(self.data))?
+        if self.data.is_null() {
+            table.set("data", LuaValue::Nil)?;
         } else {
-            lua.create_userdata(Lazy::new(self.data))?
-        };
-        table.set("data", data)?;
+            let data = if self.price.is_some() || !self.public_data {
+                lua.create_userdata(Opaque::new(self.data))?
+            } else {
+                lua.create_userdata(Lazy::new(self.data))?
+            };
+            table.set("data", data)?;
+        }
         table.set_readonly(true); // We want KvRecords to be immutable
         Ok(LuaValue::Table(table))
     }
+}
+
+/// A global key-value entry that can be viewed by all guilds
+/// 
+/// Unlike normal key-values, these are not scoped to a specific guild or tenant,
+/// are immutable (new versions must be created, updates not allowed) and have both
+/// a public metadata and potentially private value. Only staff may create global kv's that
+/// have a price attached to them.
+/// 
+/// These are primarily used for things like the template shop but may be used for other
+/// things as well in the future beyond template shop as well such as global lists.
+/// 
+/// NOTE: Global KV's created publicly cannot have a price associated to them for legal reasons.
+/// Only staff may create priced global KV's.
+/// NOTE 2: All Global KV's undergo staff review before being made available. When this occurs,
+/// review state will be updated accordingly from 'pending' to 'approved' or otherwise if rejected.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateGlobalKv {
+    pub key: String,
+    pub version: i32,
+    pub short: String, // short description for the key-value.
+    pub public_metadata: serde_json::Value, // public metadata about the key-value
+    pub scope: String,
+    pub public_data: bool,
+    pub long: Option<String>, // long description for the key-value.
+    pub data: serde_json::Value, // the actual value of the key-value, may be private
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum AttachResult {
+    PurchaseRequired { url: String },
+    Ok(()),
 }

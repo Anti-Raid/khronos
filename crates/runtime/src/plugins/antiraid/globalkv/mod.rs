@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::traits::context::{KhronosContext, Limitations};
 use crate::traits::globalkvprovider::GlobalKVProvider;
 use crate::TemplateContext;
+use crate::traits::ir::globalkv::CreateGlobalKv;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
 
@@ -37,13 +38,13 @@ impl<T: KhronosContext> LuaUserData for GlobalKvExecutor<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("GlobalKvExecutor"));
 
-        methods.add_scheduler_async_method("list", async move |_, this, _g: ()| {
-            this.check("list")
+        methods.add_scheduler_async_method("find", async move |_, this, (query, scope): (String, String)| {
+            this.check("find")
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
 
             let keys = this
                 .global_kv_provider
-                .list()
+                .find(scope, query)
                 .await
                 .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -52,17 +53,64 @@ impl<T: KhronosContext> LuaUserData for GlobalKvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "get",
-            async move |_, this, (key, version): (String, i32)| {
+            async move |_, this, (key, version, scope): (String, i32, String)| {
                 this.check("get")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let record = this
                     .global_kv_provider
-                    .get(key, version)
+                    .get(key, version, scope)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
                 Ok(record)
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "attach",
+            async move |lua, this, (key, version, scope): (String, i32, String)| {
+                this.check("attach")
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let record = this
+                    .global_kv_provider
+                    .attach(key, version, scope)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                lua.to_value(&record)
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "create",
+            async move |lua, this, entry: LuaValue| {
+                this.check("create")
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+                let entry: CreateGlobalKv = lua.from_value(entry)?;
+
+                this.global_kv_provider
+                    .create(entry)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
+            },
+        );
+
+        methods.add_scheduler_async_method(
+            "delete",
+            async move |_, this, (key, version, scope): (String, i32, String)| {
+                this.check("delete")
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                this.global_kv_provider
+                    .delete(key, version, scope)
+                    .await
+                    .map_err(|e| LuaError::external(e.to_string()))?;
+
+                Ok(())
             },
         );
     }

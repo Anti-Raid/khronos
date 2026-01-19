@@ -3,6 +3,7 @@ use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
+use khronos_runtime::traits::ir::globalkv::AttachResult;
 use khronos_runtime::traits::ir::globalkv::GlobalKv;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
 use khronos_runtime::utils::khronos_value::KhronosValue;
@@ -336,12 +337,28 @@ impl GlobalKVProvider for CliGlobalKVProvider {
         Ok(())
     }
 
-    async fn list(&self) -> Result<Vec<GlobalKv>, khronos_runtime::Error> {
-        todo!()
+    async fn find(&self, _scope: String, _query: String) -> Result<Vec<GlobalKv>, khronos_runtime::Error> {
+        Err("Not implemented yet".into())
     }
 
-    async fn get(&self, _key: String, _version: i32) -> Result<Option<GlobalKv>, khronos_runtime::Error> {
-        todo!()
+    async fn list_attached(&self, _scopes: &[String], _query: String) -> Result<Vec<GlobalKv>, khronos_runtime::Error> {
+        Err("Not implemented yet".into())
+    }
+
+    async fn get(&self, _key: String, _version: i32, _scope: String) -> Result<Option<GlobalKv>, khronos_runtime::Error> {
+        Err("Not implemented yet".into())
+    }
+
+    async fn attach(&self, _key: String, _version: i32, _scope: String) -> Result<AttachResult, khronos_runtime::Error> {
+        Err("Not implemented yet".into())
+    }
+
+    async fn create(&self, _entry: khronos_runtime::traits::ir::globalkv::CreateGlobalKv) -> Result<(), khronos_runtime::Error> {
+        Err("Not implemented yet".into())
+    }
+
+    async fn delete(&self, _key: String, _version: i32, _scope: String) -> Result<(), khronos_runtime::Error> {
+        Err("Not implemented yet".into())
     }
 }
 
