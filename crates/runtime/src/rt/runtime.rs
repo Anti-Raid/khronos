@@ -7,10 +7,11 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
 
-use mlua_scheduler::taskmgr::Hooks;
-use mlua_scheduler::TaskManager;
+use mlua_scheduler::taskmgr::{CoreActor, Hooks, SchedulerImpl};
 use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
+
+pub type S = mlua_scheduler::schedulers::rodan::CoreScheduler;
 
 use crate::TemplateContext;
 use crate::primitives::event::CreateEvent;
@@ -70,7 +71,7 @@ pub struct KhronosRuntime {
     compiler: mluau::Compiler,
 
     /// The vm scheduler
-    scheduler: TaskManager,
+    scheduler: S,
 
     /// Is the runtime instance 'broken' or not
     broken: Rc<Cell<bool>>,
@@ -151,19 +152,14 @@ impl KhronosRuntime {
             Some(limit) => Rc::new(Cell::new(Some(Instant::now() + limit))),
             None => Rc::new(Cell::new(None)),
         };
-        let scheduler = TaskManager::new(&lua, Rc::new(SchedulerHook {
+        let scheduler = S::new(CoreActor::new(lua.weak(), Rc::new(SchedulerHook {
             execution_stop_time: execution_stop_time.clone(),
             give_time: opts.give_time
-        }))
-        .map_err(|e| {
-            LuaError::external(format!(
-                "Failed to create task manager: {e:?}"
-            ))
-        })?;
+        })));
 
         if !opts.disable_task_lib {
             lua.globals()
-                .set("task", mlua_scheduler::userdata::task_lib(&lua)?)?;
+                .set("task", mlua_scheduler::userdata::task_lib::<S>(&lua)?)?;
         }
 
         log::debug!("Khronos runtime created successfully");
@@ -278,7 +274,7 @@ impl KhronosRuntime {
     }
 
     /// Returns the scheduler
-    pub fn scheduler(&self) -> &TaskManager {
+    pub fn scheduler(&self) -> &S {
         log::debug!("Getting scheduler");
         &self.scheduler
     }
@@ -495,7 +491,7 @@ impl KhronosRuntime {
 
         let res = self.handle_error(self
             .scheduler
-            .spawn_thread_and_wait(th, args)
+            .run_in_scheduler(th, args)
             .await)?;
 
         {

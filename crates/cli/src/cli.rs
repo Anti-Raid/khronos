@@ -10,6 +10,7 @@ use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
+use khronos_runtime::rt::mlua_scheduler::taskmgr::SchedulerImpl;
 use khronos_runtime::utils::proxyglobal::proxy_global;
 use rustyline::history::DefaultHistory;
 use rustyline::Editor;
