@@ -871,9 +871,31 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set("Vfs", lua.create_proxy::<Vfs>()?)?;
 
-    //
     module.set("createglobalproxy", lua.create_function(|lua, _: ()| {
         proxy_global(lua)
+    })?)?;
+
+    // Lazy/Opaque<Value> to Lazy/Opaque<HashMap<String, String>> casting functions
+    module.set("castlazyvaluetolazymap", lua.create_function(|_lua, val: LuaAnyUserData| {
+        let lazy_value = val
+            .take::<Lazy<serde_json::Value>>()
+            .map_err(|_| LuaError::external("Failed to borrow Lazy<serde_json::Value>"))?;
+
+        let map: HashMap<String, String> = serde_json::from_value(lazy_value.data)
+            .map_err(|e| LuaError::external(format!("Failed to convert serde_json::Value to HashMap<String, String>: {}", e)))?;
+
+        Ok(Lazy::new(map))
+    })?)?;
+
+    module.set("castopaquevaluetopaquemap", lua.create_function(|_lua, val: LuaAnyUserData| {
+        let opaque_value = val
+            .take::<Opaque<serde_json::Value>>()
+            .map_err(|_| LuaError::external("Failed to borrow Opaque<serde_json::Value>"))?;
+
+        let map: HashMap<String, String> = serde_json::from_value(opaque_value.data)
+            .map_err(|e| LuaError::external(format!("Failed to convert serde_json::Value to HashMap<String, String>: {}", e)))?;
+
+        Ok(Opaque::new(map))
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
