@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use crate::{core::datetime::DateTime, primitives::{lazy::Lazy, opaque::Opaque}};
@@ -71,11 +69,6 @@ pub struct GlobalKv {
 }
 
 pub enum GlobalKvData {
-    /// Opaque string map (VFS)
-    StringMap {
-        data: HashMap<String, String>,
-        opaque: bool,
-    },
     Value {
         data: serde_json::Value,
         opaque: bool,
@@ -91,15 +84,6 @@ impl IntoLua for GlobalKv {
         table.set("partial", self.partial.into_lua(lua)?)?;
         let data_table = lua.create_table()?;
         match self.data {
-            GlobalKvData::StringMap { data, opaque } => {
-                let ud = if opaque {
-                    lua.create_userdata(Opaque::new(data))?
-                } else {
-                    lua.create_userdata(Lazy::new(data))?
-                };
-                data_table.set("type", "StringMap")?;
-                data_table.set("data", ud)?;
-            }
             GlobalKvData::Value { data, opaque } => {
                 let ud = if opaque {
                     lua.create_userdata(Opaque::new(data))?
