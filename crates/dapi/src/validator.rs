@@ -6,6 +6,8 @@ use rustrict::{Censor, Type};
 use crate::ensure_safe;
 use crate::types::{CreateEmbed, CreateMessage, EditMessage, ExecuteWebhook, CreateCommandOption, CreateCommand, serenity_component::{ComponentType, Component, ActionRowComponent}};
 
+pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
+
 /// Checks if a string isn't offensive
 pub fn validate_string_offensive(input: &str) -> Result<(), crate::Error> {
     // Try a bit more leniency for offensive words
@@ -253,7 +255,6 @@ pub fn validate_embed(embed: &CreateEmbed) -> Result<usize, crate::Error> {
 
 /// Validates all messages
 pub fn validate_message(message: &CreateMessage) -> Result<(), crate::Error> {
-    pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
     pub const MAX_EMBED_CHARACTERS_LIMIT: usize = 6000;
 
     let has_content = message.content.is_some();
@@ -514,7 +515,7 @@ fn validate_option(
 
     for choice in option.choices.iter() {
         validate_string_safe(&choice.name)?;
-        if let serde_json::Value::String(ref s) = &choice.value {
+        if let serde_json::Value::String(s) = &choice.value {
             validate_string_safe(s)?;
         }
     }
