@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::Once;
 use std::time::Instant;
 
-use mlua_scheduler::taskmgr::{CoreActor, Hooks, SchedulerImpl};
+use mlua_scheduler::taskmgr::{Hooks, SchedulerImpl};
 use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 
@@ -152,10 +152,10 @@ impl KhronosRuntime {
             Some(limit) => Rc::new(Cell::new(Some(Instant::now() + limit))),
             None => Rc::new(Cell::new(None)),
         };
-        let scheduler = S::new(CoreActor::new(lua.weak(), Rc::new(SchedulerHook {
+        let scheduler = S::setup(&lua, Rc::new(SchedulerHook {
             execution_stop_time: execution_stop_time.clone(),
             give_time: opts.give_time
-        })));
+        })).map_err(|e| LuaError::external(format!("Failed to create scheduler: {}", e)))?;
 
         if !opts.disable_task_lib {
             lua.globals()
