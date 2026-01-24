@@ -279,6 +279,11 @@ impl KhronosRuntime {
         &self.scheduler
     }
 
+    /// Returns the global table
+    pub fn global_table(&self) -> &LuaTable {
+        &self.global_table
+    }
+
     /// Returns the last execution time
     ///
     /// This may be None if the VM has not executed a script yet
