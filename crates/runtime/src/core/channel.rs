@@ -2,9 +2,8 @@ use mlua_scheduler::{LuaSchedulerAsync, LuaSchedulerAsyncUserData};
 use mluau::prelude::*;
 use serenity::futures::{Stream, StreamExt};
 use serenity::futures::stream::FuturesUnordered;
-use tokio::sync::Notify;
 use tokio_util::time::DelayQueue;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 use std::{cell::RefCell, pin::Pin};
 use std::time::Duration;
 use std::rc::{Rc, Weak};
@@ -106,14 +105,14 @@ impl LuaUserData for KeyHandle {
 /// A delay channel that can be used to return a value after a delay/expiration
 pub struct DelayChannel {
     queue: Rc<RefCell<DelayQueue<LuaValue>>>,
-    notify: Rc<Notify>,
+    waiting_add: Rc<RefCell<Option<Waker>>>, // used to wake up the stream when a new item is added
 }
 
 impl DelayChannel {
     pub fn new() -> Self {
         Self {
             queue: Rc::new(RefCell::new(DelayQueue::new())),
-            notify: Rc::new(Notify::new()),
+            waiting_add: Rc::new(RefCell::new(None)),
         }
     }
     
@@ -128,7 +127,9 @@ impl DelayChannel {
     pub fn add(&self, value: LuaValue, delay: Duration) -> LuaResult<()> {
         Self::check_delay(delay)?;
         self.queue.borrow_mut().insert(value, delay);
-        self.notify.notify_one();
+        if let Some(waker) = self.waiting_add.borrow_mut().take() {
+            waker.wake();
+        }
         Ok(())
     }
 
@@ -137,25 +138,26 @@ impl DelayChannel {
     pub fn add_with_handle(&self, value: LuaValue, delay: Duration) -> LuaResult<KeyHandle> {
         Self::check_delay(delay)?;
         let key = self.queue.borrow_mut().insert(value, delay);
-        self.notify.notify_one();
+        if let Some(waker) = self.waiting_add.borrow_mut().take() {
+            waker.wake();
+        }
         Ok(KeyHandle { key, queue: Rc::downgrade(&self.queue) })
     }
 
     pub async fn next(&self) -> LuaResult<LuaValue> {
         loop {
-            // We recreate the stream wrapper in the loop (it's cheap)
             let mut stream = QueueStream {
                 queue: self.queue.clone(),
+                waiting_add: self.waiting_add.clone(),
             };
 
             // Attempt to get the next expired item
-            tokio::select! {
-                biased;
-                Some(expired) = stream.next() => return Ok(expired.into_inner()),
-                _ = self.notify.notified() => {
-                    // Notified, loop to recreate the stream and try again
-                },
-                
+            match StreamExt::next(&mut stream).await {
+                Some(expired) => return Ok(expired.into_inner()),
+                None => {
+                    // This should never happen, but just in case
+                    return Err(LuaError::external("Delay channel closed unexpectedly"));
+                }
             }
         }
     }
@@ -177,6 +179,10 @@ impl LuaUserData for DelayChannel {
             this.add_with_handle(value, delay)
         });
 
+        methods.add_method("clear", |_, this, (): ()| {
+            Ok(this.queue.try_borrow_mut().map_err(LuaError::external)?.clear())
+        });
+
         methods.add_scheduler_async_method("next", async move |_, this, ()| {
             this.next().await
         });
@@ -189,16 +195,24 @@ impl LuaUserData for DelayChannel {
 
 struct QueueStream {
     queue: Rc<RefCell<DelayQueue<LuaValue>>>,
+    waiting_add: Rc<RefCell<Option<Waker>>>,
 }
 
 impl Stream for QueueStream {
     type Item = tokio_util::time::delay_queue::Expired<LuaValue>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // We only borrow MUTABLY right here, inside the poll.
-        // If the queue is not ready, DelayQueue registers the waker and returns Pending.
-        // The borrow is dropped immediately after this line.
-        self.queue.borrow_mut().poll_expired(cx)
+        let mut queue = self.queue.borrow_mut();
+        
+        match queue.poll_expired(cx) {
+            Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(None) => { // We want to wait for new items to be added
+                // Store the waker so `add` can wake us up later
+                *self.waiting_add.borrow_mut() = Some(cx.waker().clone());
+                Poll::Pending
+            }
+        }
     }
 }
 
