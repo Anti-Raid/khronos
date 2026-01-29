@@ -19,6 +19,21 @@ pub trait DiscordProvider: 'static + Clone {
     /// Returns the guild ID
     fn guild_id(&self) -> serenity::all::GuildId;
 
+    // Superuser Command Moderation
+
+    /// Returns if commands can be created/deleted/modified at a per-guild level
+    /// 
+    /// This can be used to block guild commands in templates without explicit permission
+    /// from AntiRaid
+    fn can_manage_guild_commands(&self) -> bool {
+        false // Disabled by default, needs to be enabled explicitly
+    }
+
+    /// Returns if a specific guild command can be fetched/deleted
+    fn can_manage_guild_command(&self, _command: &str) -> bool {
+        false // Disabled by default, needs to be enabled explicitly
+    }
+
     // Audit Log
 
     /// Returns the audit logs for the guild.
@@ -925,6 +940,10 @@ pub trait DiscordProvider: 'static + Clone {
     // Uncategorized (for now)
 
     async fn get_guild_commands(&self) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
             .get_guild_commands(self.guild_id())
             .await
@@ -935,6 +954,10 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         command_id: serenity::all::CommandId,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
             .get_guild_command(self.guild_id(), command_id)
             .await
@@ -945,6 +968,10 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
             .create_guild_command(self.guild_id(), &map)
             .await
@@ -955,6 +982,10 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
             .create_guild_commands(self.guild_id(), &map)
             .await
