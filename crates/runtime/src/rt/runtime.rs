@@ -189,6 +189,10 @@ impl KhronosRuntime {
             Ok(LuaVmState::Continue)
         });
 
+        // Drop getfenv/setfenv (makes life more annoying and confusing with them present)
+        lua.globals().set("getfenv", LuaValue::Nil)?;
+        lua.globals().set("setfenv", LuaValue::Nil)?;
+
         // Ensure _G.print and _G.eprint are nil
         lua.globals().set("print", LuaValue::Nil)?;
         lua.globals().set("eprint", LuaValue::Nil)?;
