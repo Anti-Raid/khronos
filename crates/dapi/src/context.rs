@@ -29,10 +29,6 @@ impl<T: DiscordProvider> DiscordContext<T> {
         Self { discord_provider }
     }
 
-    pub fn guild_id(&self) -> serenity::all::GuildId {
-        self.discord_provider.guild_id()
-    }
-
     pub fn check_reason(&self, reason: &str) -> Result<(), crate::Error> {
         if reason.len() > 512 {
             return Err("Reason is too long".into());
@@ -218,6 +214,12 @@ impl<T: DiscordProvider> DiscordContext<T> {
                     return Err("Private channels are not supported by check_channel_permissions".into());
                 },
                 serenity::all::Channel::Guild(guild_channel) => {
+                    // While get_channel should automatically handle this, check this here
+                    // just to be truly confident in case the provider's get_channel implementation is flawed.
+                    if guild_channel.base.guild_id != guild.id {
+                        return Err("Channel does not belong to the current guild".into());
+                    }
+
                     let perms = guild.user_permissions_in(&guild_channel, &member);
 
                     if !perms.contains(needed_permissions) {

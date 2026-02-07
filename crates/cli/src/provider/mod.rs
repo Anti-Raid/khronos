@@ -1,4 +1,5 @@
 use dapi::EVENT_LIST;
+use dapi::controller::DiscordProviderContext;
 use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
@@ -410,8 +411,8 @@ impl DiscordProvider for CliDiscordProvider {
         Ok(channel)
     }
 
-    fn guild_id(&self) -> serenity::all::GuildId {
-        self.guild_id
+    fn context(&self) -> DiscordProviderContext {
+        DiscordProviderContext::Guild(self.guild_id)
     }
 
     fn serenity_http(&self) -> &serenity::all::Http {
