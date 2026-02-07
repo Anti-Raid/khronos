@@ -49,7 +49,7 @@ impl ApiReq for ModifyWebhook {
             return Err("Webhook does not belong to a guild".into());
         };
 
-        if guild_id != &this.guild_id().to_string() {
+        if guild_id != &this.controller().guild_context()?.to_string() {
             return Err("Webhook does not belong to a guild".into());
         }
         

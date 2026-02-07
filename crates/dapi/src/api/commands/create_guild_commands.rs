@@ -11,6 +11,16 @@ impl ApiReq for CreateGuildCommands {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         for cmd in &self.data {
             cmd.validate()?;
+
+            {
+                let Some(ref name) = cmd.fields.name else {
+                    return Err("Command name is required".into());
+                };
+
+                if !this.controller().can_manage_guild_command(name) {
+                    return Err("Cannot create this guild command: not authorized".into());
+                }
+            }
         }
 
         let resp = this.controller()

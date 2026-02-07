@@ -7,7 +7,7 @@ use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 //use crate::primitives::create_userdata_iterator_with_fields;
 use crate::traits::context::{KhronosContext, Limitations};
 use dapi::{apilist::MapResponseMetadata, context::DiscordContext};
-use dapi::controller::DiscordProvider;
+use dapi::controller::{DiscordProvider, DiscordProviderContext};
 use crate::{primitives::lazy::Lazy, TemplateContext};
 use mluau::prelude::*;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
@@ -250,7 +250,18 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
         // Checks the guild_id of the discord executor
         methods.add_method("guild_id", |_lua, this, _: ()| {
-            Ok(this.discord_provider.guild_id().to_string())
+            match this.discord_controller.controller().context() {
+                DiscordProviderContext::Guild(guild_id) => Ok(Some(guild_id.to_string())),
+                _ => Ok(None)
+            }
+        });
+
+        // Checks the user_id of the discord executor
+        methods.add_method("user_id", |_lua, this, _: ()| {
+            match this.discord_controller.controller().context() {
+                DiscordProviderContext::User(user_id) => Ok(Some(user_id.to_string())),
+                _ => Ok(None)
+            }
         });
 
         dapi::apilist::API::add_luau_methods::<DiscordActionExecutor<T>, _>(methods);

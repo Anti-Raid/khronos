@@ -11,7 +11,7 @@ impl ApiReq for DeleteGuildRole {
     type Resp = ();
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        if self.role_id.to_string() == this.guild_id().to_string() {
+        if self.role_id.to_string() == this.controller().guild_context()?.to_string() {
             return Err("Cannot remove the default @everyone role".into());
         }
 

@@ -25,7 +25,7 @@ impl ApiReq for DeleteInvite {
         let invite = serde_json::from_value::<serenity::all::Invite>(invite_json)?;
 
         if let Some(guild) = invite.guild {
-            if guild.id != this.guild_id() {
+            if guild.id != this.controller().guild_context()? {
                 return Err("Invite does not belong to the current guild".into());
             }
         }

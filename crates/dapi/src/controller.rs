@@ -3,6 +3,12 @@ use reqwest::header::{HeaderMap as Headers, HeaderValue};
 use serde_json::Value;
 use serenity::all::{InteractionId, ReactionType};
 
+pub enum DiscordProviderContext {
+    Guild(serenity::all::GuildId),
+    User(serenity::all::UserId),
+    None,
+}
+
 #[allow(async_fn_in_trait)] 
 pub trait DiscordProvider: 'static + Clone {
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
@@ -17,7 +23,30 @@ pub trait DiscordProvider: 'static + Clone {
     fn current_user(&self) -> Option<serenity::all::CurrentUser>;
 
     /// Returns the guild ID
-    fn guild_id(&self) -> serenity::all::GuildId;
+    fn context(&self) -> DiscordProviderContext;
+
+    /// Either returns the guild ID or returns an error if it is not available
+    fn guild_context(&self) -> Result<serenity::all::GuildId, crate::Error> {
+        match self.context() {
+            DiscordProviderContext::Guild(guild_id) => Ok(guild_id),
+            _ => Err("Guild ID is not available in the current context".into()),
+        }
+    }
+
+    // Superuser Command Moderation
+
+    /// Returns if commands can be created/deleted/modified at a per-guild level
+    /// 
+    /// This can be used to block guild commands in templates without explicit permission
+    /// from AntiRaid
+    fn can_manage_guild_commands(&self) -> bool {
+        false // Disabled by default, needs to be enabled explicitly
+    }
+
+    /// Returns if a specific guild command can be fetched/deleted
+    fn can_manage_guild_command(&self, _command: &str) -> bool {
+        false // Disabled by default, needs to be enabled explicitly
+    }
 
     // Audit Log
 
@@ -30,7 +59,7 @@ pub trait DiscordProvider: 'static + Clone {
         limit: Option<serenity::nonmax::NonMaxU8>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_audit_logs(self.guild_id(), action_type, user_id, before, limit)
+            .get_audit_logs(self.guild_context()?, action_type, user_id, before, limit)
             .await
             .map_err(|e| format!("Failed to fetch audit logs: {e}").into())
     }
@@ -41,7 +70,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_automod_rules(self.guild_id())
+            .get_automod_rules(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to fetch automod rules: {e}").into())
     }
@@ -51,7 +80,7 @@ pub trait DiscordProvider: 'static + Clone {
         rule_id: serenity::all::RuleId,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_automod_rule(self.guild_id(), rule_id)
+            .get_automod_rule(self.guild_context()?, rule_id)
             .await
             .map_err(|e| format!("Failed to fetch automod rule: {e}").into())
     }
@@ -62,7 +91,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .create_automod_rule(self.guild_id(), &map, audit_log_reason)
+            .create_automod_rule(self.guild_context()?, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to create automod rule: {e}").into())
     }
@@ -74,7 +103,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .edit_automod_rule(self.guild_id(), rule_id, &map, audit_log_reason)
+            .edit_automod_rule(self.guild_context()?, rule_id, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to edit automod rule: {e}").into())
     }
@@ -85,7 +114,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .delete_automod_rule(self.guild_id(), rule_id, audit_log_reason)
+            .delete_automod_rule(self.guild_context()?, rule_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to delete automod rule: {e}").into())
     }
@@ -106,7 +135,7 @@ pub trait DiscordProvider: 'static + Clone {
             return Err(format!("Channel {channel_id} does not belong to a guild").into());
         };
 
-        if guild_id != &self.guild_id().to_string() {
+        if guild_id != &self.guild_context()?.to_string() {
             return Err(format!("Channel {channel_id} does not belong to the guild").into());
         }
 
@@ -222,7 +251,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// This should return an error if the guild does not exist
     async fn get_guild(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_with_counts(self.guild_id())
+            .get_guild_with_counts(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to fetch guild: {e}").into())
     }
@@ -230,7 +259,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// Fetches a guild preview
     async fn get_guild_preview(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_preview(self.guild_id())
+            .get_guild_preview(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to fetch guild preview: {e}").into())
     }
@@ -242,7 +271,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .edit_guild(self.guild_id(), &map, audit_log_reason)
+            .edit_guild(self.guild_context()?, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to modify guild: {e}").into())
     }
@@ -253,7 +282,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_guild_channels(&self) -> Result<Value, crate::Error> {
         Ok(self
             .serenity_http()
-            .get_channels(self.guild_id())
+            .get_channels(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to fetch guild channels: {e:?}"))?)
     }
@@ -265,7 +294,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .create_channel(self.guild_id(), &map, audit_log_reason)
+            .create_channel(self.guild_context()?, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to create guild channel: {e}").into())
     }
@@ -276,7 +305,7 @@ pub trait DiscordProvider: 'static + Clone {
         map: impl Iterator<Item: serde::Serialize>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .edit_guild_channel_positions(self.guild_id(), map)
+            .edit_guild_channel_positions(self.guild_context()?, map)
             .await
             .map_err(|e| format!("Failed to modify guild channel positions: {e}").into())
     }
@@ -284,7 +313,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// List Active Guild Threads
     async fn list_active_guild_threads(&self) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_active_threads(self.guild_id())
+            .get_guild_active_threads(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to list active threads: {e}").into())
     }
@@ -298,7 +327,7 @@ pub trait DiscordProvider: 'static + Clone {
     ) -> Result<Value, crate::Error> {
         match self
             .serenity_http()
-            .get_member(self.guild_id(), user_id)
+            .get_member(self.guild_context()?, user_id)
             .await
         {
             Ok(member) => Ok(member),
@@ -320,7 +349,7 @@ pub trait DiscordProvider: 'static + Clone {
         after: Option<serenity::all::UserId>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_members(self.guild_id(), limit, after)
+            .get_guild_members(self.guild_context()?, limit, after)
             .await
             .map_err(|e| format!("Failed to list guild members: {e}").into())
     }
@@ -332,7 +361,7 @@ pub trait DiscordProvider: 'static + Clone {
         limit: Option<serenity::nonmax::NonMaxU16>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .search_guild_members(self.guild_id(), query, limit)
+            .search_guild_members(self.guild_context()?, query, limit)
             .await
             .map_err(|e| format!("Failed to search guild members: {e}").into())
     }
@@ -348,7 +377,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .edit_member(self.guild_id(), user_id, &map, audit_log_reason)
+            .edit_member(self.guild_context()?, user_id, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to modify guild member: {e}").into())
     }
@@ -362,7 +391,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .add_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
+            .add_member_role(self.guild_context()?, user_id, role_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to add role to member: {e}").into())
     }
@@ -374,7 +403,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .remove_member_role(self.guild_id(), user_id, role_id, audit_log_reason)
+            .remove_member_role(self.guild_context()?, user_id, role_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to remove role from member: {e}").into())
     }
@@ -385,7 +414,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .kick_member(self.guild_id(), user_id, audit_log_reason)
+            .kick_member(self.guild_context()?, user_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to remove member: {e}").into())
     }
@@ -396,7 +425,7 @@ pub trait DiscordProvider: 'static + Clone {
         limit: Option<serenity::nonmax::NonMaxU16>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_bans(self.guild_id(), target, limit)
+            .get_bans(self.guild_context()?, target, limit)
             .await
             .map_err(|e| format!("Failed to get guild bans: {e}").into())
     }
@@ -409,7 +438,7 @@ pub trait DiscordProvider: 'static + Clone {
             .serenity_http()
             .fire(serenity::all::Request::new(
                 serenity::all::Route::GuildBan {
-                    guild_id: self.guild_id(),
+                    guild_id: self.guild_context()?,
                     user_id,
                 },
                 serenity::all::LightMethod::Get,
@@ -436,7 +465,7 @@ pub trait DiscordProvider: 'static + Clone {
     ) -> Result<(), crate::Error> {
         self.serenity_http()
             .ban_user(
-                self.guild_id(),
+                self.guild_context()?,
                 user_id,
                 (delete_message_seconds / 86400)
                     .try_into()
@@ -453,7 +482,7 @@ pub trait DiscordProvider: 'static + Clone {
         reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .remove_ban(self.guild_id(), user_id, reason)
+            .remove_ban(self.guild_context()?, user_id, reason)
             .await
             .map_err(|e| format!("Failed to unban user: {e}").into())
     }
@@ -466,7 +495,7 @@ pub trait DiscordProvider: 'static + Clone {
     ) -> Result<Value, crate::Error>
     {
         self.serenity_http()
-            .get_guild_roles(self.guild_id())
+            .get_guild_roles(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to get guild roles: {e}").into())
     }
@@ -476,7 +505,7 @@ pub trait DiscordProvider: 'static + Clone {
         role_id: serenity::all::RoleId,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_role(self.guild_id(), role_id)
+            .get_guild_role(self.guild_context()?, role_id)
             .await
             .map_err(|e| format!("Failed to get guild role: {e}").into())
     }
@@ -487,7 +516,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .create_role(self.guild_id(), &map, audit_log_reason)
+            .create_role(self.guild_context()?, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to create guild role: {e}").into())
     }
@@ -498,7 +527,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .edit_role_positions(self.guild_id(), map, audit_log_reason)
+            .edit_role_positions(self.guild_context()?, map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to modify guild role positions: {e}").into())
     }
@@ -510,7 +539,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .edit_role(self.guild_id(), role_id, &map, audit_log_reason)
+            .edit_role(self.guild_context()?, role_id, &map, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to modify guild role: {e}").into())
     }
@@ -521,7 +550,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.serenity_http()
-            .delete_role(self.guild_id(), role_id, audit_log_reason)
+            .delete_role(self.guild_context()?, role_id, audit_log_reason)
             .await
             .map_err(|e| format!("Failed to modify guild role: {e}").into())
     }
@@ -864,7 +893,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
-            .get_guild_webhooks(self.guild_id())
+            .get_guild_webhooks(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to get guild webhooks: {e}").into())
     }
@@ -925,8 +954,12 @@ pub trait DiscordProvider: 'static + Clone {
     // Uncategorized (for now)
 
     async fn get_guild_commands(&self) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
-            .get_guild_commands(self.guild_id())
+            .get_guild_commands(self.guild_context()?)
             .await
             .map_err(|e| format!("Failed to get guild commands: {e}").into())
     }
@@ -935,8 +968,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         command_id: serenity::all::CommandId,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
-            .get_guild_command(self.guild_id(), command_id)
+            .get_guild_command(self.guild_context()?, command_id)
             .await
             .map_err(|e| format!("Failed to get guild command: {e}").into())
     }
@@ -945,8 +982,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
-            .create_guild_command(self.guild_id(), &map)
+            .create_guild_command(self.guild_context()?, &map)
             .await
             .map_err(|e| format!("Failed to create guild command: {e}").into())
     }
@@ -955,8 +996,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
+        if !self.can_manage_guild_commands() {
+            return Err("Guild commands are not enabled for this controller".into());
+        }
+
         self.serenity_http()
-            .create_guild_commands(self.guild_id(), &map)
+            .create_guild_commands(self.guild_context()?, &map)
             .await
             .map_err(|e| format!("Failed to create guild commands: {e}").into())
     }
