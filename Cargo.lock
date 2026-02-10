@@ -2236,6 +2236,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "khronos_ext"
+version = "1.0.0"
+dependencies = [
+ "mlua_scheduler",
+ "mluau",
+ "serde",
+ "serde_json",
+ "sqlx",
+]
+
+[[package]]
 name = "khronos_runtime"
 version = "1.0.0"
 dependencies = [
