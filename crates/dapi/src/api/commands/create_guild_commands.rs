@@ -17,7 +17,7 @@ impl ApiReq for CreateGuildCommands {
                     return Err("Command name is required".into());
                 };
 
-                if !this.controller().can_manage_guild_command(name) {
+                if !this.controller().superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::CreateCommand(name)) {
                     return Err("Cannot create this guild command: not authorized".into());
                 }
             }

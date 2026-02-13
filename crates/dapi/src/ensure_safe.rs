@@ -1,6 +1,8 @@
 use rustrict::{Censor, Trie, Type};
 use std::sync::LazyLock;
 
+use crate::{controller::SuperUserMessageTransform, types::{CreateEmbed, CreateEmbedFooter}};
+
 /// Create a trie with safe word list.
 fn make_safe_words_trie() -> &'static Trie {
     let words = include_str!("../../../data/clean_words_alpha.txt");
@@ -42,6 +44,32 @@ pub fn is_safe_word(word: &str) -> bool {
         .with_trie(&SAFE_WORDS_TRIE)
         .analyze()
         .is(Type::SAFE)
+}
+
+/// Injects a disclaimer text into the given message to be transformed before sending, if the controller has a disclaimer configured. 
+/// 
+/// This can be used to ensure that all messages sent by the bot include a disclaimer
+pub fn inject_disclaimer(transform: SuperUserMessageTransform, disclaimer: &str) -> Result<SuperUserMessageTransform, crate::Error> {
+    let mut embeds = transform.embeds;
+
+    if embeds.len() >= 10 {
+        return Err("Messages must have less than 10 embeds".into());
+    }
+
+    // Insert disclaimer into all embeds about being user-generated content
+    embeds.push(CreateEmbed {
+        footer: Some(CreateEmbedFooter {
+            text: disclaimer.to_string(),
+            icon_url: None,
+        }),
+        ..Default::default()
+    });
+
+
+    Ok(SuperUserMessageTransform {
+        embeds,
+        content: transform.content,
+    })
 }
 
 #[cfg(test)]

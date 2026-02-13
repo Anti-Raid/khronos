@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// A builder to create an embed in a message
 ///
 /// [Discord docs](https://discord.com/developers/docs/resources/channel#embed-object)
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[must_use]
 pub struct CreateEmbed {
     #[serde(skip_serializing_if = "Option::is_none")]
