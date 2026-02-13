@@ -1,13 +1,11 @@
 use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::{CreateEmbedFooter, CreateMessage}, validator::MESSAGE_CONTENT_LIMIT};
+use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateMessage};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateMessageRequest {
     pub channel_id: serenity::all::GenericChannelId,
     pub data: CreateMessage,
 }
-
-const DISCLAIMER: &str = "Content provided by users is the sole responsibility of the author. AntiRaid does not monitor, verify, or endorse any user-generated messages.";
 
 impl ApiReq for CreateMessageRequest {
     type Resp = serde_json::Value;
@@ -16,34 +14,15 @@ impl ApiReq for CreateMessageRequest {
         self.data.validate()?;
 
         {
-            // Insert disclaimer into all embeds about being user-generated content
-            let mut disclaimer_handled = false;
-            for embed in self.data.embeds.iter_mut() {
-                if let Some(footer) = &mut embed.footer {
-                    footer.text = format!("{}\n{}", footer.text, DISCLAIMER);
-                } else {
-                    embed.footer = Some(CreateEmbedFooter {
-                        text: DISCLAIMER.to_string(),
-                        icon_url: None,
-                    });
-                }
-                disclaimer_handled = true;
-            }
-
-            // Insert disclaimer into content
-            if !disclaimer_handled {
-                if let Some(content) = &mut self.data.content {
-                    let required_space = DISCLAIMER.len() + 4; // +4 for \n\n**
-                    if content.len() > required_space {
-                        content.truncate(MESSAGE_CONTENT_LIMIT - required_space);
-                    }
-                    content.push_str(format!("\n\n*{}*", DISCLAIMER).as_str());
-                } else {
-                    // Edge case: No embed AND no content (e.g. file upload)? 
-                    // Create content with just the disclaimer.
-                    self.data.content = Some(format!("*{}*", DISCLAIMER));
-                }
-            } 
+            // Apply superuser transformation to the message before sending, if applicable
+            let transform = this
+            .controller().
+            superuser_transform_message_before_send(SuperUserMessageTransform {
+                embeds: self.data.embeds,
+                content: self.data.content
+            }, SuperUserMessageTransformFlags::NONE)?;
+            self.data.embeds = transform.embeds;
+            self.data.content = transform.content;
         }
 
         let Some(bot_user) = this.current_user() else {

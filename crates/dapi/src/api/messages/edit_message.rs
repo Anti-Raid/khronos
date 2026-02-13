@@ -1,5 +1,5 @@
 use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditMessage};
+use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::EditMessage};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct EditMessageRequest {
@@ -11,8 +11,20 @@ pub struct EditMessageRequest {
 impl ApiReq for EditMessageRequest {
     type Resp = serde_json::Value;
 
-    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+    async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         self.data.validate()?;
+
+        {
+            // Apply superuser transformation to the message before sending, if applicable
+            let transform = this
+            .controller().
+            superuser_transform_message_before_send(SuperUserMessageTransform {
+                embeds: self.data.embeds.unwrap_or_default(),
+                content: self.data.content
+            }, SuperUserMessageTransformFlags::IS_EDIT)?;
+            self.data.embeds = Some(transform.embeds);
+            self.data.content = transform.content;
+        }
 
         let Some(bot_user) = this.current_user() else {
             return Err("Internal error: Current user not found".into());

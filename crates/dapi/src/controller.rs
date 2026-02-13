@@ -3,10 +3,56 @@ use reqwest::header::{HeaderMap as Headers, HeaderValue};
 use serde_json::Value;
 use serenity::all::{InteractionId, ReactionType};
 
+use crate::types::CreateEmbed;
+
 pub enum DiscordProviderContext {
     Guild(serenity::all::GuildId),
     User(serenity::all::UserId),
     None,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Sent in ``superuser_can_manage_guild_commands`` to provide context on the operation being attempted, allowing for more granular control over what endpoints can be used
+/// directly
+pub enum SuperUserDiscordCommandOp<'a> {
+    CreateCommand(&'a str),
+    FinalizeCreateCommand,
+    DeleteCommand(serenity::all::CommandId),
+    ModifyCommand(serenity::all::CommandId),
+    GetCommands,
+    GetCommand(serenity::all::CommandId),
+}
+
+#[derive(Debug)]
+pub struct SuperUserMessageTransform {
+    pub embeds: Vec<CreateEmbed>,
+    pub content: Option<String>,
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct SuperUserMessageTransformFlags: u8 {
+        const NONE = 0;
+        const IS_EDIT = 1 << 0;
+
+        // interaction
+        const IS_CREATE_FOLLOWUP_RESPONSE = 1 << 1;
+        const IS_CREATE_INTERACTION_RESPONSE = 1 << 2;
+        const IS_EDIT_FOLLOWUP_RESPONSE = 1 << 3;
+        const IS_EDIT_ORIGINAL_INTERACTION_RESPONSE = 1 << 4;
+    }
+}
+
+impl SuperUserMessageTransformFlags {
+    /// Returns true if the message being transformed is an interaction response (including followups), which can be used to apply different transformations to interaction responses vs regular messages
+    pub fn is_interaction_response(self) -> bool {
+        self.intersects(
+            Self::IS_CREATE_FOLLOWUP_RESPONSE
+            | Self::IS_CREATE_INTERACTION_RESPONSE
+            | Self::IS_EDIT_FOLLOWUP_RESPONSE
+            | Self::IS_EDIT_ORIGINAL_INTERACTION_RESPONSE
+        )
+    }
 }
 
 #[allow(async_fn_in_trait)] 
@@ -33,19 +79,19 @@ pub trait DiscordProvider: 'static + Clone {
         }
     }
 
-    // Superuser Command Moderation
+    // Superuser Moderation
 
     /// Returns if commands can be created/deleted/modified at a per-guild level
     /// 
     /// This can be used to block guild commands in templates without explicit permission
     /// from AntiRaid
-    fn can_manage_guild_commands(&self) -> bool {
+    fn superuser_can_manage_guild_commands<'a>(&self, _req: SuperUserDiscordCommandOp<'a>) -> bool {
         false // Disabled by default, needs to be enabled explicitly
     }
 
-    /// Returns if a specific guild command can be fetched/deleted
-    fn can_manage_guild_command(&self, _command: &str) -> bool {
-        false // Disabled by default, needs to be enabled explicitly
+    /// Applies any transformations to a message before it is sent as a response to a command, such as appending disclaimers or modifying embeds.
+    fn superuser_transform_message_before_send(&self, msg: SuperUserMessageTransform, _flags: SuperUserMessageTransformFlags) -> Result<SuperUserMessageTransform, crate::Error> {
+        Ok(msg)
     }
 
     // Audit Log
@@ -954,7 +1000,7 @@ pub trait DiscordProvider: 'static + Clone {
     // Uncategorized (for now)
 
     async fn get_guild_commands(&self) -> Result<Value, crate::Error> {
-        if !self.can_manage_guild_commands() {
+        if !self.superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::GetCommands) {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
@@ -968,7 +1014,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         command_id: serenity::all::CommandId,
     ) -> Result<Value, crate::Error> {
-        if !self.can_manage_guild_commands() {
+        if !self.superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::GetCommand(command_id)) {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
@@ -982,7 +1028,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
-        if !self.can_manage_guild_commands() {
+        if !self.superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::FinalizeCreateCommand) {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
@@ -996,7 +1042,7 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         map: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
-        if !self.can_manage_guild_commands() {
+        if !self.superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::FinalizeCreateCommand) {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
