@@ -13,9 +13,9 @@ macro_rules! db_plugin {
     ($($type:ty => { $base:ident, $opt:ident, $list:ident, $typestr:literal, |$lua:ident, $val:ident| $luaconv:block, |$luaf:ident, $opaque:ident| $luaconvf:block }),* $(,)?) => {
         mod plugin {
             use ::serde::{Serialize, Deserialize};
-            use ::sqlx::{Row, PgPool};
-            use ::mluau::prelude::*;
-            use ::mlua_scheduler::LuaSchedulerAsyncUserData;
+            use $crate::sqlx_ext::{Row, PgPool};
+            use $crate::mluau_ext::prelude::*;
+            use $crate::mlua_scheduler_ext::LuaSchedulerAsyncUserData;
             use $crate::db::DbRow;
 
             #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
