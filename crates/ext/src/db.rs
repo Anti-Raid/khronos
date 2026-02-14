@@ -12,10 +12,10 @@ pub fn map_db_row<T: for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>>(row: &imp
 macro_rules! db_plugin {
     ($($type:ty => { $base:ident, $opt:ident, $list:ident, $typestr:literal, |$lua:ident, $val:ident| $luaconv:block, |$luaf:ident, $opaque:ident| $luaconvf:block }),* $(,)?) => {
         mod plugin {
-            use serde::{Serialize, Deserialize};
-            use sqlx::{Row, PgPool};
-            use mluau::prelude::*;
-            use mlua_scheduler::LuaSchedulerAsyncUserData;
+            use ::serde::{Serialize, Deserialize};
+            use ::sqlx::{Row, PgPool};
+            use ::mluau::prelude::*;
+            use ::mlua_scheduler::LuaSchedulerAsyncUserData;
             use $crate::db::DbRow;
 
             #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
