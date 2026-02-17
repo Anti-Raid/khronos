@@ -223,7 +223,7 @@ where
         fields.add_field_method_get("timestamp_nanos", |_, this| {
             Ok(this.dt.timestamp_subsec_nanos())
         });
-        fields.add_field_method_get("tz", |_, this| {
+        fields.add_field_method_get("timezone", |_, this| {
             Ok(Timezone {
                 tz: this.dt.timezone().into(),
             })
