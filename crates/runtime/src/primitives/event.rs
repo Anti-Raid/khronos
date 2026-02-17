@@ -71,20 +71,20 @@ impl CreateEvent {
 }
 
 impl FromLua for CreateEvent {
-    fn from_lua(lua_value: LuaValue, lua: &Lua) -> LuaResult<Self> {
-        #[derive(Deserialize)]
-        struct EventTable {
-            name: String,
-            author: Option<String>,
-            data: KhronosValue,
-        }
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        let table = match value {
+            LuaValue::Table(t) => t,
+            _ => return Err(LuaError::FromLuaConversionError { from: value.type_name(), to: "KhronosValueWith".to_string(), message: Some("Expected a table".to_string()) }),
+        };
 
-        let event_table: EventTable = lua.from_value(lua_value)?;
+        let name: String = table.get("name")?;
+        let author: Option<String> = table.get("author")?;
+        let data: KhronosValue = table.get("data")?;        
 
         Ok(CreateEvent {
-            name: event_table.name,
-            author: event_table.author,
-            data: InnerEventData::KhronosValue(event_table.data),
+            name,
+            author,
+            data: InnerEventData::KhronosValue(data),
         })
     }
 }
