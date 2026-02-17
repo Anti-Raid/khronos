@@ -210,9 +210,7 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             Ok(this.limitations.has_any_cap(&caps))
         });
 
-        methods.add_method("with", |lua, this, with: LuaValue| {
-            let with: KhronosValueWith = lua.from_value(with)?;
-
+        methods.add_method("with", |_lua, this, with: KhronosValueWith| {
             let limits = Limitations::new(with.capabilities);
 
             // Ensure that the new limitations are a subset of the current limitations
