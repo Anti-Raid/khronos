@@ -186,12 +186,6 @@ where
             |_, this, other: LuaUserDataRef<DateTime<Tz>>| Ok(this.dt < other.dt),
         );
 
-        methods.add_method("timezone", |_, this, (): ()| {
-            Ok(Timezone {
-                tz: this.dt.timezone().into(),
-            })
-        });
-
         methods.add_method("with_timezone", |_, this, tz: LuaUserDataRef<Timezone>| {
             Ok(DateTime {
                 dt: this.dt.with_timezone(&tz.tz.into()),
@@ -229,7 +223,7 @@ where
         fields.add_field_method_get("timestamp_nanos", |_, this| {
             Ok(this.dt.timestamp_subsec_nanos())
         });
-        fields.add_field_method_get("tz", |_, this| {
+        fields.add_field_method_get("timezone", |_, this| {
             Ok(Timezone {
                 tz: this.dt.timezone().into(),
             })
