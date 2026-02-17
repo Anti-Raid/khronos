@@ -186,6 +186,12 @@ where
             |_, this, other: LuaUserDataRef<DateTime<Tz>>| Ok(this.dt < other.dt),
         );
 
+        methods.add_method("timezone", |_, this, (): ()| {
+            Ok(Timezone {
+                tz: this.dt.timezone().into(),
+            })
+        });
+
         methods.add_method("with_timezone", |_, this, tz: LuaUserDataRef<Timezone>| {
             Ok(DateTime {
                 dt: this.dt.with_timezone(&tz.tz.into()),
