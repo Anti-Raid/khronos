@@ -70,6 +70,25 @@ impl CreateEvent {
     }
 }
 
+impl FromLua for CreateEvent {
+    fn from_lua(lua_value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+        #[derive(Deserialize)]
+        struct EventTable {
+            name: String,
+            author: Option<String>,
+            data: KhronosValue,
+        }
+
+        let event_table: EventTable = lua.from_value(lua_value)?;
+
+        Ok(CreateEvent {
+            name: event_table.name,
+            author: event_table.author,
+            data: InnerEventData::KhronosValue(event_table.data),
+        })
+    }
+}
+
 impl IntoLua for CreateEvent {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tab = lua.create_table()?;

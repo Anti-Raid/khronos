@@ -9,10 +9,23 @@ use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 
 /// Represents the data to be passed into ctx:with()
-#[derive(serde::Serialize, serde::Deserialize)]
 pub struct KhronosValueWith {
     pub capabilities: Vec<String>,
     pub event: Option<CreateEvent>,
+}
+
+impl FromLua for KhronosValueWith {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        let table = match value {
+            LuaValue::Table(t) => t,
+            _ => return Err(LuaError::FromLuaConversionError { from: value.type_name(), to: "KhronosValueWith".to_string(), message: Some("Expected a table".to_string()) }),
+        };
+
+        let capabilities: Vec<String> = table.get("capabilities")?;
+        let event: Option<CreateEvent> = table.get("event")?;
+
+        Ok(KhronosValueWith { capabilities, event })
+    }
 }
 
 /// Represents a result of a set operation in the key-value store
