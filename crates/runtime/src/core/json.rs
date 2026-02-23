@@ -1,6 +1,6 @@
 use mluau::prelude::*;
 
-use crate::plugins::antiraid::LUA_DESERIALIZE_OPTIONS;
+use crate::{plugins::antiraid::LUA_DESERIALIZE_OPTIONS, primitives::blob::Blob};
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
@@ -26,6 +26,18 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                     let deserialized: serde_json::Value = serde_json::from_slice(bytes).into_lua_err()?;
                     lua.to_value(&deserialized)
                 })
+            },
+            LuaValue::UserData(ud) => {
+                if let Ok(blob) = ud.borrow::<Blob>() {
+                    let deserialized: serde_json::Value = serde_json::from_slice(&blob.data).into_lua_err()?;
+                    lua.to_value(&deserialized)
+                } else {
+                    Err(LuaError::FromLuaConversionError {
+                        from: "non-string",
+                        to: "JSON string".to_string(),
+                        message: Some("Expected a string or buffer for JSON deserialization".to_string()),
+                    })
+                }
             },
             _ => Err(LuaError::FromLuaConversionError {
                 from: "non-string",
