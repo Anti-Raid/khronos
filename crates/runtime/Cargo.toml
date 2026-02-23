@@ -56,6 +56,12 @@ chrono-tz = { version = "0.10", features = ["serde"] }
 
 # datamgmt
 bstr = "1.9" 
+async-compression = { version = "0.4", features = [
+    "tokio",
+    "brotli",
+    "gzip",
+    "zlib",
+] }
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"

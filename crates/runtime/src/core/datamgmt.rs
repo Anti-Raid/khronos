@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use base64::Engine;
 use bstr::BString;
+use mlua_scheduler::LuaSchedulerAsync;
 use mluau::prelude::*;
 use bstr::ByteSlice;
 use argon2::Argon2;
@@ -11,6 +12,11 @@ use aes_gcm::aead::Aead;
 use aes_gcm::KeyInit;
 use aes_gcm::{Aes256Gcm, Nonce};
 use rand::{Rng, RngCore};
+use async_compression::{
+    tokio::bufread::{
+        GzipDecoder, GzipEncoder, BrotliDecoder, BrotliEncoder, ZlibDecoder, ZlibEncoder,
+    },
+};
 
 use crate::primitives::blob::{Blob, BlobTaker};
 
@@ -126,6 +132,38 @@ impl LuaUserData for TarArchive {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum CompressionFormat {
+    Gzip,
+    Brotli,
+    Zlib,
+}
+
+impl FromLua for CompressionFormat {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::String(s) => {
+                let bytes = s.to_str()?;
+                match &*bytes {
+                    "gzip" => Ok(CompressionFormat::Gzip),
+                    "brotli" => Ok(CompressionFormat::Brotli),
+                    "zlib" => Ok(CompressionFormat::Zlib),
+                    _ => Err(LuaError::FromLuaConversionError {
+                        from: "string",
+                        to: "CompressionFormat".to_string(),
+                        message: Some("Expected 'gzip'".to_string()),
+                    }),
+                }
+            },
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "CompressionFormat".to_string(),
+                message: Some("Expected a string for CompressionFormat".to_string()),
+            }),
+        }
+    }
+}
+
 fn create_aes256_cipher(key: String, salt: &[u8]) -> LuaResult<Aes256Gcm> {
     let argon2 = Argon2::new(
         argon2::Algorithm::Argon2id,
@@ -151,6 +189,54 @@ fn create_aes256_cipher(key: String, salt: &[u8]) -> LuaResult<Aes256Gcm> {
     .map_err(LuaError::external)?;
 
     Ok(cipher)
+}
+
+async fn compress_data(format: CompressionFormat, data: &[u8], level: Option<i32>) -> LuaResult<Blob> {
+    let mut output = Vec::new();
+    let input = tokio::io::BufReader::new(data.as_ref());
+    let compression_quality = match level {
+        Some(lvl) => async_compression::Level::Precise(lvl),
+        None => async_compression::Level::Best,
+    };
+
+    match format {
+        CompressionFormat::Gzip => {
+            let mut encoder = GzipEncoder::with_quality(input, compression_quality);
+            tokio::io::copy(&mut encoder, &mut output).await?;
+        },
+        CompressionFormat::Brotli => {
+            let mut encoder = BrotliEncoder::with_quality(input, compression_quality);
+            tokio::io::copy(&mut encoder, &mut output).await?;
+        },
+        CompressionFormat::Zlib => {
+            let mut encoder = ZlibEncoder::with_quality(input, compression_quality);
+            tokio::io::copy(&mut encoder, &mut output).await?;
+        }
+    }
+
+    Ok(Blob { data: output })
+}
+
+async fn decompress_data(format: CompressionFormat, data: &[u8]) -> LuaResult<Blob> {
+    let mut output = Vec::new();
+    let input = tokio::io::BufReader::new(data.as_ref());
+
+    match format {
+        CompressionFormat::Gzip => {
+            let mut decoder = GzipDecoder::new(input);
+            tokio::io::copy(&mut decoder, &mut output).await?;
+        },
+        CompressionFormat::Brotli => {
+            let mut decoder = BrotliDecoder::new(input);
+            tokio::io::copy(&mut decoder, &mut output).await?;
+        },
+        CompressionFormat::Zlib => {
+            let mut decoder = ZlibDecoder::new(input);
+            tokio::io::copy(&mut decoder, &mut output).await?;
+        }
+    }
+
+    Ok(Blob { data: output })
 }
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
@@ -239,6 +325,38 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         Ok(Blob {
             data: result,
         })
+    })?)?;
+
+    module.set("compress", lua.create_scheduler_async_function(async move |lua, (format, blob, level): (CompressionFormat, LuaValue, Option<i32>)| {
+        match blob {
+            LuaValue::UserData(ud) => {
+                let blob = ud.borrow::<Blob>()?;
+                compress_data(format, &blob.data, level).await
+            },
+            LuaValue::String(s) => {
+                compress_data(format, &*s.as_bytes(), level).await
+            },
+            _ => {
+                let v = BString::from_lua(blob, &lua)?;
+                compress_data(format, &v, level).await
+            },
+        }
+    })?)?;
+
+    module.set("decompress", lua.create_scheduler_async_function(async move |lua, (format, blob): (CompressionFormat, LuaValue)| {
+        match blob {
+            LuaValue::UserData(ud) => {
+                let blob = ud.borrow::<Blob>()?;
+                decompress_data(format, &blob.data).await
+            },
+            LuaValue::String(s) => {
+                decompress_data(format, &*s.as_bytes()).await
+            },
+            _ => {
+                let v = BString::from_lua(blob, &lua)?;
+                decompress_data(format, &v).await
+            },
+        }
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
