@@ -5,9 +5,9 @@ use crate::plugins::antiraid::LUA_DESERIALIZE_OPTIONS;
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
     
-    module.set("tojsonstring", lua.create_function(|lua, (value, pretty): (LuaValue, bool)| {
+    module.set("tojsonstring", lua.create_function(|lua, (value, pretty): (LuaValue, Option<bool>)| {
         let serialized: serde_json::Value = lua.from_value_with(value, LUA_DESERIALIZE_OPTIONS)?;
-        let json_str = if pretty {
+        let json_str = if pretty.unwrap_or(false) {
             serde_json::to_vec_pretty(&serialized).into_lua_err()?
         } else {
             serde_json::to_vec(&serialized).into_lua_err()?
