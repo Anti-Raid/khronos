@@ -50,37 +50,12 @@ zeroize = "1"
 # storage deps
 tar = "0.4"
 
-# @lune/datetime
+# antiraid/datetime
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
-chrono_lc = "0.1"
-thiserror = "1.0"
-self_cell = "1"
 
-# @lune/regex
-regex = "1"
-
-# @lune/serde
-async-compression = { version = "0.4", features = [
-    "tokio",
-    "brotli",
-    "deflate",
-    "gzip",
-    "zlib",
-] }
-bstr = "1.9"
-lz4 = "1.26"
-serde_yaml = "0.9"
-toml = { version = "0.8", features = ["preserve_order"] }
-digest = "0.10.7"
-hmac = "0.12.1"
-md-5 = "0.10.6"
-sha1 = "0.10.6"
-sha2 = "0.10.8"
-sha3 = "0.10.8"
-# This feature MIGHT break due to the unstable nature of the digest crate.
-# Check before updating it.
-blake3 = { version = "=1.5.0", features = ["traits-preview"] }
+# datamgmt
+bstr = "1.9" 
 
 [dependencies.serenity]
 git = "https://github.com/Anti-Raid/serenity"

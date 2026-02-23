@@ -15,6 +15,13 @@ pub const LUA_SERIALIZE_OPTIONS: LuaSerializeOptions = LuaSerializeOptions::new(
     .serialize_none_to_null(false)
     .serialize_unit_to_null(false);
 
+pub const LUA_DESERIALIZE_OPTIONS: LuaDeserializeOptions = LuaDeserializeOptions::new()
+    .sort_keys(true)
+    .deny_recursive_tables(false)
+    .deny_unsupported_types(true)
+    .encode_empty_tables_as_array(true)
+    .detect_mixed_tables(true);
+
 #[cfg(test)]
 pub mod test_type_metamethod {
     #[test]
