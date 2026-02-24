@@ -240,24 +240,16 @@ impl KhronosRuntime {
         )?;
         lua.register_module("@antiraid/luau", crate::core::luau::init_plugin(&lua)?)?;
         lua.register_module(
+            "@antiraid/json",
+            crate::core::json::init_plugin(&lua)?,
+        )?;
+        lua.register_module(
             "@antiraid/datamgmt",
             crate::core::datamgmt::init_plugin(&lua)?,
         )?;
         lua.register_module(
             "@antiraid/typesext",
             crate::core::typesext::init_plugin(&lua)?,
-        )?;
-        lua.register_module(
-            "@lune/datetime",
-            crate::plugins::lune::datetime::init_plugin(&lua)?,
-        )?;
-        lua.register_module(
-            "@lune/regex",
-            crate::plugins::lune::regex::init_plugin(&lua)?,
-        )?;
-        lua.register_module(
-            "@lune/serde",
-            crate::plugins::lune::serde::init_plugin(&lua)?,
         )?;
 
         Ok(Self {
