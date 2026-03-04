@@ -3,7 +3,7 @@ use crate::{plugins::antiraid::LUA_SERIALIZE_OPTIONS, utils::khronos_value::Khro
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-enum InnerEventData {
+pub enum InnerEventData {
     /// The inner data of the object
     Json(serde_json::Value),
     RawValue(Box<serde_json::value::RawValue>),
@@ -67,6 +67,10 @@ impl CreateEvent {
 
     pub fn author(&self) -> Option<&str> {
         self.author.as_deref()
+    }
+
+    pub fn extract(self) -> (String, Option<String>, InnerEventData) {
+        (self.name, self.author, self.data)
     }
 }
 
