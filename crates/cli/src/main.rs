@@ -5,6 +5,8 @@ mod experiments;
 mod filestorage;
 mod provider;
 mod repl_completer;
+mod tui;
+mod tui_entrypoint;
 
 use clap::{Parser, ValueEnum};
 use cli::{Cli, CliAuxOpts, CliEntrypointAction};
@@ -442,9 +444,8 @@ impl CliArgs {
                     task_wait_mode: self.repl_wait_mode.into(),
                 }
             } else {
-                CliEntrypointAction::Repl {
-                    task_wait_mode: self.repl_wait_mode.into(),
-                }
+                // Default to TUI mode for REPL
+                CliEntrypointAction::Tui
             }
         };
 

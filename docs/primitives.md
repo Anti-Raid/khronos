@@ -1,6 +1,6 @@
-<div id="primitives"></div>
+<div id="Primitives"></div>
 
-# primitives
+# Primitives
 
 <div id="Types"></div>
 
@@ -519,6 +519,9 @@ type TemplateContext = {
 	--- Object Storage plugin
 	ObjectStorage: objectstorageP.Plugin,
 
+	--- HTTP Client plugin
+	HTTPClient: httpclientP.Plugin,
+
 	--- The public data associated with the script.
 	data: ScriptData,
 
@@ -715,6 +718,14 @@ This requires the `kv.meta:unscoped_allowed` capability to index into/use
 Object Storage plugin
 
 [objectstorageP](./objectstoragep.md).[Plugin](./objectstoragep.md#Plugin)
+
+<div id="HTTPClient"></div>
+
+### HTTPClient
+
+HTTP Client plugin
+
+[httpclientP](./httpclientp.md).[Plugin](./httpclientp.md#Plugin)
 
 <div id="data"></div>
 
