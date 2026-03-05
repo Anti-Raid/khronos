@@ -129,8 +129,8 @@ impl KhronosRuntime {
         // Allow <<>> syntax
         FFLAG_SET_GLOBAL.call_once(|| {
             // Allow <<>> syntax
-            if let Err(e) = Lua::set_fflag("LuauExplicitTypeExpressionInstantiation", true) {
-                log::warn!("Failed to enable LuauExplicitTypeExpressionInstantiation fflag: {:?}", e);
+            if let Err(e) = Lua::set_fflag("LuauExplicitTypeInstantiationSyntax", true) {
+                log::warn!("Failed to enable LuauExplicitTypeInstantiationSyntax fflag: {:?}", e);
             }
         });
 
