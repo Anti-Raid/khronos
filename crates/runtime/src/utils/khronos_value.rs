@@ -23,6 +23,12 @@ pub enum KhronosValue {
     Null,
 }
 
+impl Default for KhronosValue {
+    fn default() -> Self {
+        KhronosValue::Null
+    }
+}
+
 impl KhronosValue {
     const ALLOWED_TYPES: &'static str = "DateTime | TimeDelta | TimeZone | Integer | UnsignedInteger | Blob | MemoryVfs";
     fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
