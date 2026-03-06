@@ -69,10 +69,9 @@ impl<T: KhronosContext> LuaUserData for GlobalKvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "create",
-            async move |lua, this, entry: LuaValue| {
+            async move |_lua, this, entry: CreateGlobalKv| {
                 this.check("create")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
-                let entry: CreateGlobalKv = lua.from_value(entry)?;
 
                 this.global_kv_provider
                     .create(entry)

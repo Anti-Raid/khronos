@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::primitives::{blob::Blob, lazy::Lazy};
+use crate::{core::typesext::MemoryVfs, primitives::blob::Blob};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KhronosValue {
@@ -19,11 +19,12 @@ pub enum KhronosValue {
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
-    LazyStringMap(HashMap<String, String>), // For lazy string maps
+    MemoryVfs(HashMap<String, String>),
     Null,
 }
 
 impl KhronosValue {
+    const ALLOWED_TYPES: &'static str = "DateTime | TimeDelta | TimeZone | Integer | UnsignedInteger | Blob | MemoryVfs";
     fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
         if depth > 10 {
             return Err(LuaError::FromLuaConversionError {
@@ -95,19 +96,15 @@ impl KhronosValue {
                     let data = std::mem::take(&mut blob.data);
                     return Ok(KhronosValue::Buffer(data));
                 }
-                if let Ok(mut s_map) = ud.borrow_mut::<Lazy<HashMap<String, String>>>() {
+                if let Ok(mut s_map) = ud.borrow_mut::<MemoryVfs>() {
                     // Take out the contents of the lazy string map 
                     let data = std::mem::take(&mut s_map.data);
-                    return Ok(KhronosValue::LazyStringMap(data));
+                    return Ok(KhronosValue::MemoryVfs(data));
                 }
 
-                Err(LuaError::FromLuaConversionError { from: "userdata", to: "DateTime | TimeDelta | TimeZone".to_string(), message: Some("Invalid UserData type. Only DateTime, TimeDelta and TimeZone is supported at this time".to_string()) })
+                Err(LuaError::FromLuaConversionError { from: "userdata", to: Self::ALLOWED_TYPES.to_string(), message: Some("Invalid UserData type.".to_string()) })
             }
-            _ => Err(LuaError::FromLuaConversionError {
-                from: "any",
-                to: "KhronosValue".to_string(),
-                message: Some("Invalid type".to_string()),
-            }),
+            _ => Err(LuaError::FromLuaConversionError { from: value.type_name(), to: "KhronosValue".to_string(), message: Some("Unsupported Lua type for KhronosValue".to_string()) }),
         }
     }
 
@@ -150,10 +147,6 @@ impl KhronosValue {
                 }
                 Ok(LuaValue::Table(table))
             }
-            KhronosValue::LazyStringMap(m) => {
-                let lazy = Lazy::new(m);
-                lazy.into_lua(lua)
-            }
             KhronosValue::List(l) => {
                 let table = lua.create_table()?;
                 for v in l.into_iter() {
@@ -167,6 +160,7 @@ impl KhronosValue {
             }
             KhronosValue::Interval(i) => crate::core::datetime::TimeDelta::new(i).into_lua(lua),
             KhronosValue::TimeZone(tz) => crate::core::datetime::Timezone::new(tz).into_lua(lua),
+            KhronosValue::MemoryVfs(m) => MemoryVfs::new(m).into_lua(lua),
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }

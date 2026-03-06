@@ -4,7 +4,7 @@ use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 use rand::distr::{Alphanumeric, SampleString};
 
-use crate::{primitives::{lazy::Lazy, opaque::Opaque}, utils::proxyglobal::proxy_global};
+use crate::{primitives::opaque::Opaque, utils::{khronos_value::KhronosValue, proxyglobal::proxy_global}};
 
 /// Syntactically:
 ///
@@ -746,6 +746,24 @@ fn bitu64(lua: &Lua) -> LuaResult<LuaTable> {
     Ok(submodule)
 }
 
+pub struct MemoryVfs {
+    pub data: HashMap<String, String>,
+}
+
+impl MemoryVfs {
+    pub fn new(data: HashMap<String, String>) -> Self {
+        Self { data }
+    }
+}
+
+impl LuaUserData for MemoryVfs {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("data", |lua, this, _: ()| {
+            lua.to_value(&this.data)
+        });
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Vfs {
     pub vfs: Arc<dyn mluau_require::vfs::FileSystem>,
@@ -773,36 +791,48 @@ impl LuaUserData for Vfs {
             for vfs in vfs_list {
                 match vfs {
                     LuaValue::UserData(vfs) => {
-                        if vfs.is::<Lazy<HashMap<String, String>>>() {
+                        if vfs.is::<MemoryVfs>() {
                             let vfs = vfs
-                            .borrow::<Lazy<HashMap<String, String>>>()
-                            .map_err(|_| LuaError::external("Failed to borrow Lazy<serde_json::Value>"))?;
+                            .borrow::<MemoryVfs>()
+                            .map_err(|_| LuaError::external("Failed to borrow MemoryVfs"))?;
 
                             vfs_refs.push(mluau_require::vfs::VfsPath::new(
                                 mluau_require::create_memory_vfs_from_map(&vfs.data)
                                 .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
                             ));
                             continue;
-                        } else if vfs.is::<Opaque<HashMap<String, String>>>() {
-                            let vfs = vfs
-                            .borrow::<Opaque<HashMap<String, String>>>()
-                            .map_err(|_| LuaError::external("Failed to borrow Opaque<serde_json::Value>"))?;
+                        } else if vfs.is::<Opaque>() {
+                            let opaque = vfs
+                            .borrow::<Opaque>()
+                            .map_err(|_| LuaError::external("Failed to borrow Opaque"))?;
+                            
+                            let map = match &opaque.data {
+                                KhronosValue::MemoryVfs(vfs) => vfs,
+                                _ => return Err(LuaError::external("Opaque must contain a Vfs KhronosValue to be used as a VFS")),
+                            };
 
                             vfs_refs.push(mluau_require::vfs::VfsPath::new(
-                                mluau_require::create_memory_vfs_from_map(&vfs.data)
+                                mluau_require::create_memory_vfs_from_map(&map)
                                 .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
                             ));
                             from_opaque = true;
                             continue;
+                        } else if vfs.is::<Vfs>() {
+                            let vfs = vfs
+                            .borrow::<Vfs>()
+                            .map_err(|_| LuaError::external("Failed to borrow Vfs"))?;
+
+                            vfs_refs.push(mluau_require::vfs::VfsPath::new(vfs.vfs.clone()));
+                            continue;
+                        } else {
+                            return Err(LuaError::external(
+                                "VFS list must contain only Vfs, MemoryVfs or Opaque(VFS) UserData",
+                            ));
                         }
-
-                        let vfs = vfs.borrow::<Vfs>()?;
-
-                        vfs_refs.push(mluau_require::vfs::VfsPath::new(vfs.vfs.clone()));
                     }
                     _ => {
                         return Err(LuaError::external(
-                            "VFS list must contain only Vfs UserData or lazy string maps",
+                            "VFS list must contain only Vfs, MemoryVfs or Opaque(VFS) UserData",
                         ));
                     }
                 }
@@ -862,40 +892,17 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         })?,
     )?;
 
-    module.set("newlazystringmap", lua.create_function(|lua, val: LuaValue| {
+    module.set("createvfs", lua.create_function(|lua, val: LuaValue| {
         let lazy_value: HashMap<String, String> = lua.from_value(val)
             .map_err(|e| LuaError::external(format!("Failed to convert LuaValue to serde_json::Value: {}", e)))?;
 
-        Ok(Lazy::new(lazy_value))
+        Ok(MemoryVfs::new(lazy_value))
     })?)?;
 
     module.set("Vfs", lua.create_proxy::<Vfs>()?)?;
 
     module.set("createglobalproxy", lua.create_function(|lua, _: ()| {
         proxy_global(lua)
-    })?)?;
-
-    // Lazy/Opaque<Value> to Lazy/Opaque<HashMap<String, String>> casting functions
-    module.set("castlazyvaluetolazymap", lua.create_function(|_lua, val: LuaAnyUserData| {
-        let lazy_value = val
-            .take::<Lazy<serde_json::Value>>()
-            .map_err(|_| LuaError::external("Failed to borrow Lazy<serde_json::Value>"))?;
-
-        let map: HashMap<String, String> = serde_json::from_value(lazy_value.data)
-            .map_err(|e| LuaError::external(format!("Failed to convert serde_json::Value to HashMap<String, String>: {}", e)))?;
-
-        Ok(Lazy::new(map))
-    })?)?;
-
-    module.set("castopaquevaluetopaquemap", lua.create_function(|_lua, val: LuaAnyUserData| {
-        let opaque_value = val
-            .take::<Opaque<serde_json::Value>>()
-            .map_err(|_| LuaError::external("Failed to borrow Opaque<serde_json::Value>"))?;
-
-        let map: HashMap<String, String> = serde_json::from_value(opaque_value.data)
-            .map_err(|e| LuaError::external(format!("Failed to convert serde_json::Value to HashMap<String, String>: {}", e)))?;
-
-        Ok(Opaque::new(map))
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
