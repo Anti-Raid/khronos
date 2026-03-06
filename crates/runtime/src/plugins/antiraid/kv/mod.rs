@@ -107,6 +107,10 @@ impl<T: KhronosContext> KvExecutor<T> {
             return Err("Unscoped operations are not allowed".into());
         }
 
+        if self.limitations.has_any_reserved_key_scope(scopes) {
+            return Err("One or more of the specified scopes are reserved and cannot be interacted with using the key-value API".into());
+        }
+
         if self.limitations.has_cap("kv.meta:keys") {
             return Ok(());
         }
