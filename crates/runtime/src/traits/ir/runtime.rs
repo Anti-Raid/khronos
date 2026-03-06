@@ -8,11 +8,11 @@ const MAX_EVENTS: usize = 100;
 pub struct TenantState {
     pub events: Vec<String>,
     pub banned: bool,
-    pub data: serde_json::Value,
+    pub flags: i32,
 }
 
 impl FromLua for TenantState {
-    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
         let table = match value {
             LuaValue::Table(t) => t,
             _ => {
@@ -38,7 +38,7 @@ impl FromLua for TenantState {
         let banned: bool = table.get("banned")?;
         let data: LuaTable = table.get("data")?;
 
-        // Ensure data is a Object
+        // Ensure data is a object
         if data.metatable().is_some() {
             return Err(LuaError::FromLuaConversionError {
                 from: "table with metatable",
@@ -47,12 +47,12 @@ impl FromLua for TenantState {
             });
         }
 
-        let data = lua.from_value(LuaValue::Table(data))?;
+        let flags: i32 = data.get("flags")?;
 
         Ok(TenantState {
             events,
             banned,
-            data,
+            flags,
         })
     }
 }
@@ -63,7 +63,7 @@ impl IntoLua for TenantState {
 
         table.set("events", self.events)?;
         table.set("banned", self.banned)?;
-        table.set("data", lua.to_value(&self.data)?)?;
+        table.set("flags", self.flags)?;
 
         // Note that we do not set tenant state to readonly as we may want to mutate it
 

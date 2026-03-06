@@ -12,6 +12,7 @@ use moka::future::Cache;
 use serde_json::Value;
 use sqlx::Row;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -51,7 +52,8 @@ impl KhronosContext for CliKhronosContext {
     type RuntimeProvider = CliRuntimeProvider;
 
     fn limitations(&self) -> Limitations {
-        Limitations::new(self.allowed_caps.clone())
+        let allowed_caps = self.allowed_caps.iter().cloned().collect::<HashSet<_>>();
+        Limitations::new(allowed_caps, HashSet::new())
     }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {
@@ -655,7 +657,7 @@ mod _runtimeprovider {
     pub struct TenantState {
         pub events: Vec<String>,
         pub banned: bool,
-        pub data: serde_json::Value,
+        pub flags: i32,
     }
 }
 
@@ -677,13 +679,13 @@ impl RuntimeProvider for CliRuntimeProvider {
             return Ok(runtime_ir::TenantState {
                 events: v.events,
                 banned: v.banned,
-                data: v.data,
+                flags: v.flags,
             });
         }
         return Ok(runtime_ir::TenantState {
             events: vec!["INTERACTION_CREATE".to_string()],
             banned: false,
-            data: serde_json::Value::Object(serde_json::Map::new()),
+            flags: 0,
         });
     }
 
@@ -691,7 +693,7 @@ impl RuntimeProvider for CliRuntimeProvider {
         let v = serde_json::to_vec(&_runtimeprovider::TenantState {
             events: state.events,
             banned: state.banned,
-            data: state.data,
+            flags: state.flags,
         })?;
         self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;
         Ok(())
