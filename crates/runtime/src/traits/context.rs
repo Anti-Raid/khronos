@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{TemplateContext, primitives::event::CreateEvent, traits::runtimeprovider::RuntimeProvider};
 
 use super::{
@@ -10,7 +12,7 @@ use mluau::prelude::*;
 
 /// Represents the data to be passed into ctx:with()
 pub struct KhronosValueWith {
-    pub capabilities: Vec<String>,
+    pub limitations: Limitations,
     pub event: Option<CreateEvent>,
 }
 
@@ -21,22 +23,23 @@ impl FromLua for KhronosValueWith {
             _ => return Err(LuaError::FromLuaConversionError { from: value.type_name(), to: "KhronosValueWith".to_string(), message: Some("Expected a table".to_string()) }),
         };
 
-        let capabilities: Vec<String> = table.get("capabilities")?;
+        let limitations: Limitations = table.get("limitations")?;
         let event: Option<CreateEvent> = table.get("event")?;
 
-        Ok(KhronosValueWith { capabilities, event })
+        Ok(KhronosValueWith { limitations, event })
     }
 }
 
 /// Represents a result of a set operation in the key-value store
 pub struct Limitations {
-    pub capabilities: Vec<String>,
+    pub capabilities: HashSet<String>,
+    pub reserved_key_scopes: HashSet<String>,
 }
 
 impl Limitations {
     /// Returns a new limitations instance with the given capabilities
-    pub fn new(capabilities: Vec<String>) -> Self {
-        Self { capabilities }
+    pub fn new(capabilities: HashSet<String>, reserved_key_scopes: HashSet<String>) -> Self {
+        Self { capabilities, reserved_key_scopes }
     }
 
     /// Returns Ok(()) if `other` is a subset of `self`, otherwise returns an error
@@ -46,19 +49,82 @@ impl Limitations {
                 return Err(format!("Missing capability: {cap}. A context can only be limited into a set of limitations that are strictly a subset of itself"));
             }
         }
+        for scope in &self.reserved_key_scopes {
+            if !other.has_reserved_key_scope(scope) {
+                return Err(format!("Missing reserved key scope: {scope}. A context can only be limited into a set of limitations that are strictly a subset of itself"));
+            }
+        }
         Ok(())
+    }
+
+    /// Checks if the limitations has a specific reserved scope (cannot be interacted with in key-value api)
+    pub fn has_reserved_key_scope(&self, scope: &str) -> bool {
+        self.reserved_key_scopes.contains(scope)
+    }
+
+    /// Checks if the limitations has any of a set of reserved scopes (cannot be interacted with in key-value api)
+    pub fn has_any_reserved_key_scope(&self, scopes: &[String]) -> bool {
+        for scope in scopes {
+            if self.has_reserved_key_scope(scope) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Checks if the limitations allow a specific capability
     pub fn has_cap(&self, cap: &str) -> bool {
-        self.capabilities.iter().any(|c| c == cap || c == "*")
+        self.capabilities.contains(cap) || self.capabilities.contains("*")
     }
 
     /// Checks if the limitations allow any of a set of capabilities
     pub fn has_any_cap(&self, caps: &[String]) -> bool {
-        self.capabilities
-            .iter()
-            .any(|c| caps.iter().any(|cap| c == cap || c == "*"))
+        for cap in caps {
+            if self.has_cap(cap) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl FromLua for Limitations {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        Limitations::from_lua_impl(value)
+    }
+}
+
+impl Limitations {
+    pub fn from_lua_impl(value: LuaValue) -> LuaResult<Self> {
+        let table = match value {
+            LuaValue::Table(t) => t,
+            _ => return Err(LuaError::FromLuaConversionError { from: value.type_name(), to: "Limitations".to_string(), message: Some("Expected a table".to_string()) }),
+        };
+
+        let capabilities: Vec<String> = table.get("capabilities")?;
+        let reserved_key_scopes: Vec<String> = table.get("reserved_key_scopes")?;
+
+        Ok(Limitations::new(HashSet::from_iter(capabilities), HashSet::from_iter(reserved_key_scopes)))
+    }
+
+    pub fn into_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+
+        let capabilities_table = lua.create_table()?;
+        for cap in &self.capabilities {
+            capabilities_table.raw_push(cap.as_str())?;
+        }
+        table.set("capabilities", capabilities_table)?;
+
+        let reserved_key_scopes_table = lua.create_table()?;
+        for scope in &self.reserved_key_scopes {
+            reserved_key_scopes_table.raw_push(scope.as_str())?;
+        }
+        table.set("reserved_key_scopes", reserved_key_scopes_table)?;
+
+        table.set_readonly(true);
+
+        Ok(LuaValue::Table(table))
     }
 }
 

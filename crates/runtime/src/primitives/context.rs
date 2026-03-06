@@ -202,25 +202,19 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             }
         }); 
 
-        methods.add_method("has_cap", |_, this, cap: String| {
-            Ok(this.limitations.has_cap(&cap))
-        });
-
-        methods.add_method("has_any_cap", |_, this, caps: Vec<String>| {
-            Ok(this.limitations.has_any_cap(&caps))
+        methods.add_method("limitations", |lua, this, _: ()| {
+            this.limitations.into_lua(lua)
         });
 
         methods.add_method("with", |_lua, this, with: KhronosValueWith| {
-            let limits = Limitations::new(with.capabilities);
-
             // Ensure that the new limitations are a subset of the current limitations
-            limits
+            with.limitations
                 .subset_of(&this.limitations)
                 .map_err(mluau::Error::external)?;
 
             // Create a new context with the given limitations
             let new_context = TemplateContext {
-                limitations: Rc::new(limits),
+                limitations: Rc::new(with.limitations),
                 context: this.context.clone(),
                 store_table: this.store_table.clone(),
                 current_discord_user: this.current_discord_user.clone(),
