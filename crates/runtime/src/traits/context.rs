@@ -49,8 +49,8 @@ impl Limitations {
                 return Err(format!("Missing capability: {cap}. A context can only be limited into a set of limitations that are strictly a subset of itself"));
             }
         }
-        for scope in &self.reserved_key_scopes {
-            if !other.has_reserved_key_scope(scope) {
+        for scope in &other.reserved_key_scopes {
+            if !self.has_reserved_key_scope(scope) {
                 return Err(format!("Missing reserved key scope: {scope}. A context can only be limited into a set of limitations that are strictly a subset of itself"));
             }
         }
