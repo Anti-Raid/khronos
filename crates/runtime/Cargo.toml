@@ -18,7 +18,6 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
     "serialize",
 ] }
-captcha = { git = "https://github.com/Anti-Raid/captcha", branch = "master" }
 mluau-require = { git = "https://github.com/mluau/mluau-require" }
 bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }

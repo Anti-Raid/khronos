@@ -115,10 +115,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
         });
 
-        fields.add_field_method_get("ImageCaptcha", |lua, this| {
-            this.get_plugin(lua, "ImageCaptcha", antiraid::img_captcha::init_plugin)
-        });
-
         fields.add_field_method_get("KV", |lua, this| {
             this.get_plugin(lua, "KV", antiraid::kv::init_plugin)
         });
