@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{TemplateContext, primitives::event::CreateEvent, traits::runtimeprovider::RuntimeProvider};
 
 use super::{
-    httpclientprovider::HTTPClientProvider, httpserverprovider::HTTPServerProvider, 
+    httpclientprovider::HTTPClientProvider, 
     kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
     globalkvprovider::GlobalKVProvider
 };
@@ -134,7 +134,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
     type DiscordProvider: DiscordProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
-    type HTTPServerProvider: HTTPServerProvider;
     type RuntimeProvider: RuntimeProvider;
 
     /// Returns the (outer) limitations for the context
@@ -162,9 +161,6 @@ pub trait KhronosContext: 'static + Clone + Sized {
 
     /// Returns a HTTP client provider
     fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider>;
-
-    /// Returns a HTTP server provider
-    fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider>;
 
     /// Returns a runtime provider
     fn runtime_provider(&self) -> Option<Self::RuntimeProvider>;

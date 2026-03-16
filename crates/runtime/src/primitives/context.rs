@@ -131,10 +131,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "HTTPClient", antiraid::httpclient::init_plugin)
         });
 
-        fields.add_field_method_get("HTTPServer", |lua, this| {
-            this.get_plugin(lua, "HTTPServer", antiraid::httpserver::init_plugin)
-        });
-
         fields.add_field_method_get("Runtime", |lua, this| {
             this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
         });

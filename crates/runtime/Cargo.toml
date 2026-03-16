@@ -12,10 +12,7 @@ extract_map = { version = "0.3", features = ["serde"] }
 indexmap = { version = "2", features = ["serde"] }
 tokio = { version = "1" }
 tokio-util = { version = "0.7", features = ["time"] }
-arrayvec = "0.7"
-small-fixed-array = "0.4"
 reqwest = { version = "0.12" }
-percent-encoding = { version = "2" }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
 mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
@@ -35,12 +32,6 @@ hickory-resolver = { version = "0.25", features = ["tokio"] }
 pin-project-lite = "0.2"
 bytes = "1.2"
 futures-core = "0.3"
-
-# httpserver
-axum = { version = "0.8", features = ["macros"] }
-hyper = "1"
-hyper-util = { version = "0.1", features = ["tokio", "server-auto", "http1"] }
-tower = "0.5"
 
 # blob encryption
 aes-gcm = "0.10"

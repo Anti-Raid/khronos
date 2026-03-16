@@ -3,7 +3,6 @@ use dapi::controller::DiscordProviderContext;
 use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
-use khronos_runtime::traits::httpserverprovider::HTTPServerProvider;
 use khronos_runtime::traits::ir::globalkv::GlobalKv;
 use khronos_runtime::traits::ir::globalkv::PartialGlobalKv;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
@@ -48,7 +47,6 @@ impl KhronosContext for CliKhronosContext {
     type DiscordProvider = CliDiscordProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
-    type HTTPServerProvider = CliHttpServerProvider;
     type RuntimeProvider = CliRuntimeProvider;
 
     fn limitations(&self) -> Limitations {
@@ -113,10 +111,6 @@ impl KhronosContext for CliKhronosContext {
 
     fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider> {
         Some(CliHttpClientProvider)
-    }
-
-    fn httpserver_provider(&self) -> Option<Self::HTTPServerProvider> {
-        Some(CliHttpServerProvider)
     }
 
     fn runtime_provider(&self) -> Option<Self::RuntimeProvider> {
@@ -634,15 +628,6 @@ impl HTTPClientProvider for CliHttpClientProvider {
     }
 
     fn attempt_action(&self, _bucket: &str, _url: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct CliHttpServerProvider;
-
-impl HTTPServerProvider for CliHttpServerProvider {
-    fn attempt_action(&self, _bucket: &str, _path: String) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
 }
