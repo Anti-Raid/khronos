@@ -107,7 +107,7 @@ pub const EVENT_LIST: [&str; 71] = [
   "INTERACTION_CREATE", // User used an interaction, such as anApplication Command
   "INVITE_CREATE", // Invite to a channel was created
   "INVITE_DELETE", // Invite to a channel was deleted
-  "MESSAGE", // Message was created
+  "MESSAGE_CREATE", // Message was created
   "MESSAGE_UPDATE", // Message was edited
   "MESSAGE_DELETE", // Message was deleted
   "MESSAGE_DELETE_BULK", // Multiple messages were deleted at once

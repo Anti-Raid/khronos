@@ -7,7 +7,6 @@ const MAX_EVENTS: usize = 100;
 #[derive(Debug, Clone)]
 pub struct TenantState {
     pub events: Vec<String>,
-    pub banned: bool,
     pub flags: i32,
 }
 
@@ -35,7 +34,6 @@ impl FromLua for TenantState {
             });
         }
 
-        let banned: bool = table.get("banned")?;
         let data: LuaTable = table.get("data")?;
 
         // Ensure data is a object
@@ -51,7 +49,6 @@ impl FromLua for TenantState {
 
         Ok(TenantState {
             events,
-            banned,
             flags,
         })
     }
@@ -62,7 +59,6 @@ impl IntoLua for TenantState {
         let table = lua.create_table()?;
 
         table.set("events", self.events)?;
-        table.set("banned", self.banned)?;
         table.set("flags", self.flags)?;
 
         // Note that we do not set tenant state to readonly as we may want to mutate it
