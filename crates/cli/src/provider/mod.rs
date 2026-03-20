@@ -663,13 +663,11 @@ impl RuntimeProvider for CliRuntimeProvider {
             let v: _runtimeprovider::TenantState = serde_json::from_slice(&file.contents)?;
             return Ok(runtime_ir::TenantState {
                 events: v.events,
-                banned: v.banned,
                 flags: v.flags,
             });
         }
         return Ok(runtime_ir::TenantState {
             events: vec!["INTERACTION_CREATE".to_string()],
-            banned: false,
             flags: 0,
         });
     }
@@ -677,7 +675,7 @@ impl RuntimeProvider for CliRuntimeProvider {
     async fn set_tenant_state(&self, state: runtime_ir::TenantState) -> Result<(), khronos_runtime::Error> {
         let v = serde_json::to_vec(&_runtimeprovider::TenantState {
             events: state.events,
-            banned: state.banned,
+            banned: false,
             flags: state.flags,
         })?;
         self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;

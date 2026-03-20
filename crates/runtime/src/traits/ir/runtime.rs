@@ -34,18 +34,7 @@ impl FromLua for TenantState {
             });
         }
 
-        let data: LuaTable = table.get("data")?;
-
-        // Ensure data is a object
-        if data.metatable().is_some() {
-            return Err(LuaError::FromLuaConversionError {
-                from: "table with metatable",
-                to: "TenantState".to_string(),
-                message: Some("data field must be an object/map with no metatable or nil".to_string()),
-            });
-        }
-
-        let flags: i32 = data.get("flags")?;
+        let flags: i32 = table.get("flags")?;
 
         Ok(TenantState {
             events,
