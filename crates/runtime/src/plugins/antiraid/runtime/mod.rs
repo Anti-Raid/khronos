@@ -1,6 +1,4 @@
-use std::rc::Rc;
-
-use crate::traits::context::{KhronosContext, Limitations};
+use crate::traits::context::{KhronosContext};
 use crate::traits::runtimeprovider::RuntimeProvider;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
@@ -10,7 +8,6 @@ use crate::traits::ir::runtime as runtime_ir;
  /// An runtime executor is used to perform basic 'runtime' operations from Lua
 /// templates
 pub struct RuntimeExecutor<T: KhronosContext> {
-    limitations: Rc<Limitations>,
     runtime_provider: T::RuntimeProvider,
 }
 
@@ -19,17 +16,8 @@ impl<T: KhronosContext> RuntimeExecutor<T> {
         &self,
         action: &str,
     ) -> Result<(), crate::Error> {
-        if self.limitations.has_cap("runtime:*") // runtime:* means all runtime operations are allowed
-        || self.limitations.has_cap(&format!("runtime:{action}")) // runtime:{action} means that a specific action is allowed
-        {
-            self.runtime_provider.attempt_action(&action)?; // Check rate limits
-            return Ok(());
-        }
-
-        Err(format!(
-            "runtime operation `{action}` not allowed in this template context",
-        )
-        .into())
+        self.runtime_provider.attempt_action(action)?;
+        Ok(())
     }
 }
 
@@ -90,7 +78,6 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
     let executor = RuntimeExecutor::<T> {
-        limitations: token.limitations.clone(),
         runtime_provider,
     }
     .into_lua(lua)?;

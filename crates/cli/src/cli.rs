@@ -97,11 +97,6 @@ impl CliExtensionState {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Cli {
-    /// What capbilities the script should have (comma separated)
-    ///
-    /// Can be useful for mocking etc.
-    pub allowed_caps: Vec<String>,
-
     /// Whether or not to be verbose
     pub verbose: bool,
 
@@ -185,7 +180,6 @@ impl Cli {
     /// Create a khronos context
     fn create_khronos_context(&self) -> provider::CliKhronosContext {
         provider::CliKhronosContext {
-            allowed_caps: self.allowed_caps.clone(),
             guild_id: self.guild_id,
             http: self.http.clone(),
             file_storage_provider: self.file_storage_provider.clone(),
@@ -208,7 +202,7 @@ impl Cli {
             event.data,
         );
 
-        let ctx = self.setup_data.rt.create_context(context, create_event)?;
+        let ctx = self.setup_data.rt.create_context(context)?;
 
         let chunk_fn = self
             .setup_data
@@ -218,7 +212,7 @@ impl Cli {
         self
         .setup_data
         .rt
-        .call_in_scheduler(chunk_fn, ctx).await
+        .call_in_scheduler(chunk_fn, (ctx, create_event)).await
     }
 
     pub async fn setup_lua_vm(

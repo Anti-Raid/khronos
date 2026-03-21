@@ -1,6 +1,5 @@
 use dapi::EVENT_LIST;
 use dapi::controller::DiscordProviderContext;
-use khronos_runtime::traits::context::Limitations;
 use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::ir::globalkv::GlobalKv;
@@ -11,7 +10,6 @@ use moka::future::Cache;
 use serde_json::Value;
 use sqlx::Row;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -35,7 +33,6 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, Value>
 #[derive(Clone)]
 pub struct CliKhronosContext {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
-    pub allowed_caps: Vec<String>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
     pub pool: Option<sqlx::PgPool>,
@@ -48,11 +45,6 @@ impl KhronosContext for CliKhronosContext {
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
     type RuntimeProvider = CliRuntimeProvider;
-
-    fn limitations(&self) -> Limitations {
-        let allowed_caps = self.allowed_caps.iter().cloned().collect::<HashSet<_>>();
-        Limitations::new(allowed_caps, HashSet::new())
-    }
 
     fn kv_provider(&self) -> Option<Self::KVProvider> {
         let guild_id = if let Some(guild_id) = self.guild_id {

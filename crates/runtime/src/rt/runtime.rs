@@ -14,7 +14,6 @@ use mluau_require::{AssetRequirer, FilesystemWrapper};
 pub type S = mlua_scheduler::schedulers::rodan::CoreScheduler;
 
 use crate::TemplateContext;
-use crate::primitives::event::CreateEvent;
 use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::proxyglobal::proxy_global;
 
@@ -400,11 +399,10 @@ impl KhronosRuntime {
     pub fn create_context<K: KhronosContextTrait>(
         &self,
         context: K,
-        event: CreateEvent,
     ) -> Result<TemplateContext<K>, LuaError> {
         // Ensure create_thread wont error
         self.update_last_execution_time(std::time::Instant::now());
-        let context = TemplateContext::new(self.store_table.clone(), context, event)?;
+        let context = TemplateContext::new(self.store_table.clone(), context)?;
         Ok(context)
     }
 

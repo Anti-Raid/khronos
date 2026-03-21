@@ -1,11 +1,8 @@
-use std::rc::Rc;
-
 use crate::core::datetime::DateTime;
 use crate::core::datetime::TimeDelta;
 use crate::primitives::blob::Blob;
 use crate::primitives::blob::BlobTaker;
 use crate::traits::context::KhronosContext;
-use crate::traits::context::Limitations;
 use crate::traits::objectstorageprovider::ObjectStorageProvider;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
@@ -32,18 +29,11 @@ impl IntoLua for ObjectMetadata {
 
 #[derive(Clone)]
 pub struct Bucket<T: KhronosContext> {
-    limitations: Rc<Limitations>,
     objectstorage_provider: T::ObjectStorageProvider,
 }
 
 impl<T: KhronosContext> Bucket<T> {
     pub fn check_action(&self, action: String) -> LuaResult<()> {
-        if !self.limitations.has_cap(&format!("objectstorage:{action}")) {
-            return Err(LuaError::runtime(format!(
-                "Objectstorage action `{action}` not allowed in this template context",
-            )));
-        }
-
         self.objectstorage_provider
             .attempt_action(&action)
             .map_err(|e| LuaError::external(e.to_string()))?;
@@ -200,7 +190,6 @@ pub fn init_plugin<T: KhronosContext>(
     };
 
     let bucket = Bucket::<T> {
-        limitations: token.limitations.clone(),
         objectstorage_provider,
     }
     .into_lua(lua)?;
