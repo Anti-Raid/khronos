@@ -205,7 +205,7 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
                 };
 
                 // Check max ops performed
-                if *bulk_op.op_performed.try_borrow().map_err(LuaError::runtime)? < *bulk_op.op_performed.try_borrow().map_err(LuaError::runtime)? {
+                if *bulk_op.op_performed.try_borrow().map_err(LuaError::runtime)? < bulk_op.max_ops {
                     return Ok(()); // No-op if the user can still perform operations
                 }
 

@@ -86,14 +86,6 @@ impl KvRecord {
 }
 
 impl<T: KhronosContext> KvExecutor<T> {
-    pub fn check_keys(&self, scopes: &[String]) -> Result<(), crate::Error> {
-        if scopes.is_empty() {
-            return Err("Unscoped operations are not allowed".into());
-        }
-
-        Ok(())
-    }
-
     pub fn check(
         &self,
         scopes: &[String],
@@ -104,6 +96,14 @@ impl<T: KhronosContext> KvExecutor<T> {
         }
 
         self.kv_provider.attempt_action(scopes, action)?;
+        Ok(())
+    }
+
+    pub fn check_unscoped(
+        &self,
+        action: &str,
+    ) -> Result<(), crate::Error> {
+        self.kv_provider.attempt_action(&[], action)?;
         Ok(())
     }
 }
@@ -118,6 +118,8 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));
 
         methods.add_scheduler_async_method("list_scopes", async move |_, this, _g: ()| {
+            this.check_unscoped("list_scopes")
+                .map_err(|e| LuaError::runtime(e.to_string()))?;
             let scopes = this
                 .kv_provider
                 .list_scopes()
