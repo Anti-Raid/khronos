@@ -58,12 +58,6 @@ struct CliArgs {
 
     /// What capbilities the script should have (comma separated)
     ///
-    /// Can be useful for mocking etc.
-    ///
-    /// Environment variable: `ALLOWED_CAPS`
-    #[clap(long)]
-    allowed_caps: Option<String>,
-
     /// Whether or not to be verbose
     ///
     /// Environment variable: `VERBOSE`
@@ -272,11 +266,6 @@ impl CliArgs {
             self.inline_script = Some(inline_script);
         }
 
-        if let Ok(allowed_caps) = src.var("ALLOWED_CAPS") {
-            self.allowed_caps =
-                serde_json::from_str(&allowed_caps).expect("Failed to parse allowed caps");
-        }
-
         if let Ok(verbose) = src.var("VERBOSE") {
             self.verbose = verbose.parse().expect("Failed to parse verbose");
         }
@@ -454,16 +443,6 @@ impl CliArgs {
         (
             Cli {
                 ext_state: ext_state.clone(),
-                allowed_caps: {
-                    if let Some(allowed_caps) = self.allowed_caps {
-                        allowed_caps
-                            .split(',')
-                            .map(|s| s.trim().to_string())
-                            .collect()
-                    } else {
-                        vec![]
-                    }
-                },
                 verbose: self.verbose,
                 aux_opts: aux_opts.clone(),
                 raw_event_data: self.raw_event_data,

@@ -1,6 +1,4 @@
-use std::rc::Rc;
-
-use crate::traits::context::{KhronosContext, Limitations};
+use crate::traits::context::{KhronosContext};
 use crate::traits::globalkvprovider::GlobalKVProvider;
 use crate::TemplateContext;
 use crate::traits::ir::globalkv::CreateGlobalKv;
@@ -10,7 +8,6 @@ use mluau::prelude::*;
 /// An kv executor is used to execute key-value ops from Lua
 /// templates
 pub struct GlobalKvExecutor<T: KhronosContext> {
-    limitations: Rc<Limitations>,
     global_kv_provider: T::GlobalKVProvider,
 }
 
@@ -19,12 +16,6 @@ impl<T: KhronosContext> GlobalKvExecutor<T> {
         &self,
         scope: &str
     ) -> Result<(), crate::Error> {
-        if !self.limitations.has_cap(format!("globalkv:access:{scope}").as_str()) {
-            return Err(format!(
-                "Global KV operation not allowed in this template context for scope '{scope}'",
-            )
-            .into());
-        }
         self.global_kv_provider.attempt_action(scope)?; // Check rate limits
         Ok(())
     }
@@ -117,7 +108,6 @@ pub fn init_plugin<T: KhronosContext>(
         ));
     };
     let executor = GlobalKvExecutor::<T> {
-        limitations: token.limitations.clone(),
         global_kv_provider,
     }
     .into_lua(lua)?;

@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use crate::plugins::antiraid::LUA_SERIALIZE_OPTIONS;
 //use crate::primitives::create_userdata_iterator_with_fields;
-use crate::traits::context::{KhronosContext, Limitations};
+use crate::traits::context::{KhronosContext};
 use dapi::{apilist::MapResponseMetadata, context::DiscordContext};
 use dapi::controller::{DiscordProvider, DiscordProviderContext};
 use crate::{primitives::lazy::Lazy, TemplateContext};
@@ -63,7 +63,6 @@ pub struct BulkOpData {
 /// templates
 pub struct DiscordActionExecutor<T: KhronosContext> {
     context: T,
-    limitations: Rc<Limitations>,
     discord_provider: T::DiscordProvider,
     discord_controller: dapi::context::DiscordContext<T::DiscordProvider>,
     bulk_op: Option<Rc<BulkOpData>>,
@@ -84,12 +83,6 @@ impl<T: KhronosContext> DiscordActionExecutor<T> {
     }
 
     pub fn check_action_impl(&self, _lua: &Lua, action: &str) -> LuaResult<()> {
-        if !self.limitations.has_cap(&format!("discord:{action}")) {
-            return Err(LuaError::runtime(format!(
-                "Discord action `{action}` not allowed in this template context",
-            )));
-        }
-
         if let Some(bulk_op) = &self.bulk_op {
             if action != "antiraid_bulk_op_wait" {
                 if let Some(ref b_action) = bulk_op.action {
@@ -193,7 +186,6 @@ impl<T: KhronosContext> LuaUserData for DiscordActionExecutor<T> {
 
             let executor = DiscordActionExecutor {
                 context: this.context.clone(),
-                limitations: this.limitations.clone(),
                 discord_provider: this.discord_provider.clone(),
                 discord_controller: this.discord_controller.clone(),
                 bulk_op: Some(bulk_op)
@@ -287,7 +279,6 @@ pub fn init_plugin<T: KhronosContext>(lua: &Lua, token: &TemplateContext<T>) -> 
 
     let executor = DiscordActionExecutor {
         context: token.context.clone(),
-        limitations: token.limitations.clone(),
         discord_controller: DiscordContext::new(
             discord_provider.clone()
         ),
