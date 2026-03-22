@@ -231,7 +231,8 @@ impl Cli {
                 give_time: std::time::Duration::from_millis(500),
             },
             None::<(fn(&Lua, LuaThread) -> Result<(), LuaError>, fn(LuaLightUserData) -> ())>,
-            PhysicalFS::new(current_dir.clone())
+            PhysicalFS::new(current_dir.clone()),
+            "antiraid"
         )
         .expect("Failed to create runtime");
         log::debug!("Lua VM created in {:?}", time_now.elapsed());

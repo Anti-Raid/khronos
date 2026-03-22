@@ -122,7 +122,9 @@ impl KhronosRuntime {
             ThreadDestructionCallbackFunc,
         )>,
         vfs: FS,
+        prefix: &str,
     ) -> Result<Self, LuaError> {
+        assert!(!prefix.starts_with('@'), "Prefix should not start with `@`");
         log::debug!("Creating new Khronos runtime");
         
         // Allow <<>> syntax
@@ -226,28 +228,28 @@ impl KhronosRuntime {
 
         // Load core modules
         lua.register_module(
-            "@antiraid/channel",
+            &format!("@{prefix}/channel"),
             crate::core::channel::init_plugin(&lua)?,
         )?;
         lua.register_module(
-            "@antiraid/datetime",
+            &format!("@{prefix}/datetime"),
             crate::core::datetime::init_plugin(&lua)?,
         )?;
         lua.register_module(
-            "@antiraid/interop",
+            &format!("@{prefix}/interop"),
             crate::core::interop::init_plugin(&lua)?,
         )?;
-        lua.register_module("@antiraid/luau", crate::core::luau::init_plugin(&lua)?)?;
+        lua.register_module(&format!("@{prefix}/luau"), crate::core::luau::init_plugin(&lua)?)?;
         lua.register_module(
-            "@antiraid/json",
+            &format!("@{prefix}/json"),
             crate::core::json::init_plugin(&lua)?,
         )?;
         lua.register_module(
-            "@antiraid/datamgmt",
+            &format!("@{prefix}/datamgmt"),
             crate::core::datamgmt::init_plugin(&lua)?,
         )?;
         lua.register_module(
-            "@antiraid/typesext",
+            &format!("@{prefix}/typesext"),
             crate::core::typesext::init_plugin(&lua)?,
         )?;
 
