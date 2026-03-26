@@ -90,10 +90,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
         });
 
-        fields.add_field_method_get("KV", |lua, this| {
-            this.get_plugin(lua, "KV", antiraid::kv::init_plugin)
-        });
-
         fields.add_field_method_get("ObjectStorage", |lua, this| {
             this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
         });
@@ -104,14 +100,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         fields.add_field_method_get("Runtime", |lua, this| {
             this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
-        });
-
-        fields.add_field_method_get("GlobalKV", |lua, this| {
-            this.get_plugin(
-                lua,
-                "GlobalKV",
-                antiraid::globalkv::init_plugin::<T>,
-            )
         });
 
         let mut available_extra_plugins = Vec::new();

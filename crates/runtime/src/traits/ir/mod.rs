@@ -2,14 +2,9 @@
 //!
 //! We also use a second IR in the API itself. While this may seem like duplicated code, it allows for more flexibility
 
-/// KV IR
-pub mod kv;
 /// Object Storage IR
 pub mod objectstorage;
 /// Runtime IR
 pub mod runtime;
-/// Global KV IR
-pub mod globalkv;
 
-pub use kv::*;
 pub use objectstorage::*;

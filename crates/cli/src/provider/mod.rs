@@ -1,14 +1,9 @@
 use dapi::EVENT_LIST;
 use dapi::controller::DiscordProviderContext;
-use khronos_runtime::traits::globalkvprovider::GlobalKVProvider;
 use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
-use khronos_runtime::traits::ir::globalkv::GlobalKv;
-use khronos_runtime::traits::ir::globalkv::PartialGlobalKv;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
-use khronos_runtime::utils::khronos_value::KhronosValue;
 use moka::future::Cache;
 use serde_json::Value;
-use sqlx::Row;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -18,7 +13,6 @@ use crate::constants::default_global_guild_id;
 use crate::filestorage::FileStorageProvider;
 use khronos_runtime::traits::context::KhronosContext;
 use dapi::controller::DiscordProvider;
-use khronos_runtime::traits::kvprovider::KVProvider;
 use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 use khronos_runtime::traits::ir::runtime as runtime_ir;
 
@@ -35,52 +29,13 @@ pub struct CliKhronosContext {
     pub file_storage_provider: Rc<dyn FileStorageProvider>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
-    pub pool: Option<sqlx::PgPool>,
 }
 
 impl KhronosContext for CliKhronosContext {
-    type KVProvider = CliKVProvider;
-    type GlobalKVProvider = CliGlobalKVProvider;
     type DiscordProvider = CliDiscordProvider;
     type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
     type RuntimeProvider = CliRuntimeProvider;
-
-    fn kv_provider(&self) -> Option<Self::KVProvider> {
-        let guild_id = if let Some(guild_id) = self.guild_id {
-            guild_id
-        } else {
-            default_global_guild_id()
-        };
-
-        let Some(pool) = &self.pool else {
-            eprintln!("WARNING: A postgres pool is required for KVProvider in CLI mode.");
-            return None;
-        };
-
-        Some(CliKVProvider {
-            guild_id,
-            pool: pool.clone(),
-        })
-    }
-
-    fn global_kv_provider(&self) -> Option<Self::GlobalKVProvider> {
-        let guild_id = if let Some(guild_id) = self.guild_id {
-            guild_id
-        } else {
-            default_global_guild_id()
-        };
-
-        let Some(pool) = &self.pool else {
-            eprintln!("WARNING: A postgres pool is required for GlobalKVProvider in CLI mode.");
-            return None;
-        };
-
-        Some(CliGlobalKVProvider {
-            guild_id,
-            pool: pool.clone(),
-        })
-    }
 
     fn discord_provider(&self) -> Option<Self::DiscordProvider> {
         let guild_id = if let Some(guild_id) = self.guild_id {
@@ -107,230 +62,7 @@ impl KhronosContext for CliKhronosContext {
 
     fn runtime_provider(&self) -> Option<Self::RuntimeProvider> {
         Some(CliRuntimeProvider {
-            file_storage_provider: self.file_storage_provider.clone(),
         })
-    }
-}
-
-#[derive(Clone)]
-pub struct CliKVProvider {
-    pub guild_id: serenity::all::GuildId,
-    pub pool: sqlx::PgPool,
-}
-
-impl KVProvider for CliKVProvider {
-    async fn list_scopes(&self) -> Result<Vec<String>, khronos_runtime::Error> {
-        let query = sqlx::query(
-            "SELECT DISTINCT scopes FROM kv_v2 ORDER BY scope;
-        ",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to list scopes: {e}"))?
-        .iter()
-        .map(|row| row.get::<String, _>("scope"))
-        .collect::<Vec<_>>();
-
-        Ok(query)
-    }
-
-    async fn get(
-        &self,
-        scopes: String,
-        key: String,
-    ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        let Some(data) = sqlx::query(
-            "SELECT key, value, created_at, last_updated_at, scopes
-            FROM kv_v2
-            WHERE 
-            guild_id = $1 AND
-            key = $2 AND
-            scopes = $3
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(key)
-        .bind(scopes)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?
-        else {
-            return Ok(None);
-        };
-
-        let value = data.get::<serde_json::Value, _>("value");
-
-        let record = serde_json::from_value(value)?;
-
-        let file_contents = khronos_runtime::traits::ir::KvRecord {
-            key: data.get::<String, _>("key"),
-            value: record,
-            created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
-            last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
-            scope: data.get::<String, _>("scopes"),
-        };
-
-        Ok(Some(file_contents))
-    }
-
-    async fn set(
-        &self,
-        scopes: String,
-        key: String,
-        value: KhronosValue,
-    ) -> Result<(), khronos_runtime::Error> {
-        if let Some(existing) = sqlx::query(
-            "SELECT id
-            FROM kv_v2
-            WHERE 
-            guild_id = $1 AND
-            key = $2 AND
-            scopes = $3
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(&key)
-        .bind(&scopes)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get existing keys: {e}"))?
-        {
-            let key = existing.get::<sqlx::types::uuid::Uuid, _>("id");
-            sqlx::query("UPDATE kv_v2 SET value = $1 WHERE id = $2")
-                .bind(serde_json::to_value(value)?)
-                .bind(key)
-                .execute(&self.pool)
-                .await
-                .map_err(|e| format!("Failed to set key: {e}"))?;
-
-            return Ok(());
-        }
-
-        sqlx::query("INSERT INTO kv_v2 (guild_id, key, value, scopes) VALUES ($1, $2, $3, $4)")
-            .bind(self.guild_id.to_string())
-            .bind(&key)
-            .bind(serde_json::to_value(value)?)
-            .bind(scopes)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| format!("Failed to set key: {e}"))?;
-
-        Ok(())
-    }
-
-    async fn delete(&self, scopes: String, key: String) -> Result<(), khronos_runtime::Error> {
-        sqlx::query(
-            "DELETE FROM kv_v2
-            WHERE 
-            guild_id = $1 AND
-            key = $2 AND
-            scopes = $3
-        ",
-        )
-        .bind(self.guild_id.to_string())
-        .bind(key)
-        .bind(scopes)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get key: {e}"))?;
-
-        Ok(())
-    }
-
-    fn attempt_action(
-        &self,
-        _bucket: &str,
-    ) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    async fn find(
-        &self,
-        scopes: String,
-        query: String,
-    ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
-        let entries = if query == "%%" {
-            // Fast path for querying all keys
-            sqlx::query(
-                "SELECT key, value, created_at, last_updated_at, scopes
-                FROM kv_v2
-                WHERE 
-                guild_id = $1 
-                AND scopes = $2
-            ",
-            )
-            .bind(self.guild_id.to_string())
-            .bind(scopes)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| format!("Failed to get key: {e}"))?
-        } else {
-            sqlx::query(
-                "SELECT key, value, created_at, last_updated_at, scopes
-                FROM kv_v2
-                WHERE 
-                guild_id = $1 
-                AND key ILIKE $2
-                AND scopes = $3
-            ",
-            )
-            .bind(self.guild_id.to_string())
-            .bind(query)
-            .bind(scopes)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| format!("Failed to get key: {e}"))?
-        };
-
-        let mut records = Vec::new();
-        for data in entries {
-            let value = data.get::<serde_json::Value, _>("value");
-
-            let record = serde_json::from_value(value)?;
-
-            let file_contents = khronos_runtime::traits::ir::KvRecord {
-                key: data.get::<String, _>("key"),
-                value: record,
-                created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
-                last_updated_at: Some(
-                    data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at"),
-                ),
-                scope: data.get::<String, _>("scopes"),
-            };
-
-            records.push(file_contents);
-        }
-
-        Ok(records)
-    }
-}
-
-#[derive(Clone)]
-#[allow(dead_code)]
-pub struct CliGlobalKVProvider {
-    pub guild_id: serenity::all::GuildId,
-    pub pool: sqlx::PgPool,
-}
-
-impl GlobalKVProvider for CliGlobalKVProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    async fn find(&self, _scope: String, _query: String) -> Result<Vec<PartialGlobalKv>, khronos_runtime::Error> {
-        Err("Not implemented yet".into())
-    }
-
-    async fn get(&self, _key: String, _version: i32, _scope: String) -> Result<Option<GlobalKv>, khronos_runtime::Error> {
-        Err("Not implemented yet".into())
-    }
-
-    async fn create(&self, _entry: khronos_runtime::traits::ir::globalkv::CreateGlobalKv) -> Result<(), khronos_runtime::Error> {
-        Err("Not implemented yet".into())
-    }
-
-    async fn delete(&self, _key: String, _version: i32, _scope: String) -> Result<(), khronos_runtime::Error> {
-        Err("Not implemented yet".into())
     }
 }
 
@@ -621,20 +353,12 @@ impl HTTPClientProvider for CliHttpClientProvider {
 
 #[derive(Clone)]
 pub struct CliRuntimeProvider {
-    pub file_storage_provider: Rc<dyn FileStorageProvider>,
-}
-
-mod _runtimeprovider {
-    #[derive(serde::Serialize, serde::Deserialize)]
-    pub struct TenantState {
-        pub events: Vec<String>,
-        pub banned: bool,
-        pub flags: i32,
-    }
 }
 
 // TODO: Actually implement this correctly, for now everything is a stub
 impl RuntimeProvider for CliRuntimeProvider {
+    type StateOps = bool; // dummy
+
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
@@ -644,29 +368,8 @@ impl RuntimeProvider for CliRuntimeProvider {
         Ok(std::collections::HashMap::new())
     }
 
-    async fn get_tenant_state(&self) -> Result<runtime_ir::TenantState, khronos_runtime::Error> {
-        let file = self.file_storage_provider.get_file(&["tenantstate".to_string()], "0").await?;
-        if let Some(file) = file {
-            let v: _runtimeprovider::TenantState = serde_json::from_slice(&file.contents)?;
-            return Ok(runtime_ir::TenantState {
-                events: v.events,
-                flags: v.flags,
-            });
-        }
-        return Ok(runtime_ir::TenantState {
-            events: vec!["INTERACTION_CREATE".to_string()],
-            flags: 0,
-        });
-    }
-
-    async fn set_tenant_state(&self, state: runtime_ir::TenantState) -> Result<(), khronos_runtime::Error> {
-        let v = serde_json::to_vec(&_runtimeprovider::TenantState {
-            events: state.events,
-            banned: false,
-            flags: state.flags,
-        })?;
-        self.file_storage_provider.save_file(&["tenantstate".to_string()], "0", &v).await?;
-        Ok(())
+    async fn state_op(&self, _ops: Vec<bool>) -> Result<Vec<runtime_ir::StateExecResult>, khronos_runtime::Error> {
+        Err("Not supported".into())
     }
 
     async fn stats(&self) -> Result<runtime_ir::RuntimeStats, khronos_runtime::Error> {

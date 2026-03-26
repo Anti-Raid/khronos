@@ -3,9 +3,8 @@ use crate::traits::runtimeprovider::RuntimeProvider;
 use crate::TemplateContext;
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
-use crate::traits::ir::runtime as runtime_ir;
 
- /// An runtime executor is used to perform basic 'runtime' operations from Lua
+/// An runtime executor is used to perform basic 'runtime' operations from Lua
 /// templates
 pub struct RuntimeExecutor<T: KhronosContext> {
     runtime_provider: T::RuntimeProvider,
@@ -36,16 +35,10 @@ impl<T: KhronosContext> LuaUserData for RuntimeExecutor<T> {
             Ok(vfs_map)
         });
 
-        methods.add_scheduler_async_method("gettenantstate", async |_lua, this, _: ()| {
-            this.check("gettenantstate").map_err(|x| LuaError::external(x.to_string()))?;
-            let state = this.runtime_provider.get_tenant_state().await.map_err(|x| LuaError::external(x.to_string()))?;
+        methods.add_scheduler_async_method("execstate", async |_lua, this, ops: Vec<_>| {
+            this.check("execstate").map_err(|x| LuaError::external(x.to_string()))?;
+            let state = this.runtime_provider.state_op(ops).await.map_err(|x| LuaError::external(x.to_string()))?;
             Ok(state)
-        });
-
-        methods.add_scheduler_async_method("settenantstate", async |_lua, this, state: runtime_ir::TenantState| {
-            this.check("settenantstate").map_err(|x| LuaError::external(x.to_string()))?;
-            this.runtime_provider.set_tenant_state(state).await.map_err(|x| LuaError::external(x.to_string()))?;
-            Ok(())
         });
 
         methods.add_scheduler_async_method("stats", async |_lua, this, _: ()| {

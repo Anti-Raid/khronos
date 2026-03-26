@@ -1,57 +1,28 @@
 use mluau::prelude::*;
-use crate::core::datetime::DateTime;
+use crate::{core::datetime::DateTime, utils::khronos_value::KhronosValue};
 
-const MAX_EVENTS: usize = 100;
-
-// Tenant State
-#[derive(Debug, Clone)]
-pub struct TenantState {
-    pub events: Vec<String>,
-    pub flags: i32,
+/// Represents the result of an atomic state op
+pub struct StateExecResult {
+    pub key: String,
+    pub value: KhronosValue,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-impl FromLua for TenantState {
-    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
-        let table = match value {
-            LuaValue::Table(t) => t,
-            _ => {
-                return Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
-                    to: "TenantState".to_string(),
-                    message: Some("expected a table".to_string()),
-                })
-            }
-        };
-
-        let events: Vec<String> = table.get("events")?;
-
-        // Ensure we dont have too many events set (which signifies a app logic error)
-        if events.len() > MAX_EVENTS {
-            return Err(LuaError::FromLuaConversionError {
-                from: "table",
-                to: "TenantState".to_string(),
-                message: Some(format!("too many events set in tenant state (max {} allowed)", MAX_EVENTS)),
-            });
-        }
-
-        let flags: i32 = table.get("flags")?;
-
-        Ok(TenantState {
-            events,
-            flags,
-        })
-    }
-}
-
-impl IntoLua for TenantState {
+impl IntoLua for StateExecResult {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
-
-        table.set("events", self.events)?;
-        table.set("flags", self.flags)?;
-
-        // Note that we do not set tenant state to readonly as we may want to mutate it
-
+        table.set("key", self.key)?;
+        table.set("value", self.value)?;
+        table.set("created_at", match self.created_at {
+            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
+            None => LuaValue::Nil,
+        })?;
+        table.set("last_updated_at", match self.last_updated_at {
+            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
+            None => LuaValue::Nil,
+        })?;
+        table.set_readonly(true); // We want StateExecResult's to be immutable
         Ok(LuaValue::Table(table))
     }
 }

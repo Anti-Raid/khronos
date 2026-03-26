@@ -1,7 +1,5 @@
 pub mod discord;
 pub mod httpclient;
-pub mod kv;
-pub mod globalkv;
 pub mod objectstorage;
 pub mod runtime;
 

@@ -2,25 +2,16 @@ use crate::{TemplateContext, traits::runtimeprovider::RuntimeProvider};
 
 use super::{
     httpclientprovider::HTTPClientProvider,
-    kvprovider::KVProvider, objectstorageprovider::ObjectStorageProvider,
-    globalkvprovider::GlobalKVProvider
+    objectstorageprovider::ObjectStorageProvider,
 };
 use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 
 pub trait KhronosContext: 'static + Clone + Sized {
-    type KVProvider: KVProvider;
-    type GlobalKVProvider: GlobalKVProvider;
     type DiscordProvider: DiscordProvider;
     type ObjectStorageProvider: ObjectStorageProvider;
     type HTTPClientProvider: HTTPClientProvider;
     type RuntimeProvider: RuntimeProvider;
-
-    /// Returns a key-value provider
-    fn kv_provider(&self) -> Option<Self::KVProvider>;
-
-    /// Returns a global key-value provider
-    fn global_kv_provider(&self) -> Option<Self::GlobalKVProvider>;
 
     /// Returns a Discord provider
     ///
