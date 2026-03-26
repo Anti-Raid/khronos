@@ -17,7 +17,7 @@ pub struct KvRecord {
     pub id: String,
     pub key: String,
     pub value: KhronosValue,
-    pub scopes: Vec<String>,
+    pub scope: String,
     pub exists: bool,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -29,7 +29,7 @@ impl IntoLua for KvRecord {
         table.set("id", self.id)?;
         table.set("key", self.key)?;
         table.set("value", self.value)?;
-        table.set("scopes", self.scopes)?;
+        table.set("scope", self.scope)?;
         table.set("exists", self.exists)?;
         table.set("created_at", match self.created_at {
             Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
@@ -51,7 +51,7 @@ impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
             key: record.key,
             exists: true,
             value: record.value,
-            scopes: record.scopes,
+            scope: record.scope,
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
         }
@@ -64,7 +64,7 @@ impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
             id: record.id,
             key: record.key,
             value: record.value,
-            scopes: record.scopes,
+            scope: record.scope,
             created_at: record.created_at,
             last_updated_at: record.last_updated_at,
         }
@@ -77,7 +77,7 @@ impl KvRecord {
             id: "".to_string(),
             key: "".to_string(),
             value: KhronosValue::Null,
-            scopes: vec![],
+            scope: "".to_string(),
             exists: false,
             created_at: None,
             last_updated_at: None,
@@ -88,22 +88,9 @@ impl KvRecord {
 impl<T: KhronosContext> KvExecutor<T> {
     pub fn check(
         &self,
-        scopes: &[String],
         action: &str,
     ) -> Result<(), crate::Error> {
-        if scopes.is_empty() {
-            return Err("Unscoped operations are not allowed".into());
-        }
-
-        self.kv_provider.attempt_action(scopes, action)?;
-        Ok(())
-    }
-
-    pub fn check_unscoped(
-        &self,
-        action: &str,
-    ) -> Result<(), crate::Error> {
-        self.kv_provider.attempt_action(&[], action)?;
+        self.kv_provider.attempt_action(action)?;
         Ok(())
     }
 }
@@ -118,7 +105,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, _this, _: ()| Ok("KvExecutor"));
 
         methods.add_scheduler_async_method("list_scopes", async move |_, this, _g: ()| {
-            this.check_unscoped("list_scopes")
+            this.check("list_scopes")
                 .map_err(|e| LuaError::runtime(e.to_string()))?;
             let scopes = this
                 .kv_provider
@@ -131,13 +118,13 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "find",
-            async move |_, this, (key, scopes): (String, Vec<String>)| {
-                this.check(&scopes, "find")
+            async move |_, this, (key, scope): (String, String)| {
+                this.check("find")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let records = this
                     .kv_provider
-                    .find(&scopes, key)
+                    .find(scope, key)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?
                     .into_iter()
@@ -145,7 +132,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         id: k.id,
                         key: k.key,
                         value: k.value,
-                        scopes: k.scopes,
+                        scope: k.scope,
                         exists: true,
                         created_at: k.created_at,
                         last_updated_at: k.last_updated_at,
@@ -158,34 +145,13 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "get",
-            async move |_, this, (key, scopes): (String, Vec<String>)| {
-                this.check(&scopes, "get")
+            async move |_, this, (key, scope): (String, String)| {
+                this.check("get")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let record = this
                     .kv_provider
-                    .get(&scopes, key)
-                    .await
-                    .map_err(|e| LuaError::external(e.to_string()))?;
-
-                match record {
-                    // Return None and true if record was found but value is null
-                    Some(rec) => Ok((Some(rec.value), true)),
-                    // Return None and 0 if record was not found
-                    None => Ok((None, false)),
-                }
-            },
-        );
-
-        methods.add_scheduler_async_method(
-            "getrecord",
-            async move |_, this, (key, scopes): (String, Vec<String>)| {
-                this.check(&scopes, "get")
-                    .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                let record = this
-                    .kv_provider
-                    .get(&scopes, key)
+                    .get(scope, key)
                     .await
                     .map_err(|e| LuaError::external(e.to_string()))?;
 
@@ -194,7 +160,7 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                         id: rec.id,
                         key: rec.key,
                         value: rec.value,
-                        scopes: rec.scopes,
+                        scope: rec.scope,
                         exists: true,
                         created_at: rec.created_at,
                         last_updated_at: rec.last_updated_at,
@@ -210,24 +176,19 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
             "set",
             async move |lua,
                         this,
-                        (key, value, scopes): (
+                        (key, value, scope): (
                 String,
                 LuaValue,
-                Vec<String>,
+                String,
             )| {
-                if scopes.is_empty() {
-                    return Err(LuaError::external(
-                        "Setting keys without a scope is not allowed".to_string(),
-                    ));
-                }
-                this.check(&scopes, "set")
+                this.check("set")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 let value = KhronosValue::from_lua(value, &lua)?;
 
                 this
                     .kv_provider
-                    .set(&scopes, key, value)
+                    .set(scope, key, value)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
@@ -237,12 +198,12 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
         methods.add_scheduler_async_method(
             "delete",
-            async move |_, this, (key, scopes): (String, Vec<String>)| {
-                this.check(&scopes, "delete")
+            async move |_, this, (key, scope): (String, String)| {
+                this.check("delete")
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 
                 this.kv_provider
-                    .delete(&scopes, key)
+                    .delete(scope, key)
                     .await
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
 

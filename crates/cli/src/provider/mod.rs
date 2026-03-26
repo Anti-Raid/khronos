@@ -121,9 +121,7 @@ pub struct CliKVProvider {
 impl KVProvider for CliKVProvider {
     async fn list_scopes(&self) -> Result<Vec<String>, khronos_runtime::Error> {
         let query = sqlx::query(
-            "SELECT DISTINCT unnest_scope AS scope
-FROM kv_v2, unnest(scopes) AS unnest_scope
-ORDER BY scope;
+            "SELECT DISTINCT scopes FROM kv_v2 ORDER BY scope;
         ",
         )
         .fetch_all(&self.pool)
@@ -138,7 +136,7 @@ ORDER BY scope;
 
     async fn get(
         &self,
-        scopes: &[String],
+        scopes: String,
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
@@ -147,7 +145,7 @@ ORDER BY scope;
             WHERE 
             guild_id = $1 AND
             key = $2 AND
-            scopes @> $3
+            scopes = $3
         ",
         )
         .bind(self.guild_id.to_string())
@@ -170,7 +168,7 @@ ORDER BY scope;
             value: record,
             created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
             last_updated_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at")),
-            scopes: data.get::<Vec<String>, _>("scopes"),
+            scope: data.get::<String, _>("scopes"),
         };
 
         Ok(Some(file_contents))
@@ -178,7 +176,7 @@ ORDER BY scope;
 
     async fn set(
         &self,
-        scopes: &[String],
+        scopes: String,
         key: String,
         value: KhronosValue,
     ) -> Result<(), khronos_runtime::Error> {
@@ -188,12 +186,12 @@ ORDER BY scope;
             WHERE 
             guild_id = $1 AND
             key = $2 AND
-            scopes @> $3
+            scopes = $3
         ",
         )
         .bind(self.guild_id.to_string())
         .bind(&key)
-        .bind(scopes)
+        .bind(&scopes)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| format!("Failed to get existing keys: {e}"))?
@@ -221,13 +219,13 @@ ORDER BY scope;
         Ok(())
     }
 
-    async fn delete(&self, scopes: &[String], key: String) -> Result<(), khronos_runtime::Error> {
+    async fn delete(&self, scopes: String, key: String) -> Result<(), khronos_runtime::Error> {
         sqlx::query(
             "DELETE FROM kv_v2
             WHERE 
             guild_id = $1 AND
             key = $2 AND
-            scopes @> $3
+            scopes = $3
         ",
         )
         .bind(self.guild_id.to_string())
@@ -242,7 +240,6 @@ ORDER BY scope;
 
     fn attempt_action(
         &self,
-        _scopes: &[String],
         _bucket: &str,
     ) -> Result<(), khronos_runtime::Error> {
         Ok(())
@@ -250,7 +247,7 @@ ORDER BY scope;
 
     async fn find(
         &self,
-        scopes: &[String],
+        scopes: String,
         query: String,
     ) -> Result<Vec<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let entries = if query == "%%" {
@@ -260,7 +257,7 @@ ORDER BY scope;
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
-                AND scopes @> $2
+                AND scopes = $2
             ",
             )
             .bind(self.guild_id.to_string())
@@ -275,7 +272,7 @@ ORDER BY scope;
                 WHERE 
                 guild_id = $1 
                 AND key ILIKE $2
-                AND scopes @> $3
+                AND scopes = $3
             ",
             )
             .bind(self.guild_id.to_string())
@@ -300,7 +297,7 @@ ORDER BY scope;
                 last_updated_at: Some(
                     data.get::<chrono::DateTime<chrono::Utc>, _>("last_updated_at"),
                 ),
-                scopes: data.get::<Vec<String>, _>("scopes"),
+                scope: data.get::<String, _>("scopes"),
             };
 
             records.push(file_contents);

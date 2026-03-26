@@ -507,7 +507,7 @@ impl CliArgs {
                                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                                 key TEXT NOT NULL,
                                 value JSONB NOT NULL,
-                                scopes TEXT[] NOT NULL,
+                                scopes TEXT NOT NULL,
                                 guild_id TEXT NOT NULL,
                                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                                 last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
