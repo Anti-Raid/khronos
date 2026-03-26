@@ -14,7 +14,6 @@ pub struct KvExecutor<T: KhronosContext> {
 
 /// Represents a full record complete with metadata
 pub struct KvRecord {
-    pub id: String,
     pub key: String,
     pub value: KhronosValue,
     pub scope: String,
@@ -26,7 +25,6 @@ pub struct KvRecord {
 impl IntoLua for KvRecord {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
-        table.set("id", self.id)?;
         table.set("key", self.key)?;
         table.set("value", self.value)?;
         table.set("scope", self.scope)?;
@@ -47,7 +45,6 @@ impl IntoLua for KvRecord {
 impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
     fn from(record: crate::traits::ir::kv::KvRecord) -> Self {
         KvRecord {
-            id: record.id,
             key: record.key,
             exists: true,
             value: record.value,
@@ -61,7 +58,6 @@ impl From<crate::traits::ir::kv::KvRecord> for KvRecord {
 impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
     fn from(record: KvRecord) -> Self {
         crate::traits::ir::kv::KvRecord {
-            id: record.id,
             key: record.key,
             value: record.value,
             scope: record.scope,
@@ -74,7 +70,6 @@ impl From<KvRecord> for crate::traits::ir::kv::KvRecord {
 impl KvRecord {
     fn default() -> KvRecord {
         KvRecord {
-            id: "".to_string(),
             key: "".to_string(),
             value: KhronosValue::Null,
             scope: "".to_string(),
@@ -129,7 +124,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
                     .map_err(|e| LuaError::external(e.to_string()))?
                     .into_iter()
                     .map(|k| KvRecord {
-                        id: k.id,
                         key: k.key,
                         value: k.value,
                         scope: k.scope,
@@ -157,7 +151,6 @@ impl<T: KhronosContext> LuaUserData for KvExecutor<T> {
 
                 let record = match record {
                     Some(rec) => KvRecord {
-                        id: rec.id,
                         key: rec.key,
                         value: rec.value,
                         scope: rec.scope,

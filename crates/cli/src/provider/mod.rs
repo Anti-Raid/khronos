@@ -140,7 +140,7 @@ impl KVProvider for CliKVProvider {
         key: String,
     ) -> Result<Option<khronos_runtime::traits::ir::KvRecord>, khronos_runtime::Error> {
         let Some(data) = sqlx::query(
-            "SELECT id, key, value, created_at, last_updated_at, scopes
+            "SELECT key, value, created_at, last_updated_at, scopes
             FROM kv_v2
             WHERE 
             guild_id = $1 AND
@@ -163,7 +163,6 @@ impl KVProvider for CliKVProvider {
         let record = serde_json::from_value(value)?;
 
         let file_contents = khronos_runtime::traits::ir::KvRecord {
-            id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
             key: data.get::<String, _>("key"),
             value: record,
             created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),
@@ -253,7 +252,7 @@ impl KVProvider for CliKVProvider {
         let entries = if query == "%%" {
             // Fast path for querying all keys
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes
+                "SELECT key, value, created_at, last_updated_at, scopes
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
@@ -267,7 +266,7 @@ impl KVProvider for CliKVProvider {
             .map_err(|e| format!("Failed to get key: {e}"))?
         } else {
             sqlx::query(
-                "SELECT id, key, value, created_at, last_updated_at, scopes
+                "SELECT key, value, created_at, last_updated_at, scopes
                 FROM kv_v2
                 WHERE 
                 guild_id = $1 
@@ -290,7 +289,6 @@ impl KVProvider for CliKVProvider {
             let record = serde_json::from_value(value)?;
 
             let file_contents = khronos_runtime::traits::ir::KvRecord {
-                id: data.get::<sqlx::types::uuid::Uuid, _>("id").to_string(),
                 key: data.get::<String, _>("key"),
                 value: record,
                 created_at: Some(data.get::<chrono::DateTime<chrono::Utc>, _>("created_at")),

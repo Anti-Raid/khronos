@@ -2,7 +2,6 @@ use crate::utils::khronos_value::KhronosValue;
 
 /// Represents a full record complete with metadata
 pub struct KvRecord {
-    pub id: String,
     pub key: String,
     pub value: KhronosValue,
     pub scope: String,
