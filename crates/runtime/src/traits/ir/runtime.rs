@@ -4,24 +4,20 @@ use crate::{core::datetime::DateTime, utils::khronos_value::KhronosValue};
 /// Represents the result of an atomic state op
 pub struct StateExecResult {
     pub key: String,
+    pub scope: String,
     pub value: KhronosValue,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub last_updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub last_updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl IntoLua for StateExecResult {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         table.set("key", self.key)?;
+        table.set("scope", self.scope)?;
         table.set("value", self.value)?;
-        table.set("created_at", match self.created_at {
-            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
-            None => LuaValue::Nil,
-        })?;
-        table.set("last_updated_at", match self.last_updated_at {
-            Some(dt) => DateTime::from_utc(dt).into_lua(lua)?,
-            None => LuaValue::Nil,
-        })?;
+        table.set("created_at", DateTime::from_utc(self.created_at))?;
+        table.set("last_updated_at", DateTime::from_utc(self.last_updated_at))?;
         table.set_readonly(true); // We want StateExecResult's to be immutable
         Ok(LuaValue::Table(table))
     }
