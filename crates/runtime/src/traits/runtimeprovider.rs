@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use mluau::FromLua;
+use mluau::{IntoLua, FromLua};
 
 use crate::core::typesext::Vfs;
 
@@ -10,6 +10,7 @@ use super::ir::runtime as runtime_ir;
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
 pub trait RuntimeProvider: 'static + Clone {
     type StateOps: FromLua;
+    type StateResult: IntoLua;
 
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
     ///
@@ -23,7 +24,7 @@ pub trait RuntimeProvider: 'static + Clone {
     fn get_exposed_vfs(&self) -> Result<HashMap<String, Vfs>, crate::Error>;
 
     /// Perform a state operation, returning a list of `StateExecResult`'s
-    async fn state_op(&self, exec: Vec<Self::StateOps>) -> Result<Vec<runtime_ir::StateExecResult>, crate::Error>;
+    async fn state_op(&self, exec: Vec<Self::StateOps>) -> Result<Vec<Self::StateResult>, crate::Error>;
 
     /// Returns the statistics of the bot.
     async fn stats(&self) -> Result<runtime_ir::RuntimeStats, crate::Error>;
