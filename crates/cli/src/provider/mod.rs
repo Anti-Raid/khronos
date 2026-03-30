@@ -5,15 +5,12 @@ use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
 use moka::future::Cache;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
 use crate::constants::default_global_guild_id;
-use crate::filestorage::FileStorageProvider;
 use khronos_runtime::traits::context::KhronosContext;
 use dapi::controller::DiscordProvider;
-use khronos_runtime::traits::objectstorageprovider::ObjectStorageProvider;
 use khronos_runtime::traits::ir::runtime as runtime_ir;
 
 /// Internal short-lived channel cache
@@ -26,14 +23,12 @@ pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, Value>
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
-    pub file_storage_provider: Rc<dyn FileStorageProvider>,
     pub guild_id: Option<serenity::all::GuildId>,
     pub http: Option<Arc<serenity::all::Http>>,
 }
 
 impl KhronosContext for CliKhronosContext {
     type DiscordProvider = CliDiscordProvider;
-    type ObjectStorageProvider = CliObjectStorageProvider;
     type HTTPClientProvider = CliHttpClientProvider;
     type RuntimeProvider = CliRuntimeProvider;
 
@@ -47,12 +42,6 @@ impl KhronosContext for CliKhronosContext {
         self.http.as_ref().map(|http| CliDiscordProvider {
             http: http.clone(),
             guild_id,
-        })
-    }
-
-    fn objectstorage_provider(&self) -> Option<Self::ObjectStorageProvider> {
-        Some(CliObjectStorageProvider {
-            file_storage_provider: self.file_storage_provider.clone(),
         })
     }
 
@@ -184,157 +173,6 @@ impl DiscordProvider for CliDiscordProvider {
         CHANNEL_CACHE.remove(&channel_id).await;
 
         Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct CliObjectStorageProvider {
-    pub file_storage_provider: Rc<dyn FileStorageProvider>,
-}
-
-impl ObjectStorageProvider for CliObjectStorageProvider {
-    fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    fn bucket_name(&self) -> String {
-        "cli".to_string()
-    }
-
-    async fn list_files(
-        &self,
-        prefix: Option<String>,
-    ) -> Result<Vec<khronos_runtime::traits::ir::ObjectMetadata>, khronos_runtime::Error> {
-        let prefix_split = prefix
-            .as_ref()
-            .map(|p| p.split('/').map(|s| s.to_string()).collect::<Vec<_>>())
-            .unwrap_or_default();
-        let mut fsp_vec = vec!["objects".to_string()];
-        for prefix in prefix_split.into_iter() {
-            fsp_vec.push(prefix);
-        }
-        let files = self
-            .file_storage_provider
-            .list_files(&fsp_vec, None)
-            .await?;
-
-        let mut objects = Vec::new();
-
-        /*
-                pub key: String,
-        pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
-        pub size: i64,
-        pub etag: Option<String>,
-            */
-
-        for file in files {
-            let object = khronos_runtime::traits::ir::ObjectMetadata {
-                key: file.name.clone(),
-                size: file.size as i64,
-                last_modified: Some(file.last_updated_at),
-                etag: format!("{}.{}.{}", file.name, file.created_at, file.last_updated_at).into(),
-            };
-            objects.push(object);
-        }
-
-        Ok(objects)
-    }
-
-    async fn file_exists(&self, key: String) -> Result<bool, khronos_runtime::Error> {
-        // Split the key by '/' and add each part but last to fsp_vec
-        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
-
-        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
-
-        let mut fsp_vec = vec!["objects".to_string()];
-
-        let key_split_len = key_split.len();
-        for (i, prefix) in key_split.into_iter().enumerate() {
-            if i == key_split_len - 1 {
-                break;
-            }
-            fsp_vec.push(prefix);
-        }
-
-        self.file_storage_provider.file_exists(&fsp_vec, &key).await
-    }
-
-    async fn download_file(&self, key: String) -> Result<Vec<u8>, khronos_runtime::Error> {
-        // Split the key by '/' and add each part but last to fsp_vec
-        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
-
-        // Get the key itself first
-        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
-
-        let mut fsp_vec = vec!["objects".to_string()];
-
-        let key_split_len = key_split.len();
-        for (i, prefix) in key_split.into_iter().enumerate() {
-            if i == key_split_len - 1 {
-                break;
-            }
-            fsp_vec.push(prefix);
-        }
-
-        self.file_storage_provider
-            .get_file(&fsp_vec, &key)
-            .await?
-            .map(|file| file.contents)
-            .ok_or("Failed to download file".into())
-    }
-
-    async fn get_file_url(
-        &self,
-        key: String,
-        expiry: std::time::Duration,
-    ) -> Result<String, khronos_runtime::Error> {
-        let base_path = self.file_storage_provider.base_path();
-        Ok(format!(
-            "file://{}/{}?expiry={}",
-            base_path.display(),
-            key,
-            expiry.as_secs()
-        ))
-    }
-
-    async fn upload_file(&self, key: String, data: Vec<u8>) -> Result<(), khronos_runtime::Error> {
-        // Split the key by '/' and add each part but last to fsp_vec
-        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
-
-        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
-
-        let mut fsp_vec = vec!["objects".to_string()];
-
-        let key_split_len = key_split.len();
-        for (i, prefix) in key_split.into_iter().enumerate() {
-            if i == key_split_len - 1 {
-                break;
-            }
-            fsp_vec.push(prefix);
-        }
-
-        self.file_storage_provider
-            .save_file(&fsp_vec, &key, &data)
-            .await
-    }
-
-    async fn delete_file(&self, key: String) -> Result<(), khronos_runtime::Error> {
-        // Split the key by '/' and add each part but last to fsp_vec
-        let key_split = key.split('/').map(|s| s.to_string()).collect::<Vec<_>>();
-
-        let key = key_split.last().unwrap_or(&"".to_string()).to_string();
-
-        let mut fsp_vec = vec!["objects".to_string()];
-
-        let key_split_len = key_split.len();
-        for (i, prefix) in key_split.into_iter().enumerate() {
-            if i == key_split_len - 1 {
-                break;
-            }
-            fsp_vec.push(prefix);
-        }
-
-        self.file_storage_provider.delete_file(&fsp_vec, &key).await
     }
 }
 

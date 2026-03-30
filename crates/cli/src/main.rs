@@ -2,7 +2,6 @@ mod cli;
 mod cli_extensions;
 mod constants;
 mod experiments;
-mod filestorage;
 mod provider;
 mod repl_completer;
 mod tui;
@@ -12,7 +11,6 @@ use clap::{Parser, ValueEnum};
 use cli::{Cli, CliAuxOpts, CliEntrypointAction};
 use std::env::var;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 use tokio::fs;
 
@@ -458,38 +456,6 @@ impl CliArgs {
                     .map(|token| Arc::new(serenity::all::Http::new(serenity::all::SecretString::new(token.clone().into())))),
                 cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
-                file_storage_backend: match self.file_storage_backend {
-                    FileStorageBackend::LocalFs => cli::FileStorageBackend::LocalFs,
-                },
-                file_storage_provider: {
-                    match self.file_storage_backend {
-                        FileStorageBackend::LocalFs => {
-                            let base_path =
-                                self.file_storage_base_path.clone().unwrap_or_else(|| {
-                                    let base_path = var("XDG_DATA_HOME")
-                                        .map(|s| PathBuf::from(s).join("khronos-cli"))
-                                        .unwrap_or_else(|_| {
-                                            dirs::data_dir()
-                                                .expect("Failed to get data dir")
-                                                .join("khronos-cli")
-                                        });
-
-                                    if !base_path.exists() {
-                                        std::fs::create_dir_all(&base_path)
-                                            .expect("Failed to create base path");
-                                    }
-
-                                    base_path
-                                });
-
-                            Rc::new(
-                                filestorage::LocalFileStorageProvider::new(base_path, self.verbose)
-                                    .await
-                                    .expect("Failed to create file storage provider"),
-                            )
-                        }
-                    }
-                },
                 pool: match self.kv_store_connection_string {
                     Some(s) => {
                         let pool = sqlx::PgPool::connect(&s)

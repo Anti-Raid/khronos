@@ -1,5 +1,4 @@
 use crate::experiments::load_experiments;
-use crate::filestorage::FileStorageProvider;
 use crate::provider;
 use crate::repl_completer;
 use khronos_runtime::TemplateContext;
@@ -46,11 +45,6 @@ pub enum ReplTaskWaitMode {
     ///
     /// Does not apply to InlineScript
     YieldBeforePrompt,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FileStorageBackend {
-    LocalFs,
 }
 
 pub struct LuaSetupResult {
@@ -123,20 +117,8 @@ pub struct Cli {
     /// Optional, but required for discord-related operations
     pub bot_token: Option<String>,
 
-    /// The file storage backend to use
-    pub file_storage_backend: FileStorageBackend,
-
     /// What template name to use
     pub template_name: String,
-
-    /// The file storage to use
-    ///
-    /// If unset, the following will be used:
-    ///
-    /// If $XDG_DATA_HOME is set, $XDG_DATA_HOME/khronos-cli will be used
-    /// Otherwise, $HOME/.local/share/khronos-cli will be used on Linux/MacOS
-    /// and %APPDATA%/khronos-cli will be used on Windows
-    pub file_storage_provider: Rc<dyn FileStorageProvider>,
 
     #[allow(dead_code)]
     /// The path to a config file containing e.g.
@@ -182,7 +164,6 @@ impl Cli {
         provider::CliKhronosContext {
             guild_id: self.guild_id,
             http: self.http.clone(),
-            file_storage_provider: self.file_storage_provider.clone(),
         }
     }
 

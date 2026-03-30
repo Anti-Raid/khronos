@@ -90,29 +90,12 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
             this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
         });
 
-        fields.add_field_method_get("ObjectStorage", |lua, this| {
-            this.get_plugin(lua, "ObjectStorage", antiraid::objectstorage::init_plugin)
-        });
-
         fields.add_field_method_get("HTTPClient", |lua, this| {
             this.get_plugin(lua, "HTTPClient", antiraid::httpclient::init_plugin)
         });
 
         fields.add_field_method_get("Runtime", |lua, this| {
             this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
-        });
-
-        let mut available_extra_plugins = Vec::new();
-        for (plugin_name, plugin_init) in T::extra_plugins() {
-            available_extra_plugins.push(plugin_name.clone());
-            fields.add_field_method_get(plugin_name.clone(), move |lua, this| {
-                let plugin_func = |lua: &Lua, this: &Self| plugin_init(lua, this);
-                this.get_plugin(lua, &plugin_name, plugin_func)
-            });
-        }
-
-        fields.add_field_method_get("available_extra_plugins", move |_lua, _this| {
-            Ok(available_extra_plugins.clone())
         });
 
         // Fields

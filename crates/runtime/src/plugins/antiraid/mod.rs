@@ -1,6 +1,5 @@
 pub mod discord;
 pub mod httpclient;
-pub mod objectstorage;
 pub mod runtime;
 
 use mluau::prelude::*;
