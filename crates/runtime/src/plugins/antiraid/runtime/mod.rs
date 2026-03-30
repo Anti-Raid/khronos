@@ -35,9 +35,9 @@ impl<T: KhronosContext> LuaUserData for RuntimeExecutor<T> {
             Ok(vfs_map)
         });
 
-        methods.add_scheduler_async_method("execstate", async |_lua, this, ops: Vec<_>| {
-            this.check("execstate").map_err(|x| LuaError::external(x.to_string()))?;
-            let state = this.runtime_provider.state_op(ops).await.map_err(|x| LuaError::external(x.to_string()))?;
+        methods.add_scheduler_async_method("syscall", async |_lua, this, ops| {
+            this.check("syscall").map_err(|x| LuaError::external(x.to_string()))?;
+            let state = this.runtime_provider.syscall(ops).await.map_err(|x| LuaError::external(x.to_string()))?;
             Ok(state)
         });
 

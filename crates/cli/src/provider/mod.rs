@@ -357,8 +357,8 @@ pub struct CliRuntimeProvider {
 
 // TODO: Actually implement this correctly, for now everything is a stub
 impl RuntimeProvider for CliRuntimeProvider {
-    type StateOps = bool; // dummy
-    type StateResult = bool; // dummy
+    type SyscallArgs = bool; // dummy
+    type SyscallRet = bool; // dummy
 
     fn attempt_action(&self, _bucket: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
@@ -369,7 +369,7 @@ impl RuntimeProvider for CliRuntimeProvider {
         Ok(std::collections::HashMap::new())
     }
 
-    async fn state_op(&self, _ops: Vec<bool>) -> Result<Vec<bool>, khronos_runtime::Error> {
+    async fn syscall(&self, _ops: bool) -> Result<bool, khronos_runtime::Error> {
         Err("Not supported".into())
     }
 

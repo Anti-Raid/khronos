@@ -9,8 +9,8 @@ use super::ir::runtime as runtime_ir;
 /// A runtime provider.
 #[allow(async_fn_in_trait)] // We don't want Send/Sync whatsoever in Khronos anyways
 pub trait RuntimeProvider: 'static + Clone {
-    type StateOps: FromLua;
-    type StateResult: IntoLua;
+    type SyscallArgs: FromLua;
+    type SyscallRet: IntoLua;
 
     /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
     ///
@@ -23,8 +23,8 @@ pub trait RuntimeProvider: 'static + Clone {
     /// These VFS instances can be used to create overlays or access runtime-provided virtual filesystems.
     fn get_exposed_vfs(&self) -> Result<HashMap<String, Vfs>, crate::Error>;
 
-    /// Perform a state operation, returning a list of `StateExecResult`'s
-    async fn state_op(&self, exec: Vec<Self::StateOps>) -> Result<Vec<Self::StateResult>, crate::Error>;
+    /// Perform a syscall to do something host-defined/controlled
+    async fn syscall(&self, args: Self::SyscallArgs) -> Result<Self::SyscallRet, crate::Error>;
 
     /// Returns the statistics of the bot.
     async fn stats(&self) -> Result<runtime_ir::RuntimeStats, crate::Error>;
