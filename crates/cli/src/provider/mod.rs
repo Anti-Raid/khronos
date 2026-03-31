@@ -1,6 +1,5 @@
 use dapi::EVENT_LIST;
 use dapi::controller::DiscordProviderContext;
-use khronos_runtime::traits::httpclientprovider::HTTPClientProvider;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
 use moka::future::Cache;
 use serde_json::Value;
@@ -29,7 +28,6 @@ pub struct CliKhronosContext {
 
 impl KhronosContext for CliKhronosContext {
     type DiscordProvider = CliDiscordProvider;
-    type HTTPClientProvider = CliHttpClientProvider;
     type RuntimeProvider = CliRuntimeProvider;
 
     fn discord_provider(&self) -> Option<Self::DiscordProvider> {
@@ -43,10 +41,6 @@ impl KhronosContext for CliKhronosContext {
             http: http.clone(),
             guild_id,
         })
-    }
-
-    fn httpclient_provider(&self) -> Option<Self::HTTPClientProvider> {
-        Some(CliHttpClientProvider)
     }
 
     fn runtime_provider(&self) -> Option<Self::RuntimeProvider> {
@@ -172,19 +166,6 @@ impl DiscordProvider for CliDiscordProvider {
 
         CHANNEL_CACHE.remove(&channel_id).await;
 
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct CliHttpClientProvider;
-
-impl HTTPClientProvider for CliHttpClientProvider {
-    fn allow_localhost(&self) -> bool {
-        false // CLI mode does not allow localhost access for testing purposes
-    }
-
-    fn attempt_action(&self, _bucket: &str, _url: &str) -> Result<(), khronos_runtime::Error> {
         Ok(())
     }
 }

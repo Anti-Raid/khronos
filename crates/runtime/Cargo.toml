@@ -12,25 +12,17 @@ extract_map = { version = "0.3", features = ["serde"] }
 indexmap = { version = "2", features = ["serde"] }
 tokio = { version = "1" }
 tokio-util = { version = "0.7", features = ["time"] }
-reqwest = { version = "0.12" }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
 mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
     "serialize",
 ] }
 mluau-require = { git = "https://github.com/mluau/mluau-require" }
-bitflags = { version = "2", features = ["serde"] }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
 
 # dapi
 dapi = { path = "../dapi" }
-
-# httpclient
-hickory-resolver = { version = "0.25", features = ["tokio"] }
-pin-project-lite = "0.2"
-bytes = "1.2"
-futures-core = "0.3"
 
 # blob encryption
 aes-gcm = "0.10"
