@@ -29,6 +29,14 @@ macro_rules! api_list_enum {
             )*
         }
 
+        #[cfg(feature = "luau")]
+        impl mluau::FromLua for $name {
+            fn from_lua(value: mluau::Value, lua: &mluau::Lua) -> mluau::Result<Self> {
+                use mluau::LuaSerdeExt;
+                lua.from_value(value)
+            }
+        }
+
         impl $name {
             pub fn api_name(&self) -> &'static str {
                 match self {
