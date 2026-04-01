@@ -1,17 +1,13 @@
-use crate::plugins::{antiraid, antiraid::LUA_SERIALIZE_OPTIONS};
 use crate::traits::context::KhronosContext;
-use dapi::controller::DiscordProvider;
 use mluau::prelude::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::plugins::antiraid;
 
 #[derive(Clone)]
 pub struct TemplateContext<T: KhronosContext> {
     pub context: T,
-
-    /// The cached serialized value of the current user
-    current_discord_user: Rc<RefCell<Option<LuaValue>>>,
 
     /// Store table
     store_table: LuaTable,
@@ -33,31 +29,8 @@ impl<T: KhronosContext> TemplateContext<T> {
         Ok(Self {
             context,
             store_table,
-            current_discord_user: Rc::default(),
             cached_plugin_data: Rc::default(), // Safety note: the cached plugin data must be reset for subcontexts to avoid privilege escalation across subcontexts
         })
-    }
-
-    fn get_cached_current_user(&self, lua: &Lua) -> LuaResult<LuaValue> {
-        // Check for cached serialized data
-        let mut cached_data = self
-            .current_discord_user
-            .try_borrow_mut()
-            .map_err(|e| LuaError::external(e.to_string()))?;
-
-        if let Some(v) = cached_data.as_ref() {
-            return Ok(v.clone());
-        }
-
-        let Some(dp) = self.context.discord_provider() else {
-            return Err(LuaError::external("Current user not found"));
-        };
-
-        let v = lua.to_value_with(&dp.current_user(), LUA_SERIALIZE_OPTIONS)?;
-
-        *cached_data = Some(v.clone());
-
-        Ok(v)
     }
 
     /// Gets a plugin from cache or runs 'f' to get it
@@ -96,12 +69,6 @@ impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
 
         // Fields
         fields.add_field_method_get("store", |_, this| Ok(this.store_table.clone()));
-
-        fields.add_field_method_get("current_user", |lua, this| {
-            let v = this.get_cached_current_user(lua)?;
-
-            Ok(v)
-        });
 
         fields.add_field_method_get("memory_limit", |_lua, this| Ok(this.context.memory_limit()));
 
