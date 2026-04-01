@@ -59,10 +59,6 @@ impl<T: KhronosContext> TemplateContext<T> {
 impl<T: KhronosContext> LuaUserData for TemplateContext<T> {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         // Plugins
-        fields.add_field_method_get("Discord", |lua, this| {
-            this.get_plugin(lua, "Discord", antiraid::discord::init_plugin)
-        });
-
         fields.add_field_method_get("Runtime", |lua, this| {
             this.get_plugin(lua, "Runtime", antiraid::runtime::init_plugin)
         });

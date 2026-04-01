@@ -161,10 +161,7 @@ impl Cli {
 
     /// Create a khronos context
     fn create_khronos_context(&self) -> provider::CliKhronosContext {
-        provider::CliKhronosContext {
-            guild_id: self.guild_id,
-            http: self.http.clone(),
-        }
+        provider::CliKhronosContext {}
     }
 
     pub async fn spawn_script(

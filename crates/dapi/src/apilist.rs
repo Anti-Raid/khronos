@@ -7,7 +7,7 @@ pub struct MapResponseMetadata {
 }
 
 #[cfg(feature = "luau")]
-pub trait APIUserData: mluau::UserData + 'static {
+pub trait APIUserData: 'static {
     type DiscordProvider: DiscordProvider;
     fn check_action(&self, lua: &mluau::Lua, action: &str) -> mluau::Result<()>;
     fn controller(&self) -> &DiscordContext<Self::DiscordProvider>;
@@ -20,7 +20,9 @@ pub trait APIUserData: mluau::UserData + 'static {
 
 macro_rules! api_list_enum {
     ($name:ident { $($variant:ident($ty:ty) = $api_name:literal,)* }) => {
+        use $crate::apilist::MapResponseMetadata as MRM;
         #[derive(serde::Serialize, serde::Deserialize)]
+        #[serde(tag = "op")]
         pub enum $name {
             $(
                 $variant($ty),
@@ -28,17 +30,6 @@ macro_rules! api_list_enum {
         }
 
         impl $name {
-            pub async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<serde_json::Value, crate::Error> {
-                match self {
-                    $(
-                        $name::$variant(req) => {
-                            let resp = req.execute(this).await?;
-                            Ok(serde_json::to_value(resp)?)
-                        }
-                    )*
-                }
-            }
-
             pub fn api_name(&self) -> &'static str {
                 match self {
                     $(
@@ -46,34 +37,22 @@ macro_rules! api_list_enum {
                     )*
                 }
             }
-        }
-
-        impl $name {
-            #[cfg(feature = "luau")]
-            pub fn add_luau_methods<T: APIUserData, M: mluau::UserDataMethods<T>>(methods: &mut M) {
-                use mlua_scheduler::LuaSchedulerAsyncUserData;
-                use mluau::LuaSerdeExt;
-                use crate::exec_api;
-                $(
-                    methods.add_scheduler_async_method($api_name, async |lua, this, data: mluau::Value| {
-                        this.check_action(&lua, $api_name)?;
-
-                        let data: $ty = lua.from_value(data)?;
-
-                        let resp = exec_api(
-                            &this.controller(), 
-                            data,
-                        )
-                        .await
-                        .map_err(|e| mluau::Error::external(e.to_string()))?;
-                        
-                        let mrm = MapResponseMetadata {
-                            is_primitive_response: <$ty as crate::ApiReq>::is_primitive_response(),
-                        };
-
-                        this.map_response(&lua, $api_name, mrm, resp)
-                    });
-                )*
+            
+            pub async fn execute<T: DiscordProvider>(
+                self, 
+                this: &DiscordContext<T>
+            ) -> Result<(serde_json::Value, MRM), crate::Error> {
+                match self {
+                    $(
+                        $name::$variant(req) => {
+                            let resp = req.execute(this).await?;
+                            let mrm = MRM {
+                                is_primitive_response: <$ty as crate::ApiReq>::is_primitive_response(),
+                            };
+                            Ok((serde_json::to_value(resp)?, mrm))
+                        }
+                    )*
+                }
             }
         }
     };

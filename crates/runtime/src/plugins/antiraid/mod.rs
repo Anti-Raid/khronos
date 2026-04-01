@@ -1,4 +1,3 @@
-pub mod discord;
 pub mod runtime;
 
 use mluau::prelude::*;

@@ -1,172 +1,20 @@
 use dapi::EVENT_LIST;
-use dapi::controller::DiscordProviderContext;
 use khronos_runtime::traits::runtimeprovider::RuntimeProvider;
-use moka::future::Cache;
-use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::LazyLock;
 
-use crate::constants::default_global_guild_id;
 use khronos_runtime::traits::context::KhronosContext;
-use dapi::controller::DiscordProvider;
 use khronos_runtime::traits::ir::runtime as runtime_ir;
-
-/// Internal short-lived channel cache
-pub static CHANNEL_CACHE: LazyLock<Cache<serenity::all::GenericChannelId, Value>> =
-    LazyLock::new(|| {
-        Cache::builder()
-            .time_to_idle(std::time::Duration::from_secs(30))
-            .build()
-    });
 
 #[derive(Clone)]
 pub struct CliKhronosContext {
-    pub guild_id: Option<serenity::all::GuildId>,
-    pub http: Option<Arc<serenity::all::Http>>,
 }
 
 impl KhronosContext for CliKhronosContext {
-    type DiscordProvider = CliDiscordProvider;
     type RuntimeProvider = CliRuntimeProvider;
-
-    fn discord_provider(&self) -> Option<Self::DiscordProvider> {
-        let guild_id = if let Some(guild_id) = self.guild_id {
-            guild_id
-        } else {
-            default_global_guild_id()
-        };
-
-        self.http.as_ref().map(|http| CliDiscordProvider {
-            http: http.clone(),
-            guild_id,
-        })
-    }
 
     fn runtime_provider(&self) -> Option<Self::RuntimeProvider> {
         Some(CliRuntimeProvider {
         })
-    }
-}
-
-#[derive(Clone)]
-pub struct CliDiscordProvider {
-    guild_id: serenity::all::GuildId,
-    http: Arc<serenity::all::Http>,
-}
-
-impl DiscordProvider for CliDiscordProvider {
-    fn attempt_action(&self, _bucket: &str) -> serenity::Result<(), khronos_runtime::Error> {
-        Ok(())
-    }
-
-    fn current_user(&self) -> Option<serenity::all::CurrentUser> {
-        None
-    }
-
-    async fn get_guild(
-        &self,
-    ) -> serenity::Result<Value, khronos_runtime::Error> {
-        // Fetch from HTTP
-        self.http
-            .get_guild(self.guild_id)
-            .await
-            .map_err(|e| format!("Failed to fetch guild: {e}").into())
-    }
-
-    async fn get_channel(
-        &self,
-        channel_id: serenity::all::GenericChannelId,
-    ) -> serenity::Result<Value, khronos_runtime::Error> {
-        {
-            // Check cache first
-            let cached_channel = CHANNEL_CACHE.get(&channel_id).await;
-
-            if let Some(cached_channel) = cached_channel {
-                let Some(Value::String(guild_id)) = cached_channel.get("guild_id") else {
-                    return Err(format!("Channel {channel_id} does not belong to a guild").into());
-                };
-
-                if guild_id != &self.guild_id.to_string() {
-                    return Err(format!("Channel {channel_id} does not belong to the guild").into());
-                }
-
-                return Ok(cached_channel);
-            }
-        }
-
-        // Fetch from HTTP
-        let channel = self.http.get_channel(channel_id).await?;
-
-        let Some(Value::String(guild_id)) = channel.get("guild_id") else {
-            return Err(format!("Channel {channel_id} does not belong to a guild").into());
-        };
-
-        if guild_id != &self.guild_id.to_string() {
-            return Err(format!("Channel {channel_id} does not belong to the guild").into());
-        }
-
-        Ok(channel)
-    }
-
-    fn context(&self) -> DiscordProviderContext {
-        DiscordProviderContext::Guild(self.guild_id)
-    }
-
-    fn serenity_http(&self) -> &serenity::all::Http {
-        &self.http
-    }
-
-    async fn edit_channel(
-        &self,
-        channel_id: serenity::all::GenericChannelId,
-        map: impl serde::Serialize,
-        audit_log_reason: Option<&str>,
-    ) -> Result<Value, khronos_runtime::Error> {
-        let chan = self
-            .http
-            .edit_channel(channel_id, &map, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to edit channel: {e}"))?;
-
-        // Update cache
-        CHANNEL_CACHE.insert(channel_id, chan.clone()).await;
-
-        Ok(chan)
-    }
-
-    async fn delete_channel(
-        &self,
-        channel_id: serenity::all::GenericChannelId,
-        audit_log_reason: Option<&str>,
-    ) -> Result<Value, khronos_runtime::Error> {
-        let chan = self
-            .http
-            .delete_channel(channel_id, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to delete channel: {e}"))?;
-
-        // Remove from cache
-        CHANNEL_CACHE.remove(&channel_id).await;
-
-        Ok(chan)
-    }
-
-    async fn edit_channel_permissions(
-        &self,
-        channel_id: serenity::all::GenericChannelId,
-        target_id: serenity::all::TargetId,
-        data: impl serde::Serialize,
-        audit_log_reason: Option<&str>,
-    ) -> Result<(), khronos_runtime::Error> {
-        self.http
-            .create_permission(channel_id.expect_channel(), target_id, &data, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to edit channel permissions: {e}"))?;
-
-        CHANNEL_CACHE.remove(&channel_id).await;
-
-        Ok(())
     }
 }
 
