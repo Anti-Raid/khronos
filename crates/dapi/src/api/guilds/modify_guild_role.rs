@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data, serenity_backports::highest_role};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildRole {
     pub role_id: serenity::all::RoleId,
     pub reason: String,

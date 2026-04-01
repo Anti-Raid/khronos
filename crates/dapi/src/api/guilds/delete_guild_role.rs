@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteGuildRole {
     pub role_id: serenity::all::RoleId,
     pub reason: String,

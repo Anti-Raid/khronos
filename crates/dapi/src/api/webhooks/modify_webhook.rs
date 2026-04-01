@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditWebhook, get_format_from_image_data};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyWebhook {
     pub webhook_id: serenity::all::WebhookId,
     pub data: EditWebhook,

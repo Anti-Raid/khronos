@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RemoveGuildBan {
     pub user_id: serenity::all::UserId,
     pub reason: String,

@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, get_format_from_image_data, types::EditGuild};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuild {
     pub data: EditGuild,
     pub reason: String,

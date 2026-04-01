@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::ReactionType};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetReactions {
     pub channel_id: serenity::all::GenericChannelId,
     pub message_id: serenity::all::MessageId,

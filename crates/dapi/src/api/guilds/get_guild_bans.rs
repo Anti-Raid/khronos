@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetGuildBans {
     pub limit: Option<serenity::nonmax::NonMaxU16>,
     pub before: Option<serenity::all::UserId>,

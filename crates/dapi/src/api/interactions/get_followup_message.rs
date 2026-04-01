@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetFollowupMessage {
     pub interaction_token: String,
     pub message_id: serenity::all::MessageId,

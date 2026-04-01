@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::guilds::ModifyRolePosition, serenity_backports::highest_role};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildRolePositions {
     pub data: Vec<ModifyRolePosition>,
     pub reason: String,

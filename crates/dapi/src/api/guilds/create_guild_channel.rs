@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::CreateChannel};
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateGuildChannel {
     pub reason: String,
     pub data: CreateChannel,

@@ -2,7 +2,7 @@ use serenity::all::Permissions;
 
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditChannel as EditChannelData};
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct EditChannel {
     pub channel_id: serenity::all::GenericChannelId,
     pub reason: String,

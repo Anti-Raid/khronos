@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLogOptions {
     pub action_type: Option<u16>,
     pub user_id: Option<serenity::all::UserId>,
@@ -8,7 +8,7 @@ pub struct GetAuditLogOptions {
     pub limit: Option<serenity::nonmax::NonMaxU8>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLog {
     #[serde(flatten)]
     pub data: GetAuditLogOptions

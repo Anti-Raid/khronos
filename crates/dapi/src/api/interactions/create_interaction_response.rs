@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateInteractionResponse};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateInteractionResponseRequest {
     pub interaction_id: serenity::all::InteractionId,
     pub interaction_token: String,

@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::ExecuteWebhook};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ExecuteWebhookRequest {
     pub webhook_id: serenity::all::WebhookId,
     pub webhook_token: String,

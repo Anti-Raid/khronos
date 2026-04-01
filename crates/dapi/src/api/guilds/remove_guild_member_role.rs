@@ -1,7 +1,7 @@
 // use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::{member_permissions, highest_role}};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RemoveGuildMemberRole {
     pub user_id: serenity::all::UserId,
     pub role_id: serenity::all::RoleId,

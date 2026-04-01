@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ListGuildMembers {
     pub limit: Option<serenity::nonmax::NonMaxU16>,
     pub after: Option<serenity::all::UserId>,

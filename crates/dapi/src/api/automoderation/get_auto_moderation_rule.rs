@@ -2,12 +2,12 @@ use serenity::all::{Permissions, RuleId};
 
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct GetAutoModerationRuleOptions {
     pub rule_id: RuleId
 }
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct GetAutoModerationRule {
     pub data: GetAutoModerationRuleOptions,
 }

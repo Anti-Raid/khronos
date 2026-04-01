@@ -1,7 +1,7 @@
 use serenity::all::Permissions;
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, Default, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct DeleteChannel {
     pub channel_id: serenity::all::GenericChannelId,
     pub reason: String,

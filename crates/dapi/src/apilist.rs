@@ -21,7 +21,7 @@ pub trait APIUserData: 'static {
 macro_rules! api_list_enum {
     ($name:ident { $($variant:ident($ty:ty) = $api_name:literal,)* }) => {
         use $crate::apilist::MapResponseMetadata as MRM;
-        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
         #[serde(tag = "op")]
         pub enum $name {
             $(

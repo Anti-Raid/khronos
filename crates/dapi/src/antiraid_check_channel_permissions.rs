@@ -1,13 +1,13 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckChannelPermissionsOptions {
     pub user_id: serenity::all::UserId,
     pub channel_id: serenity::all::GenericChannelId,
     pub needed_permissions: serenity::all::Permissions,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckChannelPermissionsResponse {
     pub partial_guild: serenity::all::PartialGuild,
     pub channel: serenity::all::GuildChannel,
@@ -15,7 +15,7 @@ pub struct AntiRaidCheckChannelPermissionsResponse {
     pub permissions: serenity::all::Permissions,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckChannelPermissions {
     pub data: AntiRaidCheckChannelPermissionsOptions
 }

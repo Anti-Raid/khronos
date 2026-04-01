@@ -2428,7 +2428,7 @@ Reason
 ## GetInviteOptions
 
 [[
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetInviteOptions {
     pub code: String,
     pub with_counts: Option<bool>, // default to false
@@ -2436,7 +2436,7 @@ pub struct GetInviteOptions {
     pub guild_scheduled_event_id: Option<serenity::all::ScheduledEventId>,    
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteInviteOptions {
     pub code: String,
     pub reason: String,
@@ -2448,7 +2448,7 @@ pub struct DeleteInviteOptions {
 
 ```luau
 --[[
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetInviteOptions {
     pub code: String,
     pub with_counts: Option<bool>, // default to false
@@ -2456,7 +2456,7 @@ pub struct GetInviteOptions {
     pub guild_scheduled_event_id: Option<serenity::all::ScheduledEventId>,    
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteInviteOptions {
     pub code: String,
     pub reason: String,

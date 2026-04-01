@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::{AntiraidFusedMember, DiscordContext}, controller::DiscordProvider};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct AntiRaidGetFusedMember {
     pub ids: Vec<String>,

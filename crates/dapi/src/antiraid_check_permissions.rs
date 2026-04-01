@@ -2,27 +2,27 @@ use crate::{ApiReq, controller::DiscordProvider};
 
 use super::context::DiscordContext;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckPermissionsOptions {
     pub user_id: serenity::all::UserId,
     pub needed_permissions: serenity::all::Permissions,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckPermissionsAndHierarchyOptions {
     pub user_id: serenity::all::UserId,
     pub target_id: serenity::all::UserId,
     pub needed_permissions: serenity::all::Permissions,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckPermissionsResponse {
     pub partial_guild: serenity::all::PartialGuild,
     pub member: serenity::all::Member,
     pub permissions: serenity::all::Permissions,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckPermissions {
     pub data: AntiRaidCheckPermissionsOptions
 }
@@ -47,7 +47,7 @@ impl ApiReq for AntiRaidCheckPermissions {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiRaidCheckPermissionsAndHierarchy {
     pub data: AntiRaidCheckPermissionsAndHierarchyOptions
 }

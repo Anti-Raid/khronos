@@ -11,7 +11,7 @@ pub enum InnerEventData {
 }
 
 /// An `CreateEvent` is a/an thread-safe object that can be used to create a Event
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateEvent {
     /// The name of the event
     name: String,

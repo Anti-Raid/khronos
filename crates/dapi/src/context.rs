@@ -3,7 +3,7 @@ use serenity::all::{Mentionable, UserId};
 use crate::{controller::DiscordProvider, serenity_backports::member_permissions};
 
 // Base types
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiraidFusedMemberSingle {
     pub member: serenity::all::Member,
     pub resolved_perms: serenity::all::Permissions,
@@ -11,7 +11,7 @@ pub struct AntiraidFusedMemberSingle {
 
 /// A fused member contains both a member, the guild and the resolved permissions of
 /// the member in the guild. This is useful for operations that require both the member and the guild context, such as permission checks.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiraidFusedMember {
     pub guild: serenity::all::PartialGuild,
     pub members: Vec<AntiraidFusedMemberSingle>,

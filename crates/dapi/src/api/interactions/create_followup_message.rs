@@ -1,6 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::ExecuteWebhook};
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateFollowupMessage {
     pub interaction_token: String,
     pub data: ExecuteWebhook,
