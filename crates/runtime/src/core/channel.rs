@@ -1,7 +1,6 @@
-use mlua_scheduler::{LuaSchedulerAsync, LuaSchedulerAsyncUserData};
+use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
 use serenity::futures::{Stream, StreamExt};
-use serenity::futures::stream::FuturesUnordered;
 use tokio_util::time::DelayQueue;
 use std::cell::Cell;
 use std::task::{Context, Poll, Waker};
@@ -17,59 +16,105 @@ const NUM_LEVELS: usize = 6;
 const MAX_DURATION_UNSIGNED: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 const MAX_DURATION_OBJ_STD: Duration = Duration::from_millis(MAX_DURATION_UNSIGNED-5000);
 
-pub struct OneshotChannel {
-    tx: Rc<RefCell<Option<tokio::sync::oneshot::Sender<LuaValue>>>>,
-    rx: Rc<RefCell<Option<tokio::sync::oneshot::Receiver<LuaValue>>>>,
+#[derive(Clone)]
+pub struct StreamSender {
+    pub tx: tokio::sync::mpsc::UnboundedSender<LuaValue>,
 }
 
-impl OneshotChannel {
-    pub fn new() -> Self {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        Self {
-            tx: Rc::new(RefCell::new(Some(tx))),
-            rx: Rc::new(RefCell::new(Some(rx))),
-        }
-    }
-}
-
-impl LuaUserData for OneshotChannel {
-    fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
+impl LuaUserData for StreamSender {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("send", |_, this, value: LuaValue| {
-            let chan = this.tx.borrow_mut().take()
-                .ok_or(mluau::Error::external("Channel already used"))?;
-
-            chan
-                .send(value)
-                .map_err(|_| mluau::Error::external("Failed to send value: receiver dropped"))?;
+            let _ = this.tx.send(value);
             Ok(())
         });
 
-        methods.add_scheduler_async_method("recv", async move |_, this, ()| {
-            let rx = this.rx.borrow_mut().take()
-                .ok_or(mluau::Error::external("Channel already used"))?;
+        methods.add_method("sendstrict", |_, this, value: LuaValue| {
+            this.tx.send(value)
+            .map_err(|_| LuaError::external("Failed to send message: receiver dropped"))?;
+            Ok(())
+        });
 
-            let value = rx
-                .await
-                .map_err(|_| mluau::Error::external("Failed to receive value: sender dropped"))?;
+        methods.add_method("isclosed", |_, this, _: ()| {
+            Ok(this.tx.is_closed())
+        });
+    }
+}
+
+pub struct StreamReceiver {
+    pub rx: tokio::sync::mpsc::UnboundedReceiver<LuaValue>,
+}
+
+impl LuaUserData for StreamReceiver {
+    fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_scheduler_async_method_mut("recv", async move |_, mut this, ()| {
+            let value = this.rx
+                .recv()
+                .await;
             Ok(value)
         });
 
-        methods.add_scheduler_async_method("recvtimeout", async move |_, this, timeout: LuaUserDataRef<TimeDelta>| {
-            let rx = this.rx.borrow_mut().take()
-                .ok_or(mluau::Error::external("Channel already used"))?;
-
+        methods.add_scheduler_async_method_mut("recvtimeout", async move |_, mut this, timeout: LuaUserDataRef<TimeDelta>| {
             let timeout = timeout.timedelta.to_std().map_err(LuaError::external)?;
             if timeout > MAX_TIMEOUT {
                 return Err(LuaError::external("Timeout cannot be greater than the max timeout"));
             }
 
-            let value = tokio::time::timeout(timeout, rx)
+            let value = tokio::time::timeout(timeout, this.rx.recv())
                 .await
-                .map_err(|_| mluau::Error::external("Receive timed out"))?
-                .map_err(|_| mluau::Error::external("Failed to receive value: sender dropped"))?;
+                .ok();
             
             Ok(value)
         });
+
+        methods.add_scheduler_async_method_mut("recvbatch", async move |_, mut this, (expected_count, timeout): (usize, LuaUserDataRef<TimeDelta>)| {
+            let timeout_dur = timeout.timedelta.to_std().map_err(LuaError::external)?;
+            if timeout_dur > MAX_TIMEOUT {
+                return Err(LuaError::external("Timeout cannot be greater than the max timeout"));
+            }
+
+            let mut results = Vec::with_capacity(expected_count);
+
+            // Calculate the absolute deadline for the entire batch operation
+            let deadline = tokio::time::Instant::now() + timeout_dur;
+
+            // Keep reading from our single channel until we hit our target count
+            while results.len() < expected_count {
+                // Try to grab the next message before the overarching deadline hits
+                match tokio::time::timeout_at(deadline, this.rx.recv()).await {
+                    Ok(Some(value)) => results.push(value),
+                    Ok(None) => return Ok((results, "closed")),                     
+                    Err(_) => return Ok((results, "timeout"))
+                }
+            }
+
+            // Returns a Luau tuple: ( {results...}, timed_out_boolean )
+            Ok((results, "completed"))
+        });
+    }
+}
+
+pub struct LuaStream {
+    tx: StreamSender,
+    rx: StreamReceiver,
+}
+
+impl LuaStream {
+    pub fn new() -> Self {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        Self {
+            tx: StreamSender { tx },
+            rx: StreamReceiver { rx },
+        }
+    }
+}
+
+impl IntoLua for LuaStream {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let tab = lua.create_table_with_capacity(0, 2)?;
+        tab.set("sender", self.tx)?;
+        tab.set("receiver", self.rx)?;
+        tab.set_readonly(true);
+        Ok(LuaValue::Table(tab))
     }
 }
 
@@ -238,52 +283,12 @@ impl Stream for QueueStream {
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    module.set("OneshotChannel", lua.create_function(|_, ()| {
-        Ok(OneshotChannel::new())
+    module.set("Stream", lua.create_function(|_, ()| {
+        Ok(LuaStream::new())
     })?)?;
 
     module.set("DelayChannel", lua.create_function(|_, ()| {
         Ok(DelayChannel::new())
-    })?)?;
-
-    module.set("selectoneshots", lua.create_scheduler_async_function(async |_lua, (channels, timeout): (Vec<LuaUserDataRef<OneshotChannel>>, LuaUserDataRef<TimeDelta>)| {
-        let timeout = timeout.timedelta.to_std().map_err(LuaError::external)?;
-        if timeout > MAX_TIMEOUT {
-            return Err(LuaError::external("Timeout cannot be greater than the max timeout"));
-        }
-        
-        let mut futures_unordered = FuturesUnordered::new();
-        for chan in channels {
-            let rx = chan.rx.borrow_mut().take()
-                .ok_or(mluau::Error::external("Channel already used"))?;
-
-            futures_unordered.push(rx);
-        }
-
-        let mut results = Vec::with_capacity(futures_unordered.len());
-        loop {
-            tokio::select! {
-                res = futures_unordered.next() => {
-                    match res {
-                        Some(Ok(value)) => {
-                            results.push(value);
-                            if futures_unordered.is_empty() {
-                                break;
-                            }
-                        },
-                        Some(Err(_)) => {
-                            return Err(mluau::Error::external("Failed to receive value: sender dropped"));
-                        },
-                        None => break,
-                    }
-                },
-                _ = tokio::time::sleep(timeout) => {
-                    return Ok((results, true));
-                }
-            }
-        }
-
-        Ok((results, false))
     })?)?;
 
     Ok(module)
