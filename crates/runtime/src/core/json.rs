@@ -1,6 +1,6 @@
 use mluau::prelude::*;
 
-use crate::{plugins::antiraid::LUA_DESERIALIZE_OPTIONS, primitives::blob::Blob};
+use crate::{primitives::LUA_DESERIALIZE_OPTIONS, primitives::blob::Blob};
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;

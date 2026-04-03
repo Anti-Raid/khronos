@@ -1,5 +1,4 @@
 pub mod core;
-pub mod plugins;
 pub mod primitives;
 pub mod rt;
 pub mod traits;

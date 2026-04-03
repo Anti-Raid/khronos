@@ -8,9 +8,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 governor = "0.6"
 log = "0.4"
-extract_map = { version = "0.3", features = ["serde"] }
 indexmap = { version = "2", features = ["serde"] }
-tokio = { version = "1" }
+tokio = { version = "1", features = ["io-util"] }
 tokio-util = { version = "0.7", features = ["time"] }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
 mluau = { git = "https://github.com/mluau/mluau", features = [
@@ -20,9 +19,7 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
 mluau-require = { git = "https://github.com/mluau/mluau-require" }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
-
-# dapi
-dapi = { path = "../dapi" }
+futures = "0.3"
 
 # blob encryption
 aes-gcm = "0.10"
@@ -44,15 +41,6 @@ async-compression = { version = "0.4", features = [
     "gzip",
     "zlib",
 ] }
-
-[dependencies.serenity]
-git = "https://github.com/Anti-Raid/serenity"
-branch = "next"
-features = ["model", "http", "cache", "rustls_backend", "unstable"]
-
-[dependencies.uuid]
-version = "1"
-features = ["v4", "fast-rng", "serde"]
 
 [features]
 default = []

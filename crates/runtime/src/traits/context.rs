@@ -1,13 +1,10 @@
-use crate::traits::runtimeprovider::RuntimeProvider;
+use mluau::{IntoLua, FromLua};
 
+#[allow(async_fn_in_trait)]
 pub trait KhronosContext: 'static + Clone + Sized {
-    type RuntimeProvider: RuntimeProvider;
+    type SyscallArgs: FromLua;
+    type SyscallRet: IntoLua;
     
-    /// Returns a runtime provider
-    fn runtime_provider(&self) -> Option<Self::RuntimeProvider>;
-
-    /// Returns the contexts memory limit, if any
-    fn memory_limit(&self) -> Option<usize> {
-        None
-    }
+    /// Perform a syscall to do something host-defined/controlled
+    async fn syscall(&self, args: Self::SyscallArgs) -> Result<Self::SyscallRet, crate::Error>;
 }

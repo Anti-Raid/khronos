@@ -1,6 +1,6 @@
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
-use serenity::futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use tokio_util::time::DelayQueue;
 use std::cell::Cell;
 use std::task::{Context, Poll, Waker};

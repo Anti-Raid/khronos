@@ -11,7 +11,6 @@ use clap::{Parser, ValueEnum};
 use cli::{Cli, CliAuxOpts, CliEntrypointAction};
 use std::env::var;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::fs;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
@@ -120,35 +119,6 @@ struct CliArgs {
     /// Environment variable: `CONTEXT_DATA`
     #[clap(long)]
     context_data: Option<String>,
-
-    /// What guild_id to use for mocking
-    ///
-    /// If unset, all APIs will default to the default_global_guild_id
-    /// hardcoded in Khronos to be AntiRaids support server.
-    ///
-    /// Environment variable: `GUILD_ID`
-    #[clap(long)]
-    guild_id: Option<serenity::all::GuildId>,
-
-    /// What owner_guild_id to use for mocking
-    ///
-    /// Environment variable: `OWNER_GUILD_ID`
-    #[clap(long)]
-    owner_guild_id: Option<serenity::all::GuildId>,
-
-    /// Template name. Defaults to 'main'
-    ///
-    /// Environment variable: `TEMPLATE_NAME`
-    #[clap(long, default_value = "main")]
-    template_name: String,
-
-    #[clap(long)]
-    /// The discord bot token to use for discord-related operations
-    ///
-    /// Optional, but required for discord-related operations
-    ///
-    /// Environment variable: `BOT_TOKEN``
-    bot_token: Option<String>,
 
     /// What experiments to load into the CLI, comma separated
     ///
@@ -299,28 +269,6 @@ impl CliArgs {
             self.context_data = Some(context_data);
         }
 
-        if let Ok(guild_id) = src.var("GUILD_ID") {
-            self.guild_id = Some(serenity::all::GuildId::new(
-                guild_id.parse().expect("Failed to parse guild id"),
-            ));
-        }
-
-        if let Ok(owner_guild_id) = src.var("OWNER_GUILD_ID") {
-            self.owner_guild_id = Some(serenity::all::GuildId::new(
-                owner_guild_id
-                    .parse()
-                    .expect("Failed to parse owner guild id"),
-            ));
-        }
-
-        if let Ok(template_name) = src.var("TEMPLATE_NAME") {
-            self.template_name = template_name;
-        }
-
-        if let Ok(bot_token) = src.var("BOT_TOKEN") {
-            self.bot_token = Some(bot_token);
-        }
-
         if let Ok(experiments) = src.var("EXPERIMENTS") {
             self.experiments = Some(experiments);
         }
@@ -445,54 +393,9 @@ impl CliArgs {
                 aux_opts: aux_opts.clone(),
                 raw_event_data: self.raw_event_data,
                 context_data: self.context_data,
-                guild_id: self.guild_id,
-                owner_guild_id: self.owner_guild_id,
-                template_name: self.template_name,
-                bot_token: self.bot_token.clone(),
                 config_file: self.config_file,
-                http: self
-                    .bot_token
-                    .as_ref()
-                    .map(|token| Arc::new(serenity::all::Http::new(serenity::all::SecretString::new(token.clone().into())))),
                 cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
-                pool: match self.kv_store_connection_string {
-                    Some(s) => {
-                        let pool = sqlx::PgPool::connect(&s)
-                            .await
-                            .expect("Failed to connect to postgres");
-
-                        sqlx::query("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
-                            .execute(&pool)
-                            .await
-                            .expect("Failed to create extension");
-
-                        sqlx::query(
-                            "
-                            CREATE TABLE IF NOT EXISTS kv_v2 (
-                                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                                key TEXT NOT NULL,
-                                value JSONB NOT NULL,
-                                scopes TEXT NOT NULL,
-                                guild_id TEXT NOT NULL,
-                                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                            )
-                        ",
-                        )
-                        .execute(&pool)
-                        .await
-                        .expect("Failed to create kv_v2");
-
-                        sqlx::query("CREATE INDEX IF NOT EXISTS idx_kv_scopes_gin ON kv_v2 USING gin (scopes)")
-                        .execute(&pool)
-                        .await
-                        .expect("Failed to create index");
-
-                        Some(pool)
-                    }
-                    None => None,
-                },
             },
             entrypoint_action,
         )

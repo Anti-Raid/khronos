@@ -1,5 +1,5 @@
 use mluau::prelude::*;
-use crate::{plugins::antiraid::LUA_SERIALIZE_OPTIONS, utils::khronos_value::KhronosValue};
+use crate::{primitives::LUA_SERIALIZE_OPTIONS, utils::khronos_value::KhronosValue};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

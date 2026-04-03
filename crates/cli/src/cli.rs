@@ -16,7 +16,6 @@ use rustyline::Editor;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Arc;
 use tokio::fs;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -105,28 +104,10 @@ pub struct Cli {
     /// What internal context data to use for mocking
     pub context_data: Option<String>,
 
-    /// What guild_id to use for mocking
-    pub guild_id: Option<serenity::all::GuildId>,
-
-    /// What owner_guild_id to use for mocking
-    pub owner_guild_id: Option<serenity::all::GuildId>,
-
-    #[allow(dead_code)]
-    /// The discord bot token to use for discord-related operations
-    ///
-    /// Optional, but required for discord-related operations
-    pub bot_token: Option<String>,
-
-    /// What template name to use
-    pub template_name: String,
-
     #[allow(dead_code)]
     /// The path to a config file containing e.g.
     /// the bot token etc
     pub config_file: Option<PathBuf>,
-
-    /// The http client to use for discord operations
-    pub http: Option<Arc<serenity::all::Http>>,
 
     /// The cached khronos runtime arguments
     pub cached_context: Option<TemplateContext<provider::CliKhronosContext>>,
@@ -136,9 +117,6 @@ pub struct Cli {
 
     /// CLI extension state
     pub ext_state: Rc<RefCell<CliExtensionState>>,
-
-    /// Postgres Pool
-    pub pool: Option<sqlx::PgPool>,
 }
 
 #[derive(serde::Deserialize, Debug)]
