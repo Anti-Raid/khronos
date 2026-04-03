@@ -57,11 +57,6 @@ impl SuperUserMessageTransformFlags {
 
 #[allow(async_fn_in_trait)] 
 pub trait DiscordProvider: 'static + Clone {
-    /// Attempts an action on the bucket, incrementing/adjusting ratelimits if needed
-    ///
-    /// This should return an error if ratelimited
-    fn attempt_action(&self, bucket: &str) -> Result<(), crate::Error>;
-
     /// Http client
     fn serenity_http(&self) -> &serenity::http::Http;
 
