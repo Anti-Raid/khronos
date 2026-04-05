@@ -21,6 +21,9 @@ rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
 futures = "0.3"
 
+# yaml
+serde-saphyr = "0.0.23"
+
 # blob encryption
 aes-gcm = "0.10"
 argon2 = "0.5"
