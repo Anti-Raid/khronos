@@ -10,7 +10,7 @@ macro_rules! api_list_enum {
     ($name:ident { $($variant:ident($ty:ty),)* }) => {
         use $crate::apilist::MapResponseMetadata as MRM;
         #[derive(Debug, serde::Serialize, serde::Deserialize)]
-        #[serde(tag = "op")]
+        #[serde(tag = "op", content = "data")]
         pub enum $name {
             $(
                 $variant($ty),
