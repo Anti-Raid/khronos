@@ -2,7 +2,6 @@ mod cli;
 mod cli_extensions;
 mod constants;
 mod experiments;
-mod provider;
 mod repl_completer;
 mod tui;
 mod tui_entrypoint;
@@ -394,7 +393,6 @@ impl CliArgs {
                 raw_event_data: self.raw_event_data,
                 context_data: self.context_data,
                 config_file: self.config_file,
-                cached_context: None,
                 setup_data: Cli::setup_lua_vm(aux_opts, ext_state).await,
             },
             entrypoint_action,

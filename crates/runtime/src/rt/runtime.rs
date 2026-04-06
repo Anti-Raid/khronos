@@ -12,9 +12,6 @@ use mluau::prelude::*;
 use mluau_require::{AssetRequirer, FilesystemWrapper};
 
 pub type S = mlua_scheduler::schedulers::rodan::CoreScheduler;
-
-use crate::TemplateContext;
-use crate::traits::context::KhronosContext as KhronosContextTrait;
 use crate::utils::proxyglobal::proxy_global;
 
 /// A function to be called when the Khronos runtime is marked as broken
@@ -28,7 +25,6 @@ pub struct RuntimeCreateOpts {
     pub give_time: std::time::Duration,
     //pub time_slice: Option<std::time::Duration>,
 }
-
 
 pub struct SchedulerHook {
     execution_stop_time: Rc<Cell<Option<std::time::Instant>>>,
@@ -398,18 +394,9 @@ impl KhronosRuntime {
         let Some(ref lua) = *self.lua.borrow() else {
             return Err(LuaError::RuntimeError("Lua VM is not valid".to_string()));
         };
-        self.handle_error(func(lua))
-    }
-
-    /// Creates a new TemplateContext with the given KhronosContext
-    pub fn create_context<K: KhronosContextTrait>(
-        &self,
-        context: K,
-    ) -> Result<TemplateContext<K>, LuaError> {
-        // Ensure create_thread wont error
+         // Ensure create_thread wont error
         self.update_last_execution_time(std::time::Instant::now());
-        let context = TemplateContext::new(self.store_table.clone(), context)?;
-        Ok(context)
+        self.handle_error(func(lua))
     }
 
     /// Helper methods to handle errors correctly, dispatching mark_broken calls if theres

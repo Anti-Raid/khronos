@@ -1,7 +1,5 @@
 use crate::experiments::load_experiments;
-use crate::provider;
 use crate::repl_completer;
-use khronos_runtime::TemplateContext;
 use khronos_runtime::mluau_require::AssetRequirer;
 use khronos_runtime::mluau_require::FilesystemWrapper;
 use khronos_runtime::mluau_require::vfs::PhysicalFS;
@@ -109,9 +107,6 @@ pub struct Cli {
     /// the bot token etc
     pub config_file: Option<PathBuf>,
 
-    /// The cached khronos runtime arguments
-    pub cached_context: Option<TemplateContext<provider::CliKhronosContext>>,
-
     /// Setup data
     pub setup_data: LuaSetupResult,
 
@@ -137,18 +132,11 @@ impl Cli {
         }
     }
 
-    /// Create a khronos context
-    fn create_khronos_context(&self) -> provider::CliKhronosContext {
-        provider::CliKhronosContext {}
-    }
-
     pub async fn spawn_script(
         &mut self,
         name: &str,
         code: &str,
     ) -> LuaResult<LuaMultiValue> {
-        let context = self.create_khronos_context();
-
         let event = self.parse_event_args();
 
         let create_event = CreateEvent::new(
@@ -156,8 +144,6 @@ impl Cli {
             None,
             event.data,
         );
-
-        let ctx = self.setup_data.rt.create_context(context)?;
 
         let chunk_fn = self
             .setup_data
@@ -167,7 +153,7 @@ impl Cli {
         self
         .setup_data
         .rt
-        .call_in_scheduler(chunk_fn, (ctx, create_event)).await
+        .call_in_scheduler(chunk_fn, create_event).await
     }
 
     pub async fn setup_lua_vm(
