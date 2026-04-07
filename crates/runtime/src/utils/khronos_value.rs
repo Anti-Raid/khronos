@@ -9,7 +9,7 @@ use crate::{core::typesext::MemoryVfs, primitives::blob::Blob};
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
-    UnsignedInteger(u64),
+    Int64(i64),
     Float(f64),
     Boolean(bool),
     Buffer(Vec<u8>),   // Binary data
@@ -43,6 +43,7 @@ impl KhronosValue {
         match value {
             LuaValue::String(s) => Ok(KhronosValue::Text(s.to_string_lossy())),
             LuaValue::Integer(i) => Ok(KhronosValue::Integer(i)),
+            LuaValue::Int64(i) => Ok(KhronosValue::Int64(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
             LuaValue::Boolean(b) => Ok(KhronosValue::Boolean(b)),
             LuaValue::Buffer(buf) => {
@@ -91,12 +92,6 @@ impl KhronosValue {
                 if let Ok(tz) = ud.borrow::<crate::core::datetime::Timezone>() {
                     return Ok(KhronosValue::TimeZone(tz.tz));
                 }
-                if let Ok(i_64) = ud.borrow::<crate::core::typesext::I64>() {
-                    return Ok(KhronosValue::Integer(i_64.0));
-                }
-                if let Ok(u_64) = ud.borrow::<crate::core::typesext::U64>() {
-                    return Ok(KhronosValue::UnsignedInteger(u_64.0));
-                }
                 if let Ok(mut blob) = ud.borrow_mut::<Blob>() {
                     // Take out the contents of the blob 
                     let data = std::mem::take(&mut blob.data);
@@ -125,17 +120,8 @@ impl KhronosValue {
 
         match self {
             KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(&s)?)),
-            KhronosValue::Integer(i) => {
-                // If i is above/below the 52 bit precision limit, use a typesext.I64
-                let min_luau_integer = -9007199254740991; // 2^53 - 1
-                let max_luau_integer = 9007199254740991; // 2^53 - 1
-                if i > max_luau_integer || i < min_luau_integer {
-                    crate::core::typesext::I64(i).into_lua(lua)
-                } else {
-                    Ok(LuaValue::Integer(i))
-                }
-            }
-            KhronosValue::UnsignedInteger(i) => crate::core::typesext::U64(i).into_lua(lua), // An UnsignedInteger can only be created through explicit U64 parse
+            KhronosValue::Integer(i) => Ok(LuaValue::Integer(i)),
+            KhronosValue::Int64(i) => Ok(LuaValue::Int64(i)),
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
             KhronosValue::Buffer(buf) => {

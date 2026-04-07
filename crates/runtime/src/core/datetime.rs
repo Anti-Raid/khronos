@@ -1,4 +1,3 @@
-use super::typesext::I64;
 use std::{str::FromStr, time::Duration};
 
 use chrono::{Datelike, TimeZone, Timelike};
@@ -414,8 +413,8 @@ impl LuaUserData for Timezone {
         });
 
         // Given a unix time, returns a DateTime object with this timezone
-        methods.add_method("fromTime", |_, this, time: I64| {
-            let Some(dt) = chrono::DateTime::from_timestamp(time.0, 0) else {
+        methods.add_method("fromTime", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp(time, 0) else {
                 return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
@@ -425,8 +424,8 @@ impl LuaUserData for Timezone {
         });
 
         // Given a unix time in milliseconds, returns a DateTime object with this timezone
-        methods.add_method("fromTimeMillis", |_, this, time: I64| {
-            let Some(dt) = chrono::DateTime::from_timestamp_millis(time.0) else {
+        methods.add_method("fromTimeMillis", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp_millis(time) else {
                 return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
@@ -436,8 +435,8 @@ impl LuaUserData for Timezone {
         });
 
         // Given a unix time in microseconds, returns a DateTime object with this timezone
-        methods.add_method("fromTimeMicros", |_, this, time: I64| {
-            let Some(dt) = chrono::DateTime::from_timestamp_micros(time.0) else {
+        methods.add_method("fromTimeMicros", |_, this, time: i64| {
+            let Some(dt) = chrono::DateTime::from_timestamp_micros(time) else {
                 return Err(mluau::Error::RuntimeError(
                     "Invalid time (might exceed bounds?)".to_string(),
                 ));
@@ -447,8 +446,8 @@ impl LuaUserData for Timezone {
         });
 
         // Given a unix time in nanoseconds, returns a DateTime object with this timezone
-        methods.add_method("fromTimeNanos", |_, this, epoch: I64| {
-            let dt = chrono::DateTime::from_timestamp_nanos(epoch.0);
+        methods.add_method("fromTimeNanos", |_, this, epoch: i64| {
+            let dt = chrono::DateTime::from_timestamp_nanos(epoch);
             let dt = dt.with_timezone(&this.tz);
             Ok(DateTime { dt })
         });
@@ -498,9 +497,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     // Creates a new TimeDelta object
     module.set(
         "timedelta_weeks",
-        lua.create_function(|_, weeks: I64| {
+        lua.create_function(|_, weeks: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_weeks(weeks.0).ok_or(
+                timedelta: chrono::Duration::try_weeks(weeks).ok_or(
                     mluau::Error::RuntimeError("Invalid number of weeks".to_string()),
                 )?,
             })
@@ -509,9 +508,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_days",
-        lua.create_function(|_, days: I64| {
+        lua.create_function(|_, days: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_days(days.0).ok_or(mluau::Error::RuntimeError(
+                timedelta: chrono::Duration::try_days(days).ok_or(mluau::Error::RuntimeError(
                     "Invalid number of days".to_string(),
                 ))?,
             })
@@ -520,9 +519,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_hours",
-        lua.create_function(|_, hours: I64| {
+        lua.create_function(|_, hours: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_hours(hours.0).ok_or(
+                timedelta: chrono::Duration::try_hours(hours).ok_or(
                     mluau::Error::RuntimeError("Invalid number of hours".to_string()),
                 )?,
             })
@@ -531,9 +530,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_minutes",
-        lua.create_function(|_, minutes: I64| {
+        lua.create_function(|_, minutes: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_minutes(minutes.0).ok_or(
+                timedelta: chrono::Duration::try_minutes(minutes).ok_or(
                     mluau::Error::RuntimeError("Invalid number of minutes".to_string()),
                 )?,
             })
@@ -542,9 +541,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_seconds",
-        lua.create_function(|_, seconds: I64| {
+        lua.create_function(|_, seconds: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_seconds(seconds.0).ok_or(
+                timedelta: chrono::Duration::try_seconds(seconds).ok_or(
                     mluau::Error::RuntimeError("Invalid number of seconds".to_string()),
                 )?,
             })
@@ -553,9 +552,9 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_millis",
-        lua.create_function(|_, millis: I64| {
+        lua.create_function(|_, millis: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::try_milliseconds(millis.0).ok_or(
+                timedelta: chrono::Duration::try_milliseconds(millis).ok_or(
                     mluau::Error::RuntimeError("Invalid number of milliseconds".to_string()),
                 )?,
             })
@@ -564,18 +563,18 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set(
         "timedelta_micros",
-        lua.create_function(|_, micros: I64| {
+        lua.create_function(|_, micros: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::microseconds(micros.0),
+                timedelta: chrono::Duration::microseconds(micros),
             })
         })?,
     )?;
 
     module.set(
         "timedelta_nanos",
-        lua.create_function(|_, nanos: I64| {
+        lua.create_function(|_, nanos: i64| {
             Ok(TimeDelta {
-                timedelta: chrono::Duration::nanoseconds(nanos.0),
+                timedelta: chrono::Duration::nanoseconds(nanos),
             })
         })?,
     )?;
