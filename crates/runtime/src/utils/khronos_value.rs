@@ -5,11 +5,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::{core::typesext::MemoryVfs, primitives::blob::Blob};
 
+mod string_i64 {
+    use serde::{de, Deserialize, Deserializer, Serializer};
+    use std::str::FromStr;
+
+    pub fn serialize<S>(value: &i64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Convert i64 to string and serialize as a string
+        serializer.serialize_str(&value.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as a string, then parse back to i64
+        let s = String::deserialize(deserializer)?;
+        i64::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KhronosValue {
     Text(String),
     Integer(i64),
-    Int64(i64),
+    Int64(#[serde(with = "string_i64")] i64),
     Float(f64),
     Boolean(bool),
     Buffer(Vec<u8>),   // Binary data
