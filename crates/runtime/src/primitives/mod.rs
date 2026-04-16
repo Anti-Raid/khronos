@@ -1,4 +1,3 @@
-pub mod event;
 pub mod lazy;
 pub mod opaque;
 pub mod blob;

@@ -3,7 +3,6 @@ use crate::repl_completer;
 use khronos_runtime::mluau_require::AssetRequirer;
 use khronos_runtime::mluau_require::FilesystemWrapper;
 use khronos_runtime::mluau_require::vfs::PhysicalFS;
-use khronos_runtime::primitives::event::CreateEvent;
 use khronos_runtime::rt::mlua::prelude::*;
 use khronos_runtime::rt::KhronosRuntime;
 use khronos_runtime::rt::RuntimeCreateOpts;
@@ -114,37 +113,12 @@ pub struct Cli {
     pub ext_state: Rc<RefCell<CliExtensionState>>,
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct EventArgs {
-    name: String,
-    data: serde_json::Value,
-}
-
 impl Cli {
-    fn parse_event_args(&self) -> EventArgs {
-        if let Some(ref raw_event_data) = self.raw_event_data {
-            serde_json::from_str(raw_event_data).expect("Failed to parse raw event data")
-        } else {
-            EventArgs {
-                name: "NoEvent".to_string(),
-                data: serde_json::json!({}),
-            }
-        }
-    }
-
     pub async fn spawn_script(
         &mut self,
         name: &str,
         code: &str,
     ) -> LuaResult<LuaMultiValue> {
-        let event = self.parse_event_args();
-
-        let create_event = CreateEvent::new(
-            event.name.to_string(),
-            None,
-            event.data,
-        );
-
         let chunk_fn = self
             .setup_data
             .rt
@@ -153,7 +127,7 @@ impl Cli {
         self
         .setup_data
         .rt
-        .call_in_scheduler(chunk_fn, create_event).await
+        .call_in_scheduler(chunk_fn, ()).await
     }
 
     pub async fn setup_lua_vm(
