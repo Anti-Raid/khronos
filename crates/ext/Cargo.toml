@@ -12,3 +12,6 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
     "serialize",
 ] }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler" }
+tokio = { version = "1", features = ["rt"] }
+chrono = "0.4"
+khronos_runtime = { path = "../runtime" }

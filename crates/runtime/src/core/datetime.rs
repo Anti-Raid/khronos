@@ -4,6 +4,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use chrono_tz::OffsetComponents;
 use mluau::prelude::*;
 
+pub type DateTimeUtc = DateTime<chrono_tz::Tz>;
 pub type DateTimeRef = LuaUserDataRef<DateTime<chrono_tz::Tz>>;
 
 pub struct TimeDelta {
@@ -136,6 +137,10 @@ where
         DateTime {
             dt: dt.with_timezone(&Tz::from(chrono_tz::Tz::UTC)),
         }
+    }
+
+    pub fn to_utc(&self) -> chrono::DateTime<chrono::Utc> {
+        self.dt.with_timezone(&chrono::Utc)
     }
 }
 

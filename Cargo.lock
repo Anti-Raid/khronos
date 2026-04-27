@@ -1807,11 +1807,14 @@ dependencies = [
 name = "khronos_ext"
 version = "1.0.0"
 dependencies = [
+ "chrono",
+ "khronos_runtime",
  "mlua_scheduler",
  "mluau",
  "serde",
  "serde_json",
  "sqlx",
+ "tokio",
 ]
 
 [[package]]
