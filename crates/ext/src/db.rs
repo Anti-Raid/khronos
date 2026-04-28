@@ -1,3 +1,4 @@
+use khronos_runtime::utils::khronos_value::KhronosValue;
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -21,42 +22,51 @@ pub trait DbValueMapper: 'static + Clone + Sized {
     fn type_name(&self) -> &'static str;
 
     // Map to/from postgres
-    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> Query<'_, Postgres, PgArguments>;
+    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> sqlx::Result<Query<'_, Postgres, PgArguments>>;
     fn from_row(row: &sqlx::postgres::PgRow, idx: usize, type_name: &str) -> sqlx::Result<Self>;
 
     // Map to/from Lua
     fn from_lua(lua: &Lua, value: LuaValue, type_name: &str) -> LuaResult<Self>;
-    fn to_lua(&self, lua: &Lua) -> LuaResult<LuaValue>;
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue>;
 }
 
 #[derive(Clone)]
-struct DbValue<T: DbValueMapper>(T);
+struct DbValue<T: DbValueMapper>(Option<T>);
 
 impl<T: DbValueMapper> DbValue<T> {
     /// Creates an DbValue from a database row, given the column index and expected type name.
     fn from_row(row: &sqlx::postgres::PgRow, idx: usize, type_name: &str) -> sqlx::Result<Self> {
-        T::from_row(row, idx, type_name).map(DbValue)
+        T::from_row(row, idx, type_name).map(|x| DbValue(Some(x)))
     }
 
     /// Creates an DbValue from a Lua value, given the expected type name.
     fn from_lua(lua: &Lua, value: LuaValue, type_name: &str) -> LuaResult<Self> {
-        T::from_lua(lua, value, type_name).map(DbValue)
+        T::from_lua(lua, value, type_name).map(|x| DbValue(Some(x)))
     }
 
     /// Binds the value to a sqlx query.
-    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> Query<'_, Postgres, PgArguments>
+    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> Result<Query<'_, Postgres, PgArguments>, sqlx::Error>
     {
-        self.0.bind(query)
+        let Some(v) = self.0 else {
+            return Err(sqlx::Error::ColumnNotFound("column already destructed".into()))
+        };
+        v.bind(query)
     }
 }
 
 impl<T: DbValueMapper> LuaUserData for DbValue<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("type", |_, this, ()| {
-            Ok(this.0.type_name())
+            let Some(ref v) = this.0 else {
+                return Err(LuaError::external("have already taken out dbvalue"))
+            };
+            Ok(v.type_name())
         });
-        methods.add_method("get", |lua, this, ()| {
-            this.0.to_lua(lua)
+        methods.add_method_mut("take", |lua, this, ()| {
+            let Some(v) = this.0.take() else {
+                return Err(LuaError::external("have already taken out dbvalue"))
+            };
+            v.into_lua(lua)
         });
     }
 }
@@ -139,7 +149,7 @@ impl<T: DbValueMapper> LuaUserData for Db<T> {
         methods.add_scheduler_async_method("execute", async |_lua, this, (query, params): (String, Vec<DbValueTaker<T>>)| {
             let mut q = sqlx::query(&query);
             for param in params {
-                q = param.0.bind(q);
+                q = param.0.bind(q).map_err(|e| LuaError::external(format!("Database bind failed: {}", e)))?;
             }
             
             let result = q.execute(&this.pool).await.map_err(|e| LuaError::external(format!("Database execute failed: {}", e)))?;
@@ -150,7 +160,7 @@ impl<T: DbValueMapper> LuaUserData for Db<T> {
         methods.add_scheduler_async_method("fetchall", async |_lua, this, (query, params): (String, Vec<DbValueTaker<T>>)| {
             let mut q = sqlx::query(&query);
             for param in params {
-                q = param.0.bind(q);
+                q = param.0.bind(q).map_err(|e| LuaError::external(format!("Database bind failed: {}", e)))?;
             }
             let rows = q.fetch_all(&this.pool).await.map_err(|e| LuaError::external(format!("Database query failed: {}", e)))?;
             Ok(rows.into_iter().map(PgRow::<T>::from_row).collect::<Vec<_>>())
@@ -187,7 +197,7 @@ impl<T: DbValueMapper> LuaUserData for DbTx<T> {
             
             let mut q = sqlx::query(&query);
             for param in params {
-                q = param.0.bind(q);
+                q = param.0.bind(q).map_err(|e| LuaError::external(format!("Database bind failed: {}", e)))?;
             }
             
             let result = q.execute(&mut **tx).await.map_err(|e| LuaError::external(format!("Transaction execute failed: {}", e)))?;
@@ -201,7 +211,7 @@ impl<T: DbValueMapper> LuaUserData for DbTx<T> {
             
             let mut q = sqlx::query(&query);
             for param in params {
-                q = param.0.bind(q);
+                q = param.0.bind(q).map_err(|e| LuaError::external(format!("Database bind failed: {}", e)))?;
             }
             
             let rows = q.fetch_all(&mut **tx).await.map_err(|e| LuaError::external(format!("Transaction query failed: {}", e)))?;
@@ -232,7 +242,7 @@ impl<T: DbValueMapper> LuaUserData for DbTx<T> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
 /// A simple db value mapper that supports common types like i32, i64, String, bool, f64, timestamptz, json, and jsonb, as well as lists of those types. 
 /// 
@@ -254,6 +264,7 @@ pub enum SimpleDbValueMapper {
     JsonList(Option<Vec<serde_json::Value>>),
     Jsonb(Option<serde_json::Value>),
     JsonbList(Option<Vec<serde_json::Value>>),
+    KhronosValue(KhronosValue)
 }
 
 impl DbValueMapper for SimpleDbValueMapper {
@@ -266,7 +277,7 @@ impl DbValueMapper for SimpleDbValueMapper {
             "f64" | "{f64}" |
             "timestamptz" | "{timestamptz}" |
             "json" | "{json}" |
-            "jsonb" | "{jsonb}"
+            "jsonb" | "{jsonb}" | "custom@khronosvalue"
         )
     }
 
@@ -288,11 +299,12 @@ impl DbValueMapper for SimpleDbValueMapper {
             Self::JsonList(_) => "{json}",
             Self::Jsonb(_) => "jsonb",
             Self::JsonbList(_) => "{jsonb}",
+            Self::KhronosValue(_) => "custom@khronosvalue"
         }
     }
 
-    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> Query<'_, Postgres, PgArguments> {
-        match self {
+    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> sqlx::Result<Query<'_, Postgres, PgArguments>> {
+        Ok(match self {
             Self::I32(v) => query.bind(v),
             Self::I32List(v) => query.bind(v),
             Self::I64(v) => query.bind(v),
@@ -309,7 +321,11 @@ impl DbValueMapper for SimpleDbValueMapper {
             Self::JsonList(v) => query.bind(v), 
             Self::Jsonb(v) => query.bind(v),
             Self::JsonbList(v) => query.bind(v),
-        }
+            Self::KhronosValue(v) => {
+                let v = serde_json::to_value(v).map_err(|e| sqlx::Error::AnyDriverError(Box::new(e)))?;
+                query.bind(v)
+            }
+        })
     }
 
     fn from_row(row: &sqlx::postgres::PgRow, idx: usize, type_name: &str) -> sqlx::Result<Self> {
@@ -330,6 +346,13 @@ impl DbValueMapper for SimpleDbValueMapper {
             "{json}" => Ok(Self::JsonList(row.try_get(idx)?)),
             "jsonb" => Ok(Self::Jsonb(row.try_get(idx)?)),
             "{jsonb}" => Ok(Self::JsonbList(row.try_get(idx)?)),
+            "custom@khronosvalue" => {
+                let json = row.try_get(idx)?;
+                match serde_json::from_value(json) {
+                    Ok(v) => Ok(Self::KhronosValue(v)),
+                    Err(e) => Err(sqlx::Error::AnyDriverError(Box::new(e)))
+                }
+            },
             _ => Err(sqlx::Error::ColumnNotFound(format!("Unsupported type name: {}", type_name))),
         }
     }
@@ -377,28 +400,30 @@ impl DbValueMapper for SimpleDbValueMapper {
             "{json}" => lua.from_value(value).map(Self::JsonList),
             "jsonb" => lua.from_value(value).map(Self::Jsonb),
             "{jsonb}" => lua.from_value(value).map(Self::JsonbList),
+            "custom@khronosvalue" => KhronosValue::from_lua(value, lua).map(Self::KhronosValue),
             _ => Err(LuaError::external(format!("Unsupported type name: {}", type_name))),
         }
     }
 
-    fn to_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         match self {
-            Self::I32(v) => lua.to_value(v),
-            Self::I32List(v) => lua.to_value(v),
-            Self::I64(v) => lua.to_value(v),
-            Self::I64List(v) => lua.to_value(v),
-            Self::String(v) => lua.to_value(v),
-            Self::StringList(v) => lua.to_value(v),
-            Self::Bool(v) => lua.to_value(v),
-            Self::BoolList(v) => lua.to_value(v),
-            Self::F64(v) => lua.to_value(v),
-            Self::F64List(v) => lua.to_value(v),
-            Self::Timestamptz(v) => lua.to_value(v),
-            Self::TimestamptzList(v) => lua.to_value(v),
-            Self::Json(v) => lua.to_value(v),
-            Self::JsonList(v) => lua.to_value(v),
-            Self::Jsonb(v) => lua.to_value(v),
-            Self::JsonbList(v) => lua.to_value(v),
+            Self::I32(v) => lua.to_value(&v),
+            Self::I32List(v) => lua.to_value(&v),
+            Self::I64(v) => lua.to_value(&v),
+            Self::I64List(v) => lua.to_value(&v),
+            Self::String(v) => lua.to_value(&v),
+            Self::StringList(v) => lua.to_value(&v),
+            Self::Bool(v) => lua.to_value(&v),
+            Self::BoolList(v) => lua.to_value(&v),
+            Self::F64(v) => lua.to_value(&v),
+            Self::F64List(v) => lua.to_value(&v),
+            Self::Timestamptz(v) => lua.to_value(&v),
+            Self::TimestamptzList(v) => lua.to_value(&v),
+            Self::Json(v) => lua.to_value(&v),
+            Self::JsonList(v) => lua.to_value(&v),
+            Self::Jsonb(v) => lua.to_value(&v),
+            Self::JsonbList(v) => lua.to_value(&v),
+            Self::KhronosValue(v) => v.into_lua(lua),
         }
     }
 }
@@ -425,7 +450,7 @@ impl<T: DbValueMapper, U: DbValueMapper> DbValueMapper for ChainedDbValueMapper<
         }
     }
 
-    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> Query<'_, Postgres, PgArguments> {
+    fn bind(self, query: Query<'_, Postgres, PgArguments>) -> sqlx::Result<Query<'_, Postgres, PgArguments>> {
         match self {
             Self::Left(left) => left.bind(query),
             Self::Right(right) => right.bind(query),
@@ -452,10 +477,10 @@ impl<T: DbValueMapper, U: DbValueMapper> DbValueMapper for ChainedDbValueMapper<
         }
     }
 
-    fn to_lua(&self, lua: &Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         match self {
-            Self::Left(left) => left.to_lua(lua),
-            Self::Right(right) => right.to_lua(lua),
+            Self::Left(left) => left.into_lua(lua),
+            Self::Right(right) => right.into_lua(lua),
         }
     }
 }

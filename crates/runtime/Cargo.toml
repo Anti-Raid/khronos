@@ -36,6 +36,9 @@ tar = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
 
+# antiraid/kittycat
+kittycat = { git = "https://github.com/anti-raid/kittycat" }
+
 # datamgmt
 bstr = "1.9" 
 async-compression = { version = "0.4", features = [
