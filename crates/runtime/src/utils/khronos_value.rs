@@ -3,27 +3,38 @@ use std::collections::HashMap;
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{core::typesext::MemoryVfs, primitives::blob::Blob};
+use crate::core::typesext::MemoryVfs;
 
 mod string_i64 {
-    use serde::{de, Deserialize, Deserializer, Serializer};
-    use std::str::FromStr;
+    use serde::{de, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &i64, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         // Convert i64 to string and serialize as a string
-        serializer.serialize_str(&value.to_string())
+        serializer.collect_str(value)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
     where
         D: Deserializer<'de>,
     {
-        // Deserialize as a string, then parse back to i64
-        let s = String::deserialize(deserializer)?;
-        i64::from_str(&s).map_err(de::Error::custom)
+        struct I64Visitor;
+
+        impl<'de> de::Visitor<'de> for I64Visitor {
+            type Value = i64;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string representing an i64")
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                value.parse().map_err(de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(I64Visitor)
     }
 }
 
@@ -34,7 +45,6 @@ pub enum KhronosValue {
     Int64(#[serde(with = "string_i64")] i64),
     Float(f64),
     Boolean(bool),
-    Buffer(Vec<u8>),   // Binary data
     Vector((f32, f32, f32)), // Luau vector
     Map(Vec<(KhronosValue, KhronosValue)>),
     List(Vec<KhronosValue>),
@@ -68,9 +78,9 @@ impl KhronosValue {
             LuaValue::Int64(i) => Ok(KhronosValue::Int64(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
             LuaValue::Boolean(b) => Ok(KhronosValue::Boolean(b)),
-            LuaValue::Buffer(buf) => {
-                let data = buf.to_vec();
-                Ok(KhronosValue::Buffer(data))
+            LuaValue::Buffer(_) => {
+                // We do not support storing values etc. yet
+                Err(LuaError::FromLuaConversionError { from: "buffer", to: "KhronosValue".to_string(), message: Some("Cannot send/store buffers.".to_string()) })
             }
             LuaValue::Vector(v) => Ok(KhronosValue::Vector((v.x(), v.y(), v.z()))),
             LuaValue::Nil => Ok(KhronosValue::Null),
@@ -114,11 +124,6 @@ impl KhronosValue {
                 if let Ok(tz) = ud.borrow::<crate::core::datetime::Timezone>() {
                     return Ok(KhronosValue::TimeZone(tz.tz));
                 }
-                if let Ok(mut blob) = ud.borrow_mut::<Blob>() {
-                    // Take out the contents of the blob 
-                    let data = std::mem::take(&mut blob.data);
-                    return Ok(KhronosValue::Buffer(data));
-                }
                 if let Ok(mut s_map) = ud.borrow_mut::<MemoryVfs>() {
                     // Take out the contents of the lazy string map 
                     let data = std::mem::take(&mut s_map.data);
@@ -146,11 +151,6 @@ impl KhronosValue {
             KhronosValue::Int64(i) => Ok(LuaValue::Int64(i)),
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
-            KhronosValue::Buffer(buf) => {
-                let data = buf;
-                let lua_buf = lua.create_buffer(data)?;
-                Ok(LuaValue::Buffer(lua_buf))
-            }
             KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
             KhronosValue::Map(j) => {
                 let table = lua.create_table()?;

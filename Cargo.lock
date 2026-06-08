@@ -363,6 +363,9 @@ name = "bytes"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bytestring"
@@ -1826,12 +1829,12 @@ dependencies = [
  "async-compression",
  "base64",
  "bstr",
+ "bytes",
  "chrono",
  "chrono-tz",
  "futures",
  "governor",
  "indexmap",
- "kittycat",
  "log",
  "mlua_scheduler",
  "mluau",
@@ -1843,16 +1846,6 @@ dependencies = [
  "tar",
  "tokio",
  "tokio-util",
- "zeroize",
-]
-
-[[package]]
-name = "kittycat"
-version = "0.2.0"
-source = "git+https://github.com/anti-raid/kittycat#19df26098714f4ca5e12ee40c33dca5b1a85908a"
-dependencies = [
- "indexmap",
- "serde",
 ]
 
 [[package]]

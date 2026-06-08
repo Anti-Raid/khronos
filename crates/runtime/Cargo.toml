@@ -20,6 +20,7 @@ mluau-require = { git = "https://github.com/mluau/mluau-require" }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
 futures = "0.3"
+bytes = { version = "1", features = ["serde"] }
 
 # yaml
 serde-saphyr = "0.0.25"
@@ -27,7 +28,6 @@ serde-saphyr = "0.0.25"
 # blob encryption
 aes-gcm = "0.10"
 argon2 = "0.5"
-zeroize = "1"
 
 # storage deps
 tar = "0.4"
@@ -35,9 +35,6 @@ tar = "0.4"
 # antiraid/datetime
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = { version = "0.10", features = ["serde"] }
-
-# antiraid/kittycat
-kittycat = { git = "https://github.com/anti-raid/kittycat" }
 
 # datamgmt
 bstr = "1.9" 

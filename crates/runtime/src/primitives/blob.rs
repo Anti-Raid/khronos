@@ -1,16 +1,7 @@
 //! A Blob is a special structure that is owned by Rust
 //! and can be used to e.g. avoid copying between Lua and Rust
-//! 
-//! This core primitive is not available in WASM contexts.yet
-//! 
-//! When a Blob is passed into a DataStore/Rust, its contents may be moved
-//! to Rust leaving a empty Blob. `clone` can be used to avoid this. When this
-//! will happen is undefined
-//! 
-//! Blob is also a way to encrypt/decrypt data with AES-256-GCM (using Argon2id for key derivation)
 
 use mluau::prelude::*;
-use zeroize::Zeroize;
 
 pub struct Blob {
     /// The data of the blob
@@ -47,28 +38,11 @@ impl LuaUserData for Blob {
         methods.add_function("tobuffer", |lua, ud: LuaAnyUserData| {
             let blob = ud.take::<Self>()?;
 
-            let memory_limit = lua.memory_limit()?;
-            let used_memory = lua.used_memory();
-            if memory_limit > used_memory && memory_limit - used_memory < blob.data.len() {
-                return Err(LuaError::external(format!(
-                    "Blob size {} exceeds available memory ({} bytes / {} total bytes)",
-                    blob.data.len(),
-                    memory_limit - lua.used_memory(),
-                    memory_limit
-                )));
-            }
-
             let buffer = lua.create_buffer(blob.data)?;
             Ok(buffer)
         });
 
         methods.add_method_mut("drain", |_, this, ()| {
-            std::mem::take(&mut this.data);
-            Ok(())
-        });
-
-        methods.add_method_mut("zeroize", |_, this, ()| {
-            this.data.zeroize();
             std::mem::take(&mut this.data);
             Ok(())
         });
