@@ -51,7 +51,7 @@ pub enum KhronosValue {
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
     TimeZone(chrono_tz::Tz),
-    MemoryVfs(HashMap<String, String>),
+    MemoryVfs(Box<HashMap<String, String>>),
     Null,
 }
 
@@ -127,7 +127,7 @@ impl KhronosValue {
                 if let Ok(mut s_map) = ud.borrow_mut::<MemoryVfs>() {
                     // Take out the contents of the lazy string map 
                     let data = std::mem::take(&mut s_map.data);
-                    return Ok(KhronosValue::MemoryVfs(data));
+                    return Ok(KhronosValue::MemoryVfs(data.into()));
                 }
 
                 Err(LuaError::FromLuaConversionError { from: "userdata", to: Self::ALLOWED_TYPES.to_string(), message: Some("Invalid UserData type.".to_string()) })
@@ -174,7 +174,7 @@ impl KhronosValue {
             }
             KhronosValue::Interval(i) => crate::core::datetime::TimeDelta::new(i).into_lua(lua),
             KhronosValue::TimeZone(tz) => crate::core::datetime::Timezone::new(tz).into_lua(lua),
-            KhronosValue::MemoryVfs(m) => MemoryVfs::new(m).into_lua(lua),
+            KhronosValue::MemoryVfs(m) => MemoryVfs::new(*m).into_lua(lua),
             KhronosValue::Null => Ok(LuaValue::Nil),
         }
     }
