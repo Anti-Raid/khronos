@@ -24,7 +24,7 @@ pub struct TarArchive {
 }
 
 impl TarArchive {
-    const MAX_ENTRY_SIZE: usize = 1 * 1024 * 1024;
+    const MAX_ENTRY_SIZE: usize = 4 * 1024 * 1024;
 
     /// Makes a empty tar archive
     pub fn new() -> Self {
