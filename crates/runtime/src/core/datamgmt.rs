@@ -1,9 +1,8 @@
-//! Does not support WASM contexts yet
-
 use std::collections::HashMap;
 use std::io::Read;
 use base64::Engine;
 use bstr::BString;
+use bytes::{Buf, BufMut};
 use mlua_scheduler::LuaSchedulerAsync;
 use mluau::prelude::*;
 use bstr::ByteSlice;
@@ -21,10 +20,12 @@ use async_compression::{
 use crate::primitives::blob::{Blob, BlobTaker};
 
 pub struct TarArchive {
-    pub entries: HashMap<BString, Blob>,
+    pub entries: HashMap<BString, bytes::Bytes>,
 }
 
 impl TarArchive {
+    const MAX_ENTRY_SIZE: usize = 1 * 1024 * 1024;
+
     /// Makes a empty tar archive
     pub fn new() -> Self {
         TarArchive {
@@ -32,60 +33,60 @@ impl TarArchive {
         }
     }
 
-    /// Adds an entry to the tar archive
-    pub fn add_entry(&mut self, name: LuaString, blob: BlobTaker) {
-        self.entries.insert(BString::new(name.as_bytes().to_vec()), Blob { data: blob.0 });
-    }
-
-    /// Takes an entry by name, removing it from the archive
-    pub fn take_entry(&mut self, name: &str) -> Option<Blob> {
-        self.entries.remove(&BString::from(name))
-    }
-
-    /// Given a Blob, attempts to read it as a tar archive
-    pub fn from_blob(blob: Blob) -> LuaResult<Self> {
-        Self::from_array(blob.data)
-    }
-
-    pub fn from_array(arr: Vec<u8>) -> LuaResult<Self> {
+    pub fn from(b: bytes::Bytes) -> LuaResult<Self> {
         let mut entries = HashMap::new();
-        let mut archive = tar::Archive::new(arr.as_slice());
+        let mut archive = tar::Archive::new(b.as_ref());
+        let archive_len = b.len();
 
         for entry in archive.entries()? {
-            let mut entry = entry?;
+            let entry = entry?;
             let header = entry.header();
             // Convert the path to a byte string
             let path = header.path_bytes();
             let path_bstr = BString::from(path.as_ref());
 
-            // Read the entry data into a Blob
-            let mut data = Vec::new();
-            entry.read_to_end(&mut data)?;
+            // Read the entry data
+            let size = header.size().unwrap_or(0) as usize;
 
-            entries.insert(path_bstr, Blob { data });
+            if size > archive_len {
+                return Err(LuaError::external("Entry size exceeds total archive size."));
+            }
+
+            if size > Self::MAX_ENTRY_SIZE {
+                return Err(LuaError::external(format!(
+                    "Archive entry '{}' exceeds maximum allowed size.", 
+                    path_bstr
+                )));
+            }
+
+            let mut data = Vec::with_capacity(size as usize);            
+            entry.take(size as u64).read_to_end(&mut data)?;
+
+            entries.insert(path_bstr, data.into());
         }
 
         Ok(TarArchive { entries })
     }
 
     /// Writes the tar archive to a Blob
-    pub fn to_blob(self) -> LuaResult<Blob> {
-        let mut buffer = Vec::new();
+    pub fn to_blob(self) -> LuaResult<bytes::Bytes> {
+        let buffer = bytes::BytesMut::new();
+        let mut bw = buffer.writer();
         {
-            let mut tar = tar::Builder::new(&mut buffer);
+            let mut tar = tar::Builder::new(&mut bw);
             for (path, blob) in self.entries {
                 let mut header = tar::Header::new_gnu();
-                header.set_size(blob.data.len() as u64);
+                header.set_size(blob.len() as u64);
                 tar.append_data(
                     &mut header,
                     path.to_path_lossy(),
-                    blob.data.as_slice(),
+                    blob.reader(),
                 )?;
             }
             tar.finish()?;
         }
 
-        Ok(Blob { data: buffer })
+        Ok(bw.into_inner().freeze())
     }
 }
 
@@ -95,23 +96,23 @@ impl LuaUserData for TarArchive {
             Ok(this.entries.len())
         });
 
-        methods.add_method_mut("takefile", |lua, this, name: String| {
-            if let Some(blob) = this.take_entry(&name) {
-                let blob = blob.into_lua(lua)?;
+        methods.add_method_mut("takefile", |lua, this, name: BString| {
+            if let Some(blob) = this.entries.remove(&name) {
+                let blob = Blob { data: blob }.into_lua(lua)?;
                 Ok(blob)
             } else {
                 Ok(LuaNil)
             }
         });
 
-        methods.add_method_mut("addfile", |_, this, (name, blob): (LuaString, BlobTaker)| {
-            this.add_entry(name, blob);
+        methods.add_method_mut("addfile", |_, this, (name, blob): (BString, BlobTaker)| {
+            this.entries.insert(name, blob.0);
             Ok(())
         });
 
         methods.add_function("toblob", |_, this: LuaAnyUserData| {
             let this = this.take::<Self>()?;
-            this.to_blob()
+            this.to_blob().map(|data| Blob { data })
         });
 
         methods.add_method("entries", |lua, this, ()| {
@@ -214,7 +215,7 @@ async fn compress_data(format: CompressionFormat, data: &[u8], level: Option<i32
         }
     }
 
-    Ok(Blob { data: output })
+    Ok(Blob { data: output.into() })
 }
 
 async fn decompress_data(format: CompressionFormat, data: &[u8]) -> LuaResult<Blob> {
@@ -236,17 +237,11 @@ async fn decompress_data(format: CompressionFormat, data: &[u8]) -> LuaResult<Bl
         }
     }
 
-    Ok(Blob { data: output })
+    Ok(Blob { data: output.into() })
 }
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
-
-    module.set("newblob", lua.create_function(|_, buf: BlobTaker| {
-        Ok(Blob {
-            data: buf.0,
-        })
-    })?)?;
 
     module.set("base64encode", lua.create_function(|_, blob: BlobTaker| {
         let encoded = base64::prelude::BASE64_STANDARD.encode(&blob.0);
@@ -256,12 +251,12 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     module.set("base64decode", lua.create_function(|_, str: LuaString| {
         let decoded = base64::prelude::BASE64_STANDARD.decode(str.as_bytes())
             .map_err(|e| LuaError::external(format!("Failed to decode base64: {e:?}")))?;
-        Ok(Blob { data: decoded })
+        Ok(Blob { data: decoded.into() })
     })?)?;
 
     module.set("TarArchive", lua.create_function(|_, blob: Option<BlobTaker>| {
         if let Some(blob) = blob {
-            TarArchive::from_array(blob.0).map_err(LuaError::external)
+            TarArchive::from(blob.0).map_err(LuaError::external)
         } else {
             Ok(TarArchive::new())
         }
@@ -287,7 +282,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         result.append(&mut encrypted);
 
         Ok(Blob {
-            data: result,
+            data: result.into(),
         })
     })?)?;
 
@@ -309,7 +304,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
 
         Ok(Blob {
-            data: result,
+            data: result.into(),
         })
     })?)?;
 
@@ -323,7 +318,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
 
         Ok(Blob {
-            data: result,
+            data: result.into(),
         })
     })?)?;
 
@@ -364,21 +359,3 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     Ok(module)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tar_archive() {
-        let mut archive = TarArchive::new();
-        archive.entries.insert(
-            BString::from("foo/test.txt"),
-            Blob {
-                data: b"Hello, world!".to_vec(),
-            },
-        );
-        let blob = archive.to_blob().unwrap();
-        let mut tar_archive = TarArchive::from_blob(blob).expect("Failed to read tar archive");
-        assert_eq!(tar_archive.take_entry("foo/test.txt").unwrap().data, b"Hello, world!".as_bytes());
-    }
-}

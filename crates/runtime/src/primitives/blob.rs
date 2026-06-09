@@ -5,21 +5,21 @@ use mluau::prelude::*;
 
 pub struct Blob {
     /// The data of the blob
-    pub data: Vec<u8>, 
+    pub data: bytes::Bytes, 
 }
 
 /// A simple way to accept blobs or buffers from usercode
-pub struct BlobTaker(pub Vec<u8>);
+pub struct BlobTaker(pub bytes::Bytes);
 
 impl FromLua for BlobTaker {
     fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
         match value {
-            LuaValue::Buffer(b) => Ok(BlobTaker(b.to_vec())),
+            LuaValue::Buffer(b) => Ok(BlobTaker(b.to_vec().into())),
             LuaValue::UserData(ud) => {
-                let mut ud = ud.borrow_mut::<Blob>()?;
-                Ok(BlobTaker(std::mem::take(&mut ud.data)))
+                let ud = ud.borrow::<Blob>()?;
+                Ok(BlobTaker(ud.data.clone()))
             },
-            LuaValue::String(str) => Ok(BlobTaker(str.as_bytes().to_vec())),
+            LuaValue::String(str) => Ok(BlobTaker(str.as_bytes().to_vec().into())),
             _ => Err(LuaError::FromLuaConversionError {
                 from: "Blob | buffer",
                 to: "BlobTaker".to_string(),
