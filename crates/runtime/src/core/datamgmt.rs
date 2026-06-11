@@ -17,7 +17,7 @@ use async_compression::{
     },
 };
 
-use crate::primitives::blob::{Blob, BlobTaker};
+use crate::primitives::blob::{Blob, BlobTaker, blob_ref};
 
 pub struct TarArchive {
     pub entries: HashMap<BString, bytes::Bytes>,
@@ -243,8 +243,8 @@ async fn decompress_data(format: CompressionFormat, data: &[u8]) -> LuaResult<Bl
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    module.set("base64encode", lua.create_function(|_, blob: BlobTaker| {
-        let encoded = base64::prelude::BASE64_STANDARD.encode(&blob.0);
+    module.set("base64encode", lua.create_function(|_, buf: LuaValue| {
+        let encoded = blob_ref(&buf, |b| base64::prelude::BASE64_STANDARD.encode(b))?;
         Ok(encoded)
     })?)?;
 
@@ -262,7 +262,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         }
     })?)?;
 
-    module.set("aes256encrypt", lua.create_function(|_, (blob, key): (BlobTaker, String)| {
+    module.set("aes256encrypt", lua.create_function(|_, (blob, key): (LuaValue, String)| {
         let mut salt = [0u8; 8];
         rand::rng().fill_bytes(&mut salt);
 
@@ -271,9 +271,11 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         let random_slice = rand::rng().random::<[u8; 12]>();
         let nonce = Nonce::from_slice(&random_slice);
 
-        let mut encrypted = cipher
-            .encrypt(nonce, &*blob.0)
-            .map_err(|e| LuaError::external(format!("Failed to encrypt: {:?}", e)))?;
+        let mut encrypted = blob_ref(&blob, |s| {
+            cipher
+            .encrypt(nonce, s)
+            .map_err(|e| LuaError::external(format!("Failed to encrypt: {:?}", e)))
+        })??;
 
         // Format must be <salt><nonce><ciphertext>
         let mut result = Vec::with_capacity(8 + 12 + encrypted.len());
@@ -286,40 +288,28 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         })
     })?)?;
 
-    module.set("aes256decrypt", lua.create_function(|_, (blob, key): (BlobTaker, String)| {
-        if blob.0.len() < 20 {
-            return Err(LuaError::external("Blob data is too short to decrypt".to_string()));
-        }
+    module.set("aes256decrypt", lua.create_function(|_, (blob, key): (LuaValue, String)| {
+        blob_ref(&blob, |blob| {
+            if blob.len() < 20 {
+                return Err(LuaError::external("Blob data is too short to decrypt".to_string()));
+            }
 
-        let salt = &blob.0[..8];
-        let nonce = &blob.0[8..20];
-        let ciphertext = &blob.0[20..]; 
+            let salt = &blob[..8];
+            let nonce = &blob[8..20];
+            let ciphertext = &blob[20..]; 
 
-        let cipher = create_aes256_cipher(key, salt)?;
+            let cipher = create_aes256_cipher(key, salt)?;
 
-        let nonce = Nonce::from_slice(nonce);
+            let nonce = Nonce::from_slice(nonce);
 
-        let result = cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
+            let result = cipher
+                .decrypt(nonce, ciphertext)
+                .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
 
-        Ok(Blob {
-            data: result.into(),
-        })
-    })?)?;
-
-    module.set("aes256decryptcustom", lua.create_function(|_, (salt, nonce, ciphertext, key): (BlobTaker, BlobTaker, BlobTaker, String)| {
-        let cipher = create_aes256_cipher(key, &salt.0)?;
-
-        let nonce = Nonce::from_slice(&nonce.0);
-
-        let result = cipher
-            .decrypt(nonce, &*ciphertext.0)
-            .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
-
-        Ok(Blob {
-            data: result.into(),
-        })
+            Ok(Blob {
+                data: result.into(),
+            })
+        })?
     })?)?;
 
     module.set("compress", lua.create_scheduler_async_function(async move |lua, (format, blob, level): (CompressionFormat, LuaValue, Option<i32>)| {

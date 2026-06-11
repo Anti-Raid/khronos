@@ -29,6 +29,26 @@ impl FromLua for BlobTaker {
     }
 }
 
+pub fn blob_ref<R>(val: &LuaValue, f: impl FnOnce(&[u8]) -> R) -> LuaResult<R> {
+    match val {
+        LuaValue::String(s) => Ok(f(&*s.as_bytes())),
+        LuaValue::Buffer(buf) => {
+            Ok(buf.with_bytes(|bytes| {
+                f(bytes)
+            }))
+        },
+        LuaValue::UserData(ud) => {
+            let blob = ud.borrow::<Blob>()?;
+            Ok(f(&*blob.data))
+        },
+        _ => return Err(LuaError::FromLuaConversionError {
+            from: "non-bytes",
+            to: "bytes".to_string(),
+            message: Some("Expected a bytes-like".to_string()),
+        }),
+    }
+}
+
 impl LuaUserData for Blob {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method(LuaMetaMethod::Len, |_, this, ()| {

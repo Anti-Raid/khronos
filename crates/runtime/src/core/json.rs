@@ -1,6 +1,6 @@
 use mluau::prelude::*;
 
-use crate::{primitives::LUA_DESERIALIZE_OPTIONS, primitives::blob::Blob};
+use crate::primitives::{LUA_DESERIALIZE_OPTIONS, blob::blob_ref};
 
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
@@ -16,35 +16,8 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     })?)?;
 
     module.set("fromjsonstring", lua.create_function(|lua, json_str: LuaValue| {
-        match json_str {
-            LuaValue::String(s) => {
-                let deserialized: serde_json::Value = serde_json::from_slice(&s.as_bytes()).into_lua_err()?;
-                lua.to_value(&deserialized)
-            },
-            LuaValue::Buffer(buf) => {
-                buf.with_bytes(|bytes| {
-                    let deserialized: serde_json::Value = serde_json::from_slice(bytes).into_lua_err()?;
-                    lua.to_value(&deserialized)
-                })
-            },
-            LuaValue::UserData(ud) => {
-                if let Ok(blob) = ud.borrow::<Blob>() {
-                    let deserialized: serde_json::Value = serde_json::from_slice(&blob.data).into_lua_err()?;
-                    lua.to_value(&deserialized)
-                } else {
-                    Err(LuaError::FromLuaConversionError {
-                        from: "non-string",
-                        to: "JSON string".to_string(),
-                        message: Some("Expected a string or buffer for JSON deserialization".to_string()),
-                    })
-                }
-            },
-            _ => Err(LuaError::FromLuaConversionError {
-                from: "non-string",
-                to: "JSON string".to_string(),
-                message: Some("Expected a string for JSON deserialization".to_string()),
-            }),
-        }
+        let deser: serde_json::Value = blob_ref(&json_str, |s| serde_json::from_slice(s).into_lua_err())??;
+        lua.to_value(&deser)
     })?)?;
 
 
