@@ -47,6 +47,7 @@ pub enum KhronosValue {
     Boolean(bool),
     Vector((f32, f32, f32)), // Luau vector
     Map(Vec<(KhronosValue, KhronosValue)>),
+    StrMap(Box<HashMap<String, KhronosValue>>), // optimization on Map
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
@@ -95,14 +96,38 @@ impl KhronosValue {
                     }
 
                     // Map
-                    let mut map = Vec::new();
+                    let mut str_map = HashMap::new();
+                    let mut generic_map = Vec::new();
+                    let mut is_pure_str_map = true;
+
                     for pair in table.pairs::<LuaValue, LuaValue>() {
                         let (k, v) = pair?;
-                        let k = KhronosValue::from_lua_impl(k, lua, depth + 1)?;
-                        let v = KhronosValue::from_lua_impl(v, lua, depth + 1)?;
-                        map.push((k, v));
+                        let parsed_v = KhronosValue::from_lua_impl(v, lua, depth + 1)?;
+
+                        if is_pure_str_map {
+                            if let LuaValue::String(s) = &k {
+                                str_map.insert(s.to_string_lossy(), parsed_v);
+                                continue;
+                            } else {
+                                // We hit a non-string key! 
+                                // Convert everything we gathered so far into the generic map.
+                                is_pure_str_map = false;
+                                for (str_k, val) in str_map.drain() {
+                                    generic_map.push((KhronosValue::Text(str_k), val));
+                                }
+                            }
+                        }
+
+                        // If we are no longer a pure string map, push to the generic map
+                        let parsed_k = KhronosValue::from_lua_impl(k, lua, depth + 1)?;
+                        generic_map.push((parsed_k, parsed_v));
                     }
-                    return Ok(KhronosValue::Map(map));
+
+                    if is_pure_str_map {
+                        return Ok(KhronosValue::StrMap(Box::new(str_map)))
+                    } else {
+                        return Ok(KhronosValue::Map(generic_map))
+                    }
                 }
                 // Check if the table is a list
                 let mut list = Vec::new();
@@ -153,9 +178,17 @@ impl KhronosValue {
             KhronosValue::Boolean(b) => Ok(LuaValue::Boolean(b)),
             KhronosValue::Vector(v) => LuaVector::new(v.0, v.1, v.2).into_lua(lua),
             KhronosValue::Map(j) => {
-                let table = lua.create_table()?;
+                let table = lua.create_table_with_capacity(0, j.len())?;
                 for (k, v) in j.into_iter() {
                     let k = k.into_lua_impl(lua, depth + 1)?;
+                    let v = v.into_lua_impl(lua, depth + 1)?;
+                    table.set(k, v)?;
+                }
+                Ok(LuaValue::Table(table))
+            }
+            KhronosValue::StrMap(j) => {
+                let table = lua.create_table_with_capacity(0, j.len())?;
+                for (k, v) in j.into_iter() {
                     let v = v.into_lua_impl(lua, depth + 1)?;
                     table.set(k, v)?;
                 }
