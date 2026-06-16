@@ -301,7 +301,7 @@ impl<'a> Serialize for CKhronosValueRef<'a> {
             KhronosValue::StrMap(m) => serializer.serialize_newtype_variant("Compressed", 2, "#SM", &CompressedStrMap(m.as_ref())),
             KhronosValue::Vector(m) => serializer.serialize_newtype_variant("Compressed", 3, "Vec", m),
             KhronosValue::Timestamptz(m) => serializer.serialize_newtype_variant("Compressed", 4, "TS", m),
-            KhronosValue::Interval(m) => serializer.serialize_newtype_variant("Compressed", 5, "Interval", m),
+            KhronosValue::Interval(m) => serializer.serialize_newtype_variant("Compressed", 5, "IV", m),
             KhronosValue::TimeZone(m) => serializer.serialize_newtype_variant("Compressed", 6, "TZ", m),
             KhronosValue::MemoryVfs(m) => serializer.serialize_newtype_variant("Compressed", 7, "MVfs", m),
             KhronosValue::Null(m) => serializer.serialize_newtype_variant("Compressed", 8, "N", m),
@@ -413,7 +413,7 @@ impl<'de> serde::de::Visitor<'de> for CKhronosVisitor {
             }
             "Vec" => KhronosValue::Vector(map.next_value()?),
             "TS" => KhronosValue::Timestamptz(map.next_value()?),
-            "Interval" => KhronosValue::Interval(map.next_value()?),
+            "IV" => KhronosValue::Interval(map.next_value()?),
             "TZ" => KhronosValue::TimeZone(map.next_value()?),
             "MVfs" => KhronosValue::MemoryVfs(map.next_value()?),
             "N" => KhronosValue::Null(map.next_value()?),
