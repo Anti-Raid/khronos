@@ -294,17 +294,17 @@ impl<'a> Serialize for CKhronosValueRef<'a> {
                 }
                 seq.end()
             }
-            KhronosValue::Integer(i) => serializer.serialize_newtype_variant("Compressed", 0, "I", i),
-            KhronosValue::Float(i) => serializer.serialize_newtype_variant("Compressed", 1, "F", i),
-            KhronosValue::Int64(i) => serializer.serialize_newtype_variant("Compressed", 2, "I64", &IntStr(*i)),
-            KhronosValue::Map(m) => serializer.serialize_newtype_variant("Compressed", 3, "M", &CompressedMap(m.as_ref())),
-            KhronosValue::StrMap(m) => serializer.serialize_newtype_variant("Compressed", 4, "#SM", &CompressedStrMap(m.as_ref())),
-            KhronosValue::Vector(m) => serializer.serialize_newtype_variant("Compressed", 5, "Vec", m),
-            KhronosValue::Timestamptz(m) => serializer.serialize_newtype_variant("Compressed", 6, "TS", m),
-            KhronosValue::Interval(m) => serializer.serialize_newtype_variant("Compressed", 7, "Interval", m),
-            KhronosValue::TimeZone(m) => serializer.serialize_newtype_variant("Compressed", 8, "TZ", m),
-            KhronosValue::MemoryVfs(m) => serializer.serialize_newtype_variant("Compressed", 9, "MVfs", m),
-            KhronosValue::Null(m) => serializer.serialize_newtype_variant("Compressed", 10, "N", m),
+            KhronosValue::Integer(i) => serializer.serialize_i64(*i),
+            KhronosValue::Float(i) => serializer.serialize_f64(*i), // yes, this is *technically* lossy but CKhronosValue is allowed to be lossy anyways :)
+            KhronosValue::Int64(i) => serializer.serialize_newtype_variant("Compressed", 0, "I64", &IntStr(*i)),
+            KhronosValue::Map(m) => serializer.serialize_newtype_variant("Compressed", 1, "M", &CompressedMap(m.as_ref())),
+            KhronosValue::StrMap(m) => serializer.serialize_newtype_variant("Compressed", 2, "#SM", &CompressedStrMap(m.as_ref())),
+            KhronosValue::Vector(m) => serializer.serialize_newtype_variant("Compressed", 3, "Vec", m),
+            KhronosValue::Timestamptz(m) => serializer.serialize_newtype_variant("Compressed", 4, "TS", m),
+            KhronosValue::Interval(m) => serializer.serialize_newtype_variant("Compressed", 5, "Interval", m),
+            KhronosValue::TimeZone(m) => serializer.serialize_newtype_variant("Compressed", 6, "TZ", m),
+            KhronosValue::MemoryVfs(m) => serializer.serialize_newtype_variant("Compressed", 7, "MVfs", m),
+            KhronosValue::Null(m) => serializer.serialize_newtype_variant("Compressed", 8, "N", m),
         }    
     }
 }
@@ -337,6 +337,27 @@ impl<'de> serde::de::Visitor<'de> for CKhronosVisitor {
         E: serde::de::Error,
     {
         Ok(CKhronosValue(KhronosValue::Text(v)))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error, 
+    {
+        Ok(CKhronosValue(KhronosValue::Integer(v)))
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error, 
+    {
+        Ok(CKhronosValue(KhronosValue::Integer(v as i64)))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error, 
+    {
+        Ok(CKhronosValue(KhronosValue::Float(v)))
     }
 
     fn visit_unit<E>(self) -> Result<Self::Value, E>
@@ -374,8 +395,6 @@ impl<'de> serde::de::Visitor<'de> for CKhronosVisitor {
             .ok_or_else(|| serde::de::Error::custom("expected a tag key for non-primitive CKhronosValue but found an empty object"))?;
 
         let value = match key.as_str() {
-            "I" => KhronosValue::Integer(map.next_value()?),
-            "F" => KhronosValue::Float(map.next_value()?),
             "I64" => {
                 let s: String = map.next_value()?;
                 KhronosValue::Int64(s.parse::<i64>().map_err(serde::de::Error::custom)?)
@@ -433,6 +452,7 @@ mod test_compressed {
         let mut my_map = HashMap::new();
         my_map.insert("foo".to_string(), KhronosValue::Boolean(true));
         my_map.insert("carrot".to_string(), KhronosValue::Integer(23));
+        my_map.insert("carrots".to_string(), KhronosValue::Float(23.45));
         my_map.insert("bar".to_string(), KhronosValue::Int64(284));
         my_map.insert("baz".to_string(), KhronosValue::List(vec![KhronosValue::Int64(333), KhronosValue::Nil(()), KhronosValue::Nil(()), KhronosValue::Null(()), KhronosValue::Text("Hello?".to_string())]));
         let my_kv = KhronosValue::StrMap(Box::new(my_map));
