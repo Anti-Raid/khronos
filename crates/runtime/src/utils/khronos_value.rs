@@ -89,7 +89,7 @@ impl KhronosValue {
                 Err(LuaError::FromLuaConversionError { from: "buffer", to: "KhronosValue".to_string(), message: Some("Cannot send/store buffers.".to_string()) })
             }
             LuaValue::Vector(v) => Ok(KhronosValue::Vector((v.x(), v.y(), v.z()))),
-            LuaValue::Nil => Ok(KhronosValue::Null(())),
+            LuaValue::Nil => Ok(KhronosValue::Nil(())),
             LuaValue::Table(table) => {
                 if table.raw_len() == 0 {
                     // Check for array metatable
