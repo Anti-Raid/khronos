@@ -3,11 +3,11 @@ use reqwest::header::{HeaderMap as Headers, HeaderValue};
 use serde_json::Value;
 use serenity::all::{InteractionId, ReactionType};
 
-use crate::types::CreateEmbed;
+use crate::{AnyId, CommandId, GuildId, UserId, dhttp, types::CreateEmbed};
 
 pub enum DiscordProviderContext {
-    Guild(serenity::all::GuildId),
-    User(serenity::all::UserId),
+    Guild(GuildId),
+    User(UserId),
     None,
 }
 
@@ -17,10 +17,10 @@ pub enum DiscordProviderContext {
 pub enum SuperUserDiscordCommandOp<'a> {
     CreateCommand(&'a str),
     FinalizeCreateCommand,
-    DeleteCommand(serenity::all::CommandId),
-    ModifyCommand(serenity::all::CommandId),
+    DeleteCommand(CommandId),
+    ModifyCommand(CommandId),
     GetCommands,
-    GetCommand(serenity::all::CommandId),
+    GetCommand(CommandId),
 }
 
 #[derive(Debug)]
@@ -57,17 +57,13 @@ impl SuperUserMessageTransformFlags {
 
 #[allow(async_fn_in_trait)] 
 pub trait DiscordProvider: 'static + Clone {
-    /// Http client
-    fn serenity_http(&self) -> &serenity::http::Http;
-
-    /// Returns the current Discord user, if any
-    fn current_user(&self) -> Option<serenity::all::CurrentUser>;
+    fn dhttp(&self) -> &dhttp::Client;
 
     /// Returns the guild ID
     fn context(&self) -> DiscordProviderContext;
 
     /// Either returns the guild ID or returns an error if it is not available
-    fn guild_context(&self) -> Result<serenity::all::GuildId, crate::Error> {
+    fn guild_context(&self) -> Result<GuildId, crate::Error> {
         match self.context() {
             DiscordProviderContext::Guild(guild_id) => Ok(guild_id),
             _ => Err("Guild ID is not available in the current context".into()),
@@ -95,9 +91,9 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_audit_logs(
         &self,
         action_type: Option<u16>,
-        user_id: Option<serenity::model::prelude::UserId>,
-        before: Option<serenity::model::prelude::AuditLogEntryId>,
-        limit: Option<serenity::nonmax::NonMaxU8>,
+        user_id: Option<UserId>,
+        before: Option<AnyId>,
+        limit: Option<u8>,
     ) -> Result<Value, crate::Error> {
         self.serenity_http()
             .get_audit_logs(self.guild_context()?, action_type, user_id, before, limit)

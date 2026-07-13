@@ -381,24 +381,16 @@ pub fn validate_webhook_execute(message: &ExecuteWebhook) -> Result<(), crate::E
     } else {
         false
     };
-    let has_attachments = message.attachments.is_some()
-        && !message
-            .attachments
-            .as_ref()
-            .unwrap()
-            .new_and_existing_attachments
-            .is_empty();
     let has_components =
         message.components.is_some() && !message.components.as_ref().unwrap().is_empty();
     let has_poll = message.poll.is_some();
 
     if !has_content
         && !has_embed
-        && !has_attachments
         && !has_poll
         && !has_components
     {
-        return Err("No content/embeds/attachments/poll/components set".into());
+        return Err("No content/embeds/poll/components set".into());
     }
 
     if let Some(content) = message.content.as_ref() {

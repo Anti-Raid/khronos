@@ -320,3 +320,32 @@ impl PartialOrd<Role> for ModifyRolePosition {
         }
     }
 }
+
+
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub struct Member {
+    /// Attached User struct.
+    pub user: User,
+    /// Vector of Ids of [`Role`]s given to the member.
+    pub roles: Vec<RoleId>,
+    /// The unique Id of the guild that the member is a part of.
+    #[serde(default)]
+    pub guild_id: GuildId,
+
+    #[serde(flatten)]
+    pub extra_info: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+pub struct User {
+    pub id: UserId,
+    pub username: String,
+    #[serde(default)]
+    pub bot: bool,
+    #[serde(default)]
+    pub system: bool,
+    #[serde(flatten)]
+    pub extra_info: HashMap<String, serde_json::Value>,
+}

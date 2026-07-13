@@ -1,4 +1,4 @@
-use crate::types::PartialGuild;
+use crate::types::{Member, PartialGuild};
 use crate::{Permissions, UserId};
 
 use crate::{controller::DiscordProvider, serenity_backports::member_permissions};
@@ -6,7 +6,7 @@ use crate::{controller::DiscordProvider, serenity_backports::member_permissions}
 // Base types
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiraidFusedMemberSingle {
-    pub member: serenity::all::Member,
+    pub member: Member,
     pub resolved_perms: Permissions,
 }
 

@@ -1,4 +1,4 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetAuditLogOptions {
@@ -22,7 +22,7 @@ impl ApiReq for GetAuditLog {
             return Err("Internal error: Current user not found".into());
         };
 
-        this.check_permissions(bot_user.id, serenity::all::Permissions::VIEW_AUDIT_LOG)
+        this.check_permissions(bot_user.id, Permissions::VIEW_AUDIT_LOG)
             .await?;
 
         let logs = this

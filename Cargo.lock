@@ -181,9 +181,12 @@ checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 
 [[package]]
 name = "arrayvec"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "async-compression"
@@ -658,6 +661,7 @@ dependencies = [
 name = "dapi"
 version = "1.0.0"
 dependencies = [
+ "arrayvec",
  "async-trait",
  "bitflags 2.11.0",
  "chrono",
@@ -672,7 +676,6 @@ dependencies = [
  "rustrict",
  "serde",
  "serde_json",
- "small-fixed-array",
 ]
 
 [[package]]
@@ -3078,12 +3081,6 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
-
-[[package]]
-name = "small-fixed-array"
-version = "0.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47eb472ef0994fb63d68ce4851eef89fa0faaf0dc4088c941b4015ce32c083f"
 
 [[package]]
 name = "smallvec"

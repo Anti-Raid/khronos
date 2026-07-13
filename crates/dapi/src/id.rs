@@ -1,4 +1,4 @@
-use std::{fmt, marker::PhantomData};
+use std::{fmt::{self, Display}, marker::PhantomData};
 
 use serde::{Deserializer, de::Error};
 
@@ -20,10 +20,17 @@ impl<W> Id<W> {
     }
 }
 
+impl<W> Display for Id<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let inner = self.inner;
+        std::fmt::Display::fmt(&inner, f)
+    }
+}
+
 impl<W> fmt::Debug for Id<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let inner = self.inner;
-        inner.fmt(f)
+        std::fmt::Debug::fmt(&inner, f)
     }
 }
 
@@ -105,6 +112,13 @@ macro_rules! id {
                     self.0.get()
                 }
             }
+
+            impl std::fmt::Display for $name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    let inner = self.get();
+                    std::fmt::Display::fmt(&inner, f)
+                }
+            }
         )*
     }
 }
@@ -124,4 +138,6 @@ id! {
     StickerId, StickerWrapper, "StickerId";
     AnyId, AnyWrapper, "AnyId";
     SkuId, SkuWrapper, "SkuId";
+    WebhookId, WebhookWrapper, "WebhookId";
+    InteractionId, InteractionWrapper, "InteractionId";
 }

@@ -1,7 +1,8 @@
 //use extract_map::ExtractMap;
 use extract_map::ExtractMap;
 use log::{error, warn};
-use serenity::all::{GuildId, Member, PartialGuild, Permissions, Role, RoleId, UserId};
+
+use crate::{GuildId, Permissions, RoleId, UserId, types::{Member, PartialGuild, Role}};
 
 pub fn member_permissions(guild: &PartialGuild, member: &Member) -> Permissions {
     user_permissions(

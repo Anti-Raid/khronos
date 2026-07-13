@@ -7,13 +7,12 @@ edition = "2024"
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
-reqwest = { version = "0.12" }
+reqwest = { version = "0.12", features = ["json"] }
 percent-encoding = { version = "2" }
 extract_map = { version = "0.3", features = ["serde"] }
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 bitflags = { version = "2", features = ["serde"] }
-small-fixed-array = "0.4"
 linkify = { git = "https://github.com/robinst/linkify" }
 rustrict = "0.7"
 regex = "1"
@@ -22,6 +21,7 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
     "serialize",
 ], optional = true }
 mlua_scheduler = { git = "https://github.com/mluau/scheduler", optional = true }
+arrayvec = { version = "0.7", features = ["serde"] }
 
 [features]
 default = ["luau"]
