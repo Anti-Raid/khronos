@@ -18,16 +18,11 @@ type Result<T, E = HttpError> = StdResult<T, E>;
 pub type ResultJson = Result<serde_json::Value>;
 
 pub enum HttpCall<'a> {
-    AddGuildMember {
-        guild_id: GuildId,
-        user_id: UserId,
-        map: serde_json::Value,
-    },
     AddMemberRole {
         guild_id: GuildId,
         user_id: UserId,
         role_id: RoleId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     BanUser {
         guild_id: GuildId,
@@ -35,74 +30,66 @@ pub enum HttpCall<'a> {
         delete_message_seconds: u32,
         reason: Option<String>,
     },
-    BulkBanUsers {
-        guild_id: GuildId,
-        map: serde_json::Value,
-        reason: Option<String>,
-    },
     BroadcastTyping {
         channel_id: ChannelId,
     },
     CreateChannel {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     CreateStageInstance {
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     CreateEmoji {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     CreateApplicationEmoji {
         application_id: ApplicationId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateFollowupMessage {
         application_id: ApplicationId,
         interaction_token: &'a str,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateGlobalCommand {
         application_id: ApplicationId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateGlobalCommands {
         application_id: ApplicationId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateGuildCommands {
         application_id: ApplicationId,
         guild_id: GuildId,
-        map: serde_json::Value,
-    },
-    CreateGuild {
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateGuildCommand {
         application_id: ApplicationId,
         guild_id: GuildId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
 
     CreateInteractionResponse {
         interaction_id: InteractionId,
         interaction_token: &'a str,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     CreateInvite {
         channel_id: ChannelId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     CreatePermission {
         channel_id: ChannelId,
         target_id: AnyId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     CreateReaction {
         channel_id: ChannelId,
@@ -111,26 +98,21 @@ pub enum HttpCall<'a> {
     },
     CreateRole {
         guild_id: GuildId,
-        body: serde_json::Value,
-        audit_log_reason: Option<String>,
-    },
-    CreateWebhook {
-        channel_id: ChannelId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        body: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteChannel {
         channel_id: ChannelId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteStageInstance {
         channel_id: ChannelId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteEmoji {
         guild_id: GuildId,
         emoji_id: EmojiId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteApplicationEmoji {
         application_id: ApplicationId,
@@ -152,17 +134,17 @@ pub enum HttpCall<'a> {
     },
     DeleteInvite {
         code: &'a str,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteMessage {
         channel_id: ChannelId,
         message_id: MessageId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteMessages {
         channel_id: ChannelId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteMessageReactions {
         channel_id: ChannelId,
@@ -180,7 +162,7 @@ pub enum HttpCall<'a> {
     DeletePermission {
         channel_id: ChannelId,
         target_id: AnyId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteReaction {
         channel_id: ChannelId,
@@ -196,43 +178,38 @@ pub enum HttpCall<'a> {
     DeleteRole {
         guild_id: GuildId,
         role_id: RoleId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteWebhook {
         webhook_id: WebhookId,
-        audit_log_reason: Option<String>,
-    },
-    DeleteWebhookWithToken {
-        webhook_id: WebhookId,
-        token: &'a str,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     EditChannel {
         channel_id: ChannelId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditStageInstance {
         channel_id: ChannelId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditEmoji {
         guild_id: GuildId,
         emoji_id: EmojiId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditApplicationEmoji {
         application_id: ApplicationId,
         emoji_id: EmojiId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditFollowupMessage {
         application_id: ApplicationId,
         interaction_token: &'a str,
         message_id: MessageId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     GetFollowupMessage {
         application_id: ApplicationId,
@@ -242,24 +219,24 @@ pub enum HttpCall<'a> {
     EditGlobalCommand {
         application_id: ApplicationId,
         command_id: CommandId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditGuild {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditGuildCommand {
         application_id: ApplicationId,
         guild_id: GuildId,
         command_id: CommandId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditGuildCommandPermissions {
         application_id: ApplicationId,
         guild_id: GuildId,
         command_id: CommandId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditGuildChannelPositions {
         guild_id: GuildId,
@@ -267,38 +244,38 @@ pub enum HttpCall<'a> {
     },
     EditGuildWidget {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditGuildWelcomeScreen {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditMember {
         guild_id: GuildId,
         user_id: UserId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditMessage {
         channel_id: ChannelId,
         message_id: MessageId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditMemberMe {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditCurrentMember {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     FollowNewsChannel {
         news_channel_id: ChannelId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     GetOriginalInteractionResponse {
         application_id: ApplicationId,
@@ -307,51 +284,21 @@ pub enum HttpCall<'a> {
     EditOriginalInteractionResponse {
         application_id: ApplicationId,
         interaction_token: &'a str,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditProfile {
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     EditRole {
         guild_id: GuildId,
         role_id: RoleId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditRolePositions {
         guild_id: GuildId,
         positions: &'a [ModifyRolePosition],
-        audit_log_reason: Option<String>,
-    },
-    EditWebhook {
-        webhook_id: WebhookId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
-    },
-    EditWebhookWithToken {
-        webhook_id: WebhookId,
-        token: &'a str,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
-    },
-    GetWebhookMessage {
-        webhook_id: WebhookId,
-        thread_id: Option<ChannelId>,
-        token: &'a str,
-        message_id: MessageId,
-    },
-    EditWebhookMessage {
-        webhook_id: WebhookId,
-        thread_id: Option<ChannelId>,
-        token: &'a str,
-        message_id: MessageId,
-        map: serde_json::Value,
-    },
-    DeleteWebhookMessage {
-        webhook_id: WebhookId,
-        thread_id: Option<ChannelId>,
-        token: &'a str,
-        message_id: MessageId,
+        audit_log_reason: Option<&'a str>,
     },
     GetBans {
         guild_id: GuildId,
@@ -378,24 +325,21 @@ pub enum HttpCall<'a> {
     },
     CreateAutomodRule {
         guild_id: GuildId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     EditAutomodRule {
         guild_id: GuildId,
         rule_id: RuleId,
-        map: serde_json::Value,
-        audit_log_reason: Option<String>,
+        map: Vec<u8>,
+        audit_log_reason: Option<&'a str>,
     },
     DeleteAutomodRule {
         guild_id: GuildId,
         rule_id: RuleId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     GetChannelInvites {
-        channel_id: ChannelId,
-    },
-    GetChannelWebhooks {
         channel_id: ChannelId,
     },
     GetChannel {
@@ -437,6 +381,10 @@ pub enum HttpCall<'a> {
         guild_id: GuildId,
         with_counts: bool,
     },
+    GetGuildMember {
+        guild_id: GuildId,
+        user_id: UserId,
+    },
     GetGuildCommands {
         application_id: ApplicationId,
         guild_id: GuildId,
@@ -477,9 +425,6 @@ pub enum HttpCall<'a> {
     GetGuildRoles {
         guild_id: GuildId,
     },
-    GetGuildWebhooks {
-        guild_id: GuildId,
-    },
     GetCurrentUserGuilds {
         target: Option<GuildPagination>,
         limit: Option<u8>,
@@ -514,13 +459,6 @@ pub enum HttpCall<'a> {
     GetUser {
         user_id: UserId,
     },
-    GetWebhook {
-        webhook_id: WebhookId,
-    },
-    GetWebhookWithToken {
-        webhook_id: WebhookId,
-        token: &'a str,
-    },
     KickMember {
         guild_id: GuildId,
         user_id: UserId,
@@ -528,23 +466,23 @@ pub enum HttpCall<'a> {
     },
     CreateChannelMessage {
         channel_id: ChannelId,
-        map: serde_json::Value,
+        map: Vec<u8>,
     },
     PinMessage {
         channel_id: ChannelId,
         message_id: MessageId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     RemoveBan {
         guild_id: GuildId,
         user_id: UserId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     RemoveMemberRole {
         guild_id: GuildId,
         user_id: UserId,
         role_id: RoleId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     SearchGuildMembers {
         guild_id: GuildId,
@@ -554,12 +492,12 @@ pub enum HttpCall<'a> {
     StartGuildPrune {
         guild_id: GuildId,
         days: u8,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
     UnpinMessage {
         channel_id: ChannelId,
         message_id: MessageId,
-        audit_log_reason: Option<String>,
+        audit_log_reason: Option<&'a str>,
     },
 }
 
@@ -573,15 +511,6 @@ pub struct CustomRoute {
 impl<'a> HttpCall<'a> {
     pub fn into_url_and_body(self) -> CustomRoute {
         match self {
-            Self::AddGuildMember {
-                guild_id,
-                user_id,
-                map,
-            } => {
-                let route = Route::GuildMember { guild_id, user_id };
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PUT }
-            }
             Self::AddMemberRole {
                 guild_id,
                 user_id,
@@ -610,15 +539,6 @@ impl<'a> HttpCall<'a> {
                 ));
                 CustomRoute { url: path, body: None, headers: reason.as_deref().map(reason_into_header), method: reqwest::Method::PUT }
             }
-            Self::BulkBanUsers {
-                guild_id,
-                map,
-                reason,
-            } => {
-                let route = Route::GuildBulkBan { guild_id };
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
-            }
             Self::BroadcastTyping { channel_id } => {
                 let route = Route::ChannelTyping { channel_id };
                 let path = route.path();
@@ -631,7 +551,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildChannels { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::CreateStageInstance {
                 map,
@@ -639,7 +559,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::StageInstances;
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::CreateEmoji {
                 guild_id,
@@ -648,7 +568,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildEmojis { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::CreateApplicationEmoji {
                 application_id, map } => {
@@ -656,7 +576,7 @@ impl<'a> HttpCall<'a> {
                     application_id: application_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::CreateFollowupMessage {
                 application_id,
@@ -668,7 +588,7 @@ impl<'a> HttpCall<'a> {
                     token: interaction_token,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::CreateGlobalCommand {
                 application_id, map } => {
@@ -676,7 +596,7 @@ impl<'a> HttpCall<'a> {
                     application_id: application_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::CreateGlobalCommands {
                 application_id, map } => {
@@ -684,7 +604,7 @@ impl<'a> HttpCall<'a> {
                     application_id: application_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PUT }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PUT }
             }
             Self::CreateGuildCommands {
                 application_id, guild_id, map } => {
@@ -693,12 +613,7 @@ impl<'a> HttpCall<'a> {
                     guild_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PUT }
-            }
-            Self::CreateGuild { map } => {
-                let route = Route::Guilds;
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PUT }
             }
             Self::CreateGuildCommand {
                 application_id, guild_id, map } => {
@@ -707,7 +622,7 @@ impl<'a> HttpCall<'a> {
                     guild_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
 
             Self::CreateInteractionResponse {
@@ -720,7 +635,7 @@ impl<'a> HttpCall<'a> {
                     token: interaction_token,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::CreateInvite {
                 channel_id,
@@ -729,7 +644,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::ChannelInvites { channel_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::CreatePermission {
                 channel_id,
@@ -742,7 +657,7 @@ impl<'a> HttpCall<'a> {
                     target_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::CreateReaction {
                 channel_id,
@@ -764,16 +679,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildRoles { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&body).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
-            }
-            Self::CreateWebhook {
-                channel_id,
-                map,
-                audit_log_reason,
-            } => {
-                let route = Route::ChannelWebhooks { channel_id };
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(body), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::DeleteChannel {
                 channel_id,
@@ -871,7 +777,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::ChannelMessagesBulkDelete { channel_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::DELETE }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::DELETE }
             }
             Self::DeleteMessageReactions {
                 channel_id,
@@ -963,15 +869,6 @@ impl<'a> HttpCall<'a> {
                 let path = route.path();
                 CustomRoute { url: path, body: None, headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::DELETE }
             }
-            Self::DeleteWebhookWithToken {
-                webhook_id,
-                token,
-                audit_log_reason,
-            } => {
-                let route = Route::WebhookWithToken { webhook_id, token };
-                let path = route.path();
-                CustomRoute { url: path, body: None, headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::DELETE }
-            }
             Self::EditChannel {
                 channel_id,
                 map,
@@ -979,7 +876,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::Channel { channel_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditStageInstance {
                 channel_id,
@@ -988,7 +885,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::StageInstance { channel_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditEmoji {
                 guild_id,
@@ -998,7 +895,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildEmoji { guild_id, emoji_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditApplicationEmoji {
                 application_id, emoji_id, map } => {
@@ -1007,7 +904,7 @@ impl<'a> HttpCall<'a> {
                     emoji_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditFollowupMessage {
                 application_id,
@@ -1021,7 +918,7 @@ impl<'a> HttpCall<'a> {
                     message_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::GetFollowupMessage {
                 application_id,
@@ -1043,7 +940,7 @@ impl<'a> HttpCall<'a> {
                     command_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditGuild {
                 guild_id,
@@ -1052,7 +949,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::Guild { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditGuildCommand {
                 application_id,
@@ -1066,7 +963,7 @@ impl<'a> HttpCall<'a> {
                     command_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditGuildCommandPermissions {
                 application_id,
@@ -1080,7 +977,7 @@ impl<'a> HttpCall<'a> {
                     command_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditGuildChannelPositions { guild_id, value } => {
                 let route = Route::GuildChannels { guild_id };
@@ -1094,7 +991,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildWidget { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditGuildWelcomeScreen {
                 guild_id,
@@ -1103,7 +1000,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildWelcomeScreen { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditMember {
                 guild_id,
@@ -1113,7 +1010,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildMember { guild_id, user_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditMessage {
                 channel_id,
@@ -1125,7 +1022,7 @@ impl<'a> HttpCall<'a> {
                     message_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditMemberMe {
                 guild_id,
@@ -1134,7 +1031,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildMemberMe { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditCurrentMember {
                 guild_id,
@@ -1143,7 +1040,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildMemberMe { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::FollowNewsChannel {
                 news_channel_id,
@@ -1153,7 +1050,7 @@ impl<'a> HttpCall<'a> {
                     channel_id: news_channel_id,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::GetOriginalInteractionResponse {
                 application_id, interaction_token } => {
@@ -1174,12 +1071,12 @@ impl<'a> HttpCall<'a> {
                     token: interaction_token,
                 };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditProfile { map } => {
                 let route = Route::UserMe;
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditRole {
                 guild_id,
@@ -1189,7 +1086,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildRole { guild_id, role_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::EditRolePositions {
                 guild_id,
@@ -1199,77 +1096,6 @@ impl<'a> HttpCall<'a> {
                 let route = Route::GuildRoles { guild_id };
                 let path = route.path();
                 CustomRoute { url: path, body: Some(serde_json::to_vec(positions).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
-            }
-            Self::EditWebhook {
-                webhook_id,
-                map,
-                audit_log_reason,
-            } => {
-                let route = Route::Webhook { webhook_id };
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
-            }
-            Self::EditWebhookWithToken {
-                webhook_id,
-                token,
-                map,
-                audit_log_reason,
-            } => {
-                let route = Route::WebhookWithToken { webhook_id, token };
-                let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
-            }
-            Self::GetWebhookMessage {
-                webhook_id,
-                thread_id,
-                token,
-                message_id,
-            } => {
-                let route = Route::WebhookMessage {
-                    webhook_id,
-                    token,
-                    message_id,
-                };
-                let mut path = route.path();
-                if let Some(tid) = thread_id {
-                    path.push_str(&format!("?thread_id={tid}"));
-                }
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
-            }
-            Self::EditWebhookMessage {
-                webhook_id,
-                thread_id,
-                token,
-                message_id,
-                map,
-            } => {
-                let route = Route::WebhookMessage {
-                    webhook_id,
-                    token,
-                    message_id,
-                };
-                let mut path = route.path();
-                if let Some(tid) = thread_id {
-                    path.push_str(&format!("?thread_id={tid}"));
-                }
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::PATCH }
-            }
-            Self::DeleteWebhookMessage {
-                webhook_id,
-                thread_id,
-                token,
-                message_id,
-            } => {
-                let route = Route::WebhookMessage {
-                    webhook_id,
-                    token,
-                    message_id,
-                };
-                let mut path = route.path();
-                if let Some(tid) = thread_id {
-                    path.push_str(&format!("?thread_id={tid}"));
-                }
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::DELETE }
             }
             Self::GetBans {
                 guild_id,
@@ -1349,7 +1175,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildAutomodRules { guild_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::POST }
             }
             Self::EditAutomodRule {
                 guild_id,
@@ -1359,7 +1185,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::GuildAutomodRule { guild_id, rule_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
+                CustomRoute { url: path, body: Some(map), headers: audit_log_reason.as_deref().map(reason_into_header), method: reqwest::Method::PATCH }
             }
             Self::DeleteAutomodRule {
                 guild_id,
@@ -1372,11 +1198,6 @@ impl<'a> HttpCall<'a> {
             }
             Self::GetChannelInvites { channel_id } => {
                 let route = Route::ChannelInvites { channel_id };
-                let path = route.path();
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
-            }
-            Self::GetChannelWebhooks { channel_id } => {
-                let route = Route::ChannelWebhooks { channel_id };
                 let path = route.path();
                 CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
             }
@@ -1463,6 +1284,11 @@ impl<'a> HttpCall<'a> {
                 }
                 CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
             }
+            Self::GetGuildMember { guild_id, user_id } => {
+                let route = Route::GuildMember { guild_id, user_id };
+                let path = route.path();
+                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
+            }
             Self::GetGuildCommands {
                 application_id, guild_id } => {
                 let route = Route::GuildCommands {
@@ -1547,11 +1373,6 @@ impl<'a> HttpCall<'a> {
             }
             Self::GetGuildRoles { guild_id } => {
                 let route = Route::GuildRoles { guild_id };
-                let path = route.path();
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
-            }
-            Self::GetGuildWebhooks { guild_id } => {
-                let route = Route::GuildWebhooks { guild_id };
                 let path = route.path();
                 CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
             }
@@ -1655,16 +1476,6 @@ impl<'a> HttpCall<'a> {
                 let path = route.path();
                 CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
             }
-            Self::GetWebhook { webhook_id } => {
-                let route = Route::Webhook { webhook_id };
-                let path = route.path();
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
-            }
-            Self::GetWebhookWithToken { webhook_id, token } => {
-                let route = Route::WebhookWithToken { webhook_id, token };
-                let path = route.path();
-                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::GET }
-            }
             Self::KickMember {
                 guild_id,
                 user_id,
@@ -1680,7 +1491,7 @@ impl<'a> HttpCall<'a> {
             } => {
                 let route = Route::ChannelMessages { channel_id };
                 let path = route.path();
-                CustomRoute { url: path, body: Some(serde_json::to_vec(&map).unwrap()), headers: None, method: reqwest::Method::POST }
+                CustomRoute { url: path, body: Some(map), headers: None, method: reqwest::Method::POST }
             }
             Self::PinMessage {
                 channel_id,

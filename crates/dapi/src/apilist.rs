@@ -79,7 +79,6 @@ api_list_enum!(API {
     // GetChannelInvites(crate::api::channels::get_channel_invites::GetChannelInvites),
     CreateChannelInvite(crate::api::channels::create_channel_invite::CreateChannelInvite),
     DeleteChannelPermission(crate::api::channels::delete_channel_permission::DeleteChannelPermission),
-    // FollowAnnouncementChannel(crate::api::channels::follow_announcement_channel::FollowAnnouncementChannel),
 
     // Guilds
     ModifyGuild(ModifyGuild),
@@ -115,7 +114,6 @@ api_list_enum!(API {
     GetChannelMessages(crate::api::messages::get_channel_messages::GetChannelMessages),
     GetChannelMessage(crate::api::messages::get_channel_message::GetChannelMessage),
     CreateMessage(crate::api::messages::create_message::CreateMessageRequest),
-    CrosspostMessage(crate::api::messages::crosspost_message::CrosspostMessage),
     EditMessage(crate::api::messages::edit_message::EditMessageRequest),
     DeleteMessage(crate::api::messages::delete_message::DeleteMessage),
     BulkDeleteMessages(crate::api::messages::bulk_delete_messages::BulkDeleteMessages),
@@ -145,11 +143,5 @@ api_list_enum!(API {
     CreateGuildCommands(crate::api::commands::create_guild_commands::CreateGuildCommands),
 
     // Webhooks
-    CreateWebhook(crate::api::webhooks::create_webhook::CreateWebhookRequest),
-    GetChannelWebhooks(crate::api::webhooks::get_channel_webhooks::GetChannelWebhooks),
-    GetGuildWebhooks(crate::api::webhooks::get_guild_webhooks::GetGuildWebhooks),
-    GetWebhook(crate::api::webhooks::get_webhook::GetWebhook),
-    ModifyWebhook(crate::api::webhooks::modify_webhook::ModifyWebhook),
     DeleteWebhook(crate::api::webhooks::delete_webhook::DeleteWebhook),
-    ExecuteWebhook(crate::api::webhooks::execute_webhook::ExecuteWebhookRequest),
 });

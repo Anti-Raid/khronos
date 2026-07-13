@@ -71,8 +71,8 @@ impl Client {
         self.inner.app_id
     }
 
-    /// Make an http call to discord
-    pub async fn call<'a, T: DeserializeOwned>(&self, call: HttpCall<'a>) -> Result<Option<T>, HttpError> {
+    #[inline(always)]
+    async fn call_inner<'a>(&self, call: HttpCall<'a>) -> Result<(reqwest::Response, reqwest::Method), HttpError> {
         let req = call.into_url_and_body();
         let mut headers = req.headers.unwrap_or_default();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -94,7 +94,13 @@ impl Client {
         }
 
         let reqw = reqw.headers(headers).build()?;
-        let resp = self.inner.client.execute(reqw).await?;
+        let resp = self.inner.client.execute(reqw).await?;  
+        Ok((resp, fmethod))
+    }
+
+    /// Make an http call to discord
+    pub async fn call<'a, T: DeserializeOwned>(&self, call: HttpCall<'a>) -> Result<Option<T>, HttpError> {
+        let (resp, fmethod) = self.call_inner(call).await?;
 
         if resp.status().is_success() {
             if resp.status() == StatusCode::NO_CONTENT {
@@ -103,6 +109,37 @@ impl Client {
                 let json = resp.json().await?;
                 Ok(Some(json))
             }
+        } else {
+            Err(HttpError::UnsuccessfulRequest(
+                ErrorResponse::from_response(resp, fmethod).await,
+            ))
+        }
+    }
+
+    /// Make an http call to discord
+    pub async fn call_json<'a>(&self, call: HttpCall<'a>) -> Result<serde_json::Value, HttpError> {
+        let (resp, fmethod) = self.call_inner(call).await?;
+
+        if resp.status().is_success() {
+            if resp.status() == StatusCode::NO_CONTENT {
+                Ok(serde_json::Value::Null)
+            } else {
+                let json = resp.json().await?;
+                Ok(json)
+            }
+        } else {
+            Err(HttpError::UnsuccessfulRequest(
+                ErrorResponse::from_response(resp, fmethod).await,
+            ))
+        }
+    }
+
+    /// Make an http call to discord
+    pub async fn call_fire<'a>(&self, call: HttpCall<'a>) -> Result<(), HttpError> {
+        let (resp, fmethod) = self.call_inner(call).await?;
+
+        if resp.status().is_success() {
+            Ok(())
         } else {
             Err(HttpError::UnsuccessfulRequest(
                 ErrorResponse::from_response(resp, fmethod).await,
