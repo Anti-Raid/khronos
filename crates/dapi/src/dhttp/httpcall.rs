@@ -28,7 +28,7 @@ pub enum HttpCall<'a> {
         guild_id: GuildId,
         user_id: UserId,
         delete_message_seconds: u32,
-        reason: Option<String>,
+        reason: Option<&'a str>,
     },
     BroadcastTyping {
         channel_id: ChannelId,
@@ -241,6 +241,9 @@ pub enum HttpCall<'a> {
     EditGuildChannelPositions {
         guild_id: GuildId,
         value: &'a [ModifyChannelPosition],
+    },
+    ListActiveGuildThreads {
+        guild_id: GuildId,
     },
     EditGuildWidget {
         guild_id: GuildId,
@@ -462,7 +465,7 @@ pub enum HttpCall<'a> {
     KickMember {
         guild_id: GuildId,
         user_id: UserId,
-        reason: Option<String>,
+        reason: Option<&'a str>,
     },
     CreateChannelMessage {
         channel_id: ChannelId,
@@ -667,7 +670,7 @@ impl<'a> HttpCall<'a> {
                 let route = Route::ChannelMessageReactionMe {
                     channel_id,
                     message_id,
-                    reaction: &reaction_type,
+                    reaction: reaction_type,
                 };
                 let path = route.path();
                 CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::PUT }
@@ -983,6 +986,11 @@ impl<'a> HttpCall<'a> {
                 let route = Route::GuildChannels { guild_id };
                 let path = route.path();
                 CustomRoute { url: path, body: Some(serde_json::to_vec(value).unwrap()), headers: None, method: reqwest::Method::PATCH }
+            }
+            Self::ListActiveGuildThreads { guild_id } => {
+                let route = Route::GuildThreadsActive { guild_id };
+                let path = route.path();
+                CustomRoute { url: path, body: None, headers: None, method: reqwest::Method::PATCH }
             }
             Self::EditGuildWidget {
                 guild_id,

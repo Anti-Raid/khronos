@@ -142,7 +142,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
         if target_member_json.is_null() {
             return Err(format!(
                 "User not found in guild: {}",
-                target_id.mention()
+                target_id
             ).into());
         }
 

@@ -4,8 +4,6 @@ use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 pub struct GetInvite {
     pub code: String,
     pub with_counts: bool,
-    pub with_expiration: bool,
-    pub guild_scheduled_event_id: Option<serenity::all::ScheduledEventId>,
 }
 
 impl ApiReq for GetInvite {
@@ -13,7 +11,7 @@ impl ApiReq for GetInvite {
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         let invite = this.controller()
-            .get_invite(&self.code, self.with_counts, self.with_expiration, self.guild_scheduled_event_id)
+            .get_invite(&self.code, self.with_counts)
             .await?;
 
         Ok(invite)

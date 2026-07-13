@@ -122,7 +122,6 @@ api_list_enum!(API {
     CreateReaction(crate::api::messages::create_reaction::CreateReaction),
     DeleteOwnReaction(crate::api::messages::delete_own_reaction::DeleteOwnReaction),
     DeleteUserReaction(crate::api::messages::delete_user_reaction::DeleteUserReaction),
-    GetReactions(crate::api::messages::get_reactions::GetReactions),
     DeleteAllReactions(crate::api::messages::delete_all_reactions::DeleteAllReactions),
     DeleteAllReactionsForEmoji(crate::api::messages::delete_all_reactions_for_emoji::DeleteAllReactionsForEmoji),
 

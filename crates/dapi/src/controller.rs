@@ -1,9 +1,7 @@
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqwest::{StatusCode, header::{HeaderMap as Headers, HeaderValue}};
+use reqwest::StatusCode;
 use serde_json::Value;
-use serenity::all::{InteractionId, ReactionType};
 
-use crate::{AnyId, ChannelId, CommandId, GuildId, RuleId, UserId, WebhookId, dhttp::{self, HttpError}, types::{CreateEmbed, ModifyChannelPosition}};
+use crate::{AnyId, ChannelId, CommandId, GuildId, InteractionId, MessageId, RoleId, RuleId, UserId, WebhookId, dhttp::{self, HttpError, UserPagination}, types::{CreateEmbed, MessagePagination, ModifyChannelPosition, ModifyRolePosition, ReactionType}};
 
 pub enum DiscordProviderContext {
     Guild(GuildId),
@@ -217,15 +215,8 @@ pub trait DiscordProvider: 'static + Clone {
                 channel_id,
                 map: serde_json::to_vec(&map)?,
                 audit_log_reason
-            }).await?;
-
-        let chan = self
-            .serenity_http()
-            .edit_channel(channel_id, &map, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to edit channel: {e}"))?;
-
-        Ok(chan)
+            }).await
+            .map_err(|e| format!("Failed to edit channel: {e}").into())
     }
 
     async fn delete_channel(
@@ -233,25 +224,24 @@ pub trait DiscordProvider: 'static + Clone {
         channel_id: ChannelId,
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
-        let chan = self
-            .serenity_http()
-            .delete_channel(channel_id, audit_log_reason)
-            .await
-            .map_err(|e| format!("Failed to delete channel: {e}"))?;
-
-        Ok(chan)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::DeleteChannel {
+                channel_id,
+                audit_log_reason
+            }).await
+            .map_err(|e| format!("Failed to delete channel: {e}").into())
     }
 
     async fn edit_channel_permissions(
         &self,
         channel_id: ChannelId,
-        target_id: serenity::all::TargetId,
+        target_id: AnyId,
         data: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::CreatePermission {
-                channel_id: channel_id.expect_channel(),
+            .call_fire(crate::dhttp::HttpCall::CreatePermission {
+                channel_id,
                 target_id,
                 map: serde_json::to_vec(&data)?,
                 audit_log_reason,
@@ -266,7 +256,7 @@ pub trait DiscordProvider: 'static + Clone {
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::GetChannelInvites {
-                channel_id: channel_id.expect_channel(),
+                channel_id,
             })
             .await
             .map_err(|e| format!("Failed to get channel invites: {e}").into())
@@ -280,7 +270,7 @@ pub trait DiscordProvider: 'static + Clone {
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::CreateInvite {
-                channel_id: channel_id.expect_channel(),
+                channel_id,
                 map: serde_json::to_vec(&map).unwrap(),
                 audit_log_reason,
             })
@@ -291,12 +281,12 @@ pub trait DiscordProvider: 'static + Clone {
     async fn delete_channel_permission(
         &self,
         channel_id: ChannelId,
-        target_id: serenity::all::TargetId,
+        target_id: AnyId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeletePermission {
-                channel_id: channel_id.expect_channel(),
+            .call_fire(crate::dhttp::HttpCall::DeletePermission {
+                channel_id,
                 target_id,
                 audit_log_reason,
             })
@@ -310,8 +300,11 @@ pub trait DiscordProvider: 'static + Clone {
     ///
     /// This should return an error if the guild does not exist
     async fn get_guild(&self) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .get_guild_with_counts(self.guild_context()?)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetGuild {
+                guild_id: self.guild_context()?,
+                with_counts: true
+            })
             .await
             .map_err(|e| format!("Failed to fetch guild: {e}").into())
     }
@@ -346,11 +339,12 @@ pub trait DiscordProvider: 'static + Clone {
 
     /// Gets all guild channels
     async fn get_guild_channels(&self) -> Result<Value, crate::Error> {
-        Ok(self
-            .serenity_http()
-            .get_channels(self.guild_context()?)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetChannels {
+                guild_id: self.guild_context()?,
+            })
             .await
-            .map_err(|e| format!("Failed to fetch guild channels: {e:?}"))?)
+            .map_err(|e| format!("Failed to fetch guild channels: {e}").into())
     }
 
     /// Create a guild channel
@@ -385,10 +379,12 @@ pub trait DiscordProvider: 'static + Clone {
 
     /// List Active Guild Threads
     async fn list_active_guild_threads(&self) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .get_guild_active_threads(self.guild_context()?)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::ListActiveGuildThreads {
+                guild_id: self.guild_context()?,
+            })
             .await
-            .map_err(|e| format!("Failed to list active threads: {e}").into())
+            .map_err(|e| format!("Failed to list active guild threads: {e}").into())
     }
 
     /// Returns a member from the guild.
@@ -418,7 +414,7 @@ pub trait DiscordProvider: 'static + Clone {
     /// List guild members
     async fn list_guild_members(
         &self,
-        limit: Option<serenity::nonmax::NonMaxU16>,
+        limit: Option<u16>,
         after: Option<UserId>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
@@ -435,7 +431,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn search_guild_members(
         &self,
         query: &str,
-        limit: Option<serenity::nonmax::NonMaxU16>,
+        limit: Option<u16>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::SearchGuildMembers {
@@ -473,11 +469,11 @@ pub trait DiscordProvider: 'static + Clone {
     async fn add_guild_member_role(
         &self,
         user_id: UserId,
-        role_id: serenity::all::RoleId,
+        role_id: RoleId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::AddMemberRole {
+            .call_fire(crate::dhttp::HttpCall::AddMemberRole {
                 guild_id: self.guild_context()?,
                 user_id,
                 role_id,
@@ -490,11 +486,11 @@ pub trait DiscordProvider: 'static + Clone {
     async fn remove_guild_member_role(
         &self,
         user_id: UserId,
-        role_id: serenity::all::RoleId,
+        role_id: RoleId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::RemoveMemberRole {
+            .call_fire(crate::dhttp::HttpCall::RemoveMemberRole {
                 guild_id: self.guild_context()?,
                 user_id,
                 role_id,
@@ -510,7 +506,7 @@ pub trait DiscordProvider: 'static + Clone {
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::KickMember {
+            .call_fire(crate::dhttp::HttpCall::KickMember {
                 guild_id: self.guild_context()?,
                 user_id,
                 reason: audit_log_reason,
@@ -521,8 +517,8 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_guild_bans(
         &self,
-        target: Option<serenity::all::UserPagination>,
-        limit: Option<serenity::nonmax::NonMaxU16>,
+        target: Option<UserPagination>,
+        limit: Option<u16>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::GetBans {
@@ -538,27 +534,14 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         user_id: UserId,
     ) -> Result<Value, crate::Error> {
-        match self
-            .serenity_http()
-            .fire(serenity::all::Request::new(
-                serenity::all::Route::GuildBan {
-                    guild_id: self.guild_context()?,
-                    user_id,
-                },
-                serenity::all::LightMethod::Get,
-            ))
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetBan {
+                guild_id: self.guild_context()?,
+                user_id
+            })
             .await
-        {
-            Ok(v) => Ok(v),
-            Err(serenity::all::Error::Http(serenity::all::HttpError::UnsuccessfulRequest(e))) => {
-                if e.status_code == serenity::all::StatusCode::NOT_FOUND {
-                    Ok(Value::Null)
-                } else {
-                    Err(format!("Failed to get guild ban: {e:?}").into())
-                }
-            }
-            Err(e) => Err(format!("Failed to get guild ban: {e:?}").into()),
-        }
+            .map_err(|e| format!("Failed to get guild ban: {e}").into())
+
     }
 
     async fn create_guild_ban(
@@ -568,13 +551,13 @@ pub trait DiscordProvider: 'static + Clone {
         reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::BanUser {
+            .call_fire(crate::dhttp::HttpCall::BanUser {
                 guild_id: self.guild_context()?,
                 user_id,
                 delete_message_seconds: (delete_message_seconds / 86400)
                     .try_into()
                     .map_err(|e| format!("Failed to convert ban duration to days: {e}"))?,
-                reason: reason.map(|x| x.to_string()),
+                reason,
             })
             .await
             .map_err(|e| format!("Failed to ban user: {e}").into())
@@ -586,10 +569,10 @@ pub trait DiscordProvider: 'static + Clone {
         reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::RemoveBan {
+            .call_fire(crate::dhttp::HttpCall::RemoveBan {
                 guild_id: self.guild_context()?,
                 user_id,
-                audit_log_reason: reason: reason.map(|x| x.to_string()),
+                audit_log_reason: reason,
             })
             .await
             .map_err(|e| format!("Failed to unban user: {e}").into())
@@ -612,7 +595,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn get_guild_role(
         &self,
-        role_id: serenity::all::RoleId,
+        role_id: RoleId,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::GetGuildRole {
@@ -631,7 +614,7 @@ pub trait DiscordProvider: 'static + Clone {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::CreateRole {
                 guild_id: self.guild_context()?,
-                body: &map,
+                body: serde_json::to_vec(&map)?,
                 audit_log_reason,
             })
             .await
@@ -640,7 +623,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn modify_guild_role_positions(
         &self,
-        map: impl Iterator<Item: serde::Serialize>,
+        map: &[ModifyRolePosition],
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
@@ -655,7 +638,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn modify_guild_role(
         &self,
-        role_id: serenity::all::RoleId,
+        role_id: RoleId,
         map: impl serde::Serialize,
         audit_log_reason: Option<&str>,
     ) -> Result<Value, crate::Error> {
@@ -672,7 +655,7 @@ pub trait DiscordProvider: 'static + Clone {
 
     async fn delete_guild_role(
         &self,
-        role_id: serenity::all::RoleId,
+        role_id: RoleId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
@@ -692,11 +675,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         code: &str,
         member_counts: bool,
-        expiration: bool,
-        event_id: Option<serenity::all::ScheduledEventId>,
     ) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .get_invite(code, member_counts, expiration, event_id)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetInvite {
+                code,
+                member_counts,
+            })
             .await
             .map_err(|e| format!("Failed to get invite: {e}").into())
     }
@@ -720,8 +704,8 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_channel_messages(
         &self,
         channel_id: ChannelId,
-        target: Option<serenity::all::MessagePagination>,
-        limit: Option<serenity::nonmax::NonMaxU8>,
+        target: Option<MessagePagination>,
+        limit: Option<u8>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::GetMessages {
@@ -736,7 +720,7 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_channel_message(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::GetMessage {
@@ -750,11 +734,13 @@ pub trait DiscordProvider: 'static + Clone {
     async fn create_message(
         &self,
         channel_id: ChannelId,
-        files: Vec<serenity::all::CreateAttachment<'_>>,
         data: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .send_message(channel_id, files, &data)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::CreateChannelMessage {
+                channel_id,
+                map: serde_json::to_vec(&data)?
+            })
             .await
             .map_err(|e| format!("Failed to send message: {e}").into())
     }
@@ -762,14 +748,14 @@ pub trait DiscordProvider: 'static + Clone {
     async fn create_reaction(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::CreateReaction {
+            .call_fire(crate::dhttp::HttpCall::CreateReaction {
                 channel_id,
                 message_id,
-                reaction_type: reaction,
+                reaction_type: &reaction.as_data(),
             })
             .await
             .map_err(|e| format!("Failed to create reaction: {e}").into())
@@ -778,14 +764,14 @@ pub trait DiscordProvider: 'static + Clone {
     async fn delete_own_reaction(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeleteReactionMe {
+            .call_fire(crate::dhttp::HttpCall::DeleteReactionMe {
                 channel_id,
                 message_id,
-                reaction_type: reaction,
+                reaction_type: &reaction.as_data(),
             })
             .await
             .map_err(|e| format!("Failed to delete own reaction: {e}").into())
@@ -794,72 +780,28 @@ pub trait DiscordProvider: 'static + Clone {
     async fn delete_user_reaction(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         user_id: UserId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeleteReaction {
+            .call_fire(crate::dhttp::HttpCall::DeleteReaction {
                 channel_id,
                 message_id,
                 user_id,
-                reaction_type: reaction,
+                reaction_type: &reaction.as_data(),
             })
             .await
             .map_err(|e| format!("Failed to delete reaction: {e}").into())
     }
 
-    async fn get_reactions(
-        &self,
-        channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
-        reaction: &ReactionType,
-        is_burst: Option<bool>,
-        after: Option<UserId>,
-        limit: Option<serenity::nonmax::NonMaxU8>,
-    ) -> Result<Value, crate::Error> {
-        let mut params= vec![];
-
-        let after = after.map(|x| x.to_string());
-        if let Some(ref after_str) = after {
-            let after_str = after_str.as_str();
-            params.push(("after", after_str));
-        }
-
-        let limit = limit.map(|x| x.to_string());
-        if let Some(ref limit) = limit {
-            let limit_str = limit.as_str();
-            params.push(("limit", limit_str));
-        }
-
-        if let Some(burst) = is_burst {
-            if burst {
-                params.push(("type", "1"));
-            } else {
-                params.push(("type", "0"));
-            }
-        }
-
-        Ok(self
-            .serenity_http()
-            .fire(
-                serenity::all::Request::new(
-                    serenity::all::Route::ChannelMessageReactionEmoji { channel_id, message_id, reaction: &reaction.as_data() },
-                    serenity::all::LightMethod::Get,
-                )
-                .params(&params),
-            )
-            .await
-            .map_err(|e| format!("Failed to get reactions: {e}"))?)
-    }
-
     async fn delete_all_reactions(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeleteMessageReactions {
+            .call_fire(crate::dhttp::HttpCall::DeleteMessageReactions {
                 channel_id,
                 message_id,
             })
@@ -870,14 +812,14 @@ pub trait DiscordProvider: 'static + Clone {
     async fn delete_all_reactions_for_emoji(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         reaction: &ReactionType,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeleteMessageReactionEmoji {
+            .call_fire(crate::dhttp::HttpCall::DeleteMessageReactionEmoji {
                 channel_id,
                 message_id,
-                reaction_type: reaction,
+                reaction_type: &reaction.as_data(),
             })
             .await
             .map_err(|e| format!("Failed to delete all reactions for emoji: {e}").into())
@@ -886,24 +828,27 @@ pub trait DiscordProvider: 'static + Clone {
     async fn edit_message(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
-        files: Vec<serenity::all::CreateAttachment<'_>>,
+        message_id: MessageId,
         data: impl serde::Serialize,
     ) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .edit_message(channel_id, message_id, &data, files)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::EditMessage {
+                channel_id,
+                message_id,
+                map: serde_json::to_vec(&data)?
+            })
             .await
-            .map_err(|e| format!("Failed to send message: {e}").into())
+            .map_err(|e| format!("Failed to edit message: {e}").into())
     }
 
     async fn delete_message(
         &self,
         channel_id: ChannelId,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         audit_log_reason: Option<&str>,
     ) -> Result<(), crate::Error> {
         self.dhttp()
-            .call_json(crate::dhttp::HttpCall::DeleteMessage {
+            .call_fire(crate::dhttp::HttpCall::DeleteMessage {
                 channel_id,
                 message_id,
                 audit_log_reason,
@@ -935,10 +880,13 @@ pub trait DiscordProvider: 'static + Clone {
         interaction_id: InteractionId,
         interaction_token: &str,
         response: impl serde::Serialize,
-        files: Vec<serenity::all::CreateAttachment<'_>>,
     ) -> Result<(), crate::Error> {
-        self.serenity_http()
-            .create_interaction_response(interaction_id, interaction_token, &response, files)
+        self.dhttp()
+            .call_fire(crate::dhttp::HttpCall::CreateInteractionResponse {
+                interaction_id,
+                interaction_token,
+                map: serde_json::to_vec(&response)?,
+            })
             .await
             .map_err(|e| format!("Failed to create interaction response: {e}").into())
     }
@@ -947,8 +895,11 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
     ) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .get_original_interaction_response(interaction_token)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetOriginalInteractionResponse {
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+            })
             .await
             .map_err(|e| format!("Failed to get original interaction response: {e}").into())
     }
@@ -958,13 +909,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
         map: impl serde::Serialize,
-        new_files: Vec<serenity::all::CreateAttachment<'_>>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::EditOriginalInteractionResponse {
-                application_id: interaction_token,
-                interaction_token: &map,
-                map: new_files,
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+                map: serde_json::to_vec(&map)?,
             })
             .await
             .map_err(|e| format!("Failed to edit original interaction response: {e}").into())
@@ -974,8 +924,11 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
     ) -> Result<(), crate::Error> {
-        self.serenity_http()
-            .delete_original_interaction_response(interaction_token)
+        self.dhttp()
+            .call_fire(crate::dhttp::HttpCall::DeleteOriginalInteractionResponse {
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+            })
             .await
             .map_err(|e| format!("Failed to delete original interaction response: {e}").into())
     }
@@ -983,10 +936,14 @@ pub trait DiscordProvider: 'static + Clone {
     async fn get_followup_message(
         &self,
         interaction_token: &str,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
     ) -> Result<Value, crate::Error> {
-        self.serenity_http()
-            .get_followup_message(interaction_token, message_id)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetFollowupMessage {
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+                message_id
+            })
             .await
             .map_err(|e| format!("Failed to get interaction followup: {e}").into())
     }
@@ -995,13 +952,12 @@ pub trait DiscordProvider: 'static + Clone {
         &self,
         interaction_token: &str,
         response: impl serde::Serialize,
-        files: Vec<serenity::all::CreateAttachment<'_>>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::CreateFollowupMessage {
-                application_id: interaction_token,
-                interaction_token: &response,
-                map: files,
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+                map: serde_json::to_vec(&response)?,
             })
             .await
             .map_err(|e| format!("Failed to create interaction followup: {e}").into())
@@ -1010,16 +966,15 @@ pub trait DiscordProvider: 'static + Clone {
     async fn edit_followup_message(
         &self,
         interaction_token: &str,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
         map: impl serde::Serialize,
-        new_files: Vec<serenity::all::CreateAttachment<'_>>,
     ) -> Result<Value, crate::Error> {
         self.dhttp()
             .call_json(crate::dhttp::HttpCall::EditFollowupMessage {
-                application_id: interaction_token,
-                interaction_token: message_id,
-                message_id: &map,
-                map: new_files,
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+                message_id: message_id,
+                map: serde_json::to_vec(&map)?,
             })
             .await
             .map_err(|e| format!("Failed to edit interaction followup: {e}").into())
@@ -1028,12 +983,16 @@ pub trait DiscordProvider: 'static + Clone {
     async fn delete_followup_message(
         &self,
         interaction_token: &str,
-        message_id: serenity::all::MessageId,
+        message_id: MessageId,
     ) -> Result<(), crate::Error> {
-        self.serenity_http()
-            .delete_followup_message(interaction_token, message_id)
+        self.dhttp()
+            .call_fire(crate::dhttp::HttpCall::DeleteFollowupMessage {
+                application_id: self.dhttp().app_id(),
+                interaction_token,
+                message_id: message_id,
+            })
             .await
-            .map_err(|e| format!("Failed to delete interaction followup: {e}").into())
+            .map_err(|e| format!("Failed to edit interaction followup: {e}").into())
     }
 
     // Webhooks (all methods outside of deleting is currently not supported due to security risks)
@@ -1061,22 +1020,29 @@ pub trait DiscordProvider: 'static + Clone {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
-        self.serenity_http()
-            .get_guild_commands(self.guild_context()?)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetGuildCommands {
+                application_id: self.dhttp().app_id(),
+                guild_id: self.guild_context()?,
+            })
             .await
             .map_err(|e| format!("Failed to get guild commands: {e}").into())
     }
 
     async fn get_guild_command(
         &self,
-        command_id: serenity::all::CommandId,
+        command_id: CommandId,
     ) -> Result<Value, crate::Error> {
         if !self.superuser_can_manage_guild_commands(crate::controller::SuperUserDiscordCommandOp::GetCommand(command_id)) {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
-        self.serenity_http()
-            .get_guild_command(self.guild_context()?, command_id)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::GetGuildCommand {
+                application_id: self.dhttp().app_id(),
+                guild_id: self.guild_context()?,
+                command_id
+            })
             .await
             .map_err(|e| format!("Failed to get guild command: {e}").into())
     }
@@ -1089,8 +1055,12 @@ pub trait DiscordProvider: 'static + Clone {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
-        self.serenity_http()
-            .create_guild_command(self.guild_context()?, &map)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::CreateGuildCommand {
+                application_id: self.dhttp().app_id(),
+                guild_id: self.guild_context()?,
+                map: serde_json::to_vec(&map)?
+            })
             .await
             .map_err(|e| format!("Failed to create guild command: {e}").into())
     }
@@ -1103,8 +1073,12 @@ pub trait DiscordProvider: 'static + Clone {
             return Err("Guild commands are not enabled for this controller".into());
         }
 
-        self.serenity_http()
-            .create_guild_commands(self.guild_context()?, &map)
+        self.dhttp()
+            .call_json(crate::dhttp::HttpCall::CreateGuildCommands {
+                application_id: self.dhttp().app_id(),
+                guild_id: self.guild_context()?,
+                map: serde_json::to_vec(&map)?
+            })
             .await
             .map_err(|e| format!("Failed to create guild commands: {e}").into())
     }

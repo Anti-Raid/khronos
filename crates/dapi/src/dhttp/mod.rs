@@ -4,13 +4,13 @@ mod request;
 mod routing;
 
 use crate::GuildId;
-use crate::MessageId;
 use crate::UserId;
 
 pub use self::httpcall::*;
 pub use self::error::*;
 pub use self::request::*;
 pub use self::routing::*;
+pub use crate::types::MessagePagination;
 
 #[non_exhaustive]
 pub enum GuildPagination {
@@ -26,14 +26,6 @@ pub enum UserPagination {
     After(UserId),
     /// The Id to get the users before.
     Before(UserId),
-}
-
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub enum MessagePagination {
-    After(MessageId),
-    Around(MessageId),
-    Before(MessageId),
 }
 
 pub(super) async fn decode_resp<T: serde::de::DeserializeOwned>(

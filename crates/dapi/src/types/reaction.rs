@@ -1,3 +1,4 @@
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as DeError, ser::SerializeMap};
 
 use crate::EmojiId;
@@ -19,6 +20,23 @@ pub enum ReactionType {
     },
     /// A reaction with a twemoji.
     Unicode(String),
+}
+
+impl ReactionType {
+    pub fn as_data(&self) -> String {
+        match self {
+            ReactionType::Custom {
+                id,
+                name,
+                ..
+            } => {
+                format!("{}:{id}", name.as_deref().unwrap_or_default())
+            },
+            ReactionType::Unicode(unicode) => {
+                utf8_percent_encode(unicode, NON_ALPHANUMERIC).to_string()
+            },
+        }
+    }
 }
 
 // Manual impl needed to decide enum variant by presence of `id`
