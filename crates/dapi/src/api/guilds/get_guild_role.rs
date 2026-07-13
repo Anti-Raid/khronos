@@ -1,9 +1,9 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, RoleId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct GetGuildRole {
-    pub role_id: serenity::all::RoleId,
+    pub role_id: RoleId,
 }
 
 impl ApiReq for GetGuildRole {

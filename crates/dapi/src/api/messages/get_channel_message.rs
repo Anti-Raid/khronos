@@ -1,25 +1,22 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, ChannelId, MessageId, Permissions, context::DiscordContext, controller::DiscordProvider, types::ChannelType};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetChannelMessage {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub message_id: serenity::all::MessageId,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
 }
 
 impl ApiReq for GetChannelMessage {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         // Perform required checks
         let (_, _, guild_channel, perms) = this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::VIEW_CHANNEL).await?;
 
-        if guild_channel.base.kind == serenity::all::ChannelType::Voice 
-        && !perms.connect() {
+        if guild_channel.kind == ChannelType::Voice 
+        && !perms.contains(Permissions::CONNECT) {
             return Err("Bot does not have permission to connect to the given voice channel".into());
         }
 

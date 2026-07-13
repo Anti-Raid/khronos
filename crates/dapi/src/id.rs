@@ -1,4 +1,4 @@
-use std::{fmt::{self, Display}, marker::PhantomData};
+use std::{fmt::{self, Display}, marker::PhantomData, num::ParseIntError, str::FromStr};
 
 use serde::{Deserializer, de::Error};
 
@@ -31,6 +31,14 @@ impl<W> fmt::Debug for Id<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let inner = self.inner;
         std::fmt::Debug::fmt(&inner, f)
+    }
+}
+
+impl<W> FromStr for Id<W> {
+    type Err = ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s_u64: u64 = s.parse()?;
+        Ok(Id::new(s_u64))
     }
 }
 
@@ -117,6 +125,14 @@ macro_rules! id {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     let inner = self.get();
                     std::fmt::Display::fmt(&inner, f)
+                }
+            }
+
+            impl FromStr for $name {
+                type Err = ParseIntError;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    let s_u64: Id<$wrapper> = s.parse()?;
+                    Ok(Self(s_u64))
                 }
             }
         )*

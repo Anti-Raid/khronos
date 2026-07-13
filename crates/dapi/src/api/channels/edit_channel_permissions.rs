@@ -1,10 +1,9 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, multioption::MultiOption};
+use crate::{AnyId, ApiReq, ChannelId, Permissions, context::DiscordContext, controller::DiscordProvider, multioption::MultiOption};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditChannelPermissions {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub target_id: serenity::all::TargetId,
+    pub channel_id: ChannelId,
+    pub target_id: AnyId,
     pub allow: MultiOption<Permissions>,
     pub deny: MultiOption<Permissions>,
     #[serde(rename = "type")]
@@ -18,9 +17,7 @@ impl ApiReq for EditChannelPermissions {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let (_partial_guild, _bot_member, _guild_channel, perms) = this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::MANAGE_ROLES)
         .await?;

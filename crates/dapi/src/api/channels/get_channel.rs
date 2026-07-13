@@ -1,9 +1,9 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, ChannelId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct GetChannel {
-    pub channel_id: serenity::all::GenericChannelId,
+    pub channel_id: ChannelId,
 }
 
 impl ApiReq for GetChannel {

@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role, types::{EditMember, EditableGuildMemberFlags}};
+use crate::{ApiReq, Permissions, UserId, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role, types::{EditMember}};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildMember {
-    pub user_id: serenity::all::UserId,
+    pub user_id: UserId,
     pub reason: String,
     pub data: EditMember,
 }
@@ -11,12 +10,10 @@ pub struct ModifyGuildMember {
 impl ApiReq for ModifyGuildMember {
     type Resp = serde_json::Value;
 
-    async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
+    async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         if bot_user.id == self.user_id {
             return Err("Cannot modify self".into());
@@ -81,7 +78,7 @@ impl ApiReq for ModifyGuildMember {
             return Err("Target user not found in guild".into());
         }
 
-        if let Some(ref flags) = self.data.flags {
+        if self.data.flags.is_some() {
             if !(perms.contains(Permissions::MANAGE_GUILD) || perms.contains(Permissions::MANAGE_ROLES) || perms.contains(Permissions::MODERATE_MEMBERS | Permissions::KICK_MEMBERS | Permissions::BAN_MEMBERS)) {
                 return Err("Modifying member flags requires either MANAGE_GUILD, MANAGE_ROLES, or (MODERATE_MEMBERS and KICK_MEMBERS and BAN_MEMBERS)".into());
             }

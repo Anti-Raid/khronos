@@ -1,12 +1,20 @@
 use std::collections::HashMap;
 
-use crate::{ChannelId, GuildId, Permissions, RoleId, UserId, enum_number, internal_bitflags, multioption::MultiOption};
+use crate::{ChannelId, GuildId, Permissions, RoleId, UserId, enum_number, internal_bitflags, multioption::MultiOption, serenity_backports::{greater_member_hierarchy_in, member_highest_role_in, member_permissions, user_permissions_in}, types::Channel};
 use chrono::{DateTime, Utc};
 use extract_map::{ExtractKey, ExtractMap};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[non_exhaustive]
+pub struct MinPartialGuild {
+    /// The unique Id identifying the guild.
+    ///
+    /// This is equivalent to the Id of the default role (`@everyone`).
+    pub id: GuildId,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct PartialGuild {
     /// The unique Id identifying the guild.
     ///
@@ -34,11 +42,67 @@ pub struct PartialGuild {
     pub extra_info: HashMap<String, serde_json::Value>,
 }
 
+impl PartialGuild {
+    /// Returns the guild's icon URL.
+    pub fn icon_url(&self) -> Option<String> {
+        self.icon.as_ref().map(|hash| {
+            format!(
+                "https://cdn.discordapp.com/icons/{}/{}.jpg?size=1024",
+                self.id, hash
+            )
+        })
+    }
+
+    /// Calculate a [`Member`]'s permissions in the guild.
+    #[must_use]
+    pub fn member_permissions(&self, member: &Member) -> Permissions {
+        member_permissions(self, member)
+    }
+
+    /// Gets the highest role a [`Member`] of this Guild has.
+    ///
+    /// Returns None if the member has no roles or the member from this guild.
+    #[must_use]
+    pub fn member_highest_role(&self, member: &Member) -> Option<&Role> {
+        member_highest_role_in(&self.roles, member)
+    }
+
+    /// Returns which of two [`User`]s has a higher [`Member`] hierarchy.
+    ///
+    /// If both user IDs are the same, [`None`] is returned. If one of the users is the guild
+    /// owner, their ID is returned.
+    #[must_use]
+    pub fn greater_member_hierarchy(&self, lhs: &Member, rhs: &Member) -> Option<UserId> {
+        let lhs_highest_role = self.member_highest_role(lhs);
+        let rhs_highest_role = self.member_highest_role(rhs);
+
+        greater_member_hierarchy_in(
+            lhs_highest_role,
+            rhs_highest_role,
+            self.owner_id,
+            lhs,
+            rhs,
+        )
+    }
+
+    /// Calculate a [`Member`]'s permissions in a given channel in the guild.
+    #[must_use]
+    pub fn user_permissions_in(&self, channel: &Channel, member: &Member) -> Permissions {
+        user_permissions_in(
+            Some(channel),
+            member.user.id,
+            &member.roles,
+            self.id,
+            &self.roles,
+            self.owner_id,
+        )
+    }
+}
+
 /// Information about a role within a guild.
 ///
 /// [Discord docs](https://discord.com/developers/docs/topics/permissions#role-object).
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[non_exhaustive]
 pub struct Role {
     /// The Id of the role. Can be used to calculate the role's creation date.
     pub id: RoleId,
@@ -61,6 +125,23 @@ pub struct Role {
 
     #[serde(flatten)]
     pub extra_info: HashMap<String, serde_json::Value>,
+}
+
+impl PartialOrd for Role {
+    fn partial_cmp(&self, other: &Role) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Role {
+    fn cmp(&self, other: &Role) -> Ordering {
+        // Discord does position DESC, id ASC so:
+        if self.position == other.position {
+            other.id.cmp(&self.id)
+        } else {
+            self.position.cmp(&other.position)
+        }
+    }
 }
 
 impl ExtractKey<RoleId> for Role {
@@ -86,8 +167,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-default-message-notification-level).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum DefaultMessageNotificationLevel {
         /// Receive notifications for everything.
         All = 0,
@@ -102,8 +181,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-explicit-content-filter-level).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum ExplicitContentFilter {
         /// Don't scan any messages.
         None = 0,
@@ -120,8 +197,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-mfa-level).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum MfaLevel {
         /// MFA is disabled.
         None = 0,
@@ -137,8 +212,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-verification-level).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum VerificationLevel {
         /// Does not require any verification.
         None = 0,
@@ -159,8 +232,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/guild#guild-object-guild-nsfw-level).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum NsfwLevel {
         /// The nsfw level is not specified.
         Default = 0,
@@ -179,8 +250,6 @@ enum_number! {
     ///
     /// See [AfkMetadata::afk_timeout].
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     pub enum AfkTimeout {
         OneMinute = 60,
         FiveMinutes = 300,
@@ -323,7 +392,6 @@ impl PartialOrd<Role> for ModifyRolePosition {
 
 
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-#[non_exhaustive]
 pub struct Member {
     /// Attached User struct.
     pub user: User,
@@ -338,7 +406,6 @@ pub struct Member {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[non_exhaustive]
 pub struct User {
     pub id: UserId,
     pub username: String,

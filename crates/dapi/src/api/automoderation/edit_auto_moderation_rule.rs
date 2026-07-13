@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditAutoModRule};
+use crate::{ApiReq, Permissions, RuleId, context::DiscordContext, controller::DiscordProvider, types::EditAutoModRule};
 
 #[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct EditAutoModerationRule {
-    pub rule_id: serenity::all::RuleId,
+    pub rule_id: RuleId,
     pub reason: String,
     pub data: EditAutoModRule,
 }
@@ -14,9 +13,7 @@ impl ApiReq for EditAutoModerationRule {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_permissions(bot_user.id, Permissions::MANAGE_GUILD)
             .await?;

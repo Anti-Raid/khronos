@@ -1,5 +1,4 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::CreateChannel};
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider, types::CreateChannel};
 
 #[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct CreateGuildChannel {
@@ -13,9 +12,7 @@ impl ApiReq for CreateGuildChannel {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
         
         let (_, _, bot_perms) = this.check_permissions(bot_user.id, Permissions::MANAGE_CHANNELS)
         .await?;
@@ -35,7 +32,7 @@ impl ApiReq for CreateGuildChannel {
         if let Some(ref permission_overwrites) = self.data.permission_overwrites {
             // Check for ManageRoles permission
             if !bot_perms
-                .manage_roles()
+                .contains(Permissions::MANAGE_ROLES)
             {
                 return Err("Bot does not have permission to manage roles".into());
             }

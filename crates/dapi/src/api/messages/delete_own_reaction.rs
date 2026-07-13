@@ -1,10 +1,9 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::ReactionType};
+use crate::{ApiReq, Permissions, ChannelId, MessageId, context::DiscordContext, controller::DiscordProvider, types::ReactionType};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteOwnReaction {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub message_id: serenity::all::MessageId,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
     pub reaction: ReactionType,
 }
 
@@ -12,15 +11,13 @@ impl ApiReq for DeleteOwnReaction {
     type Resp = ();
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::READ_MESSAGE_HISTORY | Permissions::ADD_REACTIONS)
             .await?;
 
         this.controller()
-            .delete_own_reaction(self.channel_id, self.message_id, &self.reaction.into_serenity())
+            .delete_own_reaction(self.channel_id, self.message_id, &self.reaction)
             .await?;
 
         Ok(())

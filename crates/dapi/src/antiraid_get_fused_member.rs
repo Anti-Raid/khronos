@@ -1,4 +1,4 @@
-use crate::{ApiReq, context::{AntiraidFusedMember, DiscordContext}, controller::DiscordProvider};
+use crate::{ApiReq, UserId, context::{AntiraidFusedMember, DiscordContext}, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -13,7 +13,7 @@ impl ApiReq for AntiRaidGetFusedMember {
         let mut user_ids = Vec::with_capacity(self.ids.len());
 
         for user_id in self.ids {
-            let user_id: serenity::all::UserId = user_id
+            let user_id: UserId = user_id
                 .parse()?;
             user_ids.push(user_id);
         }

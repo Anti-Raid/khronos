@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::CreateInvite};
+use crate::{ApiReq, ChannelId, Permissions, context::DiscordContext, controller::DiscordProvider, types::CreateInvite};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateChannelInvite {
-    pub channel_id: serenity::all::GenericChannelId,
+    pub channel_id: ChannelId,
     pub data: CreateInvite,
     pub reason: String,
 }
@@ -14,11 +13,9 @@ impl ApiReq for CreateChannelInvite {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
-        this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::CREATE_INSTANT_INVITE)
+        this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::CREATE_INVITE)
         .await?;
 
         let invite = this

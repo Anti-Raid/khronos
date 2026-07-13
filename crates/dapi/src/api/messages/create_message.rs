@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateMessage};
+use crate::{ApiReq, ChannelId, Permissions, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateMessage};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateMessageRequest {
-    pub channel_id: serenity::all::GenericChannelId,
+    pub channel_id: ChannelId,
     pub data: CreateMessage,
 }
 
@@ -25,15 +24,13 @@ impl ApiReq for CreateMessageRequest {
             self.data.content = transform.content;
         }
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::SEND_MESSAGES)
             .await?;
 
         let msg = this.controller()
-            .create_message(self.channel_id, vec![], &self.data)
+            .create_message(self.channel_id, &self.data)
             .await?;
 
         Ok(msg)

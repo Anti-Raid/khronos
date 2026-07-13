@@ -1,10 +1,9 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, ChannelId, MessageId, Permissions, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct BulkDeleteMessages {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub messages: Vec<serenity::all::MessageId>,
+    pub channel_id: ChannelId,
+    pub messages: Vec<MessageId>,
     pub reason: String,
 }
 
@@ -12,9 +11,7 @@ impl ApiReq for BulkDeleteMessages {
     type Resp = ();
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::MANAGE_MESSAGES)
             .await?;

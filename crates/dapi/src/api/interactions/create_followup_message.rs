@@ -10,12 +10,6 @@ impl ApiReq for CreateFollowupMessage {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let files = if let Some(ref attachments) = self.data.attachments {
-            attachments.take_files()?
-        } else {
-            Vec::new()
-        };
-
         {
             // Apply superuser transformation to the message before sending, if applicable
             let transform = this
@@ -29,7 +23,7 @@ impl ApiReq for CreateFollowupMessage {
         }
 
         let msg = this.controller()
-            .create_followup_message(&self.interaction_token, &self.data, files)
+            .create_followup_message(&self.interaction_token, &self.data)
             .await?;
 
         Ok(msg)

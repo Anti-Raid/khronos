@@ -1,5 +1,4 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::channels::ModifyChannelPosition};
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider, types::channels::ModifyChannelPosition};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildChannelPositions {
@@ -10,15 +9,13 @@ impl ApiReq for ModifyGuildChannelPositions {
     type Resp = ();
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_permissions(bot_user.id, Permissions::MANAGE_CHANNELS)
             .await?;
 
         this.controller()
-            .modify_guild_channel_positions(self.data.iter())
+            .modify_guild_channel_positions(&self.data)
             .await?;
 
         Ok(())

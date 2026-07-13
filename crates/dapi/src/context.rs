@@ -1,5 +1,5 @@
-use crate::types::{Member, PartialGuild};
-use crate::{Permissions, UserId};
+use crate::types::{Channel, ChannelType, Member, PartialGuild};
+use crate::{ChannelId, Permissions, UserId};
 
 use crate::{controller::DiscordProvider, serenity_backports::member_permissions};
 
@@ -25,6 +25,10 @@ pub struct DiscordContext<T: DiscordProvider> {
     discord_provider: T,
 }
 
+pub struct CurrentUser {
+    pub id: UserId
+}
+
 impl<T: DiscordProvider> DiscordContext<T> {
     pub fn new(discord_provider: T) -> Self {
         Self { discord_provider }
@@ -44,12 +48,8 @@ impl<T: DiscordProvider> DiscordContext<T> {
         &self.discord_provider
     }
 
-    pub fn serenity_http(&self) -> &serenity::http::Http {
-        self.discord_provider.serenity_http()
-    }
-
-    pub fn current_user(&self) -> Option<serenity::all::CurrentUser> {
-        self.discord_provider.current_user()
+    pub fn current_user(&self) -> CurrentUser {
+        CurrentUser { id: UserId::new(self.discord_provider.dhttp().app_id().get()) }
     }
 
     pub async fn check_permissions(
@@ -57,9 +57,9 @@ impl<T: DiscordProvider> DiscordContext<T> {
         user_id: UserId,
         needed_permissions: Permissions,
     ) -> Result<(
-        serenity::all::PartialGuild,
-        serenity::all::Member,
-        serenity::all::Permissions,
+        PartialGuild,
+        Member,
+        Permissions,
     ), crate::Error> {
         // Get the guild
         let guild_json = self
@@ -67,7 +67,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
             .get_guild()
             .await?;
 
-        let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)?;
+        let guild: PartialGuild = serde_json::from_value(guild_json)?;
 
         let member_json = self
             .discord_provider
@@ -77,11 +77,11 @@ impl<T: DiscordProvider> DiscordContext<T> {
         if member_json.is_null() {
             return Err(format!(
                 "User not found in guild: {}",
-                user_id.mention()
+                user_id
             ).into());
         }
 
-        let member: serenity::all::Member = serde_json::from_value(member_json)?;
+        let member: Member = serde_json::from_value(member_json)?;
 
         let member_perms = member_permissions(&guild, &member);
 
@@ -99,18 +99,18 @@ impl<T: DiscordProvider> DiscordContext<T> {
         &self,
         user_id: UserId,
         target_id: UserId,
-        needed_permissions: serenity::all::Permissions,
+        needed_permissions: Permissions,
     ) -> Result<(
-        serenity::all::PartialGuild,
-        serenity::all::Member,
-        serenity::all::Permissions,
+        PartialGuild,
+        Member,
+        Permissions,
     ), crate::Error> {
         let guild_json = self
             .discord_provider
             .get_guild()
             .await?;
 
-        let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)?;
+        let guild: PartialGuild = serde_json::from_value(guild_json)?;
 
         let member_json = self
             .discord_provider
@@ -120,11 +120,11 @@ impl<T: DiscordProvider> DiscordContext<T> {
         if member_json.is_null() {
             return Err(format!(
                 "User not found in guild: {}",
-                user_id.mention()
+                user_id
             ).into());
         }
 
-        let member: serenity::all::Member = serde_json::from_value(member_json)?;
+        let member: Member = serde_json::from_value(member_json)?;
 
         let member_perms = member_permissions(&guild, &member);
         if !member_perms.contains(needed_permissions) {
@@ -146,7 +146,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
             ).into());
         }
 
-        let target_member: serenity::all::Member = serde_json::from_value(target_member_json)?;
+        let target_member: Member = serde_json::from_value(target_member_json)?;
 
         let higher_id = guild
             .greater_member_hierarchy(&member, &target_member)
@@ -171,13 +171,13 @@ impl<T: DiscordProvider> DiscordContext<T> {
     pub async fn check_channel_permissions(
         &self,
         user_id: UserId,
-        channel_id: serenity::all::GenericChannelId,
-        needed_permissions: serenity::all::Permissions,
+        channel_id: ChannelId,
+        needed_permissions: Permissions,
     ) -> Result<(
-        serenity::all::PartialGuild,
-        serenity::all::Member,
-        serenity::all::GuildChannel,
-        serenity::all::Permissions,
+        PartialGuild,
+        Member,
+        Channel,
+        Permissions,
     ), crate::Error> {
         let mut id = channel_id;
         loop {
@@ -187,7 +187,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
                 .get_channel(id)
                 .await?;
 
-            let channel: serenity::all::Channel = serde_json::from_value(channel_val)?;
+            let channel: Channel = serde_json::from_value(channel_val)?;
 
             let member_json = self
                 .discord_provider
@@ -197,31 +197,36 @@ impl<T: DiscordProvider> DiscordContext<T> {
             if member_json.is_null() {
                 return Err(format!(
                     "User not found in guild: {}",
-                    user_id.mention()
+                    user_id
                 ).into());
             }
 
-            let member: serenity::all::Member = serde_json::from_value(member_json)?;
+            let member: Member = serde_json::from_value(member_json)?;
 
             let guild_json = self
                 .discord_provider
                 .get_guild()
                 .await?;
 
-            let guild: serenity::all::PartialGuild = serde_json::from_value(guild_json)?;
+            let guild: PartialGuild = serde_json::from_value(guild_json)?;
 
-            match channel {
-                serenity::all::Channel::Private(_) => {
+            // While get_channel should automatically handle this, check this here
+            // just to be truly confident in case the provider's get_channel implementation is flawed.
+            if channel.guild_id.is_none() || channel.guild_id.unwrap() != guild.id {
+                return Err("Channel does not belong to the current guild".into());
+            }
+
+            match (channel.kind, channel.parent_id) {
+                (ChannelType::Private, _) => {
                     return Err("Private channels are not supported by check_channel_permissions".into());
                 },
-                serenity::all::Channel::Guild(guild_channel) => {
-                    // While get_channel should automatically handle this, check this here
-                    // just to be truly confident in case the provider's get_channel implementation is flawed.
-                    if guild_channel.base.guild_id != guild.id {
-                        return Err("Channel does not belong to the current guild".into());
-                    }
-
-                    let perms = guild.user_permissions_in(&guild_channel, &member);
+                (ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread, Some(parent)) => {
+                    // Threads are always under a parent channel, so we need to get the parent channel
+                    id = parent;
+                    continue; // Loop again with the parent channel id
+                }
+                _ => {
+                    let perms = guild.user_permissions_in(&channel, &member);
 
                     if !perms.contains(needed_permissions) {
                         return Err(format!(
@@ -229,15 +234,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
                         ).into());
                     }
 
-                    return Ok((guild, member, guild_channel, perms))
-                }
-                serenity::all::Channel::GuildThread(gt) => {
-                    // Threads are always under a parent channel, so we need to get the parent channel
-                    id = gt.parent_id.widen();
-                    continue; // Loop again with the parent channel id
-                },
-                _ => {
-                    return Err("Unsupported channel type in check_channel_permissions".into());
+                    return Ok((guild, member, channel, perms))
                 }
             }
         }
@@ -249,7 +246,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
             .get_guild()
             .await?;
 
-        let partial_guild: serenity::all::PartialGuild = serde_json::from_value(partial_guild_json)?;
+        let partial_guild: PartialGuild = serde_json::from_value(partial_guild_json)?;
 
         let mut member_and_resolved_perms = Vec::with_capacity(user_ids.len());
 
@@ -261,11 +258,11 @@ impl<T: DiscordProvider> DiscordContext<T> {
             if member_json.is_null() {
                 return Err(format!(
                     "User not found in guild: {}",
-                    id.mention()
+                    id
                 ).into());
             }
 
-            let member: serenity::all::Member = serde_json::from_value(member_json)?;
+            let member: Member = serde_json::from_value(member_json)?;
 
             let resolved_perms = member_permissions(&partial_guild, &member);
 

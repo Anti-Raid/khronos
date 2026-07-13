@@ -1,9 +1,9 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, MessageId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteFollowupMessage {
     pub interaction_token: String,
-    pub message_id: serenity::all::MessageId,
+    pub message_id: MessageId,
 }
 
 impl ApiReq for DeleteFollowupMessage {

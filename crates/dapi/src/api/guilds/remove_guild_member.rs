@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, Permissions, UserId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RemoveGuildMember {
-    pub user_id: serenity::all::UserId,
+    pub user_id: UserId,
     pub reason: String,
 }
 
@@ -13,9 +12,7 @@ impl ApiReq for RemoveGuildMember {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_permissions_and_hierarchy(
             bot_user.id,

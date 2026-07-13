@@ -1,4 +1,4 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, get_format_from_image_data, types::EditGuild};
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider, get_format_from_image_data, types::EditGuild};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuild {
@@ -12,9 +12,7 @@ impl ApiReq for ModifyGuild {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.controller().current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         if let Some(ref name) = self.data.name {
             if name.len() < 2 || name.len() > 100 {
@@ -94,7 +92,7 @@ impl ApiReq for ModifyGuild {
 
         let (guild, _member, perms) = this.check_permissions(
             bot_user.id,
-            serenity::all::Permissions::MANAGE_GUILD,
+            Permissions::MANAGE_GUILD,
         )
         .await?;
 
@@ -119,7 +117,7 @@ impl ApiReq for ModifyGuild {
             if (
                 (features.contains(&"COMMUNITY".into()) && !guild_has_community) || 
                 (!features.contains(&"COMMUNITY".into()) && guild_has_community)
-            ) && !perms.contains(serenity::all::Permissions::ADMINISTRATOR) {
+            ) && !perms.contains(Permissions::ADMINISTRATOR) {
                 return Err("Enabling/disabling the community feature requires the bot to have the Administrator permission".into());
             }
         }

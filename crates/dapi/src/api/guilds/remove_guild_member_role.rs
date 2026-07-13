@@ -1,10 +1,10 @@
 // use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::{member_permissions, highest_role}};
+use crate::{ApiReq, Permissions, RoleId, UserId, context::DiscordContext, controller::DiscordProvider, serenity_backports::{highest_role, member_permissions}, types::{Member, PartialGuild}};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RemoveGuildMemberRole {
-    pub user_id: serenity::all::UserId,
-    pub role_id: serenity::all::RoleId,
+    pub user_id: UserId,
+    pub role_id: RoleId,
     pub reason: String,
 }
 
@@ -14,9 +14,7 @@ impl ApiReq for RemoveGuildMemberRole {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let bot_member_json = this.controller().get_guild_member(bot_user.id).await?;
 
@@ -24,10 +22,10 @@ impl ApiReq for RemoveGuildMemberRole {
             return Err("Bot user not found in guild".into());
         }
 
-        let bot_member = serde_json::from_value::<serenity::all::Member>(bot_member_json)?;
+        let bot_member = serde_json::from_value::<Member>(bot_member_json)?;
 
         let guild_json = this.controller().get_guild().await?;
-        let guild = serde_json::from_value::<serenity::all::PartialGuild>(guild_json)?;
+        let guild = serde_json::from_value::<PartialGuild>(guild_json)?;
 
         let target_member_json = this.controller().get_guild_member(self.user_id).await?;
         if target_member_json.is_null() {
@@ -36,7 +34,7 @@ impl ApiReq for RemoveGuildMemberRole {
 
         let resolved = member_permissions(&guild, &bot_member);
 
-        if !resolved.manage_roles() {
+        if !resolved.contains(Permissions::MANAGE_ROLES) {
             return Err("Bot does not have permission to manage roles".into());
         }
 

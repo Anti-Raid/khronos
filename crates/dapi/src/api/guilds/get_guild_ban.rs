@@ -1,19 +1,16 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, Permissions, UserId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct GetGuildBan {
-    pub user_id: serenity::all::UserId,
+    pub user_id: UserId,
 }
 
 impl ApiReq for GetGuildBan {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };    
+        let bot_user = this.current_user();    
 
         this.check_permissions(bot_user.id, Permissions::BAN_MEMBERS)
         .await?;

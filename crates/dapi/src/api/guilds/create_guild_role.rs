@@ -1,5 +1,4 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data};
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateGuildRole {
@@ -19,9 +18,7 @@ impl ApiReq for CreateGuildRole {
             }
         }
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let (guild, _, bot_perms) = this.check_permissions(
             bot_user.id,

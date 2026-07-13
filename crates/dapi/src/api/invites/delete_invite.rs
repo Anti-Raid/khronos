@@ -1,5 +1,6 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use serde::Deserialize;
+
+use crate::{ApiReq, Permissions, context::DiscordContext, controller::DiscordProvider, types::{MinPartialChannel, MinPartialGuild}};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteInvite {
@@ -13,16 +14,20 @@ impl ApiReq for DeleteInvite {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };    
+        let bot_user = this.current_user();    
 
         // Call get_invite to find the channel id
         let invite_json = this.controller()
-            .get_invite(&self.code, false, false, None)
+            .get_invite(&self.code, false)
             .await?;
 
-        let invite = serde_json::from_value::<serenity::all::Invite>(invite_json)?;
+        #[derive(Deserialize)]
+        struct PartialInvite {
+            guild: Option<MinPartialGuild>,
+            channel: MinPartialChannel
+        }
+
+        let invite = serde_json::from_value::<PartialInvite>(invite_json)?;
 
         if let Some(guild) = invite.guild {
             if guild.id != this.controller().guild_context()? {
@@ -30,13 +35,13 @@ impl ApiReq for DeleteInvite {
             }
         }
 
-        let (_partial_guild, _bot_member, _channel, perms) = this.check_channel_permissions(bot_user.id, invite.channel.id.widen(), Permissions::empty())
+        let (_partial_guild, _bot_member, _channel, perms) = this.check_channel_permissions(bot_user.id, invite.channel.id, Permissions::empty())
             .await?;
 
-        let has_perms = perms.manage_guild() || perms.manage_channels();
+        let has_perms = perms.contains(Permissions::MANAGE_GUILD) || perms.contains(Permissions::MANAGE_CHANNELS);
 
         if !has_perms {
-            return Err("Bot does not have permission to manage channels (either Manage Server globally or Manage Channels on the channel level)".into());
+            return Err("Bot does not have permission to manage this channel (either Manage Server globally or Manage Channels on the channel whose invite is to be deleted from)".into());
         }
 
         let invite = this.controller()

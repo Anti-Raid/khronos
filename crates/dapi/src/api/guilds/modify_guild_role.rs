@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditRole, get_format_from_image_data, serenity_backports::highest_role};
+use crate::{ApiReq, Permissions, RoleId, context::DiscordContext, controller::DiscordProvider, get_format_from_image_data, serenity_backports::highest_role, types::EditRole};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildRole {
-    pub role_id: serenity::all::RoleId,
+    pub role_id: RoleId,
     pub reason: String,
     pub data: EditRole,
 }
@@ -20,9 +19,7 @@ impl ApiReq for ModifyGuildRole {
             }
         }
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let (guild, member, bot_perms) = this.check_permissions(
             bot_user.id,

@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use serde_json::Value;
 
-use crate::{AnyId, ChannelId, CommandId, GuildId, InteractionId, MessageId, RoleId, RuleId, UserId, WebhookId, dhttp::{self, HttpError, UserPagination}, types::{CreateEmbed, MessagePagination, ModifyChannelPosition, ModifyRolePosition, ReactionType}};
+use crate::{AnyId, ChannelId, CommandId, GuildId, InteractionId, MessageId, RoleId, RuleId, UserId, dhttp::{self, HttpError, UserPagination}, types::{CreateEmbed, MessagePagination, ModifyChannelPosition, ModifyRolePosition, ReactionType}};
 
 pub enum DiscordProviderContext {
     Guild(GuildId),
@@ -995,21 +995,7 @@ pub trait DiscordProvider: 'static + Clone {
             .map_err(|e| format!("Failed to edit interaction followup: {e}").into())
     }
 
-    // Webhooks (all methods outside of deleting is currently not supported due to security risks)
-    async fn delete_webhook(
-        &self,
-        webhook_id: WebhookId,
-        audit_log_reason: Option<&str>,
-    ) -> Result<(), crate::Error> {
-        self.dhttp()
-            .call_fire(crate::dhttp::HttpCall::DeleteWebhook {
-                webhook_id,
-                audit_log_reason,
-            })
-            .await
-            .map_err(|e| format!("Failed to delete webhook: {e}").into())
-    }
-
+    // Webhooks (all methods) are not supported due to security risks at this time
     // Delete webhook with token is intentionally not supported for security reasons
     // Get/Edit/Delete webhook message is intentionally not supported due to lack of use cases and security concerns
 

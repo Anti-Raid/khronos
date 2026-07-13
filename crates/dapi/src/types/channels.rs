@@ -1,4 +1,6 @@
-use crate::{AnyId, ApplicationId, ChannelId, EmojiId, ForumTagId, Permissions, UserId, enum_number, multioption::MultiOption};
+use std::collections::HashMap;
+
+use crate::{AnyId, ApplicationId, ChannelId, EmojiId, ForumTagId, GuildId, Permissions, UserId, enum_number, multioption::MultiOption};
 use serde::{Deserialize, Deserializer, Serialize, ser::SerializeMap};
 
 enum_number! {
@@ -6,8 +8,7 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-channel-types).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
+
     pub enum ChannelType {
         /// An indicator that the channel is a text [`GuildChannel`].
         Text = 0,
@@ -38,7 +39,7 @@ enum_number! {
         /// An indicator that the channel is a forum [`GuildChannel`].
         Forum = 15,
         _ => Unknown(u8),
-    } // Make sure to update [`GuildChannel::is_text_based`].
+    }
 }
 
 enum_number! {
@@ -46,8 +47,7 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-video-quality-modes).
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
+
     pub enum VideoQualityMode {
         /// An indicator that the video quality is chosen by Discord for optimal
         /// performance.
@@ -63,8 +63,6 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/stage-instance#stage-instance-object-privacy-level).
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
     #[<default> = 2]
     pub enum StageInstancePrivacyLevel {
         /// The Stage instance is visible publicly. (deprecated)
@@ -80,8 +78,7 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#thread-metadata-object)
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
+
     pub enum AutoArchiveDuration {
         None = 0,
         OneHour = 60,
@@ -97,8 +94,7 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-forum-layout-types).
     #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    
-    #[non_exhaustive]
+
     pub enum ForumLayoutType {
         /// No default has been set for forum channel.
         NotSet = 0,
@@ -116,7 +112,7 @@ enum_number! {
 /// [docs]()
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
+
 pub enum ForumEmoji {
     /// The id of a guild's custom emoji.
     Id(EmojiId),
@@ -169,7 +165,7 @@ impl<'de> serde::Deserialize<'de> for ForumEmoji {
 /// See [Discord docs](https://discord.com/developers/docs/resources/channel#forum-tag-object)
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
+
 pub struct ForumTag {
     /// The id of the tag.
     pub id: ForumTagId,
@@ -187,10 +183,8 @@ enum_number! {
     /// The sort order for threads in a forum.
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-sort-order-types).
-    
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
-    #[non_exhaustive]
-    pub enum SortOrder {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
+pub enum SortOrder {
         /// Sort forum posts by activity.
         LatestActivity = 0,
         /// Sort forum posts by creation time (from most recent to oldest).
@@ -203,14 +197,24 @@ bitflags::bitflags! {
     /// Describes extra features of the channel.
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags).
-    
-    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
     pub struct ChannelFlags: u64 {
         /// This thread is pinned to the top of its parent GUILD_FORUM channel
         const PINNED = 1 << 1;
         /// Whether a tag is required to be specified when creating a
         /// thread in a GUILD_FORUM channel. Tags are specified in the applied_tags field.
         const REQUIRE_TAG = 1 << 4;
+    }
+}
+
+enum_number! {
+    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
+pub enum PermissionOverwriteType {
+        /// Permission overwrite targets an individual role.
+        Role = 0,
+        /// Permission overwrite targets an individual member.
+        Member = 1,
+        _ => Unknown(u8),
     }
 }
 
@@ -221,11 +225,63 @@ pub struct PermissionOverwrite {
     pub deny: Permissions,
     pub id: AnyId,
     #[serde(rename = "type")]
-    pub kind: u8,
+    pub kind: PermissionOverwriteType,
 }
 
-/// A builder for creating a new [`GuildChannel`] in a [`Guild`].
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct MinPartialChannel {
+    /// ID of the channel.
+    pub id: ChannelId,
+}
+
+/// For Discord's documentation on channels, refer to [Discord Docs/Channel].
 ///
+/// [Discord Docs/Channel]: https://discord.com/developers/docs/resources/channel
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Channel {
+    /// Flags of the channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<ChannelFlags>,
+    /// ID of the guild the channel is in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guild_id: Option<GuildId>,
+    /// ID of the channel.
+    pub id: ChannelId,
+    /// Whether users can be invited.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invitable: Option<bool>,
+    /// Type of the channel.
+    ///
+    /// This can be used to determine what fields *might* be available.
+    #[serde(rename = "type")]
+    pub kind: ChannelType,
+    /// Name of the channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Whether the channel has been configured to be NSFW.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nsfw: Option<bool>,
+    /// ID of the creator of the channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<UserId>,
+    /// ID of the parent channel.
+    ///
+    /// For guild channels this is the ID of the parent category channel.
+    ///
+    /// For threads this is the ID of the channel the thread was created in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<ChannelId>,
+    /// Explicit permission overwrites for members and roles.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
+    /// Sorting position of the channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<i32>,
+
+    #[serde(flatten)]
+    pub extra_info: HashMap<String, serde_json::Value>,
+}
+
 /// Except [`Self::name`], all fields are optional.
 ///
 /// [Discord docs](https://discord.com/developers/docs/resources/guild#create-guild-channel).
@@ -432,8 +488,7 @@ enum_number! {
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/invite#invite-object-invite-target-types).
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-    #[non_exhaustive]
-    pub enum InviteTargetType {
+pub enum InviteTargetType {
         Stream = 1,
         EmbeddedApplication = 2,
         _ => Unknown(u8),

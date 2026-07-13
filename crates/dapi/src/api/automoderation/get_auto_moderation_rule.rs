@@ -1,6 +1,4 @@
-use serenity::all::{Permissions, RuleId};
-
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, Permissions, RuleId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct GetAutoModerationRuleOptions {
@@ -16,9 +14,7 @@ impl ApiReq for GetAutoModerationRule {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_permissions(bot_user.id, Permissions::MANAGE_GUILD)
         .await?;

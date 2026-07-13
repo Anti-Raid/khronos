@@ -140,7 +140,4 @@ api_list_enum!(API {
     GetGuildCommands(crate::api::commands::get_guild_commands::GetGuildCommands),
     CreateGuildCommand(crate::api::commands::create_guild_command::CreateGuildCommand),
     CreateGuildCommands(crate::api::commands::create_guild_commands::CreateGuildCommands),
-
-    // Webhooks
-    DeleteWebhook(crate::api::webhooks::delete_webhook::DeleteWebhook),
 });

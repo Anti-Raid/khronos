@@ -1,9 +1,9 @@
-use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::EditWebhookMessage};
+use crate::{ApiReq, MessageId, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::EditWebhookMessage};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditFollowupMessage {
     pub interaction_token: String,
-    pub message_id: serenity::all::MessageId,
+    pub message_id: MessageId,
     pub data: EditWebhookMessage,
 }
 
@@ -11,12 +11,6 @@ impl ApiReq for EditFollowupMessage {
     type Resp = serde_json::Value;
 
     async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let files = if let Some(ref attachments) = self.data.attachments {
-            attachments.take_files()?
-        } else {
-            Vec::new()
-        };
-
         {
             // Apply superuser transformation to the message before sending, if applicable
             let transform = this
@@ -30,7 +24,7 @@ impl ApiReq for EditFollowupMessage {
         }
 
         let msg = this.controller()
-            .edit_followup_message(&self.interaction_token, self.message_id, &self.data, files)
+            .edit_followup_message(&self.interaction_token, self.message_id, &self.data)
             .await?;
 
         Ok(msg)

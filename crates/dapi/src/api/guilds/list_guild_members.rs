@@ -1,9 +1,9 @@
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, UserId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ListGuildMembers {
-    pub limit: Option<serenity::nonmax::NonMaxU16>,
-    pub after: Option<serenity::all::UserId>,
+    pub limit: Option<u16>,
+    pub after: Option<UserId>,
 }
 
 impl ApiReq for ListGuildMembers {
@@ -11,7 +11,7 @@ impl ApiReq for ListGuildMembers {
 
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         if let Some(limit) = self.limit {
-            if limit.get() > 1000 {
+            if limit > 1000 {
                 return Err("The maximum `limit` for get_guild_members is 1000".into());
             }
         }

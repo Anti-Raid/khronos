@@ -1,8 +1,8 @@
-use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateInteractionResponse};
+use crate::{ApiReq, InteractionId, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::CreateInteractionResponse};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateInteractionResponseRequest {
-    pub interaction_id: serenity::all::InteractionId,
+    pub interaction_id: InteractionId,
     pub interaction_token: String,
     pub data: CreateInteractionResponse,
 }
@@ -11,8 +11,6 @@ impl ApiReq for CreateInteractionResponseRequest {
     type Resp = ();
 
     async fn execute<T: DiscordProvider>(mut self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
-        let files = self.data.take_files()?;
-
         match self.data {
             CreateInteractionResponse::Message(ref mut msg) 
             | CreateInteractionResponse::UpdateMessage(ref mut msg) 
@@ -36,7 +34,7 @@ impl ApiReq for CreateInteractionResponseRequest {
         }
 
         this.controller()
-            .create_interaction_response(self.interaction_id, &self.interaction_token, &self.data, files)
+            .create_interaction_response(self.interaction_id, &self.interaction_token, &self.data)
             .await?;
 
         Ok(())

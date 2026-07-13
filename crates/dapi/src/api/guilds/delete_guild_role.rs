@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role};
+use crate::{ApiReq, Permissions, RoleId, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DeleteGuildRole {
-    pub role_id: serenity::all::RoleId,
+    pub role_id: RoleId,
     pub reason: String,
 }
 
@@ -17,9 +16,7 @@ impl ApiReq for DeleteGuildRole {
 
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let (guild, member, _) = this.check_permissions(
             bot_user.id,

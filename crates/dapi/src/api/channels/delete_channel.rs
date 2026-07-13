@@ -1,9 +1,8 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
+use crate::{ApiReq, ChannelId, Permissions, context::DiscordContext, controller::DiscordProvider, types::ChannelType};
 
 #[derive(Debug, serde::Serialize, Default, serde::Deserialize)]
 pub struct DeleteChannel {
-    pub channel_id: serenity::all::GenericChannelId,
+    pub channel_id: ChannelId,
     pub reason: String,
 }
 
@@ -13,18 +12,16 @@ impl ApiReq for DeleteChannel {
     async fn execute<T: DiscordProvider>(self, this: &DiscordContext<T>) -> Result<Self::Resp, crate::Error> {
         this.check_reason(&self.reason)?;
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         let (_partial_guild, _bot_member, guild_channel, perms) = this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::empty())
         .await?;
 
-        match guild_channel.base.kind {
-            serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread => {
+        match guild_channel.kind {
+            ChannelType::PublicThread | ChannelType::PrivateThread => {
                 // Check if the bot has permissions to manage threads
                 if !perms
-                    .manage_threads()
+                    .contains(Permissions::MANAGE_THREADS)
                 {
                     return Err("Bot does not have permission to manage this thread".into());
                 }
@@ -32,7 +29,7 @@ impl ApiReq for DeleteChannel {
             _ => {
                 // Check if the bot has permissions to manage channels
                 if !perms
-                    .manage_channels()
+                    .contains(Permissions::MANAGE_CHANNELS)
                 {
                     return Err("Bot does not have permission to manage this channel".into());
                 }

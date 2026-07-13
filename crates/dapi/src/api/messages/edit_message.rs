@@ -1,10 +1,9 @@
-use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::EditMessage};
+use crate::{ApiReq, Permissions, ChannelId, MessageId, context::DiscordContext, controller::{DiscordProvider, SuperUserMessageTransform, SuperUserMessageTransformFlags}, types::EditMessage};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct EditMessageRequest {
-    pub channel_id: serenity::all::GenericChannelId,
-    pub message_id: serenity::all::MessageId,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
     pub data: EditMessage,
 }
 
@@ -26,15 +25,13 @@ impl ApiReq for EditMessageRequest {
             self.data.content = transform.content;
         }
 
-        let Some(bot_user) = this.current_user() else {
-            return Err("Internal error: Current user not found".into());
-        };
+        let bot_user = this.current_user();
 
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::MANAGE_MESSAGES)
             .await?;
 
         let msg = this.controller()
-            .edit_message(self.channel_id, self.message_id, vec![], &self.data)
+            .edit_message(self.channel_id, self.message_id, &self.data)
             .await?;
 
         Ok(msg)
