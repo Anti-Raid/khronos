@@ -47,8 +47,8 @@ impl ApiReq for EditChannel {
             }
         }
 
-        if let Some(ref rate_limit_per_user) = self.data.rate_limit_per_user {
-            if rate_limit_per_user.get() > 21600 {
+        if let Some(rate_limit_per_user) = self.data.rate_limit_per_user {
+            if rate_limit_per_user > 21600 {
                 return Err(
                     "Rate limit per user must be less than 21600 seconds".into(),
                 );
@@ -88,10 +88,10 @@ impl ApiReq for EditChannel {
             }
         }
 
-        if let Some(ref default_thread_rate_limit_per_user) =
+        if let Some(default_thread_rate_limit_per_user) =
             self.data.default_thread_rate_limit_per_user
         {
-            if default_thread_rate_limit_per_user.get() > 21600 {
+            if default_thread_rate_limit_per_user > 21600 {
                 return Err(
                     "Default thread rate limit per user must be less than 21600 seconds".into()
                 );

@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use serenity::all::*;
 
-use crate::internal_enum_number;
+use crate::{EmojiId, enum_number};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CreatePoll {
@@ -29,7 +28,7 @@ pub struct CreatePollAnswer {
     pub poll_media: CreatePollAnswerMedia,
 }
 
-internal_enum_number! {
+enum_number! {
     /// Represents the different layouts that a [`Poll`] may have.
     ///
     /// Currently, there is only the one option.

@@ -1,11 +1,9 @@
-use crate::internal_enum_number;
+use crate::{ChannelId, GuildId, MessageId, StickerId, enum_number};
 
 use super::allowed_mentions::CreateAllowedMentions;
-use super::attachment::CreateMessageAttachment;
 use super::embed::CreateEmbed;
 use super::poll::CreatePoll;
 use serde::{Deserialize, Serialize};
-use serenity::all::*;
 use super::serenity_component::Component as SerenityComponent;
 
 /// The macro forwards the generation to the `bitflags::bitflags!` macro and implements the default
@@ -138,8 +136,6 @@ pub struct CreateMessage {
     pub enforce_nonce: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<CreateMessageAttachment>,
 }
 
 impl CreateMessage {
@@ -163,8 +159,6 @@ pub struct EditMessage {
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<Vec<SerenityComponent>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<CreateMessageAttachment>,
 }
 
 impl EditMessage {
@@ -173,7 +167,7 @@ impl EditMessage {
     }
 }
 
-internal_enum_number! {
+enum_number! {
     /// Message Reference Type information
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/message#message-reference-types)
@@ -198,7 +192,7 @@ pub struct MessageReference {
     /// ID of the originating message.
     pub message_id: Option<MessageId>,
     /// ID of the originating message's channel.
-    pub channel_id: GenericChannelId,
+    pub channel_id: ChannelId,
     /// ID of the originating message's guild.
     pub guild_id: Option<GuildId>,
     /// When sending, whether to error if the referenced message doesn't exist instead of sending
@@ -212,14 +206,4 @@ pub enum MessagePagination {
     Before(MessageId),
     After(MessageId),
     Around(MessageId),
-}
-
-impl From<MessagePagination> for serenity::all::MessagePagination {
-    fn from(p: MessagePagination) -> Self {
-        match p {
-            MessagePagination::Before(id) => serenity::all::MessagePagination::Before(id),
-            MessagePagination::After(id) => serenity::all::MessagePagination::After(id),
-            MessagePagination::Around(id) => serenity::all::MessagePagination::Around(id),
-        }
-    }
 }

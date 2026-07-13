@@ -1,7 +1,94 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use serenity::all::*;
 use std::collections::HashMap;
+
+use crate::{Permissions, enum_number, types::ChannelType};
+
+enum_number! {
+    /// The type of an application command.
+    ///
+    /// [Discord docs](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-types).
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    
+    #[non_exhaustive]
+    pub enum CommandType {
+        ChatInput = 1,
+        User = 2,
+        Message = 3,
+        PrimaryEntryPoint = 4,
+        _ => Unknown(u8),
+    }
+}
+
+enum_number! {
+    /// Signifies how the invocation of a command of type [`PrimaryEntryPoint`] should be handled.
+    ///
+    /// [`PrimaryEntryPoint`]: CommandType::PrimaryEntryPoint
+    /// [Discord docs](https://discord.com/developers/docs/interactions/application-commands#application-command-object-entry-point-command-handler-types)
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    
+    #[non_exhaustive]
+    pub enum EntryPointHandlerType {
+        AppHandler = 1,
+        DiscordLaunchActivity = 2,
+        _ => Unknown(u8),
+    }
+}
+
+enum_number! {
+    /// The type of an [`CommandOption`].
+    ///
+    /// [Discord docs](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type).
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    
+    #[non_exhaustive]
+    pub enum CommandOptionType {
+        SubCommand = 1,
+        SubCommandGroup = 2,
+        String = 3,
+        Integer = 4,
+        Boolean = 5,
+        User = 6,
+        Channel = 7,
+        Role = 8,
+        Mentionable = 9,
+        Number = 10,
+        Attachment = 11,
+        _ => Unknown(u8),
+    }
+}
+
+enum_number! {
+    /// An enum representing the [installation contexts].
+    ///
+    /// [interaction contexts](https://discord.com/developers/docs/resources/application#application-object-application-integration-types).
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    
+    #[non_exhaustive]
+    pub enum InstallationContext {
+        Guild = 0,
+        User = 1,
+        _ => Unknown(u8),
+    }
+}
+
+enum_number! {
+    /// An enum representing the different [interaction contexts].
+    ///
+    /// [interaction contexts](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-interaction-context-types).
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+    
+    #[non_exhaustive]
+    pub enum InteractionContext {
+        /// Interaction can be used within servers
+        Guild = 0,
+        /// Interaction can be used within DMs with the app's bot user
+        BotDm = 1,
+        /// Interaction can be used within Group DMs and DMs other than the app's bot user
+        PrivateChannel = 2,
+        _ => Unknown(u8),
+    }
+}
 
 /// A builder for creating a new [`Command`].
 ///

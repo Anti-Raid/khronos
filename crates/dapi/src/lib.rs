@@ -12,6 +12,10 @@ pub mod apilist;
 pub mod multioption;
 pub mod validator;
 pub mod ensure_safe;
+pub mod id;
+pub mod permissions;
+pub use id::*;
+pub use permissions::*;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>; // This is constant and should be copy pasted
 

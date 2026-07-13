@@ -1,4 +1,5 @@
-use serenity::all::{Mentionable, UserId};
+use crate::types::PartialGuild;
+use crate::{Permissions, UserId};
 
 use crate::{controller::DiscordProvider, serenity_backports::member_permissions};
 
@@ -6,14 +7,14 @@ use crate::{controller::DiscordProvider, serenity_backports::member_permissions}
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiraidFusedMemberSingle {
     pub member: serenity::all::Member,
-    pub resolved_perms: serenity::all::Permissions,
+    pub resolved_perms: Permissions,
 }
 
 /// A fused member contains both a member, the guild and the resolved permissions of
 /// the member in the guild. This is useful for operations that require both the member and the guild context, such as permission checks.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AntiraidFusedMember {
-    pub guild: serenity::all::PartialGuild,
+    pub guild: PartialGuild,
     pub members: Vec<AntiraidFusedMemberSingle>,
 }
 
@@ -53,8 +54,8 @@ impl<T: DiscordProvider> DiscordContext<T> {
 
     pub async fn check_permissions(
         &self,
-        user_id: serenity::all::UserId,
-        needed_permissions: serenity::all::Permissions,
+        user_id: UserId,
+        needed_permissions: Permissions,
     ) -> Result<(
         serenity::all::PartialGuild,
         serenity::all::Member,
@@ -96,8 +97,8 @@ impl<T: DiscordProvider> DiscordContext<T> {
 
     pub async fn check_permissions_and_hierarchy(
         &self,
-        user_id: serenity::all::UserId,
-        target_id: serenity::all::UserId,
+        user_id: UserId,
+        target_id: UserId,
         needed_permissions: serenity::all::Permissions,
     ) -> Result<(
         serenity::all::PartialGuild,
@@ -169,7 +170,7 @@ impl<T: DiscordProvider> DiscordContext<T> {
     /// The returned GuildChannel will either be the GuildChannel or the parent GuildChannel of a thread (if the channel id is one for a thread)
     pub async fn check_channel_permissions(
         &self,
-        user_id: serenity::all::UserId,
+        user_id: UserId,
         channel_id: serenity::all::GenericChannelId,
         needed_permissions: serenity::all::Permissions,
     ) -> Result<(

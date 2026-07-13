@@ -1,12 +1,11 @@
-use serenity::nonmax::NonMaxU32;
 use serde::de::Error as DeError;
 use serde::ser::{Serializer};
 use serde::{Deserialize, Serialize, Deserializer};
 use serde_json::{from_value, Value};
-use small_fixed_array::{FixedString, FixedArray};
 use serde_json::Map as JsonMap;
 
-use serenity::model::prelude::*;
+use crate::{SkuId, enum_number};
+use crate::types::{ChannelType, ReactionType};
 
 fn default_true() -> bool {
     true
@@ -20,45 +19,7 @@ where
     T::deserialize(val).map_err(serde::de::Error::custom)
 }
 
-#[macro_export]
-macro_rules! internal_enum_number {
-    (
-        $(#[$outer:meta])*
-        $(#[<default> = $default:literal])?
-        $vis:vis enum $Enum:ident {
-            $(
-                $(#[doc = $doc:literal])*
-                $(#[cfg $($cfg:tt)*])?
-                $Variant:ident = $value:literal,
-            )*
-            _ => Unknown($T:ty),
-        }
-    ) => {
-        $(#[$outer])*
-        $vis struct $Enum (pub $T);
-
-        $(
-            impl Default for $Enum {
-                fn default() -> Self {
-                    Self($default)
-                }
-            }
-        )?
-
-        #[allow(non_snake_case, non_upper_case_globals)]
-        #[allow(clippy::allow_attributes, reason = "Does not always trigger due to macro")]
-        #[allow(dead_code)]
-        impl $Enum {
-            $(
-                $(#[doc = $doc])*
-                $(#[cfg $($cfg)*])?
-                $vis const $Variant: Self = Self($value);
-            )*
-        }
-    };
-}
-
-internal_enum_number! {
+enum_number! {
     /// The type of a component
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
     pub enum ComponentType {
@@ -154,7 +115,7 @@ pub struct Section {
     /// The components inside of the section.
     ///
     /// As of 2025-02-28, this is limited to just [`ComponentType::TextDisplay`] with up to 3 max.
-    pub components: FixedArray<Component>,
+    pub components: Vec<Component>,
     /// The accessory to the side of the section.
     ///
     /// As of 2025-02-28, this is limited to [`ComponentType::Button`] or
@@ -176,7 +137,7 @@ pub struct Thumbnail {
     /// The internal media item this contains.
     pub media: UnfurledMediaItem,
     /// The description of the thumbnail.
-    pub description: Option<FixedString<u16>>,
+    pub description: Option<String>,
     /// Whether or not this component is spoilered.
     pub spoiler: Option<bool>,
 }
@@ -188,15 +149,15 @@ pub struct Thumbnail {
 #[non_exhaustive]
 pub struct UnfurledMediaItem {
     /// The url of this item.
-    pub url: FixedString<u16>,
+    pub url: String,
     /// The proxied discord url.
-    pub proxy_url: Option<FixedString<u16>>,
+    pub proxy_url: Option<String>,
     /// The width of the media item.
-    pub width: Option<NonMaxU32>,
+    pub width: Option<u32>,
     /// The height of the media item.
-    pub height: Option<NonMaxU32>,
+    pub height: Option<u32>,
     /// The content type of the media item.
-    pub content_type: Option<FixedString>,
+    pub content_type: Option<String>,
 }
 
 /// A component that allows you to add text to your message, similiar to the `content` field of a
@@ -210,7 +171,7 @@ pub struct TextDisplay {
     #[serde(rename = "type")]
     pub kind: ComponentType,
     /// The content of this text display component.
-    pub content: FixedString<u16>,
+    pub content: String,
 }
 
 /// A Media Gallery is a component that allows you to display media attachments in an organized
@@ -224,7 +185,7 @@ pub struct MediaGallery {
     #[serde(rename = "type")]
     pub kind: ComponentType,
     /// Array of images this media gallery can contain, max of 10.
-    pub items: FixedArray<MediaGalleryItem>,
+    pub items: Vec<MediaGalleryItem>,
 }
 
 /// An individual media gallery item.
@@ -238,7 +199,7 @@ pub struct MediaGalleryItem {
     /// The internal media piece that this item contains.
     pub media: UnfurledMediaItem,
     /// The description of the media item.
-    pub description: Option<FixedString<u16>>,
+    pub description: Option<String>,
     /// Whether or not this component is spoilered.
     pub spoiler: Option<bool>,
 }
@@ -258,7 +219,7 @@ pub struct Separator {
     pub spacing: Option<SeparatorSpacingSize>,
 }
 
-internal_enum_number! {
+enum_number! {
     /// The size of a separator component.
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
     #[non_exhaustive]
@@ -294,7 +255,7 @@ pub struct Container {
     #[serde(rename = "type")]
     pub kind: ComponentType,
     /// The accent colour, similar to an embeds accent.
-    pub accent_color: Option<Colour>,
+    pub accent_color: Option<u32>,
     /// Whether or not this component is spoilered.
     pub spoiler: Option<bool>,
     /// The components within this container.
@@ -302,7 +263,7 @@ pub struct Container {
     /// As of 2025-02-28, this can be [`ComponentType::ActionRow`], [`ComponentType::Section`],
     /// [`ComponentType::TextDisplay`], [`ComponentType::MediaGallery`], [`ComponentType::File`] or
     /// [`ComponentType::Separator`]
-    pub components: FixedArray<Component>,
+    pub components: Vec<Component>,
 }
 
 /// An action row.
@@ -386,9 +347,9 @@ impl From<SelectMenu> for ActionRowComponent {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum ButtonKind {
-    Link { url: FixedString },
+    Link { url: String },
     Premium { sku_id: SkuId },
-    NonLink { custom_id: FixedString, style: ButtonStyle },
+    NonLink { custom_id: String, style: ButtonStyle },
 }
 
 impl Serialize for ButtonKind {
@@ -452,7 +413,7 @@ pub struct Button {
     pub data: ButtonKind,
     /// The text which appears on the button.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<FixedString>,
+    pub label: Option<String>,
     /// The emoji of this button, if there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emoji: Option<ReactionType>,
@@ -461,7 +422,7 @@ pub struct Button {
     pub disabled: bool,
 }
 
-internal_enum_number! {
+enum_number! {
     /// The style of a button.
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
     #[non_exhaustive]
@@ -487,17 +448,17 @@ pub struct SelectMenu {
     #[serde(rename = "type")]
     pub kind: ComponentType,
     /// An identifier defined by the developer for the select menu.
-    pub custom_id: Option<FixedString>,
+    pub custom_id: Option<String>,
     /// The options of this select menu.
     ///
     /// Required for [`ComponentType::StringSelect`] and unavailable for all others.
     #[serde(default)]
-    pub options: FixedArray<SelectMenuOption>,
+    pub options: Vec<SelectMenuOption>,
     /// List of channel types to include in the [`ComponentType::ChannelSelect`].
     #[serde(default)]
-    pub channel_types: FixedArray<ChannelType>,
+    pub channel_types: Vec<ChannelType>,
     /// The placeholder shown when nothing is selected.
-    pub placeholder: Option<FixedString>,
+    pub placeholder: Option<String>,
     /// The minimum number of selections allowed.
     pub min_values: Option<u8>,
     /// The maximum number of selections allowed.
@@ -514,11 +475,11 @@ pub struct SelectMenu {
 #[non_exhaustive]
 pub struct SelectMenuOption {
     /// The text displayed on this option.
-    pub label: FixedString,
+    pub label: String,
     /// The value to be sent for this option.
-    pub value: FixedString,
+    pub value: String,
     /// The description shown for this option.
-    pub description: Option<FixedString>,
+    pub description: Option<String>,
     /// The emoji displayed on this option.
     pub emoji: Option<ReactionType>,
     /// Render this option as the default selection.
@@ -536,7 +497,7 @@ pub struct InputText {
     #[serde(rename = "type")]
     pub kind: ComponentType,
     /// Developer-defined identifier for the input; max 100 characters
-    pub custom_id: FixedString<u16>,
+    pub custom_id: String,
     /// The [`InputTextStyle`]. Required when sending modal data.
     ///
     /// Discord docs are wrong here; it says the field is always sent in modal submit interactions
@@ -548,7 +509,7 @@ pub struct InputText {
     /// Discord docs are wrong here; it says the field is always sent in modal submit interactions
     /// but it's not. It's only required when _sending_ modal data to Discord.
     /// <https://github.com/discord/discord-api-docs/issues/6141>
-    pub label: Option<FixedString<u8>>,
+    pub label: Option<String>,
     /// Minimum input length for a text input; min 0, max 4000
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_length: Option<u16>,
@@ -562,13 +523,13 @@ pub struct InputText {
     ///
     /// When receiving: The input from the user (always Some)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<FixedString<u16>>,
+    pub value: Option<String>,
     /// Custom placeholder text if the input is empty; max 100 characters
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub placeholder: Option<FixedString<u16>>,
+    pub placeholder: Option<String>,
 }
 
-internal_enum_number! {
+enum_number! {
     /// The style of the input text
     ///
     /// [Discord docs](https://discord.com/developers/docs/interactions/message-components#text-inputs-text-input-styles).

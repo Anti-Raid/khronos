@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use rustrict::{Censor, Type};
 
 use crate::ensure_safe;
+use crate::types::CommandType;
 use crate::types::{CreateEmbed, CreateMessage, EditMessage, ExecuteWebhook, CreateCommandOption, CreateCommand, serenity_component::{ComponentType, Component, ActionRowComponent}};
 
 pub const MESSAGE_CONTENT_LIMIT: usize = 2000;
@@ -259,13 +260,6 @@ pub fn validate_message(message: &CreateMessage) -> Result<(), crate::Error> {
 
     let has_content = message.content.is_some();
     let has_embed = !message.embeds.is_empty();
-    let has_attachments = message.attachments.is_some()
-        && !message
-            .attachments
-            .as_ref()
-            .unwrap()
-            .new_and_existing_attachments
-            .is_empty();
     let has_poll = message.poll.is_some();
     let has_sticker_ids = !message.sticker_ids.is_empty();
     let has_components =
@@ -273,12 +267,11 @@ pub fn validate_message(message: &CreateMessage) -> Result<(), crate::Error> {
 
     if !has_content
         && !has_embed
-        && !has_attachments
         && !has_poll
         && !has_sticker_ids
         && !has_components
     {
-        return Err("No content/embeds/attachments/poll/sticker_ids/components set".into());
+        return Err("No content/embeds/poll/sticker_ids/components set".into());
     }
 
     if let Some(content) = message.content.as_ref() {
@@ -328,22 +321,14 @@ pub fn validate_message_edit(message: &EditMessage) -> Result<(), crate::Error> 
     } else {
         false
     };
-    let has_attachments = message.attachments.is_some()
-        && !message
-            .attachments
-            .as_ref()
-            .unwrap()
-            .new_and_existing_attachments
-            .is_empty();
     let has_components =
         message.components.is_some() && !message.components.as_ref().unwrap().is_empty();
 
     if !has_content
         && !has_embed
-        && !has_attachments
         && !has_components
     {
-        return Err("No content/embeds/attachments/components set".into());
+        return Err("No content/embeds/components set".into());
     }
 
     if let Some(content) = message.content.as_ref() {
@@ -471,7 +456,7 @@ pub fn validate_webhook_execute(message: &ExecuteWebhook) -> Result<(), crate::E
 
 fn validate_option(
     option: &CreateCommandOption,
-    kind: serenity::all::CommandType,
+    kind: CommandType,
     depth: u8,
 ) -> Result<(), crate::Error> {
     if depth > 3 {
@@ -482,7 +467,7 @@ fn validate_option(
     validate_string_safe(&option.name)?;
 
     // For CHAT_INPUT commands, validate against Discord's regex
-    if kind == serenity::all::CommandType::ChatInput {
+    if kind == CommandType::ChatInput {
         // Validate the name against Discord's regex for CHAT_INPUT commands
         validate_name_option_chatinput(&option.name)?;
     }
@@ -494,7 +479,7 @@ fn validate_option(
             validate_string_safe(name)?;
 
             // For CHAT_INPUT commands, validate against Discord's regex
-            if kind == serenity::all::CommandType::ChatInput {
+            if kind == CommandType::ChatInput {
                 validate_name_option_chatinput(name)?;
             }
         }
@@ -526,12 +511,12 @@ fn validate_option(
 pub fn validate_command(command: &CreateCommand) -> Result<(), crate::Error> {
     let kind = command
         .kind
-        .unwrap_or(serenity::all::CommandType::ChatInput);
+        .unwrap_or(CommandType::ChatInput);
 
     if let Some(name) = command.fields.name.as_ref() {
         validate_string_safe(name)?;
         // For CHAT_INPUT commands, validate against Discord's regex
-        if kind == serenity::all::CommandType::ChatInput {
+        if kind == CommandType::ChatInput {
             validate_name_option_chatinput(name)?;
         }
     }
@@ -541,7 +526,7 @@ pub fn validate_command(command: &CreateCommand) -> Result<(), crate::Error> {
         validate_string_safe(name)?;
 
         // For CHAT_INPUT commands, validate against Discord's regex
-        if kind == serenity::all::CommandType::ChatInput {
+        if kind == CommandType::ChatInput {
             validate_name_option_chatinput(name)?;
         }
     }

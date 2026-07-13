@@ -33,14 +33,8 @@ impl ApiReq for EditMessageRequest {
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::MANAGE_MESSAGES)
             .await?;
 
-        let files = if let Some(ref attachments) = self.data.attachments {
-            attachments.take_files()?
-        } else {
-            Vec::new()
-        };
-
         let msg = this.controller()
-            .edit_message(self.channel_id, self.message_id, files, &self.data)
+            .edit_message(self.channel_id, self.message_id, vec![], &self.data)
             .await?;
 
         Ok(msg)

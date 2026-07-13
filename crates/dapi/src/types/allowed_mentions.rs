@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serenity::all::*;
+use crate::{RoleId, UserId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]

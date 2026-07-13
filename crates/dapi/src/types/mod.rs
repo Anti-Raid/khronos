@@ -1,6 +1,5 @@
 pub mod allowed_mentions;
 pub mod app_commands;
-pub mod attachment;
 pub mod auto_moderation;
 pub mod channels;
 pub mod embed;

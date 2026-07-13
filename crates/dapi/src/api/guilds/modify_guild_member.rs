@@ -1,5 +1,5 @@
 use serenity::all::Permissions;
-use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, types::EditMember, serenity_backports::highest_role};
+use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider, serenity_backports::highest_role, types::{EditMember, EditableGuildMemberFlags}};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModifyGuildMember {
@@ -81,17 +81,10 @@ impl ApiReq for ModifyGuildMember {
             return Err("Target user not found in guild".into());
         }
 
-        if let Some(ref mut flags) = self.data.flags {
+        if let Some(ref flags) = self.data.flags {
             if !(perms.contains(Permissions::MANAGE_GUILD) || perms.contains(Permissions::MANAGE_ROLES) || perms.contains(Permissions::MODERATE_MEMBERS | Permissions::KICK_MEMBERS | Permissions::BAN_MEMBERS)) {
                 return Err("Modifying member flags requires either MANAGE_GUILD, MANAGE_ROLES, or (MODERATE_MEMBERS and KICK_MEMBERS and BAN_MEMBERS)".into());
             }
-
-            let mut p_flags = serenity::all::GuildMemberFlags::empty();
-            if flags.contains(serenity::all::GuildMemberFlags::BYPASSES_VERIFICATION) {
-                p_flags |= serenity::all::GuildMemberFlags::BYPASSES_VERIFICATION;
-            }
-            
-            *flags = p_flags;
         }
 
         // Check roles

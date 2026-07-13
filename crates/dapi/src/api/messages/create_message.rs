@@ -32,14 +32,8 @@ impl ApiReq for CreateMessageRequest {
         this.check_channel_permissions(bot_user.id, self.channel_id, Permissions::SEND_MESSAGES)
             .await?;
 
-        let files = if let Some(ref attachments) = self.data.attachments {
-            attachments.take_files()?
-        } else {
-            Vec::new()
-        };
-
         let msg = this.controller()
-            .create_message(self.channel_id, files, &self.data)
+            .create_message(self.channel_id, vec![], &self.data)
             .await?;
 
         Ok(msg)

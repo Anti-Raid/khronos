@@ -1,9 +1,8 @@
-use serenity::all::*;
 use serde::{Deserialize, Serialize};
+use crate::{AnyId, ChannelId};
 use crate::multioption::MultiOption;
 use super::MessageFlags;
 use super::allowed_mentions::CreateAllowedMentions;
-use super::attachment::CreateMessageAttachment;
 use super::embed::CreateEmbed;
 use super::poll::CreatePoll;
 use super::serenity_component::Component as SerenityComponent;
@@ -44,13 +43,11 @@ pub struct ExecuteWebhook {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<CreateMessageAttachment>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thread_name: Option<String>,    
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub applied_tags: Option<Vec<GenericId>>,
+    pub applied_tags: Option<Vec<AnyId>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
 }

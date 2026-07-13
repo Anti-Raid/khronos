@@ -1,12 +1,10 @@
 use super::MessageFlags;
 
 use super::allowed_mentions::CreateAllowedMentions;
-use super::attachment::CreateMessageAttachment;
 use super::embed::CreateEmbed;
 use super::poll::CreatePoll;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
-use serenity::all::*;
 use std::collections::HashMap;
 use super::serenity_component::Component as SerenityComponent;
 use super::serenity_component::ActionRow as SerenityActionRow;
@@ -69,35 +67,6 @@ impl Default for CreateInteractionResponse {
     }
 }
 
-impl CreateInteractionResponse {
-    pub fn take_files<'a>(&self) -> Result<Vec<serenity::all::CreateAttachment<'a>>, crate::Error> {
-        match self {
-            Self::Message(x) => {
-                if let Some(ref x) = x.attachments {
-                    x.take_files()
-                } else {
-                    Ok(Vec::new())
-                }
-            }
-            Self::Defer(x) => {
-                if let Some(ref x) = x.attachments {
-                    x.take_files()
-                } else {
-                    Ok(Vec::new())
-                }
-            }
-            Self::UpdateMessage(x) => {
-                if let Some(ref x) = x.attachments {
-                    x.take_files()
-                } else {
-                    Ok(Vec::new())
-                }
-            }
-            _ => Ok(Vec::new()),
-        }
-    }
-}
-
 /// [Discord docs](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-messages).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[must_use]
@@ -116,8 +85,6 @@ pub struct CreateInteractionResponseMessage {
     pub components: Option<Vec<SerenityComponent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<CreateMessageAttachment>,
 }
 
 impl serde::Serialize for CreateInteractionResponse {
@@ -278,7 +245,6 @@ pub struct CreateInteractionResponseFollowup {
     pub flags: Option<MessageFlags>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub poll: Option<CreatePoll>,
-    pub attachments: Option<CreateMessageAttachment>,
 }
 
 /// A builder to specify the fields to edit in an existing [`Webhook`]'s message.
@@ -294,6 +260,4 @@ pub struct EditWebhookMessage {
     pub allowed_mentions: Option<CreateAllowedMentions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub components: Option<Vec<SerenityComponent>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<CreateMessageAttachment>,
 }
