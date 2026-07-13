@@ -4,7 +4,6 @@ version = "1.0.0"
 edition = "2024"
 
 [dependencies]
-async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 reqwest = { version = "0.12", features = ["json"] }
@@ -20,9 +19,7 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
     "luau",
     "serialize",
 ], optional = true }
-mlua_scheduler = { git = "https://github.com/mluau/scheduler", optional = true }
-arrayvec = { version = "0.7", features = ["serde"] }
 
 [features]
 default = ["luau"]
-luau = ["dep:mluau", "dep:mlua_scheduler"]
+luau = ["dep:mluau"]

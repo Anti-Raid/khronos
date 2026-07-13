@@ -184,9 +184,6 @@ name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "async-compression"
@@ -198,17 +195,6 @@ dependencies = [
  "compression-core",
  "pin-project-lite",
  "tokio",
-]
-
-[[package]]
-name = "async-trait"
-version = "0.1.89"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -661,14 +647,11 @@ dependencies = [
 name = "dapi"
 version = "1.0.0"
 dependencies = [
- "arrayvec",
- "async-trait",
  "bitflags 2.11.0",
  "chrono",
  "extract_map",
  "linkify",
  "log",
- "mlua_scheduler",
  "mluau",
  "percent-encoding",
  "regex",

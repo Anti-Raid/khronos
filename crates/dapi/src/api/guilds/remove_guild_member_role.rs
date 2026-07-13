@@ -1,4 +1,3 @@
-// use serenity::all::Permissions;
 use crate::{ApiReq, Permissions, RoleId, UserId, context::DiscordContext, controller::DiscordProvider, serenity_backports::{highest_role, member_permissions}, types::{Member, PartialGuild}};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
