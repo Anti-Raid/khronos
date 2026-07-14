@@ -33,7 +33,6 @@ pub enum ClientKind {
 }
 
 struct ClientInner {
-    token: HeaderValue,
     discord: String,
     client: reqwest::Client,
     app_id: ApplicationId
@@ -42,6 +41,7 @@ struct ClientInner {
 #[derive(Clone)]
 pub struct Client {
     inner: Arc<ClientInner>,
+    token: HeaderValue,
 }
 
 impl std::fmt::Debug for Client {
@@ -56,15 +56,15 @@ impl Client {
             ClientKind::Bot { token } => format!("Bot {token}"),
             ClientKind::Oauth2 { token } => format!("Bearer {token}")
         };
-        Self { inner: Arc::new(ClientInner { token: HeaderValue::from_str(&token).unwrap(), discord: discord.into(), client, app_id }) }
+        Self { inner: Arc::new(ClientInner { discord: discord.into(), client, app_id }), token: HeaderValue::from_str(&token).unwrap() }
     }
 
-    pub fn nest(&self, discord: String, kind: ClientKind, client: reqwest::Client) -> Self {
+    pub fn nest(&self, kind: ClientKind) -> Self {
         let token = match kind {
             ClientKind::Bot { token } => format!("Bot {token}"),
             ClientKind::Oauth2 { token } => format!("Bearer {token}")
         };
-        Self { inner: Arc::new(ClientInner { token: HeaderValue::from_str(&token).unwrap(), discord: discord.into(), client, app_id: self.inner.app_id }) }
+        Self { inner: self.inner.clone(), token: HeaderValue::from_str(&token).unwrap() }
     }
 
     pub fn app_id(&self) -> ApplicationId {
@@ -79,7 +79,7 @@ impl Client {
         headers.insert(USER_AGENT, HeaderValue::from_static(USER_AGENT_STR));
         headers.insert(
             AUTHORIZATION,
-            self.inner.token.clone(),
+            self.token.clone(),
         );
 
         let furl = format!("{}/{}", self.inner.discord, req.url);
