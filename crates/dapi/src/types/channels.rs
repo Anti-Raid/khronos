@@ -197,8 +197,8 @@ bitflags::bitflags! {
     /// Describes extra features of the channel.
     ///
     /// [Discord docs](https://discord.com/developers/docs/resources/channel#channel-object-channel-flags).
-#[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
-    pub struct ChannelFlags: u64 {
+    #[derive(Copy, Clone, Default, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
+    pub struct ChannelFlags: u16 {
         /// This thread is pinned to the top of its parent GUILD_FORUM channel
         const PINNED = 1 << 1;
         /// Whether a tag is required to be specified when creating a
@@ -239,9 +239,6 @@ pub struct MinPartialChannel {
 /// [Discord Docs/Channel]: https://discord.com/developers/docs/resources/channel
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Channel {
-    /// Flags of the channel.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub flags: Option<ChannelFlags>,
     /// ID of the guild the channel is in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guild_id: Option<GuildId>,
