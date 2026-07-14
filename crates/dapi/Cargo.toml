@@ -15,11 +15,3 @@ bitflags = { version = "2", features = ["serde"] }
 linkify = { git = "https://github.com/robinst/linkify" }
 rustrict = "0.7"
 regex = "1"
-mluau = { git = "https://github.com/mluau/mluau", features = [
-    "luau",
-    "serialize",
-], optional = true }
-
-[features]
-default = ["luau"]
-luau = ["dep:mluau"]

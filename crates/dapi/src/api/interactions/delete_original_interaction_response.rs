@@ -1,7 +1,6 @@
 use crate::{ApiReq, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
 pub struct DeleteOriginalInteractionResponse {
     pub interaction_token: String,
 }

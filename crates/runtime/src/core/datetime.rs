@@ -633,7 +633,7 @@ mod tests {
             assert(date.base_offset.millis == 19800000, "12: Expected 19800000, got " .. date.base_offset.millis)
             assert(date.dst_offset.seconds == 0, "12: Expected 0, got " .. date.dst_offset.seconds)
             assert(date.dst_offset.millis == 0, "12: Expected 0, got " .. date.dst_offset.millis)
-            assert(date.tz == myTz, "12: Expected myTz, got " .. tostring(date.tz))
+            assert(date.timezone == myTz, "12: Expected myTz, got " .. tostring(date.timezone))
             
             -- Make a new timedelta object
             local td = tz.timedelta_seconds(10)
@@ -666,6 +666,7 @@ mod tests {
             assert(tz.UTC:fromString("2021-01-01T08:00:00+00:00"):format("%Y-%m-%dT%H:%M:%S%z") == "2021-01-01T08:00:00+0000", "23: Expected 2021-01-01T08:00:00+0000, got " .. tz.UTC:fromString("2021-01-01T08:00:00+00:00"):format("%Y-%m-%dT%H:%M:%S%z"))
         "#,
         )
+        .set_name("dt")
         .call::<()>(module)
         .unwrap();
     }

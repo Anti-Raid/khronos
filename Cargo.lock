@@ -652,7 +652,6 @@ dependencies = [
  "extract_map",
  "linkify",
  "log",
- "mluau",
  "percent-encoding",
  "regex",
  "reqwest",

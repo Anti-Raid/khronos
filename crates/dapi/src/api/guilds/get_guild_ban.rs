@@ -1,7 +1,6 @@
 use crate::{ApiReq, Permissions, UserId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
 pub struct GetGuildBan {
     pub user_id: UserId,
 }

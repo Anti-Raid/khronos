@@ -1,7 +1,6 @@
 use crate::{ApiReq, UserId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
 pub struct GetGuildMember {
     pub user_id: UserId,
 }

@@ -1,7 +1,6 @@
 use crate::{ApiReq, ChannelId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
 pub struct GetChannel {
     pub channel_id: ChannelId,
 }

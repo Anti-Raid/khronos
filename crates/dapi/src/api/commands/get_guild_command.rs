@@ -1,7 +1,6 @@
 use crate::{ApiReq, CommandId, context::DiscordContext, controller::DiscordProvider};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
 pub struct GetGuildCommand {
     pub command_id: CommandId,
 }
