@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use reqwest::header::{
     AUTHORIZATION,
-    CONTENT_LENGTH,
     CONTENT_TYPE,
     HeaderValue,
     USER_AGENT,
@@ -82,19 +81,17 @@ impl Client {
             self.token.clone(),
         );
 
-        let furl = format!("{}/{}", self.inner.discord, req.url);
+        let furl = format!("{}{}", self.inner.discord, req.url);
         let fmethod = req.method;
         let mut reqw = self.inner.client.request(fmethod.clone(), furl);
         if let Some(body) = req.body {
-            headers.insert(CONTENT_LENGTH, body.len().into());
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             reqw = reqw.body(body);
-        } else {
-            headers.insert(CONTENT_LENGTH, 0.into()); 
         }
 
         let reqw = reqw.headers(headers).build()?;
         let resp = self.inner.client.execute(reqw).await?;  
+        log::info!("resp status code: {:?}", resp.status());
         Ok((resp, fmethod))
     }
 
