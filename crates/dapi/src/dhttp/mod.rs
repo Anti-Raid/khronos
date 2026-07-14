@@ -27,11 +27,3 @@ pub enum UserPagination {
     /// The Id to get the users before.
     Before(UserId),
 }
-
-pub(super) async fn decode_resp<T: serde::de::DeserializeOwned>(
-    resp: reqwest::Response,
-) -> Result<T, crate::dhttp::error::HttpError> {
-    let result = serde_json::from_slice(&resp.bytes().await?)?;
-    Ok(result)
-}
-

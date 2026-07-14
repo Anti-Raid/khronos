@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde::de::{Deserializer, Error as _};
 use serde_json::Value;
 
-use super::decode_resp;
-
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[non_exhaustive]
 pub struct DiscordJsonError {
@@ -47,11 +45,17 @@ impl ErrorResponse {
             status_code: r.status(),
             url: r.url().to_string(),
             method,
-            error: decode_resp(r).await.unwrap_or_else(|e| DiscordJsonError {
-                code: -1,
-                message: format!("Could not decode json when receiving error response from discord:, {e}"),
-                errors: vec![],
-            }),
+            error: {
+                let text = r.text().await.unwrap_or_default();
+                match serde_json::from_str(&text) {
+                    Ok(body) => body,
+                    Err(e) => DiscordJsonError {
+                        code: -1,
+                        message: format!("Could not decode json when receiving error response from discord: {e} [{text}]"),
+                        errors: vec![],
+                    },
+                }
+            }
         }
     }
 }
