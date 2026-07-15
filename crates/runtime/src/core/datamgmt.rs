@@ -155,7 +155,7 @@ fn create_aes256_cipher(key: String, salt: &[u8]) -> LuaResult<Aes256Gcm> {
         .map_err(|e| LuaError::external(format!("Failed to hash password: {e:?}")))?;
 
     let cipher = Aes256Gcm::new_from_slice(&hashed_key)
-    .map_err(LuaError::external)?;
+    .map_err(|x| LuaError::external(format!("Aes256 cipher fail: {x}")))?;
 
     Ok(cipher)
 }
