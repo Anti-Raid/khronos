@@ -5,4 +5,3 @@ pub mod typesext;
 pub mod datamgmt;
 pub mod channel;
 pub mod json;
-pub mod yaml;

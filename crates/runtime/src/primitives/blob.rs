@@ -33,13 +33,29 @@ pub fn blob_ref<R>(val: &LuaValue, f: impl FnOnce(&[u8]) -> R) -> LuaResult<R> {
     match val {
         LuaValue::String(s) => Ok(f(&*s.as_bytes())),
         LuaValue::Buffer(buf) => {
-            Ok(buf.with_bytes(|bytes| {
-                f(bytes)
-            }))
+            Ok(buf.with_bytes(f))
         },
         LuaValue::UserData(ud) => {
             let blob = ud.borrow::<Blob>()?;
             Ok(f(&*blob.data))
+        },
+        _ => return Err(LuaError::FromLuaConversionError {
+            from: "non-bytes",
+            to: "bytes".to_string(),
+            message: Some("Expected a bytes-like".to_string()),
+        }),
+    }
+}
+
+pub async fn blob_ref_async<R>(val: &LuaValue, f: impl AsyncFnOnce(&[u8]) -> R) -> LuaResult<R> {
+    match val {
+        LuaValue::String(s) => Ok(f(&*s.as_bytes()).await),
+        LuaValue::Buffer(buf) => {
+            Ok(buf.with_bytes_async(f).await)
+        },
+        LuaValue::UserData(ud) => {
+            let blob = ud.borrow::<Blob>()?;
+            Ok(f(&*blob.data).await)
         },
         _ => return Err(LuaError::FromLuaConversionError {
             from: "non-bytes",

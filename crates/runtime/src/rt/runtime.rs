@@ -241,10 +241,6 @@ impl KhronosRuntime {
             crate::core::json::init_plugin(&lua)?,
         )?;
         lua.register_module(
-            &format!("@{prefix}/yaml"),
-            crate::core::yaml::init_plugin(&lua)?,
-        )?;
-        lua.register_module(
             &format!("@{prefix}/datamgmt"),
             crate::core::datamgmt::init_plugin(&lua)?,
         )?;
