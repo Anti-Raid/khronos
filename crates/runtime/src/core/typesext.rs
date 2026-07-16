@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use mluau::prelude::*;
-use mluau_require::{AssetRequirer, FilesystemWrapper};
+use mluau_require::AssetRequirer;
 use rand::distr::{Alphanumeric, SampleString};
 
 use crate::{primitives::opaque::Opaque, utils::{khronos_value::KhronosValue, proxyglobal::proxy_global}};
@@ -26,7 +26,7 @@ impl LuaUserData for MemoryVfs {
 
 #[derive(Debug, Clone)]
 pub struct Vfs {
-    pub vfs: Arc<dyn mluau_require::vfs::FileSystem>,
+    pub vfs: Arc<mluau_require::Vfs>,
 
     #[allow(dead_code)]
     /// Not used currently, but may be useful in the future
@@ -38,7 +38,7 @@ pub struct Vfs {
 }
 
 impl Vfs {
-    pub fn new(vfs: Arc<dyn mluau_require::vfs::FileSystem>, opaque: bool) -> Self {
+    pub fn new(vfs: Arc<mluau_require::Vfs>, opaque: bool) -> Self {
         Self { vfs, from_opaque: opaque }
     }
 }
@@ -46,7 +46,7 @@ impl Vfs {
 impl LuaUserData for Vfs {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_function("newoverlay", |_lua, vfs_list: Vec<LuaValue>| {
-            let mut vfs_refs = Vec::with_capacity(vfs_list.len());
+            let mut final_vfs = mluau_require::Vfs::new();
             let mut from_opaque = false;
             for vfs in vfs_list {
                 match vfs {
@@ -56,10 +56,7 @@ impl LuaUserData for Vfs {
                             .borrow::<MemoryVfs>()
                             .map_err(|_| LuaError::external("Failed to borrow MemoryVfs"))?;
 
-                            vfs_refs.push(mluau_require::vfs::VfsPath::new(
-                                mluau_require::create_memory_vfs_from_map(&vfs.data)
-                                .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
-                            ));
+                            final_vfs.extend(mluau_require::create_memory_vfs_from_map_ref(&vfs.data));
                             continue;
                         } else if vfs.is::<Opaque>() {
                             let opaque = vfs
@@ -70,19 +67,15 @@ impl LuaUserData for Vfs {
                                 KhronosValue::MemoryVfs(vfs) => vfs,
                                 _ => return Err(LuaError::external("Opaque must contain a Vfs KhronosValue to be used as a VFS")),
                             };
-
-                            vfs_refs.push(mluau_require::vfs::VfsPath::new(
-                                mluau_require::create_memory_vfs_from_map(&map)
-                                .map_err(|e| LuaError::external(format!("Failed to create memory VFS: {}", e)))?,
-                            ));
-                            from_opaque = true;
+                            final_vfs.extend(mluau_require::create_memory_vfs_from_map_ref(&map));
+                            from_opaque = true; // taint as opaque
                             continue;
                         } else if vfs.is::<Vfs>() {
                             let vfs = vfs
                             .borrow::<Vfs>()
                             .map_err(|_| LuaError::external("Failed to borrow Vfs"))?;
 
-                            vfs_refs.push(mluau_require::vfs::VfsPath::new(vfs.vfs.clone()));
+                            final_vfs.extend_ref(&vfs.vfs);
                             continue;
                         } else {
                             return Err(LuaError::external(
@@ -98,11 +91,11 @@ impl LuaUserData for Vfs {
                 }
             }
 
-            Ok(Vfs { vfs: Arc::new(mluau_require::vfs::OverlayFS::new(&vfs_refs)), from_opaque })
+            Ok(Vfs::new(final_vfs.into(), from_opaque))
         });
 
         methods.add_method("createrequirefunction", |lua, this, (id, global_table): (String, LuaTable)| {
-            let controller = AssetRequirer::new(FilesystemWrapper::new(this.vfs.clone()), id, global_table);
+            let controller = AssetRequirer::new_arc(this.vfs.clone(), id, global_table);
             lua.create_require_function(controller)
         });
     }

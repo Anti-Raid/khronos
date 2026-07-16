@@ -4,12 +4,12 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 use std::time::Instant;
 
 use mlua_scheduler::taskmgr::{Hooks, SchedulerImpl};
 use mluau::prelude::*;
-use mluau_require::{AssetRequirer, FilesystemWrapper};
+use mluau_require::{AssetRequirer, Vfs};
 
 pub type S = mlua_scheduler::schedulers::rodan::CoreScheduler;
 use crate::utils::proxyglobal::proxy_global;
@@ -110,14 +110,13 @@ impl KhronosRuntime {
     pub fn new<
         ThreadCreationCallbackFunc: Fn(&Lua, LuaThread) -> Result<(), mluau::Error> + 'static,
         ThreadDestructionCallbackFunc: Fn(LuaLightUserData) + 'static,
-        FS: mluau_require::vfs::FileSystem + 'static,
     >(
         opts: RuntimeCreateOpts,
         on_thread_event_callback: Option<(
             ThreadCreationCallbackFunc,
             ThreadDestructionCallbackFunc,
         )>,
-        vfs: FS,
+        vfs: Arc<Vfs>,
         prefix: &str,
     ) -> Result<Self, LuaError> {
         assert!(!prefix.starts_with('@'), "Prefix should not start with `@`");
@@ -197,7 +196,7 @@ impl KhronosRuntime {
 
         // Setup require function
         let global_table = proxy_global(&lua)?;
-        let controller = AssetRequirer::new(FilesystemWrapper::new(vfs), "main".to_string(), global_table.clone());
+        let controller = AssetRequirer::new_arc(vfs, "main".to_string(), global_table.clone());
         let require = lua.create_require_function(controller)?;
         global_table
             .set("require", require)?;
