@@ -91,7 +91,6 @@ impl Client {
 
         let reqw = reqw.headers(headers).build()?;
         let resp = self.inner.client.execute(reqw).await?;  
-        log::info!("resp status code: {:?}", resp.status());
         Ok((resp, fmethod))
     }
 

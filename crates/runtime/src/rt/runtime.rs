@@ -119,9 +119,7 @@ impl KhronosRuntime {
         vfs: Arc<Vfs>,
         prefix: &str,
     ) -> Result<Self, LuaError> {
-        assert!(!prefix.starts_with('@'), "Prefix should not start with `@`");
-        log::debug!("Creating new Khronos runtime");
-        
+        assert!(!prefix.starts_with('@'), "Prefix should not start with `@`");        
         // Allow <<>> syntax
         FFLAG_SET_GLOBAL.call_once(|| {
             // Allow <<>> syntax
@@ -157,8 +155,6 @@ impl KhronosRuntime {
             lua.globals()
                 .set("task", mlua_scheduler::userdata::task_lib::<S>(&lua)?)?;
         }
-
-        log::debug!("Khronos runtime created successfully");
 
         let broken = Rc::new(Cell::new(false));
         let broken_ref = broken.clone();
@@ -267,7 +263,6 @@ impl KhronosRuntime {
 
     /// Returns the scheduler
     pub fn scheduler(&self) -> &S {
-        log::debug!("Getting scheduler");
         &self.scheduler
     }
 
@@ -280,13 +275,11 @@ impl KhronosRuntime {
     ///
     /// This may be None if the VM has not executed a script yet
     pub fn last_execution_time(&self) -> Option<Instant> {
-        log::debug!("Getting last execution time");
         self.last_execution_time.get()
     }
 
     /// Updates the last execution time
     pub fn update_last_execution_time(&self, time: Instant) {
-        log::debug!("Updating last execution time");
         self.last_execution_time.set(Some(time));
 
         // Update the execution stop time as well
@@ -305,13 +298,11 @@ impl KhronosRuntime {
 
     /// Returns whether the runtime is broken or not
     pub fn is_broken(&self) -> bool {
-        log::debug!("Getting if runtime is broken");
         self.broken.get()
     }
 
     /// Returns the runtime creation options
     pub fn opts(&self) -> &RuntimeCreateOpts {
-        log::debug!("Getting runtime creation options");
         &self.opts
     }
 
@@ -320,7 +311,6 @@ impl KhronosRuntime {
     ///
     /// It is a logic error to call this function while holding a reference to the lua vm
     pub fn mark_broken(&self, broken: bool) -> Result<(), crate::Error> {
-        log::debug!("Marking runtime as broken");
         let mut stat = Ok(());
         match self.close() {
             Ok(_) => {}
@@ -345,13 +335,11 @@ impl KhronosRuntime {
 
     /// Returns if a on_broken callback is set
     pub fn has_on_broken(&self) -> bool {
-        log::debug!("Getting if on_broken callback is set");
         self.on_broken.borrow().is_some()
     }
 
     /// Registers a callback to be called when the runtime is marked as broken
     pub fn set_on_broken(&self, callback: OnBrokenFunc) {
-        log::debug!("Setting on_broken callback");
         self.on_broken.borrow_mut().replace(callback);
     }
 
