@@ -9,3 +9,4 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>; // This is constant a
 pub use mluau_require;
 pub use chrono;
 pub use chrono_tz;
+pub use futures_util;

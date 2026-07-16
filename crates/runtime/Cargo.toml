@@ -19,7 +19,7 @@ mluau = { git = "https://github.com/mluau/mluau", features = [
 mluau-require = { git = "https://github.com/mluau/mluau-require" }
 rand = { version = "0.9", features = ["std"] }
 base64 = "0.22"
-futures = "0.3"
+futures-util = "0.3"
 bytes = { version = "1", features = ["serde"] }
 
 # blob encryption
