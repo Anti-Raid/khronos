@@ -17,108 +17,61 @@ const MAX_DURATION_UNSIGNED: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 const MAX_DURATION_OBJ_STD: Duration = Duration::from_millis(MAX_DURATION_UNSIGNED-5000);
 
 #[derive(Clone)]
-pub struct StreamSender {
-    pub tx: tokio::sync::mpsc::UnboundedSender<LuaValue>,
+pub struct BroadcastTx<T: Clone + FromLua + IntoLua + 'static> {
+    pub tx: tokio::sync::broadcast::Sender<T>,
 }
 
-impl LuaUserData for StreamSender {
+impl<T: Clone + FromLua + IntoLua + 'static> LuaUserData for BroadcastTx<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("send", |_, this, value: LuaValue| {
-            let _ = this.tx.send(value);
-            Ok(())
-        });
-
-        methods.add_method("sendstrict", |_, this, value: LuaValue| {
+        methods.add_method("send", |_, this, value: T| {
             this.tx.send(value)
-            .map_err(|_| LuaError::external("Failed to send message: receiver dropped"))?;
-            Ok(())
+            .map_err(|_| LuaError::external("Failed to send message: no receivers"))
         });
 
-        methods.add_method("isclosed", |_, this, _: ()| {
-            Ok(this.tx.is_closed())
+        methods.add_method("newsub", |_, this, _: ()| {
+            Ok(BroadcastRx { rx: this.tx.subscribe() })
+        });
+
+        methods.add_scheduler_async_method("waitforclosed", async |_, this, _: ()| {
+            Ok(this.tx.closed().await)
         });
     }
 }
 
-pub struct StreamReceiver {
-    pub rx: tokio::sync::mpsc::UnboundedReceiver<LuaValue>,
+pub struct BroadcastRx<T: Clone + FromLua + IntoLua + 'static> {
+    pub rx: tokio::sync::broadcast::Receiver<T>,
 }
 
-impl LuaUserData for StreamReceiver {
-    fn add_methods<M: mluau::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_scheduler_async_method_mut("recv", async move |_, mut this, ()| {
-            let value = this.rx
-                .recv()
-                .await;
-            Ok(value)
+impl<T: Clone + FromLua + IntoLua + 'static> LuaUserData for BroadcastRx<T> {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_scheduler_async_method_mut("recv", async |_, mut this, _: ()| {
+            this.rx.recv().await
+            .map_err(|_| LuaError::external("Failed to send message: no receivers"))
         });
 
         methods.add_scheduler_async_method_mut("recvtimeout", async move |_, mut this, timeout: LuaUserDataRef<TimeDelta>| {
             let timeout = timeout.timedelta.to_std().map_err(LuaError::external)?;
             if timeout > MAX_TIMEOUT {
-                return Err(LuaError::external("Timeout cannot be greater than the max timeout"));
+                return Err(LuaError::external("Timeout cannot be greater than the max timeout || limit > MAX_LIMIT"));
             }
 
             let value = tokio::time::timeout(timeout, this.rx.recv())
                 .await
                 .ok();
-            
-            Ok(value)
+            match value {
+                Some(Ok(v)) => Ok(Some(v)),
+                Some(Err(e)) => Err(LuaError::external(e.to_string())),
+                None => Ok(None)
+            }
+        });
+
+        methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaUserDataRef<BroadcastRx<T>>| {
+            Ok(this.rx.same_channel(&other.rx))
         });
 
         methods.add_method("isclosed", |_, this, _: ()| {
             Ok(this.rx.is_closed())
         });
-
-        methods.add_scheduler_async_method_mut("recvbatch", async move |_, mut this, (expected_count, timeout): (usize, LuaUserDataRef<TimeDelta>)| {
-            let timeout_dur = timeout.timedelta.to_std().map_err(LuaError::external)?;
-            if timeout_dur > MAX_TIMEOUT {
-                return Err(LuaError::external("Timeout cannot be greater than the max timeout"));
-            }
-
-            let mut results = Vec::with_capacity(expected_count);
-
-            // Calculate the absolute deadline for the entire batch operation
-            let deadline = tokio::time::Instant::now() + timeout_dur;
-
-            // Keep reading from our single channel until we hit our target count
-            while results.len() < expected_count {
-                // Try to grab the next message before the overarching deadline hits
-                match tokio::time::timeout_at(deadline, this.rx.recv()).await {
-                    Ok(Some(value)) => results.push(value),
-                    Ok(None) => return Ok((results, "closed")),                     
-                    Err(_) => return Ok((results, "timeout"))
-                }
-            }
-
-            // Returns a Luau tuple: ( {results...}, timed_out_boolean )
-            Ok((results, "completed"))
-        });
-    }
-}
-
-pub struct LuaStream {
-    tx: StreamSender,
-    rx: StreamReceiver,
-}
-
-impl LuaStream {
-    pub fn new() -> Self {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        Self {
-            tx: StreamSender { tx },
-            rx: StreamReceiver { rx },
-        }
-    }
-}
-
-impl IntoLua for LuaStream {
-    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        let tab = lua.create_table_with_capacity(0, 2)?;
-        tab.set("sender", self.tx)?;
-        tab.set("receiver", self.rx)?;
-        tab.set_readonly(true);
-        Ok(LuaValue::Table(tab))
     }
 }
 
@@ -287,8 +240,12 @@ impl Stream for QueueStream {
 pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
-    module.set("Stream", lua.create_function(|_, ()| {
-        Ok(LuaStream::new())
+    module.set("BroadcastChannel", lua.create_function(|_, capacity: usize| {
+        if capacity > 10 {
+            return Err(LuaError::external("capacity cannot be > 10 for a user-created broadcast channel"))
+        }
+        let (tx, rx) = tokio::sync::broadcast::channel::<LuaValue>(capacity);
+        Ok((BroadcastTx { tx }, BroadcastRx { rx }))
     })?)?;
 
     module.set("DelayChannel", lua.create_function(|_, ()| {
