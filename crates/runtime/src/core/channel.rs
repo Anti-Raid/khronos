@@ -66,6 +66,10 @@ impl LuaUserData for StreamReceiver {
             Ok(value)
         });
 
+        methods.add_method("isclosed", |_, this, _: ()| {
+            Ok(this.rx.is_closed())
+        });
+
         methods.add_scheduler_async_method_mut("recvbatch", async move |_, mut this, (expected_count, timeout): (usize, LuaUserDataRef<TimeDelta>)| {
             let timeout_dur = timeout.timedelta.to_std().map_err(LuaError::external)?;
             if timeout_dur > MAX_TIMEOUT {
