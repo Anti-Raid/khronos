@@ -246,8 +246,8 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
     let module = lua.create_table()?;
 
     module.set("BroadcastChannel", lua.create_function(|_, capacity: usize| {
-        if capacity > 10 {
-            return Err(LuaError::external("capacity cannot be > 10 for a user-created broadcast channel"))
+        if capacity > 5 {
+            return Err(LuaError::external("capacity cannot be > 5 for a user-created broadcast channel"))
         }
         let (tx, rx) = tokio::sync::broadcast::channel::<LuaValue>(capacity);
         Ok((BroadcastTx { tx }, BroadcastRx { rx }))
