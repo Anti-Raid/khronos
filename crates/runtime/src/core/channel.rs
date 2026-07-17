@@ -1,6 +1,7 @@
 use mlua_scheduler::LuaSchedulerAsyncUserData;
 use mluau::prelude::*;
 use futures_util::{Stream, StreamExt};
+use tokio::sync::broadcast::error::RecvError;
 use tokio_util::time::DelayQueue;
 use std::cell::Cell;
 use std::task::{Context, Poll, Waker};
@@ -24,8 +25,10 @@ pub struct BroadcastTx<T: Clone + FromLua + IntoLua + 'static> {
 impl<T: Clone + FromLua + IntoLua + 'static> LuaUserData for BroadcastTx<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("send", |_, this, value: T| {
-            this.tx.send(value)
-            .map_err(|_| LuaError::external("Failed to send message: no receivers"))
+            match this.tx.send(value) {
+                Ok(v) => Ok((v, None)),
+                Err(e) => Ok((0, Some(e.0)))
+            }
         });
 
         methods.add_method("newsub", |_, this, _: ()| {
@@ -42,11 +45,20 @@ pub struct BroadcastRx<T: Clone + FromLua + IntoLua + 'static> {
     pub rx: tokio::sync::broadcast::Receiver<T>,
 }
 
+impl<T: Clone + FromLua + IntoLua + 'static> BroadcastRx<T> {
+    async fn recv_lua(&mut self) -> (Option<T>, Option<&'static str>, u64) {
+        match self.rx.recv().await {
+            Ok(v) => (Some(v), None, 0),
+            Err(RecvError::Closed) => (None, Some("closed"), 0),
+            Err(RecvError::Lagged(amt)) => (None, Some("lagged"), amt),
+        }
+    }
+}
+
 impl<T: Clone + FromLua + IntoLua + 'static> LuaUserData for BroadcastRx<T> {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         methods.add_scheduler_async_method_mut("recv", async |_, mut this, _: ()| {
-            this.rx.recv().await
-            .map_err(|_| LuaError::external("Failed to send message: no receivers"))
+            Ok(this.recv_lua().await)
         });
 
         methods.add_scheduler_async_method_mut("recvtimeout", async move |_, mut this, timeout: LuaUserDataRef<TimeDelta>| {
@@ -55,14 +67,7 @@ impl<T: Clone + FromLua + IntoLua + 'static> LuaUserData for BroadcastRx<T> {
                 return Err(LuaError::external("Timeout cannot be greater than the max timeout || limit > MAX_LIMIT"));
             }
 
-            let value = tokio::time::timeout(timeout, this.rx.recv())
-                .await
-                .ok();
-            match value {
-                Some(Ok(v)) => Ok(Some(v)),
-                Some(Err(e)) => Err(LuaError::external(e.to_string())),
-                None => Ok(None)
-            }
+            tokio::time::timeout(timeout, this.recv_lua()).await.map_err(|x| LuaError::external(x.to_string()))
         });
 
         methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaUserDataRef<BroadcastRx<T>>| {
