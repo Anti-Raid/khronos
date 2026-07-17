@@ -10,3 +10,4 @@ pub use mluau_require;
 pub use chrono;
 pub use chrono_tz;
 pub use futures_util;
+pub use tokio_util;
