@@ -488,11 +488,11 @@ impl KhronosRuntime {
     /// Closes the lua vm and marks the runtime as broken
     ///
     /// This is similar to ``mark_broken`` but will not call any callbacks
-    pub fn close(&self) -> Result<(), crate::Error> {
+    fn close(&self) -> Result<(), crate::Error> {
         self.broken.set(true); // Mark the runtime as broken if it is closed
 
         {
-            if let Some(ref lua) = *self.lua.borrow_mut() {
+            if let Some(ref lua) = *self.lua.try_borrow_mut()? {
                 {
                     // Ensure strong_count == 1
                     if lua.strong_count() > 1 {
@@ -504,7 +504,7 @@ impl KhronosRuntime {
             }
         }
 
-        *self.lua.borrow_mut() = None; // Drop the Lua VM
+        *self.lua.try_borrow_mut()? = None; // Drop the Lua VM
         self.broken.set(true); // Mark the runtime as broken if it is closed
 
         Ok(())
