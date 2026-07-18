@@ -4,7 +4,7 @@ use mluau::prelude::*;
 use mluau_require::AssetRequirer;
 use rand::distr::{Alphanumeric, SampleString};
 
-use crate::{primitives::opaque::Opaque, utils::{khronos_value::KhronosValue, proxyglobal::proxy_global}};
+use crate::{primitives::opaque::Opaque, utils::{khronos_value::KhronosValue, pp::pretty_print, proxyglobal::proxy_global}};
 
 pub struct MemoryVfs {
     pub data: HashMap<String, String>,
@@ -128,6 +128,10 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
 
     module.set("createglobalproxy", lua.create_function(|lua, _: ()| {
         proxy_global(lua)
+    })?)?;
+
+    module.set("fmtpretty", lua.create_function(|_, v: LuaMultiValue| {
+        Ok(pretty_print(v))
     })?)?;
 
     module.set_readonly(true); // Block any attempt to modify this table
