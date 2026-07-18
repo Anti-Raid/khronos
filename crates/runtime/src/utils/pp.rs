@@ -1,7 +1,9 @@
 use mluau::prelude::*;
-pub fn pretty_print(values: LuaMultiValue) {
+
+#[must_use = "pretty_print returns the formatted string, which should probably be used"]
+pub fn pretty_print(values: LuaMultiValue) -> String {
     if !values.is_empty() {
-        println!(
+        format!(
             "{}",
             values
                 .iter()
@@ -13,8 +15,8 @@ pub fn pretty_print(values: LuaMultiValue) {
                 })
                 .collect::<Vec<_>>()
                 .join("\t")
-        );
+        )
     } else {
-        println!("nil");
+        format!("nil")
     }
 }
