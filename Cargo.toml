@@ -1,4 +1,4 @@
 [workspace]
 resolver = "2"
-members = ["crates/runtime", "crates/dapi", "crates/ext"]
+members = ["crates/runtime", "crates/dapi", "crates/ext", "test_plugin"]
 default-members = ["crates/runtime"]

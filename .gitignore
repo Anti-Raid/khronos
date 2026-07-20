@@ -5,3 +5,4 @@
 /test_files
 bundled.luau
 **/bundled.luau
+**/target

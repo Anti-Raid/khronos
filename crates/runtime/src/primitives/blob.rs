@@ -78,6 +78,10 @@ impl LuaUserData for Blob {
             Ok(buffer)
         });
 
+        methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
+            Ok(String::from_utf8_lossy(&this.data).to_string())
+        });
+
         methods.add_method_mut("drain", |_, this, ()| {
             std::mem::take(&mut this.data);
             Ok(())

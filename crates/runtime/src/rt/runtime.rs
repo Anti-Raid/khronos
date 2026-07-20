@@ -24,6 +24,12 @@ pub struct RuntimeCreateOpts {
     pub time_limit: Option<std::time::Duration>,
     pub give_time: std::time::Duration,
     //pub time_slice: Option<std::time::Duration>,
+    
+    /// Maximum total bytes of memory all WASM instances can allocate combined
+    pub wasm_max_memory_bytes: Option<usize>,
+    
+    /// Maximum number of instructions (fuel) a WASM instance can execute synchronously before trapping
+    pub wasm_max_fuel_per_slice: Option<u64>,
 }
 
 pub struct SchedulerHook {
@@ -242,6 +248,15 @@ impl KhronosRuntime {
         lua.register_module(
             &format!("@{prefix}/typesext"),
             crate::core::typesext::init_plugin(&lua)?,
+        )?;
+        
+        lua.register_module(
+            &format!("@{prefix}/wasm"),
+            crate::core::wasm::init_plugin(
+                &lua, 
+                opts.wasm_max_memory_bytes.unwrap_or(10 * 1024 * 1024), 
+                opts.wasm_max_fuel_per_slice.unwrap_or(100_000_000)
+            )?
         )?;
 
         Ok(Self {
