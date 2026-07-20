@@ -1,7 +1,7 @@
 #[link(wasm_import_module = "env")]
 extern "C" {
     fn send(ptr: *const u8, len: u32);
-    fn recv_len() -> u32;
+    fn recv_await() -> u32;
     fn recv_into(ptr: *mut u8) -> u32;
 }
 
@@ -13,7 +13,7 @@ pub extern "C" fn main() {
 
     loop {
         // Ask the host for the length of the next message
-        let len = unsafe { recv_len() };
+        let len = unsafe { recv_await() };
         
         // Allocate memory for it
         let mut buf = vec![0u8; len as usize];

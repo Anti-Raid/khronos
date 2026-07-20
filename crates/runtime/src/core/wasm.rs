@@ -99,6 +99,17 @@ impl LuaUserData for WasmState {
     }
 }
 
+/// Tries to find memory export at either memory or mem. Bails out if we dont see it
+fn get_memory(caller: &mut wasmtime::Caller<'_, WasmContext>) -> std::io::Result<wasmtime::Memory> {
+    if let Some(mem) = caller.get_export("memory").and_then(|e| e.into_memory()) {
+        return Ok(mem);
+    }
+    if let Some(mem) = caller.get_export("mem").and_then(|e| e.into_memory()) {
+        return Ok(mem);
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::Other, "memory export not found (tried 'memory' and 'mem')"))
+}
+
 impl WasmState {
     pub async fn instantiate(
         engine: Engine,
@@ -125,9 +136,7 @@ impl WasmState {
             move |mut caller: wasmtime::Caller<'_, WasmContext>, ptr: u32, len: u32| {
                 let tx = wasm_tx.clone();
                 Box::new(async move {
-                    let memory = caller.get_export("memory")
-                        .and_then(|e| e.into_memory())
-                        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "memory export not found"))?;
+                    let memory = get_memory(&mut caller)?;
                         
                     let mut buffer = vec![0u8; len as usize];
                     memory.read(&caller, ptr as usize, &mut buffer)?;
@@ -139,11 +148,11 @@ impl WasmState {
             }
         )?;
 
-        // Import: WASM asks for the length of the next message
+        // Import: WASM asks for the length of the next message (blocks/awaits)
         let luau_tx_len = luau_tx.clone();
         linker.func_wrap0_async(
             "env", 
-            "recv_len", 
+            "recv_await", 
             move |mut caller: wasmtime::Caller<'_, WasmContext>| {
                 let tx = luau_tx_len.clone();
                 Box::new(async move {
@@ -172,23 +181,18 @@ impl WasmState {
             }
         )?;
 
-        // Import: WASM writes the next message into the allocated pointer
-        linker.func_wrap1_async(
+        // Import: WASM synchronously copies the awaited message into the allocated pointer
+        linker.func_wrap(
             "env", 
             "recv_into", 
-            move |mut caller: wasmtime::Caller<'_, WasmContext>, ptr: u32| {
-                Box::new(async move {
-                    let msg = caller.data_mut().next_msg.take().unwrap_or_default();
+            move |mut caller: wasmtime::Caller<'_, WasmContext>, ptr: u32| -> wasmtime::Result<u32> {
+                let msg = caller.data_mut().next_msg.take().unwrap_or_default();
+                
+                let memory = get_memory(&mut caller)?;
                     
-                    let memory = caller.get_export("memory")
-                        .and_then(|e| e.into_memory())
-                        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "memory export not found"))?;
-                        
-                    memory.write(&mut caller, ptr as usize, &msg)?;
-                    caller.set_fuel(max_fuel_per_slice)?; // reset fuel
-                    
-                    Ok(msg.len() as u32)
-                })
+                memory.write(&mut caller, ptr as usize, &msg)?;
+                
+                Ok(msg.len() as u32)
             }
         )?;
 
@@ -290,7 +294,7 @@ mod tests {
                 "antiraid"
             )?;
             
-            let wasm_bytes = std::fs::read("../../test_plugin/target/wasm32-unknown-unknown/release/test_plugin.wasm").expect("Failed to read test_plugin.wasm");
+            let wasm_bytes = std::fs::read("../../target/wasm32-unknown-unknown/release/test_plugin.wasm").expect("Failed to read test_plugin.wasm");
             let wasm_bytes_buf = rt.with_lua(move |l| l.create_string(&wasm_bytes))?;
 
             let f = rt.eval_script::<LuaFunction>("./init")?;
