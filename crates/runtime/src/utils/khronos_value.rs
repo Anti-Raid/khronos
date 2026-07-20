@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{borrow::Cow, collections::HashMap, fmt};
 
 use mluau::prelude::*;
 use serde::{Deserialize, Serialize, ser::{SerializeMap, SerializeSeq}};
@@ -40,14 +40,14 @@ mod string_i64 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KhronosValue {
-    Text(String),
+    Text(Cow<'static, str>),
     Integer(i64),
     Int64(#[serde(with = "string_i64")] i64),
     Float(f64),
     Boolean(bool),
     Vector((f32, f32, f32)), // Luau vector
     Map(Vec<(KhronosValue, KhronosValue)>),
-    StrMap(Box<HashMap<String, KhronosValue>>), // optimization on Map
+    StrMap(Box<HashMap<Cow<'static, str>, KhronosValue>>), // optimization on Map
     List(Vec<KhronosValue>),
     Timestamptz(chrono::DateTime<chrono::Utc>),
     Interval(chrono::Duration),
@@ -79,7 +79,7 @@ impl KhronosValue {
         }
 
         match value {
-            LuaValue::String(s) => Ok(KhronosValue::Text(s.to_string_lossy())),
+            LuaValue::String(s) => Ok(KhronosValue::Text(s.to_string_lossy().into())),
             LuaValue::Integer(i) => Ok(KhronosValue::Integer(i)),
             LuaValue::Int64(i) => Ok(KhronosValue::Int64(i)),
             LuaValue::Number(f) => Ok(KhronosValue::Float(f)),
@@ -101,7 +101,7 @@ impl KhronosValue {
                     }
 
                     // Map
-                    let mut str_map = HashMap::new();
+                    let mut str_map: HashMap<Cow<'static, str>, KhronosValue> = HashMap::new();
                     let mut generic_map = Vec::new();
                     let mut is_pure_str_map = true;
 
@@ -111,14 +111,14 @@ impl KhronosValue {
 
                         if is_pure_str_map {
                             if let LuaValue::String(s) = &k {
-                                str_map.insert(s.to_string_lossy(), parsed_v);
+                                str_map.insert(s.to_string_lossy().into(), parsed_v);
                                 continue;
                             } else {
                                 // We hit a non-string key! 
                                 // Convert everything we gathered so far into the generic map.
                                 is_pure_str_map = false;
                                 for (str_k, val) in str_map.drain() {
-                                    generic_map.push((KhronosValue::Text(str_k), val));
+                                    generic_map.push((KhronosValue::Text(str_k.into()), val));
                                 }
                             }
                         }
@@ -176,7 +176,7 @@ impl KhronosValue {
         }
 
         match self {
-            KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(&s)?)),
+            KhronosValue::Text(s) => Ok(LuaValue::String(lua.create_string(s.as_ref())?)),
             KhronosValue::Integer(i) => Ok(LuaValue::Integer(i)),
             KhronosValue::Int64(i) => Ok(LuaValue::Int64(i)),
             KhronosValue::Float(f) => Ok(LuaValue::Number(f)),
@@ -243,7 +243,7 @@ impl<'a> Serialize for CKhronosValueRef<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
     S: serde::Serializer {
-        struct CompressedStrMap<'a>(&'a std::collections::HashMap<String, KhronosValue>);
+        struct CompressedStrMap<'a>(&'a std::collections::HashMap<Cow<'static, str>, KhronosValue>);
 
         impl<'a> Serialize for CompressedStrMap<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -329,14 +329,14 @@ impl<'de> serde::de::Visitor<'de> for CKhronosVisitor {
     where
         E: serde::de::Error,
     {
-        Ok(CKhronosValue(KhronosValue::Text(v.to_owned())))
+        Ok(CKhronosValue(KhronosValue::Text(v.to_string().into())))
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(CKhronosValue(KhronosValue::Text(v)))
+        Ok(CKhronosValue(KhronosValue::Text(v.into())))
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
@@ -408,7 +408,7 @@ impl<'de> serde::de::Visitor<'de> for CKhronosVisitor {
             "#SM" => {
                 let strmap: HashMap<String, CKhronosValue> = map.next_value()?;
                 // Strip the wrappers off the children
-                let uncompressed = strmap.into_iter().map(|(k, v)| (k, v.0)).collect();
+                let uncompressed = strmap.into_iter().map(|(k, v)| (k.into(), v.0)).collect();
                 KhronosValue::StrMap(Box::new(uncompressed))
             }
             "Vec" => KhronosValue::Vector(map.next_value()?),
@@ -450,11 +450,11 @@ mod test_compressed {
     #[test]
     fn test_base() {
         let mut my_map = HashMap::new();
-        my_map.insert("foo".to_string(), KhronosValue::Boolean(true));
-        my_map.insert("carrot".to_string(), KhronosValue::Integer(23));
-        my_map.insert("carrots".to_string(), KhronosValue::Float(23.45));
-        my_map.insert("bar".to_string(), KhronosValue::Int64(284));
-        my_map.insert("baz".to_string(), KhronosValue::List(vec![KhronosValue::Int64(333), KhronosValue::Nil(()), KhronosValue::Nil(()), KhronosValue::Null(()), KhronosValue::Text("Hello?".to_string())]));
+        my_map.insert("foo".into(), KhronosValue::Boolean(true));
+        my_map.insert("carrot".into(), KhronosValue::Integer(23));
+        my_map.insert("carrots".into(), KhronosValue::Float(23.45));
+        my_map.insert("bar".into(), KhronosValue::Int64(284));
+        my_map.insert("baz".into(), KhronosValue::List(vec![KhronosValue::Int64(333), KhronosValue::Nil(()), KhronosValue::Nil(()), KhronosValue::Null(()), KhronosValue::Text("Hello?".into())]));
         let my_kv = KhronosValue::StrMap(Box::new(my_map));
         let s = serde_json::to_string_pretty(&CKhronosValueRef(&my_kv)).expect("failed to serde");
         println!("{}", s);
