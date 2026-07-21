@@ -5,7 +5,7 @@ use tokio::sync::broadcast::{channel as broadcast_channel, Sender as BroadcastSe
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver as MpscReceiver};
 use tokio::sync::Mutex as AsyncMutex;
 use mlua_scheduler::{LuaSchedulerAsyncUserData, LuaSchedulerAsync};
-use crate::primitives::blob::{Blob, BlobTaker};
+use crate::primitives::blob::Blob;
 
 #[derive(Clone)]
 pub struct SharedWasmLimits {
@@ -48,7 +48,7 @@ pub struct WasmState {
 impl LuaUserData for WasmState {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // Send a message from Luau to WASM
-        methods.add_method("send", |_lua, this, payload: BlobTaker| {
+        methods.add_method("send", |_lua, this, payload: Blob| {
             let _ = this.luau_tx.send(payload.0);
             Ok(())
         });
@@ -59,7 +59,7 @@ impl LuaUserData for WasmState {
             async move {
                 let mut rx = rx_arc.lock().await;
                 match rx.recv().await {
-                    Some(msg) => Ok(Some(Blob { data: msg })),
+                    Some(msg) => Ok(Some(Blob(msg))),
                     None => Ok(None),
                 }
             }
@@ -223,7 +223,7 @@ pub fn init_plugin(lua: &Lua, max_memory: usize, max_fuel_per_slice: u64) -> Lua
         allocated_memory: Arc::new(AtomicUsize::new(0)),
     };
     
-    let newwasm = lua.create_scheduler_async_function(move |_lua, wasm_bytes: BlobTaker| {
+    let newwasm = lua.create_scheduler_async_function(move |_lua, wasm_bytes: Blob| {
         let engine = engine.clone(); 
         let limits = shared_limits.clone();
         

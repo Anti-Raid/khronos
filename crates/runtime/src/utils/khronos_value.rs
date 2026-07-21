@@ -64,7 +64,7 @@ impl Default for KhronosValue {
 }
 
 impl KhronosValue {
-    const ALLOWED_TYPES: &'static str = "DateTime | TimeDelta | TimeZone | Integer | UnsignedInteger | Blob | MemoryVfs";
+    const ALLOWED_TYPES: &'static str = "DateTime | TimeDelta | TimeZone | Integer | UnsignedInteger | MemoryVfs";
     fn from_lua_impl(value: LuaValue, lua: &Lua, depth: usize) -> LuaResult<Self> {
         if depth > 20 {
             return Err(LuaError::FromLuaConversionError {

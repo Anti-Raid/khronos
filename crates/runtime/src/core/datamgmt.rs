@@ -17,7 +17,7 @@ use async_compression::{
     },
 };
 
-use crate::primitives::blob::{Blob, BlobTaker, blob_ref, blob_ref_async};
+use crate::primitives::blob::{Blob, blob_ref, blob_ref_async};
 
 pub struct TarArchive {
     pub entries: HashMap<BString, bytes::Bytes>,
@@ -98,21 +98,21 @@ impl LuaUserData for TarArchive {
 
         methods.add_method_mut("takefile", |lua, this, name: BString| {
             if let Some(blob) = this.entries.remove(&name) {
-                let blob = Blob { data: blob }.into_lua(lua)?;
-                Ok(blob)
+                Ok(Some(lua.create_external_buffer(blob)?))
             } else {
-                Ok(LuaNil)
+                Ok(None)
             }
         });
 
-        methods.add_method_mut("addfile", |_, this, (name, blob): (BString, BlobTaker)| {
+        methods.add_method_mut("addfile", |_, this, (name, blob): (BString, Blob)| {
             this.entries.insert(name, blob.0);
             Ok(())
         });
 
-        methods.add_function("toblob", |_, this: LuaAnyUserData| {
+        methods.add_function("toblob", |lua, this: LuaAnyUserData| {
             let this = this.take::<Self>()?;
-            this.to_blob().map(|data| Blob { data })
+            let data = this.to_blob()?;
+            lua.create_external_buffer(data)
         });
 
         methods.add_method("entries", |lua, this, ()| {
@@ -168,13 +168,13 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         Ok(encoded)
     })?)?;
 
-    module.set("base64decode", lua.create_function(|_, str: LuaString| {
+    module.set("base64decode", lua.create_function(|lua, str: LuaString| {
         let decoded = base64::prelude::BASE64_STANDARD.decode(str.as_bytes())
             .map_err(|e| LuaError::external(format!("Failed to decode base64: {e:?}")))?;
-        Ok(Blob { data: decoded.into() })
+        lua.create_external_buffer(bytes::Bytes::from(decoded))
     })?)?;
 
-    module.set("TarArchive", lua.create_function(|_, blob: Option<BlobTaker>| {
+    module.set("TarArchive", lua.create_function(|_, blob: Option<Blob>| {
         if let Some(blob) = blob {
             TarArchive::from(blob.0).map_err(LuaError::external)
         } else {
@@ -182,7 +182,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         }
     })?)?;
 
-    module.set("aes256encrypt", lua.create_function(|_, (blob, key): (LuaValue, String)| {
+    module.set("aes256encrypt", lua.create_function(|lua, (blob, key): (LuaValue, String)| {
         let mut salt = [0u8; 8];
         rand::rng().fill_bytes(&mut salt);
 
@@ -203,12 +203,10 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
         result.extend_from_slice(nonce.as_slice());
         result.append(&mut encrypted);
 
-        Ok(Blob {
-            data: result.into(),
-        })
+        lua.create_external_buffer(bytes::Bytes::from(result))
     })?)?;
 
-    module.set("aes256decrypt", lua.create_function(|_, (blob, key): (LuaValue, String)| {
+    module.set("aes256decrypt", lua.create_function(|lua, (blob, key): (LuaValue, String)| {
         blob_ref(&blob, |blob| {
             if blob.len() < 20 {
                 return Err(LuaError::external("Blob data is too short to decrypt".to_string()));
@@ -226,9 +224,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
                 .decrypt(nonce, ciphertext)
                 .map_err(|e| LuaError::external(format!("Failed to decrypt: {:?}", e)))?;
 
-            Ok(Blob {
-                data: result.into(),
-            })
+            lua.create_external_buffer(bytes::Bytes::from(result))
         })?
     })?)?;
 
@@ -244,7 +240,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             let mut encoder = GzipEncoder::with_quality(input, compression_quality);
             tokio::io::copy(&mut encoder, &mut output).await?;
 
-            Ok(Blob { data: output.into() })
+            Ok(Blob(output.into()))
         }
 
         blob_ref_async(&blob, async |bytes| compress(bytes, level).await).await?
@@ -259,7 +255,7 @@ pub fn init_plugin(lua: &Lua) -> LuaResult<LuaTable> {
             tokio::io::copy(&mut decoder, &mut output).await?;
 
 
-            Ok(Blob { data: output.into() })
+            Ok(Blob(output.into()))
         }
 
         blob_ref_async(&blob, decompress).await?
